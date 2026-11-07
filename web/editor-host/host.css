@@ -1,0 +1,7 @@
+@import "../src/index.css";
+
+/* The page is the note's body and nothing else: the phone draws the title and the bar around it. */
+html, body { margin: 0; background: transparent; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+body { padding: 0 16px 24px; }
+/* The whole screen is the editor, so a tap below the text lands in it */
+#editor .pm-editor { min-height: calc(100vh - 24px); }

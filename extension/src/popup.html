@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TEF Notes</title>
+    <script type="module" src="./popup.ts"></script>
+  </head>
+  <body class="popup">
+    <h1 id="brand"></h1>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <img id="preview" class="preview" hidden />
+    <section id="page" class="section page" hidden></section>
+    <section id="tags-section" class="section" aria-labelledby="tags-head" hidden>
+      <h2 id="tags-head">Tags</h2>
+      <div id="tags" class="chips" role="group" aria-labelledby="tags-head"></div>
+      <div id="offered" class="chips offered" aria-label="Other suggested tags"></div>
+      <select id="add-tag" class="add-tag" aria-label="Add a tag" hidden></select>
+    </section>
+    <section id="details" class="section" aria-labelledby="details-head" hidden>
+      <h2 id="details-head">Details</h2>
+      <input id="title" class="note" type="text" maxlength="200" placeholder="Title for a new note or task (optional)" aria-label="A title for a new note or task" />
+      <textarea id="note" class="note" rows="2" placeholder="Add a note (optional)" aria-label="A note to save with it"></textarea>
+      <label class="check"><input id="summary" type="checkbox" />Add a summary</label>
+    </section>
+    <section id="dest" class="section" aria-labelledby="dest-head" hidden>
+      <h2 id="dest-head">Save to</h2>
+      <div id="choices" class="choices" role="group" aria-labelledby="dest-head"></div>
+    </section>
+  </body>
+</html>

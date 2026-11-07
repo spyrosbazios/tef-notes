@@ -1,0 +1,18 @@
+@import 'tailwindcss';
+@import 'uniwind';
+@import './theme.css';
+
+/* The colours come from packages/core/src/theme.ts through the generated src/theme.css, one Uniwind theme per palette; the
+   note colours stay in JS (useTheme().NOTE_COLORS), as a card's colour is per note. */
+@theme {
+  --font-sans: 'AtkinsonHyperlegibleNext_400Regular';
+  --font-medium: 'AtkinsonHyperlegibleNext_500Medium';
+  --font-semi: 'AtkinsonHyperlegibleNext_600SemiBold';
+  --font-heavy: 'AtkinsonHyperlegibleNext_700Bold';
+  /* Figures stay in the text face: its tnum lines columns up (T sets tabular-nums), no monospace needed. */
+  --font-num: 'AtkinsonHyperlegibleNext_500Medium';
+  --font-num-bold: 'AtkinsonHyperlegibleNext_700Bold';
+  --font-display: 'AtkinsonHyperlegibleNext_800ExtraBold';
+  /* Monospace only where the characters themselves are the content: code, addresses, keys. */
+  --font-mono: 'AtkinsonHyperlegibleMono_400Regular';
+}

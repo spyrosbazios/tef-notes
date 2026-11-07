@@ -1,0 +1,7 @@
+# The build context is the repo root, which holds the live database (server/pb_data): send only what the agent runs.
+*
+!server/agent/package.json
+!server/agent/bun.lock
+!server/agent/src
+!server/agent/tsconfig.json
+!packages/core/src

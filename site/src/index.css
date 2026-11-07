@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* The phone's faces, from its own assets. */
+@font-face { font-family: "Atkinson Next"; font-weight: 400; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_400Regular.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 500; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_500Medium.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 600; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_600SemiBold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 700; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_700Bold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 800; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_800ExtraBold.ttf"); }
+@font-face { font-family: "Atkinson Mono"; font-weight: 400; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleMono_400Regular.ttf"); }
+
+@theme inline {
+  --font-sans: "Atkinson Next", system-ui, sans-serif;
+  --font-mono: "Atkinson Mono", ui-monospace, monospace;
+
+  /* The app's own names: bg-card, text-dim, border-line, text-brand… all from theme.ts through --tf-* */
+  --color-bg: var(--tf-bg);
+  --color-card: var(--tf-card);
+  --color-raised: var(--tf-raised);
+  --color-line: var(--tf-line);
+  --color-fg: var(--tf-fg);
+  --color-dim: var(--tf-dim);
+  --color-faint: var(--tf-faint);
+  --color-brand: var(--tf-brand);
+  --color-up: var(--tf-up);
+  --color-down: var(--tf-down);
+  --color-warn: var(--tf-warn);
+  --color-accent: var(--tf-accent);
+  --color-muted: var(--tf-muted);
+  --color-scrim: var(--tf-scrim);
+
+  /* The site's washes of the brand (vite-plugins.ts) */
+  --color-glow: var(--tf-glow);
+  --color-glow-soft: var(--tf-glow-soft);
+  --color-brand-line: var(--tf-brand-line);
+  --color-glass: var(--tf-glass);
+  --color-hair: var(--tf-hair);
+
+  /* A note colour's three, set per element by [data-color] below */
+  --color-tile: var(--tile-bg);
+  --color-tile-fg: var(--tile-fg);
+  --color-tile-line: var(--tile-line);
+
+  --radius-card: 1.25rem;
+  --shadow-lift: 0 30px 80px -24px var(--tf-scrim);
+  --animate-flow: flow 2.4s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-fill: fill 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes flow { to { stroke-dashoffset: -24; } }
+  @keyframes float { 50% { transform: translateY(-10px); } }
+  @keyframes fill { from { width: 0; } }
+}
+
+:root { color-scheme: dark; }
+
+
+[data-color="yellow"] { --tile-bg: var(--tf-note-yellow-bg); --tile-fg: var(--tf-note-yellow-fg); --tile-line: var(--tf-note-yellow-line); }
+[data-color="pink"] { --tile-bg: var(--tf-note-pink-bg); --tile-fg: var(--tf-note-pink-fg); --tile-line: var(--tf-note-pink-line); }
+[data-color="blue"] { --tile-bg: var(--tf-note-blue-bg); --tile-fg: var(--tf-note-blue-fg); --tile-line: var(--tf-note-blue-line); }
+[data-color="green"] { --tile-bg: var(--tf-note-green-bg); --tile-fg: var(--tf-note-green-fg); --tile-line: var(--tf-note-green-line); }
+[data-color="purple"] { --tile-bg: var(--tf-note-purple-bg); --tile-fg: var(--tf-note-purple-fg); --tile-line: var(--tf-note-purple-line); }
+[data-color="gray"] { --tile-bg: var(--tf-note-gray-bg); --tile-fg: var(--tf-note-gray-fg); --tile-line: var(--tf-note-gray-line); }
+[data-color="red"] { --tile-bg: var(--tf-note-red-bg); --tile-fg: var(--tf-note-red-fg); --tile-line: var(--tf-note-red-line); }
+[data-color="orange"] { --tile-bg: var(--tf-note-orange-bg); --tile-fg: var(--tf-note-orange-fg); --tile-line: var(--tf-note-orange-line); }
+[data-color="teal"] { --tile-bg: var(--tf-note-teal-bg); --tile-fg: var(--tf-note-teal-fg); --tile-line: var(--tf-note-teal-line); }
+
+@layer base {
+  * { @apply border-line; }
+  html { @apply scroll-smooth bg-bg font-sans text-fg antialiased; scroll-padding-top: 5rem; }
+  body { @apply min-h-screen overflow-x-hidden bg-bg text-[17px] leading-relaxed; }
+  ::selection { background: var(--tf-glow); }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-brand; }
+}
+
+@layer components {
+  /* Scroll reveal: a short rise and fade, once. No motion at all when the visitor asks for none. */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .reveal[data-in] { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    html { scroll-behavior: auto; }
+    .animate-flow, .animate-float, .animate-fill { animation: none; }
+  }
+
+  /* The hero's stage (ui.tsx ScrollStage): --rise runs 0 to 1 as it scrolls in. The title lifts; the plane, seen in
+     perspective, tilts up from 20deg to flat and settles from 1.05 to 1 (0.7 to 0.9 on a phone). */
+  .stage { --rise: 0; perspective: 1000px; }
+  .stage-title { transform: translateY(calc(var(--rise) * -100px)); }
+  .stage-plane {
+    transform: rotateX(calc((1 - var(--rise)) * 20deg)) scale(calc(1.05 - var(--rise) * 0.05));
+    transform-origin: 50% 0;
+    will-change: transform;
+  }
+  @media (max-width: 767px) { .stage-plane { transform: rotateX(calc((1 - var(--rise)) * 20deg)) scale(calc(0.7 + var(--rise) * 0.2)); } }
+  @media (prefers-reduced-motion: reduce) { .stage-title, .stage-plane { transform: none; } }
+
+  /* The feature tiles' hover (Features.tsx): each `.hov-*` piece has a rest and a hovered state, the card (`.group`)
+     being hovered. Nothing moves when the visitor asks for no motion. */
+  .hov-pop { opacity: 0; transform: translateY(6px); transition: opacity 0.35s, transform 0.35s; }
+  .group:hover .hov-pop { opacity: 1; transform: none; }
+  .hov-line { opacity: 0; transition: opacity 0.2s; }
+  .group:hover .hov-line { opacity: 1; }
+  .hov-draw path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 0.45s ease-out; }
+  .group:hover .hov-draw path { stroke-dashoffset: 0; }
+  .hov-mosaic > * { transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .group:hover .hov-mosaic > *:nth-child(1) { transform: scale(1.06); }
+  .group:hover .hov-mosaic > *:nth-child(2) { transform: scale(1.06); transition-delay: 80ms; }
+  .group:hover .hov-mosaic > *:nth-child(3) { transform: scale(1.06); transition-delay: 160ms; }
+  .hov-tick > * > span:first-child > span { transition: background 0.3s, border-color 0.3s; }
+  .group:hover .hov-tick > * > span:first-child > span { background: var(--tf-brand); border-color: var(--tf-brand); }
+  .hov-tick p { transition: color 0.3s, text-decoration-color 0.3s; text-decoration: line-through; text-decoration-color: transparent; }
+  .group:hover .hov-tick p { color: var(--tf-faint); text-decoration-color: var(--tf-faint); }
+  .hov-card { transition: opacity 0.35s 0.25s, transform 0.35s 0.25s; }
+  .hov-press { transition: transform 0.15s; }
+  .group:hover .hov-press { transform: scale(0.96); }
+  .group:hover .hov-card { opacity: 0; transform: scale(0.97); }
+  .hov-done { opacity: 0; transition: opacity 0.3s 0.5s; }
+  .group:hover .hov-done { opacity: 1; }
+  .hov-lit > * { transition: border-color 0.3s, background 0.3s, color 0.3s; }
+  .group:hover .hov-lit > * { border-color: var(--tf-brand); background: var(--tf-accent); color: var(--tf-fg); }
+  .hov-clutter { transition: opacity 0.4s, transform 0.4s; }
+  .group:hover .hov-clutter { opacity: 0; transform: translateX(12px); }
+  .hov-article { transition: width 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s, top 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s; }
+  .group:hover .hov-article { width: calc(100% - 20px); top: 10px; }
+  .group:hover .lens-a { animation: none; opacity: 0; }
+  .group:hover .lens-b { animation: none; opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .hov-pop, .hov-line, .hov-done { opacity: 1; transform: none; }
+    .hov-draw path { stroke-dashoffset: 0; }
+    .group:hover .hov-card, .group:hover .hov-clutter { opacity: 1; transform: none; }
+    .group:hover .hov-article { width: 62%; top: 2.5rem; }
+    .hov-done { display: none; }
+  }
+
+  /* The lens tile (Features.tsx): Home for four seconds, then Work, with a short crossfade between. */
+  .lens-a { animation: lens-a 9s ease-in-out infinite; }
+  .lens-b { animation: lens-b 9s ease-in-out infinite; }
+  @keyframes lens-a { 0%, 44% { opacity: 1; } 50%, 94% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes lens-b { 0%, 44% { opacity: 0; } 50%, 94% { opacity: 1; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .lens-a { animation: none; opacity: 0; } .lens-b { animation: none; opacity: 1; } }
+
+  /* Hairline grid, faded out toward its edges */
+  .bg-grid {
+    background-image: linear-gradient(var(--tf-hair) 1px, transparent 1px), linear-gradient(90deg, var(--tf-hair) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, var(--tf-fg) 30%, transparent 75%);
+  }
+
+  /* A card that lights up under the pointer (--mx / --my set in Spotlight) */
+  .spot { position: relative; isolation: isolate; }
+  .spot::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; opacity: 0; transition: opacity 0.4s;
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 0%), var(--tf-glow-soft), transparent 70%);
+  }
+  .spot:hover::before { opacity: 1; }
+  .spot::after {
+    content: ""; position: absolute; inset: -1px; z-index: -1; border-radius: inherit; padding: 1px; opacity: 0; transition: opacity 0.4s;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), var(--tf-brand-line), transparent 70%);
+    mask: linear-gradient(var(--tf-fg) 0 0) content-box exclude, linear-gradient(var(--tf-fg) 0 0); mask-composite: exclude;
+    -webkit-mask: linear-gradient(var(--tf-fg) 0 0) content-box, linear-gradient(var(--tf-fg) 0 0); -webkit-mask-composite: xor;
+  }
+  .spot:hover::after { opacity: 1; }
+
+  /* A photo's stand-in in the drawn screens (mock/parts.tsx Picture): a sky and a horizon in the note colours, and a
+     PDF's first page; the demo notes have no real pictures. */
+  .pic { position: relative; display: block; overflow: hidden; background: var(--tf-raised); }
+  .pic::before, .pic::after { content: ""; position: absolute; inset: 0; }
+  .pic-dusk::before { background: linear-gradient(180deg, var(--tf-note-orange-line) 0%, var(--tf-note-pink-line) 55%, var(--tf-note-purple-bg) 100%); }
+  .pic-dusk::after { background: radial-gradient(circle at 70% 46%, var(--tf-note-yellow-fg) 0 9%, transparent 10%), linear-gradient(170deg, transparent 62%, var(--tf-note-purple-bg) 63%); }
+  .pic-lake::before { background: linear-gradient(180deg, var(--tf-note-blue-line), var(--tf-note-teal-line) 70%, var(--tf-note-green-bg)); }
+  .pic-lake::after { background: linear-gradient(160deg, transparent 55%, var(--tf-note-green-line) 56% 70%, var(--tf-note-green-bg) 71%); }
+  .pic-sun::before { background: linear-gradient(135deg, var(--tf-note-yellow-line), var(--tf-note-orange-bg)); }
+  .pic-sun::after { background: radial-gradient(ellipse at 40% 110%, var(--tf-note-red-line) 0 38%, transparent 39%), radial-gradient(circle at 78% 30%, var(--tf-note-yellow-fg) 0 12%, transparent 13%); }
+  .pic-doc::before { background: linear-gradient(180deg, var(--tf-note-gray-line), var(--tf-note-gray-bg)); }
+  .pic-doc::after { margin: 18% 22% 0; background: repeating-linear-gradient(0deg, transparent 0 14px, var(--tf-note-gray-line) 14px 15px) var(--tf-note-gray-fg); opacity: 0.9; }
+  .pic-pdf::before { margin: 10% 16% -10%; background: var(--tf-note-gray-fg); }
+  .pic-pdf::after { margin: 18% 24% 0; background: repeating-linear-gradient(180deg, var(--tf-note-gray-line) 0 3px, transparent 3px 11px); opacity: 0.55; }
+}

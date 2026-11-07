@@ -1,0 +1,44 @@
+# Pulls the published images (ghcr.io/spyrosbazios/tef-notes and tef-notes-agent, multi-arch), never builds: TEF_NOTES_VERSION
+# pins a release, unset it is the latest. Building from source, or with the extension's signing key: docker-compose.build.yml.
+# Loopback only: there is no sign-in, so the phone and the laptop reach it through a reverse proxy on a private network
+# (e.g. Tailscale serve, HTTPS). Every setting is an environment variable with a default: .env.example lists them.
+# Deployment-specific additions (labels, extra networks) go in docker-compose.override.yml, see the .example beside this file.
+name: tefnotes
+services:
+  pocketbase:
+    image: ghcr.io/spyrosbazios/tef-notes:${TEF_NOTES_VERSION:-latest}   # PocketBase, the hooks and migrations, the web app
+    ports: ["127.0.0.1:${PB_PORT:-8097}:8090"]
+    environment:
+      TZ: ${TZ:-UTC}                                # a note the server writes is dated, and named, by this zone's day
+      TEF_NOTES_PROVIDER: ${TEF_NOTES_PROVIDER:-deepseek}   # the model provider (README.md); its key is the llm mount below
+      TEF_NOTES_MODEL: ${TEF_NOTES_MODEL:-}           # empty: the provider's default model
+      TEF_NOTES_LLM_URL: ${TEF_NOTES_LLM_URL:-}       # empty: the provider's own endpoint
+      TEF_NOTES_OLLAMA_URL: ${TEF_NOTES_OLLAMA_URL:-} # Ollama only, e.g. http://host.docker.internal:11434
+    extra_hosts: ["host.docker.internal:host-gateway"]   # an Ollama on this host
+    volumes:
+      - ./pb_data:/pb/pb_data
+      - ${TEF_NOTES_KEY_TYPESAFE:-./keys/typesafe}:/run/typesafe:ro   # JEV's key (api-key) for the auto-tagger and clips, re-read every use
+      - ${TEF_NOTES_KEY_LLM:-./keys/${TEF_NOTES_PROVIDER:-deepseek}}:/run/llm:ro   # the model provider's key (api-key) for a clip's note, re-read every use
+    restart: unless-stopped
+  # The chat agent (agent/): PocketBase's hooks can't stream. Loopback only, like PocketBase: the reverse proxy maps
+  # /agent on the public origin to it. It reaches PocketBase on the compose network.
+  agent:
+    image: ghcr.io/spyrosbazios/tef-notes-agent:${TEF_NOTES_VERSION:-latest}
+    ports: ["127.0.0.1:${AGENT_PORT:-8098}:8098"]
+    environment:
+      TEF_NOTES_PB: http://pocketbase:8090
+      TZ: ${TZ:-UTC}                                # the day, for the prompt's date and a new note's name
+      TEF_NOTES_PROVIDER: ${TEF_NOTES_PROVIDER:-deepseek}   # the model provider (README.md); its key is the llm mount below
+      TEF_NOTES_MODEL: ${TEF_NOTES_MODEL:-}           # empty: the provider's default model
+      TEF_NOTES_LLM_URL: ${TEF_NOTES_LLM_URL:-}       # empty: the provider's own endpoint
+      TEF_NOTES_OLLAMA_URL: ${TEF_NOTES_OLLAMA_URL:-} # Ollama only, e.g. http://host.docker.internal:11434
+      TEF_NOTES_MCP: ${TEF_NOTES_MCP:-0}             # 1: serve the note and task tools to other agent harnesses at /agent/mcp
+    extra_hosts: ["host.docker.internal:host-gateway"]   # an Ollama on this host
+    volumes:   # the keys (an api-key file in each directory), re-read every use; without the provider's the agent is unavailable, without exa its web search. Runs as uid 1000: the key files must be readable by it
+      - ${TEF_NOTES_KEY_LLM:-./keys/${TEF_NOTES_PROVIDER:-deepseek}}:/run/llm:ro
+      - ${TEF_NOTES_KEY_EXA:-./keys/exa}:/run/exa:ro
+      - agent_data:/data   # search by meaning: the model and the notes' vectors, derived (deleting it costs one re-embed)
+    depends_on: [pocketbase]
+    restart: unless-stopped
+volumes:
+  agent_data:

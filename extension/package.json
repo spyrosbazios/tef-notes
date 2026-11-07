@@ -1,0 +1,23 @@
+{
+  "name": "extension",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "pack": "bun scripts/crx.ts pack",
+    "id": "bun scripts/crx.ts id",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "crx3": "^2.0.0",
+    "lucide": "^1.65.0",
+    "oxlint": "^1.90.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

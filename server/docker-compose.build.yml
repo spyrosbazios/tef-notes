@@ -1,0 +1,24 @@
+# Build from source instead of pulling: the one way to get the signed Chrome extension, which needs your public origin and
+# your signing key and so cannot be in the published image. Merge it over the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# or set COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml in .env (then list docker-compose.override.yml too: Compose
+# merges that one on its own only when COMPOSE_FILE is unset). Context: the whole repository, README.md "Build from source".
+x-url: &url ${TEF_NOTES_URL:-http://localhost:8097}   # the public origin: the extension's update_url
+# The extension's signing key, a build secret. Compose fails on a missing secret file and refuses one outside the build
+# context, so it lives in server/ (gitignored) and .env names it once it exists (TEF_NOTES_CRX_KEY=./crx-key.pem); until
+# then the empty placeholder, and the image serves no extension.
+x-crx-key: &crxkey ${TEF_NOTES_CRX_KEY:-./no-crx-key}
+services:
+  pocketbase:
+    image: tefnotes-pocketbase:local      # not the published name: a local build never shadows a pulled image
+    build:                                # the web app (../web) into pb_public, and the signed extension (../extension) beside it
+      context: ..
+      dockerfile: server/Dockerfile
+      target: with-extension
+      args: { TEF_NOTES_URL: *url, CRX_KEY_FILE: *crxkey, TEF_NOTES_VERSION: "${TEF_NOTES_VERSION:-}" }   # the version: the extension's, see README.md
+      secrets: [crx_key]
+  agent:
+    image: tefnotes-agent:local
+    build: { context: .., dockerfile: server/agent/Dockerfile }
+secrets:
+  crx_key: { file: *crxkey }

@@ -1,0 +1,15 @@
+# An example of a deployment-specific override. Copy it to `docker-compose.override.yml` beside docker-compose.yml
+# (gitignored); `docker compose` merges that file over the base on its own. This one registers the services with a
+# dashboard that discovers containers by their `glance.*` labels (Glance-style). The base compose carries no labels.
+# Delete what you do not use, or put anything else a deployment needs here (extra networks, resource limits, labels).
+services:
+  pocketbase:
+    labels:
+      glance.id: tefnotes
+      glance.name: TEF Notes
+      glance.icon: mdi:notebook
+      glance.url: ${TEF_NOTES_URL:-http://localhost:8097}   # the public origin, as in .env
+      glance.description: TEF Notes (PocketBase + web)
+  agent:
+    labels:
+      glance.parent: tefnotes

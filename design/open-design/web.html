@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TEF Notes: Web</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/base.css">
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<style>
+  body { background: color-mix(in srgb, var(--tf-bg) 70%, var(--tf-card)); }
+  .boards { display: flex; flex-direction: column; gap: 56px; padding: 40px 32px 96px; max-width: 1504px; margin: 0 auto; }
+  /* A 1440 x 900 screen in browser chrome, scaled to the column's width (as site/src/components/mock/screen.tsx does) */
+  .browser { overflow: hidden; border-radius: var(--tw-2xl); border: 1px solid var(--tf-line); background: var(--tf-card); box-shadow: var(--shadow-lift); }
+  .chrome { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 14px; border-bottom: 1px solid var(--tf-line); background: color-mix(in srgb, var(--tf-raised) 70%, transparent); }
+  .chrome .lights { display: flex; gap: 6px; }
+  .chrome .lights span { width: 10px; height: 10px; border-radius: 50%; }
+  .chrome .url { display: flex; align-items: center; justify-content: center; height: 24px; width: 100%; max-width: 288px; margin: 0 auto; border-radius: 6px; background: color-mix(in srgb, var(--tf-bg) 70%, transparent); font-size: 11px; color: var(--tf-faint); }
+  .fit { position: relative; width: 100%; aspect-ratio: 1440 / 900; overflow: hidden; background: var(--tf-bg); }
+  .app { position: absolute; left: 0; top: 0; display: flex; width: 1440px; height: 900px; transform-origin: 0 0; color: var(--tf-fg); font-size: 14px; }
+
+  .main { flex: 1; min-width: 0; height: 100%; overflow: hidden; }
+  .home { max-width: 1152px; margin: 0 auto; padding: 32px 32px 0; display: flex; flex-direction: column; gap: 48px; }
+  .home h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 48px 56px; align-items: start; }
+  .tbox { display: flex; flex-direction: column; height: 416px; min-width: 0; }
+  .tbox header { display: flex; align-items: center; gap: 12px; padding: 0 0 8px 12px; }
+  .tbox .words { display: flex; align-items: center; gap: 20px; flex: 1; min-width: 0; }
+  .tbox .w { display: inline-flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; opacity: .25; white-space: nowrap; }
+  .tbox .w.on { opacity: 1; }
+  .tbox .w.on i { color: var(--tf-brand); }
+  .wsect { display: flex; align-items: center; gap: 8px; margin: 20px 12px 4px; font-size: 15px; font-weight: 600; }
+  .planned { display: flex; flex-direction: column; height: 416px; min-width: 0; }
+  .planned header { display: flex; align-items: center; gap: 4px; padding-bottom: 12px; }
+  .planned header b { display: flex; align-items: center; gap: 8px; margin-right: auto; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+  .planned header b i { color: var(--tf-brand); }
+  .cal { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: auto repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .cal .wd { padding-bottom: 2px; text-align: center; font-size: 11px; font-weight: 500; color: var(--tf-faint); }
+  .cal .d { display: flex; align-items: flex-start; justify-content: flex-end; padding: 6px; border-radius: var(--tw-lg); background: color-mix(in srgb, var(--tf-fg) 4%, transparent); font-size: 11px; line-height: 1; color: var(--tf-dim); font-variant-numeric: tabular-nums; }
+  .cal .d[data-n="1"] { background: color-mix(in srgb, var(--tf-brand) 20%, transparent); }
+  .cal .d[data-n="2"] { background: color-mix(in srgb, var(--tf-brand) 40%, transparent); }
+  .cal .d[data-n="3"] { background: color-mix(in srgb, var(--tf-brand) 65%, transparent); color: var(--tf-bg); }
+  .cal .d[data-n="4"] { background: var(--tf-brand); color: var(--tf-bg); }
+  .cal .d.past { opacity: .4; }
+  .cal .d.today { font-weight: 600; color: var(--tf-fg); box-shadow: 0 0 0 1px var(--tf-bg), 0 0 0 3px var(--tf-brand); }
+  .planned footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; font-size: 11px; color: var(--tf-faint); }
+  .planned footer b { color: var(--tf-fg); font-weight: 600; }
+  .legend { display: flex; align-items: center; gap: 4px; }
+  .legend span { width: 8px; height: 8px; border-radius: 2px; }
+  .nhead { display: flex; align-items: center; gap: 8px; height: 32px; padding-bottom: 12px; box-sizing: content-box; }
+  .nhead h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+  .wmasonry { columns: 3; column-gap: 12px; }
+  .wmasonry > * { margin-bottom: 12px; }
+
+  /* Tasks view: the list (420) and the open task */
+  .tlist { width: 420px; flex-shrink: 0; height: 100%; border-right: 1px solid var(--tf-line); padding: 16px 12px 0; overflow: hidden; }
+  .tlist h2 { display: flex; align-items: center; gap: 8px; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+  .tlist h2 i { color: var(--tf-brand); }
+  .detail { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .detail header { display: flex; align-items: center; gap: 4px; height: 48px; flex-shrink: 0; padding: 0 16px; border-bottom: 1px solid var(--tf-line); }
+  .dbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--tw-lg); background: var(--tf-down); color: var(--tf-bg); font-size: 14px; font-weight: 500; }
+  .card-t { max-width: 576px; width: 100%; margin: 0 auto; padding: 32px 40px 0; display: flex; flex-direction: column; gap: 20px; }
+  .card-t h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; }
+  .fields { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--tf-line); }
+  .field { display: flex; align-items: center; gap: 12px; min-height: 36px; font-size: 14.5px; color: var(--tf-dim); }
+  .field .k { width: 90px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: var(--r-full); background: var(--tf-muted); color: var(--tf-fg); font-size: 14px; }
+  .pill.none { color: var(--tf-faint); }
+  .clist { display: flex; flex-direction: column; gap: 2px; }
+  .clist div { display: flex; align-items: center; gap: 12px; padding: 4px; font-size: 15px; }
+  .clist .done { color: var(--tf-faint); text-decoration: line-through; }
+  .clist .wbox { width: 16px; height: 16px; }
+
+  /* the dock's body */
+  .dock .msgs { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 16px; padding: 20px 16px; }
+  .dock .msgs p.a { font-size: 15px; line-height: 1.6; }
+  .dock .foot { flex-shrink: 0; padding: 12px; border-top: 1px solid var(--tf-line); }
+  .suggest { display: flex; flex-wrap: wrap; gap: 8px; }
+  .suggest span { padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--tf-line); font-size: 14px; }
+  .confirm { overflow: hidden; border-radius: var(--tw-2xl); border: 1px solid var(--tf-brand-line); background: var(--tf-card); }
+  .confirm .top { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--tf-line); font-size: 13px; font-weight: 600; color: var(--tf-brand); background: var(--tf-brand-soft); }
+  .confirm .bot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--tf-line); }
+  .wbtn.ghost { color: var(--tf-dim); }
+</style>
+</head>
+<body>
+<header class="board-top">
+  <span class="brandmark"><i data-mark></i><span>TEF Notes</span></span>
+  <span class="faint" style="font-size:14px">Web · 1440 × 900</span>
+  <nav aria-label="Boards">
+    <a href="design-system.html">Design system</a>
+    <a href="android.html">Android</a>
+    <a href="web.html" aria-current="page">Web</a>
+    <a href="landing.html">Landing</a>
+  </nav>
+</header>
+
+<div class="boards">
+
+  <!-- ============ Notes: Home ============ -->
+  <figure>
+    <figcaption class="screen-label"><b>Notes</b> · Home: the date, the task box beside the month planner, every note in a masonry; the assistant docked</figcaption>
+    <div class="browser">
+      <div class="chrome"><div class="lights"><span style="background:color-mix(in srgb,var(--tf-down) 80%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-warn) 80%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-up) 80%,transparent)"></span></div><div class="url">notes.your-network.example</div><div style="width:40px"></div></div>
+      <div class="fit"><div class="app">
+        <nav class="rail" aria-label="Views">
+          <a class="brandmark" href="#" style="padding:4px 8px 0"><i data-mark></i><span>TEF Notes</span></a>
+          <button class="rsearch"><i data-i="search" data-s="16"></i><span class="grow" style="text-align:left">Search</span><span class="kbd">/</span></button>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <a class="ritem" href="#"><i data-i="inbox" data-s="16"></i><span class="grow">Inbox</span><span class="c">3</span></a>
+            <a class="ritem" href="#"><i data-i="star" data-s="16"></i><span class="grow">Today</span><span class="c">6</span></a>
+            <a class="ritem" href="#"><i data-i="calendar-days" data-s="16"></i><span class="grow">Upcoming</span></a>
+            <a class="ritem" href="#"><i data-i="circle-check-big" data-s="16"></i><span class="grow">Logbook</span></a>
+          </div>
+          <div class="grow"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--tf-line)">
+            <div class="row" style="gap:4px"><a class="ritem" href="#" style="flex:1"><i data-i="focus" data-s="16"></i><span class="grow">Lens</span><span class="wlens"><span class="truncate">Home</span></span></a><button class="wibtn sm brand" aria-label="Turn off the lens Home"><i data-i="x" data-s="16"></i></button></div>
+            <a class="ritem" href="#"><i data-i="settings" data-s="16"></i><span class="grow">Settings</span></a>
+          </div>
+        </nav>
+
+        <main class="main"><div class="home">
+          <h1>Monday 2 November</h1>
+          <div class="twocol">
+            <section class="tbox" aria-label="Tasks">
+              <header>
+                <nav class="words"><span class="w on"><i data-i="star" data-s="20"></i>Today</span><span class="w">Inbox</span><span class="w">Upcoming</span></nav>
+                <button class="wbtn outline"><i data-i="hash" data-s="16"></i>Tags</button>
+                <button class="wibtn sm brand" aria-label="New task"><i data-i="plus" data-s="16"></i></button>
+              </header>
+              <div>
+                <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Book train tickets</p></div><span class="due"><i data-i="flag" data-s="12"></i>Wednesday</span></div>
+                <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Pack the carry-on</p><div class="meta"><span class="num"><i data-i="list-checks" data-s="12"></i>2/4</span></div></div></div>
+                <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Measure the spare room</p><div class="meta"><span><i data-i="notebook-text" data-s="12"></i>Garage and house maintenance</span></div></div></div>
+                <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Water the plants</p><div class="meta"><span><i data-i="repeat" data-s="12"></i>Every 3 days</span></div></div></div>
+                <p class="wsect"><i data-i="moon" data-s="16" class="dim"></i>This Evening</p>
+                <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Read for twenty minutes</p><div class="meta"><span><i data-i="bell" data-s="12"></i>21:00</span></div></div></div>
+              </div>
+            </section>
+            <section class="planned" aria-label="Planned">
+              <header><b><i data-i="calendar-days" data-s="20"></i>November</b><button class="wibtn sm" aria-label="Previous month"><i data-i="chevron-left" data-s="16"></i></button><button class="wibtn sm" aria-label="Next month"><i data-i="chevron-right" data-s="16"></i></button></header>
+              <div class="cal" id="cal"></div>
+              <footer><p><b class="num">14</b> planned, up to <b class="num">4</b> a day</p><div class="legend" aria-hidden="true">Fewer<span style="background:color-mix(in srgb,var(--tf-fg) 4%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-brand) 20%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-brand) 40%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-brand) 65%,transparent)"></span><span style="background:var(--tf-brand)"></span>More</div></footer>
+            </section>
+          </div>
+          <section aria-label="Notes">
+            <div class="nhead">
+              <h2>Notes</h2><span class="grow faint num" style="font-size:12px;align-self:flex-end;padding-bottom:4px">24</span>
+              <button class="wbtn outline"><i data-i="hash" data-s="16"></i>Tags</button>
+              <span class="seg"><button class="on" aria-label="Show notes as tiles"><i data-i="layout-grid" data-s="16"></i></button><button aria-label="Group notes by tag"><i data-i="tags" data-s="16"></i></button></span>
+              <button class="wbtn outline"><i data-i="arrow-down-up" data-s="16"></i>Last edited<i data-i="chevron-down" data-s="14"></i></button>
+              <button class="wbtn primary"><i data-i="plus" data-s="16"></i>New note</button>
+            </div>
+            <div class="wmasonry">
+              <article class="wtile" data-color="pink"><div class="body"><h3 class="clamp">Weekend soup</h3><p class="clamp">Thick, cheap, comforting. Better on day two. 2 tins of beans, drained; 1 onion, 1 carrot, 1 celery stalk, finely chopped; 3 garlic cloves; 1 tbsp tomato paste…</p><div class="tags"><span class="wtag" data-color="gray">#cooking</span></div><div class="foot"><i data-i="pin" data-s="12"></i><span>2m</span></div></div></article>
+              <article class="wtile"><div class="mosaic" data-n="3"><span class="pic b"></span><span class="pic a"></span><span class="pic c"></span></div><div class="body"><h3 class="clamp">Autumn trip: five days</h3><p class="clamp">Flights are booked. Apartment near the tram line, five nights.</p><div class="tags"><span class="wtag" data-color="blue">#travel</span></div><div class="foot"><span>1h</span></div></div></article>
+              <article class="wtile" data-color="purple"><div class="body"><h3 class="clamp">Ideas worth keeping</h3><p class="clamp">A running list. No filtering. A notes app should feel like paper: instant, quiet, yours. Every setting is a small failure of design.</p><div class="tags"><span class="wtag" data-color="green">#work</span><span class="wtag" data-color="purple">#reading</span></div><div class="foot"><i data-i="pin" data-s="12"></i><span>2m</span></div></div></article>
+            </div>
+          </section>
+        </div></main>
+
+        <aside class="dock" aria-label="Assistant">
+          <header><i data-i="sparkles" data-s="16" class="brand"></i><h2>Assistant</h2><span class="grow"></span><span class="mono faint row" style="gap:4px;font-size:12px">deepseek-flash<i data-i="chevron-down" data-s="14"></i></span><button class="wibtn" aria-label="Past chats"><i data-i="history" data-s="16"></i></button><button class="wibtn" aria-label="New chat"><i data-i="square-pen" data-s="16"></i></button><button class="wibtn" aria-label="Close the assistant"><i data-i="x" data-s="16"></i></button></header>
+          <div class="msgs">
+            <p class="wbubble">Note this: buy a bread tin before the weekend</p>
+            <p class="toolline"><i data-i="list-checks" data-s="16"></i><span class="grow">Searched notes</span><i data-i="chevron-down" data-s="16"></i></p>
+            <div class="confirm">
+              <p class="top"><i data-i="plus" data-s="14"></i>Add a task</p>
+              <div class="wtask" style="padding:10px 12px"><span class="wbox"></span><div class="grow"><p class="t">Buy a bread tin</p><div class="meta"><span><i data-i="calendar" data-s="12"></i>Saturday</span></div></div></div>
+              <div class="bot"><button class="wbtn ghost">Turn down</button><button class="wbtn primary"><i data-i="check" data-s="16"></i>Add it</button></div>
+            </div>
+            <p class="a">I'll add it for Saturday, in your Home lens. Say the word and it's in.</p>
+          </div>
+          <div class="foot">
+            <p class="row faint" style="gap:6px;padding:0 4px 6px;font-size:12px"><i data-i="eye" data-s="14"></i><span class="truncate">Home</span></p>
+            <div class="wcomposer"><span class="ph">Ask about your notes…</span><span class="send"><i data-i="arrow-up" data-s="16"></i></span></div>
+          </div>
+        </aside>
+      </div></div>
+    </div>
+  </figure>
+
+  <!-- ============ Tasks: Today ============ -->
+  <figure>
+    <figcaption class="screen-label"><b>Tasks</b> · Today and This Evening, a task open beside it; the assistant docked</figcaption>
+    <div class="browser">
+      <div class="chrome"><div class="lights"><span style="background:color-mix(in srgb,var(--tf-down) 80%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-warn) 80%,transparent)"></span><span style="background:color-mix(in srgb,var(--tf-up) 80%,transparent)"></span></div><div class="url">notes.your-network.example</div><div style="width:40px"></div></div>
+      <div class="fit"><div class="app">
+        <nav class="rail" aria-label="Views">
+          <a class="brandmark" href="#" style="padding:4px 8px 0"><i data-mark></i><span>TEF Notes</span></a>
+          <button class="rsearch"><i data-i="search" data-s="16"></i><span class="grow" style="text-align:left">Search</span><span class="kbd">/</span></button>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <a class="ritem" href="#"><i data-i="inbox" data-s="16"></i><span class="grow">Inbox</span><span class="c">3</span></a>
+            <a class="ritem on" href="#" aria-current="page"><i data-i="star" data-s="16"></i><span class="grow">Today</span><span class="c">6</span></a>
+            <a class="ritem" href="#"><i data-i="calendar-days" data-s="16"></i><span class="grow">Upcoming</span></a>
+            <a class="ritem" href="#"><i data-i="circle-check-big" data-s="16"></i><span class="grow">Logbook</span></a>
+          </div>
+          <div class="grow"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--tf-line)">
+            <a class="ritem" href="#"><i data-i="focus" data-s="16"></i><span class="grow">No lens</span></a>
+            <a class="ritem" href="#"><i data-i="settings" data-s="16"></i><span class="grow">Settings</span></a>
+          </div>
+        </nav>
+
+        <section class="tlist" aria-label="Today">
+          <header style="padding:0 12px">
+            <div class="row" style="height:36px;justify-content:space-between"><h2><i data-i="star" data-s="24"></i>Today</h2><button class="wibtn sm" aria-label="New task"><i data-i="plus" data-s="20"></i></button></div>
+            <p class="faint" style="margin-top:4px;font-size:12px">Monday, November 2</p>
+          </header>
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:2px">
+            <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Book train tickets</p></div><span class="due"><i data-i="flag" data-s="12"></i>Wednesday</span></div>
+            <div class="wtask sel"><span class="wbox"></span><div class="grow"><p class="t">Pack the carry-on</p><div class="meta"><span class="num"><i data-i="list-checks" data-s="12"></i>2/4</span><span><i data-i="calendar" data-s="12"></i>Thursday</span></div></div></div>
+            <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Print the apartment check-in details</p></div><span class="due"><i data-i="flag" data-s="12"></i>Saturday</span></div>
+            <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Water the plants</p><div class="meta"><span><i data-i="repeat" data-s="12"></i>Every 3 days</span></div></div></div>
+            <div class="wtask done"><span class="wbox on"><i data-i="check" data-s="12" data-w="3.5"></i></span><div class="grow"><p class="t">Take out the recycling</p></div></div>
+          </div>
+          <p class="wsect" style="margin-top:36px"><i data-i="moon" data-s="16" class="dim"></i>This Evening</p>
+          <div class="wtask"><span class="wbox"></span><div class="grow"><p class="t">Read for twenty minutes</p><div class="meta"><span><i data-i="bell" data-s="12"></i>21:00</span></div></div></div>
+        </section>
+
+        <article class="detail" aria-label="Pack the carry-on">
+          <header><span class="grow"></span><button class="wibtn" aria-label="When"><i data-i="calendar" data-s="16" class="brand"></i></button><button class="dbtn"><i data-i="trash-2" data-s="16"></i>Delete</button></header>
+          <div class="card-t">
+            <div class="row" style="gap:12px;align-items:flex-start"><span class="box" style="margin-top:4px"></span><h1>Pack the carry-on</h1></div>
+            <p class="faint" style="padding-left:36px;font-size:14px">Notes</p>
+            <div class="clist">
+              <div class="done"><span class="wbox on"><i data-i="check" data-s="10" data-w="3.5"></i></span>Passport</div>
+              <div class="done"><span class="wbox on"><i data-i="check" data-s="10" data-w="3.5"></i></span>Charger and adapter</div>
+              <div><span class="wbox"></span>Rain jacket</div>
+              <div><span class="wbox"></span>Walking shoes</div>
+              <div class="faint"><i data-i="plus" data-s="16"></i>Add an item</div>
+            </div>
+            <div class="fields">
+              <div class="field"><i data-i="calendar" data-s="16"></i><span class="k">When</span><span class="pill">Thursday</span><i data-i="x" data-s="16" class="faint"></i></div>
+              <div class="field"><i data-i="flag" data-s="16"></i><span class="k">Deadline</span><span class="pill none">None</span></div>
+              <div class="field"><i data-i="repeat" data-s="16"></i><span class="k">Repeat</span><span class="pill none">Never</span></div>
+              <div class="field"><i data-i="bell" data-s="16"></i><span class="k">Reminder</span><span class="pill none">None</span></div>
+              <div class="field"><i data-i="tags" data-s="16"></i><span class="k">Tags</span><span class="wtag" data-color="blue">#travel</span></div>
+              <div class="field"><i data-i="notebook-text" data-s="16"></i><span class="k">Notes</span><span class="pill"><span class="truncate">Autumn trip: five days</span><i data-i="x" data-s="14" class="faint"></i></span></div>
+            </div>
+          </div>
+        </article>
+
+        <aside class="dock" aria-label="Assistant">
+          <header><i data-i="sparkles" data-s="16" class="brand"></i><h2>Assistant</h2><span class="grow"></span><span class="mono faint row" style="gap:4px;font-size:12px">deepseek-flash<i data-i="chevron-down" data-s="14"></i></span><button class="wibtn" aria-label="Past chats"><i data-i="history" data-s="16"></i></button><button class="wibtn" aria-label="New chat"><i data-i="square-pen" data-s="16"></i></button><button class="wibtn" aria-label="Close the assistant"><i data-i="x" data-s="16"></i></button></header>
+          <div class="msgs">
+            <p class="dim" style="font-size:14px;padding-top:16px">Ask about your notes and tasks, or tell it what to note. It sees what you have open.</p>
+            <div class="suggest"><span>What did I note about…</span><span>Note this: </span><span>What's pinned?</span></div>
+          </div>
+          <div class="foot">
+            <p class="row faint" style="gap:6px;padding:0 4px 6px;font-size:12px"><i data-i="eye" data-s="14"></i><span class="truncate">Pack the carry-on</span></p>
+            <div class="wcomposer"><span class="ph">Ask about your notes…</span><span class="send"><i data-i="arrow-up" data-s="16"></i></span></div>
+          </div>
+        </aside>
+      </div></div>
+    </div>
+  </figure>
+</div>
+
+<script>
+  // November 2026: Monday first, today the 2nd; shades as core/planner.ts counts them.
+  (function () {
+    const cal = document.getElementById("cal");
+    const n = { 2: 2, 3: 1, 4: 3, 5: 1, 7: 1, 11: 2, 14: 4, 18: 1, 21: 1, 25: 2, 28: 1 };
+    let html = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => `<span class="wd">${w}</span>`).join("");
+    html += '<span></span><span></span><span></span><span></span><span></span><span></span>';
+    for (let d = 1; d <= 30; d++) {
+      const cls = d < 2 ? " past" : d === 2 ? " today" : "";
+      html += `<span class="d${cls}" data-n="${n[d] ? Math.min(n[d], 4) : 0}">${d}</span>`;
+    }
+    cal.innerHTML = html;
+    // Each screen is drawn at 1440 x 900 and scaled to its frame
+    const fit = () => document.querySelectorAll(".fit").forEach((f) => { f.firstElementChild.style.transform = `scale(${f.clientWidth / 1440})`; });
+    new ResizeObserver(fit).observe(document.body);
+    fit();
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+
+  /* ---- Proposed Home: the lens beside the mark, search top right, a bigger strip, the search drawer ---- */
+  .proposed-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; margin-right: 8px; border-radius: 999px; background: var(--tf-accent); color: var(--tf-brand); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .nhead { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 8px 0 16px; }
+  .lensmark { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 6px; border-radius: 999px; background: var(--tf-accent); color: var(--tf-brand); min-width: 0; max-width: 70%; }
+  .lensmark i[data-mark] { width: 32px; height: 32px; flex-shrink: 0; }
+  .lensmark .lname { font-size: 17px; font-weight: 700; color: var(--tf-fg); }
+  .lensmark.off { background: transparent; padding-left: 0; }
+  .lensmark.off .lname { color: var(--tf-faint); font-weight: 600; }
+  .searchbtn { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; color: var(--tf-fg); }
+  .searchbtn.on { background: var(--tf-raised); }
+  .bdays { margin: 4px 0 0; }
+  .bdays .month { display: flex; align-items: center; height: 24px; padding: 0 16px; }
+  .bdays .month b { flex: 1; font-size: 15px; font-weight: 700; }
+  .bdays .month span { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--tf-brand); }
+  .bstrip { position: relative; display: flex; justify-content: center; gap: 6px; padding: 8px 0 6px; overflow: hidden; }
+  .bstrip::before, .bstrip::after { content: ""; position: absolute; top: 0; bottom: 0; width: 28px; z-index: 2; pointer-events: none; }
+  .bstrip::before { left: 0; background: linear-gradient(to right, var(--tf-bg), transparent); }
+  .bstrip::after { right: 0; background: linear-gradient(to left, var(--tf-bg), transparent); }
+  .bday { flex: 0 0 52px; height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 16px; border: 2px solid transparent; background: color-mix(in srgb, var(--tf-fg) 5%, transparent); color: var(--tf-dim); }
+  .bday .wd { font-size: 11px; font-weight: 500; }
+  .bday .dn { font-size: 20px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--tf-fg); }
+  .bday .pips { display: flex; gap: 3px; height: 5px; }
+  .bday .pips span { width: 5px; height: 5px; border-radius: 50%; background: var(--tf-brand); }
+  .bday.past { opacity: .4; }
+  .bday.today .dn { color: var(--tf-brand); font-weight: 800; }
+  .bday.slot { border-color: var(--tf-brand); background: var(--tf-accent); }
+  .bday.slot .wd { color: var(--tf-brand); }
+
+  /* the drawer, down from the header over a dimmed Home */
+  .scrim { position: absolute; inset: 0; z-index: 4; background: var(--tf-scrim); }
+  .drawer { position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; flex-direction: column; max-height: 100%; border-radius: 0 0 28px 28px; background: var(--tf-card); box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+  .sfield { display: flex; align-items: center; gap: 10px; height: 52px; margin: 8px 16px 0; padding: 0 6px 0 16px; border-radius: 999px; border: 2px solid var(--tf-brand); background: var(--tf-bg); }
+  .sfield .q { flex: 1; font-size: 16px; }
+  .sfield .caret { display: inline-block; width: 2px; height: 20px; margin-left: 1px; vertical-align: -4px; background: var(--tf-brand); }
+  .sfield .clear { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--tf-dim); }
+  .scope { display: flex; align-items: center; gap: 6px; padding: 10px 20px 0; font-size: 13px; color: var(--tf-dim); }
+  .scope a { margin-left: auto; color: var(--tf-brand); font-weight: 600; }
+  .srow { display: flex; gap: 8px; padding: 12px 16px 0; overflow: hidden; }
+  .sgroup { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 4px; font-size: 13px; font-weight: 600; color: var(--tf-dim); }
+  .sgroup span { font-weight: 500; color: var(--tf-faint); }
+  .hit { display: flex; align-items: flex-start; gap: 12px; padding: 10px 20px; }
+  .hit .sw { flex: 0 0 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--tile-bg, var(--tf-raised)); color: var(--tile-line, var(--tf-dim)); }
+  .hit .t { font-size: 15px; font-weight: 600; }
+  .hit .s { font-size: 13px; line-height: 18px; color: var(--tf-dim); }
+  .hit mark { background: var(--tf-accent); color: var(--tf-fg); font-weight: 700; border-radius: 3px; padding: 0 2px; }
+  .handle { width: 36px; height: 4px; margin: 10px auto 10px; border-radius: 4px; background: var(--tf-line); }
+  .kbd-android { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; padding: 8px 4px 6px; background: var(--tf-raised); }
+  .kbd-android .r { display: flex; justify-content: center; gap: 5px; margin-bottom: 8px; }
+  .kbd-android .k { flex: 0 0 34px; height: 42px; display: grid; place-items: center; border-radius: 6px; background: var(--tf-card); font-size: 18px; color: var(--tf-fg); }
+  .kbd-android .k.w { flex-basis: 52px; font-size: 13px; color: var(--tf-dim); }
+  .kbd-android .k.sp { flex: 0 0 180px; }
+  .kbd-android .k.go { flex-basis: 52px; background: var(--tf-brand); color: var(--tf-bg); }

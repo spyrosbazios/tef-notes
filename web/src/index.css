@@ -1,0 +1,225 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* The phone's faces, from its own assets. Figures stay in the text face (tabular-nums), as on the phone. */
+@font-face { font-family: "Atkinson Next"; font-weight: 400; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_400Regular.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 500; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_500Medium.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 600; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_600SemiBold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 700; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_700Bold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 800; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_800ExtraBold.ttf"); }
+@font-face { font-family: "Atkinson Mono"; font-weight: 400; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleMono_400Regular.ttf"); }
+
+@theme inline {
+  --font-sans: "Atkinson Next", system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: "Atkinson Mono", ui-monospace, monospace;
+
+  /* The app's own names, beside shadcn's: bg-raised, text-dim, text-faint, text-brand, text-up, text-warn… */
+  --color-bg: var(--tf-bg);
+  --color-raised: var(--tf-raised);
+  --color-line: var(--tf-line);
+  --color-fg: var(--tf-fg);
+  --color-dim: var(--tf-dim);
+  --color-faint: var(--tf-faint);
+  --color-brand: var(--tf-brand);
+  --color-up: var(--tf-up);
+  --color-down: var(--tf-down);
+  --color-warn: var(--tf-warn);
+
+  /* A note colour's three (a tile's tint, a tag's badge), set per element by [data-color] below */
+  --color-tile: var(--tile-bg);
+  --color-tile-fg: var(--tile-fg);
+  --color-tile-line: var(--tile-line);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* shadcn's tokens on the phone's palette. The --tf-* values and color-scheme here are the pre-JS default (the OLED
+   theme: black, near-black surfaces, hairline borders, one violet brand); hooks/appearance.ts re-sets them to this
+   browser's chosen theme and accent, as the phone's pages do over their bridge (src/page-theme.ts). Translucent fills
+   are theme.ts's TINT. */
+:root {
+  color-scheme: dark;
+  --radius: 0.75rem;
+  --background: var(--tf-bg);
+  --foreground: var(--tf-fg);
+  --card: var(--tf-card);
+  --card-foreground: var(--tf-fg);
+  --popover: var(--tf-raised);
+  --popover-foreground: var(--tf-fg);
+  --primary: var(--tf-brand);
+  --primary-foreground: var(--tf-bg);
+  --secondary: var(--tf-raised);
+  --secondary-foreground: var(--tf-fg);
+  --muted: var(--tf-muted);
+  --muted-foreground: var(--tf-dim);
+  --accent: var(--tf-accent);
+  --accent-foreground: var(--tf-brand);
+  --destructive: var(--tf-down);
+  --border: var(--tf-line);
+  --input: var(--tf-line);
+  --ring: var(--tf-brand);
+}
+
+[data-color="yellow"] { --tile-bg: var(--tf-note-yellow-bg); --tile-fg: var(--tf-note-yellow-fg); --tile-line: var(--tf-note-yellow-line); }
+[data-color="pink"] { --tile-bg: var(--tf-note-pink-bg); --tile-fg: var(--tf-note-pink-fg); --tile-line: var(--tf-note-pink-line); }
+[data-color="blue"] { --tile-bg: var(--tf-note-blue-bg); --tile-fg: var(--tf-note-blue-fg); --tile-line: var(--tf-note-blue-line); }
+[data-color="green"] { --tile-bg: var(--tf-note-green-bg); --tile-fg: var(--tf-note-green-fg); --tile-line: var(--tf-note-green-line); }
+[data-color="purple"] { --tile-bg: var(--tf-note-purple-bg); --tile-fg: var(--tf-note-purple-fg); --tile-line: var(--tf-note-purple-line); }
+[data-color="gray"] { --tile-bg: var(--tf-note-gray-bg); --tile-fg: var(--tf-note-gray-fg); --tile-line: var(--tf-note-gray-line); }
+[data-color="red"] { --tile-bg: var(--tf-note-red-bg); --tile-fg: var(--tf-note-red-fg); --tile-line: var(--tf-note-red-line); }
+[data-color="orange"] { --tile-bg: var(--tf-note-orange-bg); --tile-fg: var(--tf-note-orange-fg); --tile-line: var(--tf-note-orange-line); }
+[data-color="teal"] { --tile-bg: var(--tf-note-teal-bg); --tile-fg: var(--tf-note-teal-fg); --tile-line: var(--tf-note-teal-line); }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* A note's body, read: the phone's MD styles (src/ui/note.tsx) as prose. */
+@layer components {
+  .md { @apply text-[15px] leading-[1.6] text-fg break-words; }
+  .md.reader { @apply text-[17px] leading-[1.7]; }
+  .md.reader img { @apply rounded-lg; }
+  .md > * + * { @apply mt-3; }
+  .md h1 { @apply text-[22px] font-bold leading-tight mt-6; }
+  .md h2 { @apply text-lg font-bold leading-tight mt-5; }
+  .md h3 { @apply text-base font-bold mt-4; }
+  .md strong { @apply font-semibold; }
+  .md a { @apply text-brand hover:underline underline-offset-2; }
+  .md ul { @apply list-disc pl-5 marker:text-brand; }
+  .md ol { @apply list-decimal pl-5 marker:text-dim; }
+  .md li + li, .md li > ul, .md li > ol { @apply mt-1; }
+  .md li.task-list-item { @apply list-none -ml-5 flex items-start gap-2; }
+  .md li.task-list-item > ul { @apply basis-full; }
+  .md li.task-list-item:has(input:checked) { @apply text-dim line-through decoration-faint; }
+  .md input[type="checkbox"] { @apply mt-[5px] size-4 shrink-0 cursor-pointer accent-brand; }
+  .md blockquote { @apply border-l-2 border-line bg-card pl-3 py-1 text-dim rounded-r-md; }
+  .md code { @apply font-mono text-[13px] bg-raised border border-line rounded px-1 py-px; }
+  .md pre { @apply font-mono text-[13px] bg-card border border-line rounded-xl p-3 overflow-x-auto; }
+  .md pre code { @apply bg-transparent border-0 p-0; }
+  .md hr { @apply border-line; }
+  .md table { @apply text-[13px] border-collapse w-full; }
+  .md th { @apply bg-raised font-semibold text-left; }
+  .md th, .md td { @apply border border-line px-2 py-1; }
+  .md img { @apply rounded-xl max-w-full max-h-[480px]; }
+
+  /* The editor (src/editor): the same prose as above, drawn live in a contenteditable. ProseMirror's own rules first. */
+  .pm-editor { @apply relative min-h-[40vh] outline-none whitespace-pre-wrap break-words; font-variant-ligatures: none; }
+  .pm-editor pre { @apply whitespace-pre-wrap; }
+  .pm-editor li { @apply relative; }
+  .pm-editor > :first-child { @apply mt-0; }
+  .pm-editor p.is-empty::before { @apply pointer-events-none float-left h-0 text-faint; content: attr(data-placeholder); }
+  .pm-editor .ProseMirror-selectednode { @apply outline-2 outline-brand/60; }
+  .pm-editor img.ProseMirror-separator { display: inline !important; border: none !important; margin: 0 !important; width: 0 !important; height: 0 !important; }
+  .pm-editor li.task-list-item { @apply list-none -ml-5; }
+  .pm-editor li.task-list-item > .task-content { @apply min-w-0 flex-1; }
+  .pm-editor li.task-list-item:has(> input:checked) > .task-content { @apply text-dim line-through decoration-faint; }
+  /* A photo: its own line, one gap above and below whatever it sits among, so photos in a row read as a sequence. Capped to
+     the viewport (a tall one never needs more than the screen), rounded as the read view's are. A tap or click opens it. */
+  .pm-editor .pm-image { @apply my-0.5 inline-block max-w-full align-top leading-none; }
+  .pm-editor .pm-image img { @apply block h-auto w-auto max-w-full cursor-zoom-in rounded-xl object-contain; max-height: min(70vh, 125vw); }
+  .pm-editor .pm-image-missing { @apply flex min-h-24 w-56 max-w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line px-3 py-4 text-faint text-xs leading-snug; }
+  .pm-editor .pm-image-missing::before {
+    content: ""; @apply inline-block size-4 shrink-0 bg-faint;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l20 20'/%3E%3Cpath d='M10.41 10.41a2 2 0 1 1-2.83-2.83'/%3E%3Cpath d='M13.5 13.5 6 21'/%3E%3Cpath d='M18 12l3 3'/%3E%3Cpath d='M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59'/%3E%3Cpath d='M21 15V5a2 2 0 0 0-2-2H9'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  /* A bare URL's item (src/editor/link-cards.ts): thumbnail, text, then Read and Summary; they wrap under it when narrow. */
+  .pm-editor .pm-card { @apply mt-2 flex max-w-2xl cursor-pointer flex-wrap items-center gap-3 whitespace-normal rounded-xl border border-line bg-card p-2.5 text-left transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-brand/60; }
+  .pm-editor .pm-card-thumb { @apply flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-raised; }
+  .pm-editor .pm-card-thumb[data-empty]::before { content: ""; @apply block size-6 bg-faint; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .pm-editor .pm-card-image { @apply m-0 size-full max-h-none rounded-none object-cover; }
+  .pm-editor .pm-card-favicon { @apply m-0 size-8 rounded-md object-contain; }
+  .pm-editor .pm-card-body { @apply flex min-w-40 flex-1 flex-col gap-0.5; }
+  .pm-editor .pm-card-title { @apply line-clamp-1 text-sm font-semibold leading-snug text-fg; }
+  .pm-editor .pm-card-desc { @apply line-clamp-2 text-[13px] leading-snug text-dim; }
+  .pm-editor .pm-card-site { @apply flex items-center gap-1.5 truncate pt-0.5 text-xs text-faint; }
+  .pm-editor .pm-card-host { @apply min-w-0 truncate; }
+  .pm-editor .pm-card-tools { @apply ml-auto flex shrink-0 items-center gap-1; }
+  .pm-editor .pm-card-icon { @apply m-0 size-3.5 shrink-0 rounded-sm; }
+  /* A YouTube link's player (src/editor/link-cards.ts): its thumbnail and a play mark until clicked, then the embed. */
+  .pm-editor .pm-video { @apply relative mt-2 aspect-video w-full max-w-xl overflow-hidden rounded-xl border border-line bg-raised; }
+  .pm-editor .pm-video-play { @apply absolute inset-0 block size-full cursor-pointer p-0 focus-visible:outline-2 focus-visible:outline-brand/60; }
+  .pm-editor .pm-video-thumb { @apply m-0 size-full max-h-none rounded-none object-cover; }
+  .pm-editor .pm-video-icon { @apply absolute left-1/2 top-1/2 size-14 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg/70 transition-colors; }
+  .pm-editor .pm-video-play:hover .pm-video-icon { @apply bg-brand; }
+  .pm-editor .pm-video-icon::after { content: ""; @apply absolute left-[55%] top-1/2 -translate-x-1/2 -translate-y-1/2 border-y-[10px] border-l-[16px] border-y-transparent border-l-bg; }
+  .pm-editor .pm-video-frame { @apply absolute inset-0 size-full border-0; }
+  .pm-editor .html-block, .pm-editor .html-inline { @apply font-mono text-[13px] text-dim; }
+  .pm-editor .html-inline { @apply rounded bg-raised px-1; }
+  .pm-editor table { @apply my-1; }
+  .pm-editor td, .pm-editor th { @apply relative min-w-12 align-top; }
+  .pm-editor .selectedCell::after { content: ""; @apply pointer-events-none absolute inset-0 bg-brand/15; }
+  .pm-editor .tableWrapper { @apply overflow-x-auto; }
+  .pm-editor a { @apply cursor-text; }
+  /* A link's Read and Summary buttons (src/editor/link-tools.ts), after the link in the prose and on its card: small
+     pills, quiet until hovered so a note's prose stays prose. The icon is lucide's (book-open, sparkles) as a mask. */
+  .pm-editor .pm-link-tools { @apply mx-1 inline-flex gap-1 align-[1px]; }
+  .pm-editor .pm-link-tool {
+    @apply inline-flex cursor-pointer select-none items-center gap-1 whitespace-nowrap rounded-full border border-line bg-card px-2 py-px font-sans text-xs font-medium leading-5 text-dim transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand focus-visible:outline-2 focus-visible:outline-brand/60 disabled:cursor-default;
+  }
+  .pm-editor .pm-link-tool::before { content: ""; @apply block size-3.5 shrink-0 bg-current; mask: var(--tool-icon) center / contain no-repeat; }
+  .pm-editor .pm-link-tool[data-icon="read"] { --tool-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v16'/%3E%3Cpath d='M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z'/%3E%3C/svg%3E"); }
+  .pm-editor .pm-link-tool[data-icon="summary"] { --tool-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z'/%3E%3Cpath d='M20 3v4'/%3E%3Cpath d='M22 5h-4'/%3E%3Cpath d='M4 17v2'/%3E%3Cpath d='M5 18H3'/%3E%3C/svg%3E"); }
+  .pm-editor .pm-link-tool[data-busy] { @apply text-brand; }
+  .pm-editor .pm-link-tool[data-busy]::before { animation: pm-pulse 1s ease-in-out infinite alternate; }
+  @keyframes pm-pulse { to { opacity: 0.3; } }
+  /* A link to a PDF or a drawing attached to the note, as a chip: in the editor (a decoration on the link's text,
+     src/editor/files.ts) and in the read view (a real link, or plain text before it has its URL). The icon is lucide's
+     file-text (or shapes, for a drawing) as a mask, so it takes the brand colour. A drawing's chip has its PNG before it. */
+  .md .file-chip, .md a.file-chip {
+    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
+    @apply cursor-pointer rounded-lg border border-line bg-card px-2 py-0.5 text-fg no-underline hover:no-underline; box-decoration-break: clone;
+  }
+  .md .drawing-chip, .md a.drawing-chip {
+    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1'/%3E%3Ccircle cx='17.5' cy='17.5' r='3.5'/%3E%3C/svg%3E");
+  }
+  .md .file-chip::before { content: ""; @apply mr-1.5 inline-block size-4 bg-brand align-[-3px]; mask: var(--chip-icon) center / contain no-repeat; }
+  .pm-editor .drawing-thumb { @apply mr-1.5 inline-block h-10 w-auto max-w-32 cursor-pointer rounded-md border border-line bg-card object-contain align-middle; }
+  .pm-editor .pdf-page { @apply relative mb-1.5 block cursor-pointer; }
+  .pm-editor .pdf-page img { @apply block h-auto w-full max-h-[70vh] rounded-lg border border-line bg-card object-contain object-top; }
+  .pm-editor .pdf-count { @apply absolute right-2 bottom-2 rounded-md bg-fg/75 px-2 py-0.5 text-xs font-medium text-bg; }
+  .prosemirror-dropcursor-block, .prosemirror-dropcursor-inline { @apply bg-brand; }
+  .ProseMirror-gapcursor { @apply pointer-events-none absolute m-0 hidden; }
+  .ProseMirror-gapcursor::after { content: ""; @apply absolute -top-0.5 block w-5 border-t border-fg; animation: pm-blink 1.1s steps(2, start) infinite; }
+  .ProseMirror-focused .ProseMirror-gapcursor { @apply block; }
+  @keyframes pm-blink { to { visibility: hidden; } }
+
+}

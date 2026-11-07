@@ -1,0 +1,268 @@
+/* TEF Notes, as the source draws it. Colours come only from tokens.css (generated from theme.ts); sizes, radii and
+   spacing are the values the components use (mobile/src/ui, web/src/components, site/src). */
+
+@font-face { font-family: "Atkinson Next"; font-weight: 400; font-display: swap; src: url("fonts/AtkinsonHyperlegibleNext_400Regular.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 500; font-display: swap; src: url("fonts/AtkinsonHyperlegibleNext_500Medium.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 600; font-display: swap; src: url("fonts/AtkinsonHyperlegibleNext_600SemiBold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 700; font-display: swap; src: url("fonts/AtkinsonHyperlegibleNext_700Bold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 800; font-display: swap; src: url("fonts/AtkinsonHyperlegibleNext_800ExtraBold.ttf"); }
+@font-face { font-family: "Atkinson Mono"; font-weight: 400; font-display: swap; src: url("fonts/AtkinsonHyperlegibleMono_400Regular.ttf"); }
+
+:root {
+  --font-sans: "Atkinson Next", system-ui, sans-serif;
+  --font-mono: "Atkinson Mono", ui-monospace, monospace;
+  /* web/src/index.css: --radius 0.75rem and its steps */
+  --radius: 12px;
+  --r-sm: 7.2px; --r-md: 9.6px; --r-lg: 12px; --r-xl: 16.8px; --r-2xl: 21.6px; --r-3xl: 26.4px; --r-full: 999px;
+  /* Tailwind's own (the phone's Uniwind, the site): rounded-lg 8, xl 12, 2xl 16, 3xl 24 */
+  --tw-lg: 8px; --tw-xl: 12px; --tw-2xl: 16px; --tw-3xl: 24px;
+  --r-card: 20px;             /* site: --radius-card 1.25rem */
+  --shadow-lift: 0 30px 80px -24px var(--tf-scrim);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+[data-color="yellow"] { --tile-bg: var(--tf-note-yellow-bg); --tile-fg: var(--tf-note-yellow-fg); --tile-line: var(--tf-note-yellow-line); }
+[data-color="pink"] { --tile-bg: var(--tf-note-pink-bg); --tile-fg: var(--tf-note-pink-fg); --tile-line: var(--tf-note-pink-line); }
+[data-color="blue"] { --tile-bg: var(--tf-note-blue-bg); --tile-fg: var(--tf-note-blue-fg); --tile-line: var(--tf-note-blue-line); }
+[data-color="green"] { --tile-bg: var(--tf-note-green-bg); --tile-fg: var(--tf-note-green-fg); --tile-line: var(--tf-note-green-line); }
+[data-color="purple"] { --tile-bg: var(--tf-note-purple-bg); --tile-fg: var(--tf-note-purple-fg); --tile-line: var(--tf-note-purple-line); }
+[data-color="gray"] { --tile-bg: var(--tf-note-gray-bg); --tile-fg: var(--tf-note-gray-fg); --tile-line: var(--tf-note-gray-line); }
+[data-color="red"] { --tile-bg: var(--tf-note-red-bg); --tile-fg: var(--tf-note-red-fg); --tile-line: var(--tf-note-red-line); }
+[data-color="orange"] { --tile-bg: var(--tf-note-orange-bg); --tile-fg: var(--tf-note-orange-fg); --tile-line: var(--tf-note-orange-line); }
+[data-color="teal"] { --tile-bg: var(--tf-note-teal-bg); --tile-fg: var(--tf-note-teal-fg); --tile-line: var(--tf-note-teal-line); }
+
+*, *::before, *::after { box-sizing: border-box; border-color: var(--tf-line); }
+html, body { margin: 0; }
+body { background: var(--tf-bg); color: var(--tf-fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p, ul, figure { margin: 0; padding: 0; }
+ul { list-style: none; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--tf-brand); outline-offset: 2px; }
+::selection { background: var(--tf-glow); }
+i[data-i], i[data-mark] { display: inline-flex; flex-shrink: 0; font-style: normal; line-height: 0; }
+i[data-mark] svg { width: 100%; height: 100%; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+.dim { color: var(--tf-dim); } .faint { color: var(--tf-faint); } .brand { color: var(--tf-brand); } .warn { color: var(--tf-warn); }
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.truncate { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+.row { display: flex; align-items: center; }
+.grow { flex: 1; min-width: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------- Pictures. The app shows the note's own photos; these boards have none, so each cell is a drawn stand-in
+   in the note colours (a sky, a horizon), never a grey box. ---------- */
+.pic { position: relative; overflow: hidden; background: var(--tf-raised); }
+.pic::before, .pic::after { content: ""; position: absolute; inset: 0; }
+.pic.a::before { background: linear-gradient(180deg, var(--tf-note-orange-line) 0%, var(--tf-note-pink-line) 55%, var(--tf-note-purple-bg) 100%); }
+.pic.a::after { background: radial-gradient(circle at 70% 46%, var(--tf-note-yellow-fg) 0 9%, transparent 10%), linear-gradient(170deg, transparent 62%, var(--tf-note-purple-bg) 63%); }
+.pic.b::before { background: linear-gradient(180deg, var(--tf-note-blue-line), var(--tf-note-teal-line) 70%, var(--tf-note-green-bg)); }
+.pic.b::after { background: linear-gradient(160deg, transparent 55%, var(--tf-note-green-line) 56% 70%, var(--tf-note-green-bg) 71%); }
+.pic.c::before { background: linear-gradient(135deg, var(--tf-note-yellow-line), var(--tf-note-orange-bg)); }
+.pic.c::after { background: radial-gradient(ellipse at 40% 110%, var(--tf-note-red-line) 0 38%, transparent 39%), radial-gradient(circle at 78% 30%, var(--tf-note-yellow-fg) 0 12%, transparent 13%); }
+.pic.d::before { background: linear-gradient(180deg, var(--tf-note-gray-line), var(--tf-note-gray-bg)); }
+.pic.d::after { background: repeating-linear-gradient(0deg, transparent 0 14px, color-mix(in srgb, var(--tf-note-gray-fg) 22%, transparent) 14px 15px); margin: 18% 22% 0; background-color: var(--tf-note-gray-fg); opacity: .9; }
+.pic.pdf::before { background: var(--tf-note-gray-fg); margin: 10% 16% -10%; }
+.pic.pdf::after { margin: 18% 24% 0; background: repeating-linear-gradient(180deg, var(--tf-note-gray-line) 0 3px, transparent 3px 11px); opacity: .55; }
+
+/* The mosaic (core/notes.ts mosaicCells): 1 fills, 2 split, 3 one tall and two stacked, 4 quarters; +N on the last */
+.mosaic { position: relative; display: grid; gap: 2px; overflow: hidden; background: var(--tf-raised); }
+.mosaic[data-n="1"] { grid-template: 1fr / 1fr; }
+.mosaic[data-n="2"] { grid-template: 1fr / 1fr 1fr; }
+.mosaic[data-n="3"] { grid-template: 1fr 1fr / 1fr 1fr; }
+.mosaic[data-n="3"] > :first-child { grid-row: 1 / 3; }
+.mosaic[data-n="4"] { grid-template: 1fr 1fr / 1fr 1fr; }
+.mosaic .more { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; background: color-mix(in srgb, var(--tf-bg) 55%, transparent); font-size: 18px; font-weight: 600; color: var(--tf-fg); }
+.mosaic > .pic { position: relative; }
+
+/* ---------- Tags ---------- */
+/* Phone (ui/tags.tsx TagBadge): a pill, 18 tall, the tag colour's line at 22%, 10.5 medium */
+.ptag { display: inline-flex; align-items: center; height: 18px; padding: 0 8px; border-radius: var(--r-full); background: color-mix(in srgb, var(--tile-line) 22%, transparent); color: var(--tile-fg); font-size: 10.5px; font-weight: 500; white-space: nowrap; }
+/* Web (tag-badge.tsx): 20 tall, rounded-md, the tile colours with a half line */
+.wtag { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: var(--r-md); border: 1px solid color-mix(in srgb, var(--tile-line) 50%, transparent); background: var(--tile-bg); color: var(--tile-fg); font-size: 11px; white-space: nowrap; }
+
+/* ---------- Chips and buttons ---------- */
+/* Phone Chip (ds/badge.tsx): sm 32 tall, md 36; selected is the accent wash in the brand */
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-full); border: 1px solid var(--tf-line); color: var(--tf-fg); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.chip.sm { height: 32px; padding: 0 12px; font-size: 13px; gap: 6px; }
+.chip.sm.bare { padding: 0 8px; }
+.chip > i { color: var(--tf-dim); }
+.chip.on { border-color: transparent; background: var(--tf-accent); color: var(--tf-brand); }
+.chip.on > i { color: var(--tf-brand); }
+.chip.ghost { border-color: transparent; background: var(--tf-raised); }
+
+/* Phone Button (ds/button.tsx): pills, sm 36 / md 48 / lg 56 tall; filled, tonal, outline, ghost, destructive */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--r-full); font-weight: 600; white-space: nowrap; min-height: 48px; padding: 0 20px; font-size: 15px; }
+.btn.sm { min-height: 36px; padding: 0 14px; gap: 6px; font-size: 14px; }
+.btn.lg { min-height: 56px; padding: 0 24px; font-size: 17px; }
+.btn.filled { background: var(--tf-brand); color: var(--tf-bg); }
+.btn.tonal { background: var(--tf-raised); color: var(--tf-fg); }
+.btn.outline { border: 1px solid var(--tf-line); color: var(--tf-fg); }
+.btn.ghost { color: var(--tf-fg); }
+.btn.ghost:hover { background: var(--tf-muted); }
+.btn.destructive { background: var(--tf-down); color: var(--tf-bg); }
+.btn:active { opacity: .8; }
+.btn[disabled] { opacity: .45; cursor: default; }
+.ibtn { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: var(--r-full); color: var(--tf-dim); }
+.ibtn.compact { width: 36px; height: 36px; }
+.ibtn:hover { background: var(--tf-muted); }
+.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--r-full); background: var(--tf-muted); color: var(--tf-dim); font-size: 11px; font-weight: 600; }
+.badge.brand { background: var(--tf-accent); color: var(--tf-brand); }
+.badge.up { background: var(--tf-up-subtle); color: var(--tf-up); }
+.badge.down { background: var(--tf-down-subtle); color: var(--tf-down); }
+.badge.warn { background: var(--tf-warn-subtle); color: var(--tf-warn); }
+.kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 4px; background: var(--tf-muted); color: var(--tf-dim); font-size: 11px; }
+
+/* The lens (ui/lens.tsx): on, an accent pill, Focus, the name, an X; off, the Focus icon alone in dim */
+.lens { display: inline-flex; align-items: center; max-width: 40%; border-radius: var(--r-full); background: var(--tf-accent); color: var(--tf-brand); }
+.lens .name { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 4px 0 12px; font-size: 13px; font-weight: 600; min-width: 0; }
+.lens .x { display: grid; place-items: center; width: 32px; height: 36px; }
+/* the web rail's form: a small pill in the brand at 15% */
+.wlens { display: inline-flex; align-items: center; gap: 4px; height: 24px; max-width: 128px; padding: 0 8px; border-radius: var(--r-full); background: color-mix(in srgb, var(--tf-brand) 15%, transparent); color: var(--tf-brand); font-size: 12px; font-weight: 600; }
+
+/* ---------- Task boxes and rows ---------- */
+/* The phone's round box (ui/tasks.tsx Box): 24, a 2px ring in faint, the brand once ticked */
+.box { display: inline-grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--tf-faint); color: var(--tf-bg); }
+.box.on { border-color: var(--tf-brand); background: var(--tf-brand); }
+/* The web's (task-row.tsx): 18, a 1.5px ring */
+.wbox { display: inline-grid; place-items: center; width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--tf-faint); color: var(--tf-bg); }
+.wbox.on { border-color: var(--tf-brand); background: var(--tf-brand); }
+/* A note's markdown checkbox: square */
+.sq { display: inline-grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 4px; border: 2px solid var(--tf-faint); background: var(--tf-muted); color: var(--tf-bg); }
+.sq.on { border-color: var(--tf-brand); background: var(--tf-brand); }
+
+.ptask { display: flex; align-items: flex-start; gap: 14px; padding: 12px 20px; }
+.ptask .box { margin-top: 1px; }
+.ptask .t { font-size: 16px; font-weight: 500; line-height: 1.35; }
+.ptask .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin-top: 4px; font-size: 12px; color: var(--tf-dim); }
+.ptask .meta span { display: inline-flex; align-items: center; gap: 4px; }
+.ptask .due { color: var(--tf-warn); font-weight: 600; }
+.ptask.done .t { color: var(--tf-dim); text-decoration: line-through; }
+
+.wtask { display: flex; align-items: flex-start; gap: 12px; padding: 8px 12px; border-radius: var(--tw-xl); }
+.wtask:hover { background: color-mix(in srgb, var(--tf-muted) 60%, transparent); }
+.wtask.sel { background: var(--tf-muted); }
+.wtask .wbox { margin-top: 2px; }
+.wtask .t { font-size: 15px; line-height: 1.375; }
+.wtask .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin-top: 2px; font-size: 12px; color: var(--tf-faint); }
+.wtask .meta span { display: inline-flex; align-items: center; gap: 4px; }
+.wtask .due { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 12px; color: var(--tf-warn); flex-shrink: 0; }
+.wtask.done .t { color: var(--tf-faint); text-decoration: line-through; }
+
+/* ---------- Note tiles ---------- */
+/* Phone (ui/note-tile.tsx): rounded-2xl, a hairline (the tint's line at 30%), the mosaic inset 6 at the top, body p-3.5 */
+.ptile { overflow: hidden; border-radius: var(--tw-2xl); border: 1px solid var(--tf-line); background: var(--tf-card); color: var(--tf-fg); }
+.ptile[data-color] { background: var(--tile-bg); color: var(--tile-fg); border-color: color-mix(in srgb, var(--tile-line) 30%, transparent); }
+.ptile .mosaic { margin: 6px 6px 0; border-radius: var(--tw-xl); height: 112px; }
+.ptile .mosaic[data-n="3"], .ptile .mosaic[data-n="4"] { height: 150px; }
+.ptile .body { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
+.ptile h3 { font-size: 15px; font-weight: 600; line-height: 20px; -webkit-line-clamp: 2; }
+.ptile p { font-size: 13px; line-height: 18px; color: var(--tf-dim); -webkit-line-clamp: 5; }
+.ptile[data-color] p { color: var(--tile-fg); opacity: .8; }
+.ptile .tags { display: flex; gap: 6px; overflow: hidden; }
+.ptile .foot { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tf-faint); }
+.ptile[data-color] .foot { color: var(--tile-line); }
+
+/* Web (note-list.tsx): rounded-2xl, the mosaic full width (h-32, h-44 past two), body p-3 */
+.wtile { overflow: hidden; border-radius: var(--r-2xl); border: 1px solid var(--tf-line); background: var(--tf-card); color: var(--tf-fg); break-inside: avoid; }
+.wtile[data-color] { background: var(--tile-bg); color: var(--tile-fg); border-color: color-mix(in srgb, var(--tile-line) 40%, transparent); }
+.wtile .mosaic { height: 128px; }
+.wtile .mosaic[data-n="3"], .wtile .mosaic[data-n="4"] { height: 176px; }
+.wtile .body { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
+.wtile h3 { font-size: 15px; font-weight: 600; line-height: 1.375; -webkit-line-clamp: 2; }
+.wtile p { font-size: 13px; line-height: 1.375; color: var(--tf-dim); -webkit-line-clamp: 6; }
+.wtile[data-color] p { color: inherit; opacity: .85; }
+.wtile .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.wtile .foot { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tf-faint); }
+.wtile[data-color] .foot { color: var(--tile-line); }
+
+/* ---------- The days strip (ui/days.tsx): cells 46x48, gap 6, rounded-xl with a 2px ring; shades of the brand ---------- */
+.days { position: relative; margin: 0 12px; }
+.days .month { display: flex; align-items: center; height: 18px; }
+.days .month span { flex: 1; text-align: center; font-size: 11px; font-weight: 500; color: var(--tf-faint); }
+.days .month .side { flex: 0 0 32px; display: grid; place-items: center; color: var(--tf-brand); }
+.days .strip { position: relative; display: flex; justify-content: center; gap: 6px; height: 58px; padding: 5px 0; overflow: hidden; }
+.days .strip::before, .days .strip::after { content: ""; position: absolute; top: 0; bottom: 0; width: 28px; z-index: 2; pointer-events: none; }
+.days .strip::before { left: 0; background: linear-gradient(to right, var(--tf-bg), transparent); }
+.days .strip::after { right: 0; background: linear-gradient(to left, var(--tf-bg), transparent); }
+.day { flex: 0 0 46px; height: 48px; border-radius: var(--tw-xl); border: 2px solid transparent; transform: scale(.86); opacity: .55; }
+.day > span { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; border-radius: 10px; background: color-mix(in srgb, var(--tf-fg) 5%, transparent); color: var(--tf-dim); }
+.day .wd { font-size: 10px; font-weight: 500; opacity: .8; line-height: 1.2; }
+.day .dn { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.day[data-n="1"] > span { background: color-mix(in srgb, var(--tf-brand) 20%, transparent); }
+.day[data-n="2"] > span { background: color-mix(in srgb, var(--tf-brand) 40%, transparent); }
+.day[data-n="3"] > span { background: color-mix(in srgb, var(--tf-brand) 65%, transparent); color: var(--tf-bg); }
+.day[data-n="4"] > span { background: var(--tf-brand); color: var(--tf-bg); }
+.day.d1 { transform: scale(.94); opacity: .85; }
+.day.d2 { transform: scale(.9); opacity: .7; }
+.day.slot { transform: scale(1.1); opacity: 1; border-color: var(--tf-brand); }
+.day.today:not([data-n="3"]):not([data-n="4"]) > span { color: var(--tf-brand); }
+.day.today .dn { font-weight: 700; }
+.day.past { opacity: .35; }
+
+/* ---------- Phone tab bar (app/(tabs)/_layout.tsx): a floating pill on raised, the active tab a brand capsule ---------- */
+.tabbar { padding: 12px 16px 10px; background: var(--tf-bg); }
+.tabbar .pill { display: flex; align-items: center; justify-content: space-between; padding: 6px; border-radius: var(--r-full); border: 1px solid var(--tf-line); background: var(--tf-raised); box-shadow: 0 8px 18px rgba(0,0,0,.35); }
+.tabbar .tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 12px; border-radius: var(--r-full); color: var(--tf-dim); }
+.tabbar .tab.on { padding: 0 16px; background: var(--tf-accent); color: var(--tf-brand); font-size: 14px; font-weight: 600; }
+.tabbar .dot { position: absolute; right: 8px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--tf-warn); }
+
+/* ---------- Chat ---------- */
+/* Phone (ui/chat/bubble.tsx): mine in the brand, its tail corner tightened; the agent's on muted */
+.bubble { max-width: 85%; padding: 12px 16px; border-radius: var(--tw-3xl); font-size: 15px; line-height: 22px; }
+.bubble.mine { align-self: flex-end; border-bottom-right-radius: var(--tw-lg); background: var(--tf-brand); color: var(--tf-bg); }
+.bubble.theirs { align-self: flex-start; border-bottom-left-radius: var(--tw-lg); background: var(--tf-muted); }
+/* Web (assistant turn): the user's on raised, the answer as plain prose */
+.wbubble { align-self: flex-end; max-width: 85%; padding: 8px 16px; border-radius: var(--tw-3xl); background: var(--tf-raised); font-size: 15px; line-height: 1.375; }
+.toolline { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--tf-dim); }
+.ccard { overflow: hidden; border-radius: var(--tw-2xl); border: 1px solid var(--tf-line); background: var(--tf-card); }
+.ccard .fade { position: relative; max-height: 132px; overflow: hidden; font-size: 13px; color: var(--tf-dim); }
+.ccard .fade::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(to bottom, transparent, var(--tf-card)); }
+.ccard .actions { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--tf-line); }
+.composer { display: flex; align-items: flex-end; gap: 8px; min-height: 56px; padding: 4px 6px 4px 20px; border-radius: 28px; border: 1px solid var(--tf-line); background: var(--tf-card); }
+.composer .ph { flex: 1; padding: 12px 0; font-size: 16px; color: var(--tf-faint); }
+.composer .send { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 1px; border-radius: 50%; background: var(--tf-brand); color: var(--tf-bg); }
+.composer .mic { display: grid; place-items: center; width: 44px; height: 44px; color: var(--tf-dim); }
+.wcomposer { display: flex; align-items: flex-end; gap: 8px; padding: 8px; border-radius: var(--tw-2xl); border: 1px solid var(--tf-line); background: var(--tf-card); }
+.wcomposer .ph { flex: 1; min-height: 36px; padding: 6px 8px; font-size: 14px; color: var(--tf-faint); }
+.wcomposer .send { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--tf-brand); color: var(--tf-bg); }
+
+/* ---------- The web's rail and assistant dock ---------- */
+.rail { display: flex; flex-direction: column; gap: 16px; width: 240px; flex-shrink: 0; height: 100%; padding: 12px; border-right: 1px solid var(--tf-line); background: var(--tf-bg); }
+.brandmark { display: flex; align-items: center; gap: 8px; }
+.brandmark i[data-mark] { width: 24px; height: 24px; color: var(--tf-brand); }
+.brandmark span { font-size: 20px; font-weight: 800; line-height: 1; letter-spacing: -0.025em; }
+.rsearch { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 12px; border-radius: var(--r-full); border: 1px solid var(--tf-line); color: var(--tf-dim); font-size: 14px; }
+.ritem { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 10px; border-radius: var(--tw-lg); color: var(--tf-dim); font-size: 14px; text-align: left; }
+.ritem:hover { background: var(--tf-muted); color: var(--tf-fg); }
+.ritem.on { background: var(--tf-accent); color: var(--tf-brand); font-weight: 600; }
+.ritem .c { font-size: 12px; color: var(--tf-faint); font-variant-numeric: tabular-nums; }
+.dock { display: flex; flex-direction: column; width: 380px; flex-shrink: 0; height: 100%; border-left: 1px solid var(--tf-line); background: var(--tf-bg); }
+.dock header { display: flex; align-items: center; gap: 4px; height: 48px; flex-shrink: 0; padding: 0 12px; border-bottom: 1px solid var(--tf-line); }
+.dock header h2 { padding: 0 4px; font-size: 15px; font-weight: 700; letter-spacing: -0.025em; }
+.wibtn { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: var(--tw-lg); color: var(--tf-dim); }
+.wibtn:hover { background: var(--tf-muted); color: var(--tf-fg); }
+.wibtn.sm { width: 32px; height: 32px; }
+.wbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--tw-lg); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.wbtn.primary { background: var(--tf-brand); color: var(--tf-bg); border-radius: var(--r-full); }
+.wbtn.outline { border: 1px solid var(--tf-line); color: var(--tf-dim); }
+.wbtn.outline:hover { background: var(--tf-muted); color: var(--tf-fg); }
+.seg { display: inline-flex; gap: 0; border-radius: var(--tw-lg); border: 1px solid var(--tf-line); overflow: hidden; }
+.seg button { display: grid; place-items: center; width: 32px; height: 30px; color: var(--tf-dim); }
+.seg button.on { background: var(--tf-accent); color: var(--tf-brand); }
+
+/* ---------- Boards: the pages that hold the screens (not app UI) ---------- */
+.board-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 12px 32px; border-bottom: 1px solid var(--tf-hair); background: color-mix(in srgb, var(--tf-bg) 85%, transparent); backdrop-filter: blur(16px); }
+.board-top nav { display: flex; gap: 4px; margin-left: auto; }
+.board-top nav a { padding: 6px 12px; border-radius: var(--r-full); font-size: 14px; color: var(--tf-dim); }
+.board-top nav a:hover, .board-top nav a[aria-current] { color: var(--tf-fg); background: var(--tf-muted); }
+.screen-label { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--tf-dim); letter-spacing: .02em; }
+.screen-label b { color: var(--tf-fg); }
+.ds-select { height: 36px; padding: 0 12px; border-radius: var(--r-full); border: 1px solid var(--tf-line); background: var(--tf-card); color: var(--tf-fg); font: inherit; font-size: 14px; }
+.ds-accents { display: flex; gap: 6px; }
+.ds-accents button { width: 22px; height: 22px; border-radius: 50%; outline-offset: 2px; }
+.ds-accents button[aria-checked="true"] { outline: 2px solid var(--tf-fg); }
+.ds-accents button.is-theme { box-shadow: inset 0 0 0 2px var(--tf-bg); border: 1px dashed var(--tf-fg); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.ibtn.brand { color: var(--tf-brand); }

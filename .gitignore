@@ -1,0 +1,14 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# local tooling noise
+.claude/settings.local.json
+node_modules/
+
+# build output and artifacts
+dist/
+*.apk

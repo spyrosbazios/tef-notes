@@ -1,0 +1,14 @@
+{
+  "name": "@tefnotes/core",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.9",
+    "typescript": "6.0.3"
+  }
+}

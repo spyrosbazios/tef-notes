@@ -1,0 +1,3 @@
+/* The page is the document and nothing else: the phone draws the header. The pages are src/pdf/pages.css's. */
+html, body { margin: 0; background: transparent; -webkit-tap-highlight-color: transparent; }
+body { padding: 0 0 24px; }

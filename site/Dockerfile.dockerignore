@@ -1,0 +1,8 @@
+# An allowlist: only what the site builds from reaches the daemon.
+*
+!site
+!packages/core/src
+!mobile/assets/fonts
+!mobile/assets/images/icon.png
+site/node_modules
+site/dist

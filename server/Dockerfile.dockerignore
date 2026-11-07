@@ -1,0 +1,16 @@
+# The build context is the repo root, which holds the live database (server/pb_data) and gigabytes of
+# node_modules: send only what the web and extension builds read.
+*
+!web
+web/node_modules
+web/dist
+!packages/core/src
+!packages/core/vite.ts
+!mobile/assets/fonts
+!mobile/assets/images/icon.png
+!extension
+extension/node_modules
+extension/dist
+!scripts/version.sh
+!server/pb_migrations
+!server/pb_hooks

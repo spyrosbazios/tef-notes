@@ -1,0 +1,16 @@
+{
+  "name": "tefnotes-cli",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "bin": {
+    "tefnotes": "./tefnotes.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.9",
+    "typescript": "6.0.3"
+  }
+}
