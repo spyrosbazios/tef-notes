@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
-import { DECLINED, diffLines, flagLine, rowsOf, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
+import { DECLINED, diffLines, flagLine, rowsOf, tagLine, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
 import { appended, MEMORY, parseNote } from "@/core/notes";
 import { useNotes, useNoteText } from "@/store/notes";
 import { Button, T } from "./ds";
@@ -106,6 +106,7 @@ function MemoryDiff({ text }: { text: string }) {
 
 /** What an answered card says: what was done, or what was left undone. */
 const VERB: Record<string, [done: string, skipped: string]> = {
+  create_tag: ["Created", "create"], update_tag: ["Updated", "update"],
   create_note: ["Created", "create"], append_to_note: ["Added to", "add to"], rewrite_note: ["Rewrote", "rewrite"],
   set_note_flags: ["Changed flags of", "change flags of"], delete_note: ["Deleted", "delete"], update_memory: ["Updated", "update"],
 };
@@ -120,13 +121,14 @@ export function Confirm({ name, input, id, respond, answer }: {
   const title = useNotes((s) => (input.path ? s.notes[input.path]?.title : undefined)) ?? input.path ?? "the note";
   const own = todoWords(name, input);
   const head = own?.head ?? {
+    create_tag: `Create tag “${input.name ?? ""}”?`, update_tag: `Update tag “${input.name ?? input.id ?? ""}”?`,
     create_note: `Create note “${input.title ?? ""}”?`, append_to_note: `Add to ${title}?`, rewrite_note: `Rewrite ${title}?`,
     set_note_flags: `Change flags of ${title}?`, delete_note: `Delete ${title}?`, update_memory: "Update the agent's memory?",
   }[name] ?? "Go ahead?";
   const yes = own?.yes ?? (name === "create_note" ? "Create it" : name === "append_to_note" ? "Add it" : name === "delete_note" ? "Delete it" : "Save it");
   const flags = name === "create_note" ? flagLine(input) : "";
   const [done, skipped] = own ? [own.done, own.skipped] : VERB[name] ?? ["Allowed", "allow"];
-  const subject = own?.subject ?? (name === "create_note" ? `“${input.title ?? ""}”` : name === "update_memory" ? "memory" : title);
+  const subject = own?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "update_memory" ? "memory" : title);
   return (
     <Animated.View layout={LinearTransition}>
       {answer ? (
@@ -153,6 +155,7 @@ export function Confirm({ name, input, id, respond, answer }: {
               {name === "create_note" ? <Markdown md={input.body ?? ""} />
                 : name === "append_to_note" && input.path ? <AppendPreview path={input.path} input={input} />
                 : name === "rewrite_note" && input.path ? <RewriteDiff path={input.path} title={title} input={input} />
+                : (name === "create_tag" || name === "update_tag") ? <T size={14}>{tagLine(name, input)}</T>
                 : name === "set_note_flags" ? <T size={14}>{flagLine(input, true) || "No change"}</T>
                 : name === "delete_note" ? <T size={14}>Delete it for good, with its photos and PDFs</T>
                 : own ? <TodoPreview name={name} input={input} />

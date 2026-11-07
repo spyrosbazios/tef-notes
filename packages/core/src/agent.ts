@@ -32,13 +32,14 @@ export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** The server agent's tools (server/agent/src/tools.ts is the authority; the UI tools the client does itself are assistant.ts's;
  *  `show_*` hand back a widget to draw, widgets.ts); a name not here shows as it is. */
-export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
+export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "create_tag" | "update_tag" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
   | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
   | "show_day" | "show_week" | "show_review" | "show_quote" | "show_link" | "show_lens" | "find_free_slots"
   | UiToolName;
 
 /** Tool names as the owner would say them. */
 const LABEL: Record<ToolName, string> = {
+  create_tag: "Creating a tag", update_tag: "Changing a tag",
   show_items: "Showing what it found",
   show_day: "Showing a day", show_week: "Showing a week", show_review: "Reviewing your week", show_quote: "Quoting a note", show_link: "Showing a link",
   show_lens: "Previewing a lens", find_free_slots: "Finding free time",
@@ -157,6 +158,7 @@ export const cardKey = (c: Card) => (c.kind === "note" ? c.path : `${c.kind}:${c
 
 /** What the agent sends for a write: every tool's fields, all optional, as the part's input may be partial. */
 export type WriteInput = {
+  name?: string; description?: string;
   path?: string; title?: string; body?: string; text?: string; why?: string; section?: string;
   pinned?: boolean; color?: string | null; tags?: string[];
   /** The task tools': the record's id, its title as the agent read it (`about`: what a card names it by), its dates
@@ -285,4 +287,15 @@ export function rowsOf(lines: Line[], context: number, all: boolean): Row[] {
     else (rows[rows.length - 1] as { fold: number }).fold++;
   });
   return rows;
+}
+
+
+/** The definition fields proposed by a tag tool, for both clients' approval previews. */
+export function tagLine(name: string, input: WriteInput): string {
+  return [
+    input.name && `Name: ${input.name}`,
+    input.color !== undefined && `Colour: ${input.color ?? "none"}`,
+    input.description !== undefined && `Description: ${input.description || "(empty)"}`,
+    name === "update_tag" && "Existing notes and tasks keep their tag names.",
+  ].filter(Boolean).join("\n");
 }

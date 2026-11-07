@@ -549,3 +549,30 @@ describe("approvals", () => {
     expect(await a.update_memory({ text: "x".repeat(6001) }, o([web]))).toBe("not-applicable");   // its own error, straight back
   });
 });
+
+
+describe("tag definitions", () => {
+  it("creates a definition, lists its editable id, and makes it usable on notes", async () => {
+    const made = await run(T.create_tag, { name: "travel", color: "blue", description: "Trips" });
+    expect(made).toMatchObject({ tag: { name: "travel", color: "blue", description: "Trips" } });
+    expect(await run(T.list_tags, {})).toMatchObject({ tags: expect.arrayContaining([expect.objectContaining({ id: expect.any(String), name: "travel", means: "Trips" })]) });
+    expect(await run(T.create_note, { title: "Trip", body: "Packing", tags: ["travel"] })).toHaveProperty("saved");
+    expect(await run(T.create_tag, { name: "TRAVEL" })).toHaveProperty("error");
+  });
+  it("updates only supplied fields, clears optional fields, and leaves assigned names alone", async () => {
+    pb.put("notes/a.md", file("A", "Body", "tags: [work]\n"));
+    expect(await run(T.update_tag, { id: "t2", color: "green", description: "Work projects" })).toMatchObject({ tag: { name: "work", color: "green", description: "Work projects" } });
+    expect(await run(T.update_tag, { id: "t2", name: "office" })).toMatchObject({ tag: { name: "office", color: "green", description: "Work projects" } });
+    expect(parseNote("notes/a.md", (await notes.read("notes/a.md"))!.text).tags).toEqual(["work"]);
+    expect(await run(T.update_tag, { id: "t2", color: null, description: "" })).toMatchObject({ tag: { color: undefined, description: "" } });
+    expect(await run(T.update_tag, { id: "missing", name: "x" })).toHaveProperty("error");
+    expect(await run(T.update_tag, { id: "t2" })).toHaveProperty("error");
+  });
+  it("asks before tag writes, including after reading web content with cards off", async () => {
+    for (const name of ["create_tag", "update_tag"] as const) {
+      expect(await approvals(notes, todo, false)[name]({}, { messages: [] })).toBe("user-approval");
+      expect(await approvals(notes, todo, true)[name]({}, { messages: [] })).toBe("not-applicable");
+      expect(await approvals(notes, todo, true)[name]({}, { messages: [web] })).toBe("user-approval");
+    }
+  });
+});

@@ -43,7 +43,19 @@ export function fakePb() {
       const m = /^\/api\/collections\/(\w+)\/records(?:\/([\w-]+))?$/.exec(u.pathname);
       if (!m) return err(404);
       const [, col, id] = m;
-      if (col === "tags") return Response.json({ items: tags });
+      if (col === "tags") {
+        if (req.method === "GET") return Response.json({ items: tags });
+        const body = await req.json() as Rec;
+        if (tags.some((t) => t.id !== id && t.name.toLowerCase() === body.name.toLowerCase())) return err(400, { message: "Tag name already exists" });
+        if (req.method === "POST") {
+          const tag = { ...body, id: `tag${tags.length + 1}` }; tags.push(tag);
+          return Response.json(tag);
+        }
+        const tag = tags.find((t) => t.id === id);
+        if (!tag) return err(404);
+        Object.assign(tag, body);
+        return Response.json(tag);
+      }
       if (col === "attachments") {
         const note = /^note = "(.*)"$/.exec(u.searchParams.get("filter") ?? "")?.[1];
         return Response.json({ items: [...attachments.values()].filter((a) => !note || a.note === note).map(({ bytes: _, ...a }) => a) });

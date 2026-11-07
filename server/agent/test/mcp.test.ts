@@ -38,6 +38,19 @@ describe("mcp", () => {
     await c.close();
   });
 
+  it("creates and partially updates tag definitions through MCP", async () => {
+    const c = await connect();
+    const made = json(await c.callTool({ name: "create_tag", arguments: { name: "travel", description: "Trips" } }));
+    expect(made.tag.name).toBe("travel");
+    const changed = json(await c.callTool({ name: "update_tag", arguments: { id: made.tag.rec, color: "blue" } }));
+    expect(changed.tag).toMatchObject({ name: "travel", description: "Trips", color: "blue" });
+    const listed = json(await c.callTool({ name: "list_tags", arguments: {} }));
+    expect(listed.tags).toContainEqual({ id: made.tag.rec, name: "travel", means: "Trips", color: "blue" });
+    const bad = await c.callTool({ name: "create_tag", arguments: { name: " ", description: "x" } });
+    expect(bad.isError).toBe(true);
+    await c.close();
+  });
+
   it("creates a note, marked tainted, and reads it back", async () => {
     const c = await connect();
     const made = json(await c.callTool({ name: "create_note", arguments: { title: "From the laptop", body: "- one\n" } }));

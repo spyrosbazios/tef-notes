@@ -38,6 +38,7 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 /** The line under a tool's name: what it looked for, which note, or the agent's why. */
 const DETAIL: Record<ToolName, (i: Record<string, unknown>) => string> = {
   search_notes: (i) => str(i.query), list_notes: (i) => [str(i.filter), str(i.tag)].filter(Boolean).join(" · "),
+  create_tag: (i) => str(i.name), update_tag: (i) => str(i.name) || str(i.id),
   list_tags: () => "", show_items: () => "",
   read_note: (i) => titleOf(i.path), create_note: (i) => str(i.title), append_to_note: (i) => titleOf(i.path),
   rewrite_note: (i) => str(i.why) || titleOf(i.path), set_note_flags: (i) => `${titleOf(i.path)} · ${flagLine(i as WriteInput, true)}`, delete_note: (i) => titleOf(i.path),
