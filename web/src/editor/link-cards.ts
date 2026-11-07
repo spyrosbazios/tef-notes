@@ -1,4 +1,4 @@
-// A paragraph that is only a URL gets a card under it, always (the URL alone until the page answers): picture, title, description, site, as Notion and
+// A paragraph that is only a URL (bare, or one labelled link) gets a card under it, always (the URL alone until the page answers): picture, title, description, site, as Notion and
 // Outline unfurl a pasted link. The card is a widget decoration, not a node: the note stays the one line of markdown
 // it was, a `[text](url)` link inside a sentence stays a link, and delete the line and the card is gone.
 // Where the page's metadata comes from is the caller's (`resolve`): the server reads it (CORS keeps a browser out), and
@@ -21,27 +21,33 @@ const BARE = /^https?:\/\/[^\s<>]+$/;
 const TYPING = 400;          // ms a URL under the cursor must sit still before it is looked up: not once per letter typed
 const RETRY = 30_000;        // ms before a lookup that could not be made is made again
 
-/** The URL a paragraph is by itself: its text, in plain text or linked as markdown wrote a bare URL, and nothing else
- *  (a word beside it, a mark, an image or a break make it prose). null otherwise. */
-export function bareUrl(p: Node): string | null {
+/** The URL a paragraph is by itself: its text, in plain text or linked as markdown wrote a bare URL, or one
+ *  `[label](url)` link that is the whole paragraph (a clip's line), and nothing else (a word beside it, another mark,
+ *  an image or a break make it prose). null otherwise. */
+export function cardUrl(p: Node): string | null {
   if (p.type.name !== "paragraph" || !p.childCount) return null;
   let text = "";
+  let href: string | null = null;
   for (let i = 0; i < p.childCount; i++) {
     const c = p.child(i);
     if (!c.isText) return null;
-    if (c.marks.length && !(c.marks.length === 1 && c.marks[0].type.name === "link" && c.marks[0].attrs.markup)) return null;
-    if (c.marks.length && isPdfLink(c.marks[0].attrs.href)) return null;      // a PDF attached to the note is a chip (./files), not a card
-    text += c.text;
+    if (!c.marks.length) { text += c.text; continue; }
+    const m = c.marks[0];
+    if (c.marks.length > 1 || m.type.name !== "link" || isPdfLink(m.attrs.href)) return null;  // a PDF attached to the note is a chip (./files), not a card
+    if (m.attrs.markup) text += c.text;
+    else if (i === 0 && p.childCount === 1) href = m.attrs.href;
+    else return null;
   }
+  if (href) return BARE.test(href) ? href : null;
   text = text.trim();
   return BARE.test(text) && !isPdfLink(text) ? text : null;
 }
 
-/** Every bare-URL paragraph at the top of the note, with the position just after it. */
+/** Every paragraph that is one URL at the top of the note, with the position just after it. */
 function bareUrls(doc: Node): { url: string; end: number; from: number }[] {
   const out: { url: string; end: number; from: number }[] = [];
   doc.forEach((n, offset) => {
-    const url = bareUrl(n);
+    const url = cardUrl(n);
     if (url) out.push({ url, from: offset, end: offset + n.nodeSize });
   });
   return out;

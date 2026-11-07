@@ -1,15 +1,15 @@
 // Which paragraphs get a link card: only a paragraph that is nothing but one URL.
 import { describe, expect, test } from "bun:test";
-import { bareUrl } from "../src/editor/link-cards";
+import { cardUrl } from "../src/editor/link-cards";
 import { parse } from "../src/editor/markdown";
 
 const urls = (md: string) => {
   const out: (string | null)[] = [];
-  parse(md).forEach((n) => out.push(bareUrl(n)));
+  parse(md).forEach((n) => out.push(cardUrl(n)));
   return out;
 };
 
-describe("bareUrl", () => {
+describe("cardUrl", () => {
   test("a URL alone on its line, however it was written", () => {
     expect(urls("https://example.com/a?b=1\n\n<https://example.org/x>\n\nhttp://example.net/")).toEqual([
       "https://example.com/a?b=1", "https://example.org/x", "http://example.net/",
@@ -18,8 +18,11 @@ describe("bareUrl", () => {
   test("surrounding whitespace does not matter", () => {
     expect(urls("  https://example.com/a  \n")).toEqual(["https://example.com/a"]);
   });
-  test("prose, a titled link, a marked or coded URL do not", () => {
-    expect(urls("see https://example.com/a\n\n[a page](https://example.com/a)\n\n**https://example.com/a**\n\n`https://example.com/a`\n\nhttps://a.com/x https://b.com/y")).toEqual([null, null, null, null, null]);
+  test("a labelled link that is the whole line: its address", () => {
+    expect(urls("[a page](https://example.com/a)")).toEqual(["https://example.com/a"]);
+  });
+  test("prose, a link among words, a marked or coded URL do not", () => {
+    expect(urls("see https://example.com/a\n\nsee [a page](https://example.com/a)\n\n[a **b**](https://example.com/a)\n\n**https://example.com/a**\n\n`https://example.com/a`\n\nhttps://a.com/x https://b.com/y")).toEqual([null, null, null, null, null, null]);
   });
   test("only at the top: a URL in a list or quote stays a link", () => {
     expect(urls("- https://example.com/a\n\n> https://example.com/b")).toEqual([null, null]);

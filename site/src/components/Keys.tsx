@@ -4,13 +4,12 @@ import { cn } from "@/lib";
 import { ExaMark, PROVIDERS, ProviderMark, TypeSafeMark } from "./logos";
 import { Heading, Reveal } from "./ui";
 
-/** One key: whose it is, what it is for, the file it lives in and what it powers. */
-type Key = { mark: ReactNode; name: string; by: string; does: string; file: string; powers: [LucideIcon, string][]; extra?: ReactNode };
+/** One key: whose it is, what it is for and what it powers. */
+type Key = { mark: ReactNode; name: string; by: string; does: string; powers: [LucideIcon, string][]; extra?: ReactNode };
 
 const KEYS: Key[] = [
   {
     mark: <Bot className="size-9" strokeWidth={1.6} />, name: "A writing model", by: "your pick of seven", does: "Writes: the chat, a clip's note, summaries.",
-    file: "keys/<provider>/api-key",
     powers: [[MessageSquareText, "The assistant"], [Tags, "Summaries and tag descriptions"]],
     extra: (
       <div className="mt-4 flex flex-wrap gap-1.5">
@@ -24,7 +23,6 @@ const KEYS: Key[] = [
   },
   {
     mark: <TypeSafeMark className="h-10" />, name: "JEV", by: "TypeSafe AI", does: "Decides: a typed question in, a probability out. Never prose.",
-    file: "keys/typesafe/api-key",
     powers: [[Tags, "Auto-tagging"], [Search, "Where a clip belongs"]],
     extra: (
       <div className="mt-4 rounded-xl border border-line bg-bg/60 p-3">
@@ -38,21 +36,17 @@ const KEYS: Key[] = [
   },
   {
     mark: <ExaMark className="h-9" />, name: "Exa", by: "exa.ai", does: "Searches: the web, for the assistant only.",
-    file: "keys/exa/api-key",
     powers: [[Search, "Web search"], [MessageSquareText, "Read a page into the chat"]],
     extra: <p className="mt-4 text-[13px] leading-snug text-faint">A turn that read the web cannot write a note on its own, and its memory stays closed.</p>,
   },
 ];
 
-/** The file the key lives in, and what it powers. */
+/** What the key powers. */
 function Slot({ k }: { k: Key }) {
   return (
-    <div>
-      <code className="block rounded-xl border border-line bg-bg/60 px-3 py-2.5 text-[12px] text-dim">{k.file}</code>
-      <ul className="mt-3 space-y-1.5">
-        {k.powers.map(([I, label]) => <li key={label} className="flex items-center gap-2.5 text-[14px]"><I className="size-4 text-brand" />{label}</li>)}
-      </ul>
-    </div>
+    <ul className="space-y-1.5 border-t border-line pt-4">
+      {k.powers.map(([I, label]) => <li key={label} className="flex items-center gap-2.5 text-[14px]"><I className="size-4 text-brand" />{label}</li>)}
+    </ul>
   );
 }
 

@@ -1,145 +1,139 @@
-# TEF Notes
+<p align="center">
+  <img src="docs/assets/mark.svg" width="64" height="64" alt="">
+</p>
 
-<!-- reviewed: 2026-11-07 -->
+<h1 align="center">TEF Notes</h1>
 
-> **There is no sign-in.** Anyone who can reach the server's port can read, write and delete every note, task and
-> attachment. Never expose it to the public internet: no port forward, no public proxy. Reach it only through a reverse
-> proxy on a private network (Tailscale or similar). Read [SECURITY.md](SECURITY.md) before you deploy.
+<p align="center">
+  <strong>Your notes and tasks. On your own server.</strong><br>
+  Write in Markdown, link tasks to your notes, and work with an optional assistant that asks before it writes.
+</p>
 
-**TEF Notes** is a personal notes and tasks system you host yourself. Notes are
-markdown files with a little frontmatter, kept on a server you run; an Android app, a web app, a terminal client and a
-Chrome clipper all read and write them. Tasks work the way Things does. A chat agent can search, read and
-edit your notes and tasks (and ask before it writes), and an optional auto-tagger files notes under your tags.
+<p align="center">
+  <a href="#get-started">Get started</a> ·
+  <a href="#demo">Watch the demo</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-## Features
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-ffa070?style=flat-square" alt="License: AGPL-3.0"></a>
+  <a href="web/README.md"><img src="https://img.shields.io/badge/client-Web-403d52?style=flat-square" alt="Web client"></a>
+  <a href="mobile/README.md"><img src="https://img.shields.io/badge/client-Android-403d52?style=flat-square" alt="Android client"></a>
+</p>
 
-- **Notes**: markdown with frontmatter (`title`, `tags`, `color`, `pinned`), checkboxes, tables, code, links with
-  previews and a Reader view (the linked article, clutter gone), photos, PDFs and Excalidraw drawings. Notes can be in any language.
-- **Tasks**: Inbox, Today, This Evening, Upcoming and Logbook views; checklists, due dates, reminders and
-  repeating tasks (`2w`, `+3d`, `mon,thu`).
-- **Offline-first phone app** (Android): SQLite cache, background sync, home and lock screen widgets, and a
-  field-level merge when two devices edited the same thing.
-- **Web app** for the laptop, served by the same server, with the same editor as the phone.
-- **Chat agent**: an assistant in its own Ask tab on the phone and a dock on every web screen; it sees the page you are
-  on, answers over your notes, adds and edits notes and tasks through confirm cards, and optionally searches the web. It keeps a small memory of how you work.
-- **MCP server** (optional, off by default): hand your notes and tasks to another agent harness, such as Claude Code,
-  Codex or Cursor, with the same tools and write safety as the chat agent. See [server/agent/README.md](server/agent/README.md#mcp-the-tools-for-another-agent-harness).
-- **Auto-tagging**: a background job adds the tags it is sure of and offers the ones it is not.
-- **Browser clipper**: save a page or a picture to a new note, an existing note or a task, with suggestions for where
-  it fits and an optional summary.
-- **CLI** (`tefnotes`): read, append, edit and export notes and tasks from a terminal or a coding agent. Every write
-  is compare-and-swap, so it never overwrites an edit it has not seen.
-- English UI. Titles in other scripts (Greek, for one) are transliterated for file names.
+![TEF Notes web app beside an illustration of its Android interface, with sample notes and tasks](docs/assets/overview.png)
 
-## Security model: read first
+*The web app and an illustrated Android screen, using sample content. Rosé Pine theme, orange accent.*
 
-**There is no sign-in.** Every collection is open (`server/pb_migrations/1792400000_open.js`): anyone who can reach the
-server's port can read, write and delete every note, task and attachment. The design leaves access control to the
-network:
+## Notes and tasks, together
 
-- The server binds to loopback only (`127.0.0.1`).
-- Your devices reach it through a reverse proxy on a **private network** (the author uses
-  [Tailscale Serve](https://tailscale.com/kb/1242/tailscale-serve) over HTTPS).
-- **Never expose it to the public internet**: no port forward, no public reverse proxy, no Tailscale Funnel.
+### Capture what you want to keep
 
-See [SECURITY.md](SECURITY.md) for what that means in practice and how to report a vulnerability.
+Write Markdown notes with checkboxes, tables and code. Add photos, PDFs and Excalidraw drawings. Save pages and
+pictures with the Chrome clipper, and open articles in a distraction-free Reader view.
 
-## Layout
+### Keep tasks close to their context
 
-| Directory | What it is | Docs |
-|---|---|---|
-| `packages/core/` | Dependency-free TypeScript shared by every client: note format, 3-way merge, PocketBase client, task logic, agent card shapes, theme palettes. Imported everywhere as `@/core/*` | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| `server/` | PocketBase with JS hooks and migrations; `server/agent/` is the chat agent (a bun sidecar that streams). One `docker compose up -d` pulls the published images; the signed extension needs a build from source | [server/README.md](server/README.md) |
-| `web/` | The web app (Vite, React, shadcn). Also builds the phone's editor and PDF viewer pages | [web/README.md](web/README.md) |
-| `mobile/` | The Android app (Expo, React Native, offline-first, pnpm 11) | [mobile/README.md](mobile/README.md) |
-| `cli/` | The `tefnotes` command-line client (bun) | [cli/README.md](cli/README.md) |
-| `extension/` | The Chrome (MV3) clipper, packed as a signed CRX the server serves | [extension/README.md](extension/README.md) |
-| `site/` | The public marketing page: a static Vite build, deployed on its own | [site/README.md](site/README.md) |
+Work through Inbox, Today, This Evening, Upcoming and Logbook. Add checklists, deadlines, reminders and repeating
+tasks. Link a task to the notes it belongs with, and find those tasks again from the note.
 
-How the pieces fit, the note format and the write contract: [ARCHITECTURE.md](ARCHITECTURE.md).
+### Ask an assistant that knows what is open
 
-## Quick start
+Search and discuss your notes, or ask the assistant to add a task or edit a note. It sees the page you are on and
+shows changes for approval before saving by default. Choose your model provider, including a local model through
+Ollama. Auto-tagging and web search are optional too.
 
-Clone the whole repository: every module imports `packages/core`.
+### Keep control of your data
+
+Run the server yourself. The Android app keeps an offline copy and merges edits when it reconnects. Export notes
+and their attachments as files with the CLI. Notes and tasks remain usable without configuring an AI provider.
+
+### Focus with lenses
+
+A lens filters **notes and tasks together**. Give each one a name and choose the tags it includes or hides:
+
+| Lens | What you see |
+|---|---|
+| Work | Notes and tasks tagged `work` |
+| Life | Notes and tasks tagged `home` or `travel` |
+
+Switch the lens to change your focus. A new note or task inherits the lens’s first tag.
+
+## Demo
+
+![60-second TEF Notes demo: notes with photos and PDFs, the assistant, task creation from Home and lenses](docs/demo.gif)
+
+*A one-minute tour with sample data. The assistant interaction uses the real agent.*
+
+## Get started
+
+> [!IMPORTANT]
+> **TEF Notes is a personal app for a private network. There is no sign-in.** Anyone who can reach the server can
+> read, edit and delete its data. Keep its ports on loopback, use a private-network reverse proxy for your devices,
+> and never expose it to the public internet. Read the [security model](SECURITY.md) before deploying.
+
+You need Docker with Compose. `docker compose up -d` pulls the published images (the server with the web app, and the
+agent) for amd64 and arm64; building from source, which is also how the signed clipper is made, is in the
+[server setup](server/README.md). Want an AI agent to do the install for you? Give it the [self-host skill](skills/self-host/SKILL.md).
 
 ```sh
-git clone https://github.com/spyrosbazios/tef-notes.git tefnotes && cd tefnotes/server
-cp .env.example .env              # set TEF_NOTES_URL to the address your devices will use (and TZ)
-mkdir -p keys/deepseek            # optional AI keys: one api-key file per provider, see below
-cp /path/to/key keys/deepseek/api-key
-docker compose up -d              # pulls the published images (server + web app, and the agent); build from source: server/README.md
+git clone https://github.com/spyrosbazios/tef-notes.git
+cd tef-notes/server
+cp .env.example .env
+mkdir -p keys/typesafe keys/deepseek keys/exa
+# Edit .env: set TEF_NOTES_URL to your private origin and choose TZ.
+docker compose up -d
 ```
 
-Then:
+On the server machine, open [localhost:8097](http://localhost:8097). To use the app from your phone or another
+computer, configure the private reverse proxy described in the [server setup](server/README.md#security-model-read-first).
+Both `/api` and `/agent` must reach the same private origin. AI keys are optional; add them when you want those features.
 
-1. Put a reverse proxy on a private network in front of the two loopback ports (`PB_PORT`, default 8097, serves the
-   API and the web app; `AGENT_PORT`, default 8098, serves the chat agent under `/agent` on the same origin).
-   `TEF_NOTES_URL` is that origin. Chrome installs an extension only from https, so use https if you want the clipper.
-2. Open the web app at `TEF_NOTES_URL`.
-3. Install the Android app from the APK you build following [mobile/README.md](mobile/README.md), and enter your URL.
-4. Point the CLI at it with `bun cli/tefnotes.ts server <url>` ([cli/README.md](cli/README.md)).
-5. Install the extension as described in [extension/README.md](extension/README.md).
+### Use it where you are
 
-Want an AI agent to do this for you? Give it the [self-host skill](skills/self-host/SKILL.md).
+| Client | How to get it |
+|---|---|
+| **Web** | Included in the server build; open your server’s URL. [Web guide](web/README.md) |
+| **Android** | Install the APK from the [latest release](https://github.com/spyrosbazios/tef-notes/releases/latest), then enter your server’s URL. [Android guide](mobile/README.md) |
+| **Chrome clipper** | Build and sign it with the server, then install from its private HTTPS origin. [Clipper guide](extension/README.md) |
+| **CLI** | Run `tefnotes` with Bun to read, edit and export notes and tasks. [CLI guide](cli/README.md) |
+| **MCP** | Enable the server endpoint to connect another agent harness. [MCP guide](server/agent/README.md#mcp-the-tools-for-another-agent-harness) |
 
-Server configuration, the extension's signing key and the deploy checks are in [server/README.md](server/README.md).
+The UI is in English. Notes can be in any language.
 
 ## AI providers
 
-All optional. Each key is a file `server/keys/<provider>/api-key` holding the key alone (or a directory you name in
-`server/.env`, see `server/.env.example`). Keys are mounted read-only and re-read on every use, so a new key needs no
-restart. The model provider is your choice; see below.
+All AI features are optional. The assistant runs on your server and uses the model provider you configure; the
+clients hold no model keys. You can choose DeepSeek, Anthropic, OpenAI, Grok, Qwen, Z.ai or Ollama.
 
-| Provider | Powers | Without it |
-|---|---|---|
-| `typesafe` (JEV, a vision and ranking model) | Auto-tagging and the clipper's suggestions of where a page fits | Neither does anything; you can still save a clip to a note you pick or a new one |
-| The model provider (`TEF_NOTES_PROVIDER`, below) | The chat agent, the clipper's write-up and optional summary, tag descriptions | The chat is unavailable; a clip is saved as you typed it, without a summary |
-| `exa` | The chat agent's web search | The agent has no web tools |
-
-One model provider per server, chosen with `TEF_NOTES_PROVIDER` in `server/.env` (default `deepseek`); its key goes in
-`server/keys/<provider>/api-key`. `TEF_NOTES_MODEL` picks another of its models; the app's model picker lists them all.
-
-| `TEF_NOTES_PROVIDER` | Default model | Key from |
-|---|---|---|
-| `deepseek` | `deepseek-flash` | platform.deepseek.com |
-| `anthropic` | `claude-sonnet-5-5` | console.anthropic.com |
-| `openai` | `gpt-6-luna` | platform.openai.com |
-| `xai` (Grok) | `grok-4.7` | console.x.ai |
-| `qwen` | `qwen-plus` | Alibaba Cloud Model Studio (international; `TEF_NOTES_LLM_URL` for another region) |
-| `zai` (Z.ai, GLM) | `glm-5.3` | z.ai |
-| `ollama` | none: set `TEF_NOTES_MODEL` | no key: set `TEF_NOTES_OLLAMA_URL` (`http://host.docker.internal:11434` for one on the same host) |
-
-Switching provider: set `TEF_NOTES_PROVIDER`, put the key in `server/keys/<provider>/api-key`, then
-`docker compose up -d` (the variables apply when the containers are recreated). A model that calls tools reliably
-matters for the chat; a small local model may not.
-
-Whatever you send to a provider leaves your server: note text, photos the auto-tagger looks at, pages you clip. Leave
-a key out to keep that feature off.
+See [AI providers and configuration](docs/ai-providers.md) for models, key files, auto-tagging and web search.
+Content sent to a configured provider leaves your server. Leave its key out to keep that feature off.
 
 ## Backups
 
-TEF Notes ships no backup tooling. `server/pb_data/` is the whole database and its attachments; if you lose it, your
-notes are gone. Back it up yourself, either with PocketBase's backup API (from the admin dashboard at `/_/`, or
-scheduled there) or by copying the directory with the containers stopped (`docker compose stop`). Test a restore once.
+Back up `server/pb_data/`: it holds the database and attachments. TEF Notes does not provide automatic backups.
+Use PocketBase’s backup API, or stop the containers before copying the directory. Test a restore before relying on
+it. See the [backup guide](server/README.md#backups).
 
-## Development
+## Documentation
 
-Each module documents its own setup, checks and build steps:
+| Start here | What it covers |
+|---|---|
+| [Server setup](server/README.md) | Installation, private proxy, configuration, upgrades and backups |
+| [Security](SECURITY.md) | Network access, AI data handling and vulnerability reports |
+| [AI providers](docs/ai-providers.md) | Optional models and keys, auto-tagging and web search |
+| [Chat agent and MCP](server/agent/README.md) | Assistant context, approval cards, widgets and external harnesses |
+| [Architecture](ARCHITECTURE.md) | Repository layout, note format, links, sync and the write contract |
+| [Contributing](CONTRIBUTING.md) | Development setup, module checks and contribution rules |
 
-- `packages/core`: [ARCHITECTURE.md](ARCHITECTURE.md); `cd packages/core && bun test && bun run typecheck`
-- `server`: [server/README.md](server/README.md); tests with `cd server && bun test` (the agent's included)
-- `web`: [web/README.md](web/README.md); tests with `bun test`
-- `mobile`: [mobile/README.md](mobile/README.md); tests with `pnpm test`
-- `cli`: [cli/README.md](cli/README.md)
-- `extension`: [extension/README.md](extension/README.md)
+## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before sending a change. `AGENTS.md` is for AI coding agents working in the repo.
-
-## Screenshots
-
-<!-- screenshots: add docs/screenshots/*.png -->
+Bug reports, feature ideas and code contributions are welcome. [Open an issue](https://github.com/spyrosbazios/tef-notes/issues)
+with what you expected, what happened and how to reproduce it. For code changes, start with [CONTRIBUTING.md](CONTRIBUTING.md).
+Report security issues through the process in [SECURITY.md](SECURITY.md).
 
 ## License
 
-AGPL-3.0, see [LICENSE](LICENSE). Contributions need a one-time CLA ([CONTRIBUTING.md](CONTRIBUTING.md#licence-and-cla)). The phone app's font, Atkinson Hyperlegible, is under the SIL Open Font License
-(`mobile/assets/fonts/OFL.txt`).
+[GNU AGPL-3.0](LICENSE). Contributions require a one-time [Contributor License Agreement](CLA.md).
+The Atkinson Hyperlegible fonts use the [SIL Open Font License](mobile/assets/fonts/OFL.txt).

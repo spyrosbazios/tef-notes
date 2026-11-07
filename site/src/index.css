@@ -101,7 +101,7 @@
   .group:hover .hov-pop { opacity: 1; transform: none; }
   .hov-line { opacity: 0; transition: opacity 0.2s; }
   .group:hover .hov-line { opacity: 1; }
-  .hov-draw path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 0.45s ease-out; }
+  .hov-draw path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 0.35s ease-out; }
   .group:hover .hov-draw path { stroke-dashoffset: 0; }
   .hov-mosaic > * { transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1); }
   .group:hover .hov-mosaic > *:nth-child(1) { transform: scale(1.06); }
@@ -119,17 +119,20 @@
   .group:hover .hov-done { opacity: 1; }
   .hov-lit > * { transition: border-color 0.3s, background 0.3s, color 0.3s; }
   .group:hover .hov-lit > * { border-color: var(--tf-brand); background: var(--tf-accent); color: var(--tf-fg); }
-  .hov-clutter { transition: opacity 0.4s, transform 0.4s; }
-  .group:hover .hov-clutter { opacity: 0; transform: translateX(12px); }
-  .hov-article { transition: width 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s, top 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s; }
-  .group:hover .hov-article { width: calc(100% - 20px); top: 10px; }
+  .hov-out { transition: opacity 0.35s, transform 0.35s; }
+  .group:hover .hov-out { opacity: 0; transform: scale(0.97); }
+  .hov-in { opacity: 0; transform: scale(1.03); transition: opacity 0.4s 0.15s, transform 0.4s 0.15s; }
+  .group:hover .hov-in { opacity: 1; transform: none; }
+  .hov-fade { opacity: 0; transition: opacity 0.5s 0.6s; }
+  .group:hover .hov-fade { opacity: 1; }
   .group:hover .lens-a { animation: none; opacity: 0; }
   .group:hover .lens-b { animation: none; opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
     .hov-pop, .hov-line, .hov-done { opacity: 1; transform: none; }
     .hov-draw path { stroke-dashoffset: 0; }
-    .group:hover .hov-card, .group:hover .hov-clutter { opacity: 1; transform: none; }
-    .group:hover .hov-article { width: 62%; top: 2.5rem; }
+    .group:hover .hov-card { opacity: 1; transform: none; }
+    .hov-out { display: none; }
+    .hov-in, .hov-fade { opacity: 1; transform: none; }
     .hov-done { display: none; }
   }
 

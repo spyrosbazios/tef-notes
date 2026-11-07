@@ -67,8 +67,8 @@ result.
 | `TEF_NOTES_KEY_TYPESAFE` | `./keys/typesafe` | Directory holding `api-key`, mounted read-only at `/run/typesafe`. |
 | `TEF_NOTES_KEY_LLM` | `./keys/<TEF_NOTES_PROVIDER>` | Same, for the model provider, mounted into both containers at `/run/llm`. |
 | `TEF_NOTES_KEY_EXA` | `./keys/exa` | Same, for Exa, mounted into the agent at `/run/exa`. |
-| `TEF_NOTES_CRX_KEY` | `./no-crx-key` | Path to the extension's signing key, inside `server/`. Extension build only. |
-| `TEF_NOTES_PROVIDER` | `deepseek` | The model provider for the chat agent and the server's clip and tag-description writing: `deepseek`, `anthropic`, `openai`, `xai`, `qwen`, `zai`, `ollama`. Defaults and keys: the root `README.md`, "AI providers". |
+| `TEF_NOTES_CRX_KEY` | `./no-crx-key` | Path to the extension's signing key, inside `server/`. Extension build only, see the extension section. |
+| `TEF_NOTES_PROVIDER` | `deepseek` | The model provider for the chat agent and the server's clip and tag-description writing: `deepseek`, `anthropic`, `openai`, `xai`, `qwen`, `zai`, `ollama`. Defaults and keys: [AI providers](../docs/ai-providers.md). |
 | `TEF_NOTES_MODEL` | the provider's | The model; Ollama has no default. |
 | `TEF_NOTES_LLM_URL` | the provider's | Its API root, e.g. another Qwen region. |
 | `TEF_NOTES_OLLAMA_URL` | | Ollama only: where it serves (`http://host.docker.internal:11434` for one on the Docker host). |

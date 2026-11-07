@@ -1,4 +1,4 @@
-import { BookOpen, Check, ChevronDown, FileText, NotebookText, PenTool, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Check, ChevronDown, Circle, FileText, MousePointer2, NotebookText, PenTool, Sparkles, Square, Type, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib";
 import { THEMES, withAccent } from "@/core/theme";
@@ -48,46 +48,109 @@ function Through({ lens, className }: { lens: "Home" | "Work"; className: string
   );
 }
 
-/** A sketch as Excalidraw draws one: wobbly strokes, round caps, a little tilt. A kitchen plan with an arrow and a label. */
+/** Excalidraw's hand: every stroke drawn twice, the second a little off and fainter, a wobble in the lines. */
+const Rough = ({ d, className, delay }: { d: string; className?: string; delay?: number }) => {
+  const style = delay != null ? { transitionDelay: `${delay}ms` } : undefined;
+  return (
+    <g className={className}>
+      <path d={d} pathLength={1} style={style} />
+      <path d={d} pathLength={1} transform="translate(0.9 0.7)" opacity={0.45} style={style} />
+    </g>
+  );
+};
+const box = (x: number, y: number, w: number, h: number) =>
+  `M${x} ${y} q${w / 2} -1.6 ${w} 0 q1.4 ${h / 2} 0 ${h} q-${w / 2} 1.6 -${w} 0 q-1.4 -${h / 2} 0 -${h} z`;
+const blob = (cx: number, cy: number, rx: number, ry: number) =>
+  `M${cx - rx} ${cy} q0.5 -${ry} ${rx} -${ry} q${rx} 0.5 ${rx} ${ry} q-0.5 ${ry} -${rx} ${ry} q-${rx} -0.5 -${rx} -${ry} z`;
+
+/** A mind map as Excalidraw draws one: an ellipse in the middle, boxes around it, arrows between, one box hatched. The
+ *  arrows draw and the hatching fills when the tile is hovered. */
 const Sketch = () => (
-  <svg viewBox="0 0 320 150" className="h-36 w-full" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <g className="text-fg" transform="rotate(-0.6 160 75)">
-      <path d="M22 30 Q 23 29 120 30 T 118 108 Q 118 110 20 109 T 22 30" />
-      <path d="M40 42 q 30 -2 60 1" strokeDasharray="3 5" />
-      <path d="M140 60 q 2 -22 36 -24 q 36 2 34 26 q -2 24 -36 24 q -36 -2 -34 -26" />
-      <path d="M156 61 l 8 7 l 14 -16" strokeWidth="2.4" />
-      <path d="M240 36 q 40 -2 58 2 q 2 50 -2 70 q -36 2 -56 -2 q -2 -40 0 -70 z" />
-      <path d="M252 50 h 32 M252 64 h 24 M252 78 h 30" strokeDasharray="1 0" className="text-dim" />
+  <svg viewBox="0 0 320 150" className="h-36 w-full" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <defs>
+      <pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><path d="M0 0 V5" className="stroke-brand" strokeWidth="1" /></pattern>
+    </defs>
+    <g className="text-fg" transform="rotate(-0.8 160 75)">
+      <Rough d={blob(160, 72, 48, 19)} />
+      <text x="160" y="76" textAnchor="middle" fontSize="12" fontWeight="600" stroke="none" className="fill-fg">Lisbon trip</text>
+      <Rough d={box(18, 20, 74, 26)} />
+      <text x="34" y="37" fontSize="11" stroke="none" className="fill-fg">Flights</text>
+      <path d="M72 33 l 4 4 l 8 -9" className="text-up" strokeWidth="2" />
+      <path d={box(18, 104, 86, 26)} fill="url(#hatch)" stroke="none" className="hov-fade" />
+      <Rough d={box(18, 104, 86, 26)} />
+      <text x="30" y="121" fontSize="11" stroke="none" className="fill-fg">Sintra train</text>
+      <Rough d={box(226, 58, 84, 26)} />
+      <text x="240" y="75" fontSize="11" stroke="none" className="fill-fg">Where to eat</text>
+      <Rough d={box(214, 108, 74, 26)} />
+      <text x="228" y="125" fontSize="11" stroke="none" className="fill-fg">Pack list</text>
     </g>
-    <g className="text-brand hov-draw" strokeWidth="2.2" pathLength={1}>
-      <path d="M122 70 q 6 -8 16 -3" pathLength={1} />
-      <path d="M132 64 l 7 3 l -5 6" pathLength={1} style={{ transitionDelay: "250ms" }} />
-      <path d="M212 60 q 14 -2 26 0" pathLength={1} style={{ transitionDelay: "400ms" }} />
-      <path d="M232 57 l 7 3 l -6 5" pathLength={1} style={{ transitionDelay: "650ms" }} />
-    </g>
-    <g className="text-dim" strokeWidth="1.6">
-      <path d="M44 128 q 2 -4 6 0 t 6 0 M58 125 q 3 4 0 6 M66 124 q 0 8 0 8 q 5 -8 6 0 M80 128 q 2 -4 5 0 t 5 0" />
-      <path d="M234 126 l 6 -4 l 5 7 M250 122 l 0 9 M258 126 q 3 -5 6 0 t 6 0" />
+    <g className="text-brand hov-draw" strokeWidth="1.8">
+      <Rough d="M118 62 q -8 -12 -26 -22" />
+      <Rough d="M96 46 l -4 -6 l 7 0" delay={200} />
+      <Rough d="M124 82 q -12 10 -30 22" delay={280} />
+      <Rough d="M101 100 l -7 4 l 1 -7" delay={480} />
+      <Rough d="M208 70 q 8 1 18 1" delay={560} />
+      <Rough d="M221 68 l 5 3 l -5 3" delay={720} />
+      <Rough d="M196 86 q 10 14 18 22" delay={800} />
+      <Rough d="M207 107 L214 108 L213 101" delay={960} />
     </g>
   </svg>
 );
 
-/** A web page as it comes, banners and a sidebar around a column of text, which on hover clears to the article alone:
- *  Reader view. The clutter fades and slides out; the column widens and its lines fill. */
+const TOOLS = [MousePointer2, Square, Circle, ArrowRight, PenTool, Type];
+
+/** The sketch in its frame: Excalidraw's island of tools on top, the file's name, and the way into Excalidraw. */
+const Drawing = () => (
+  <div className="relative overflow-hidden rounded-xl border border-line bg-card">
+    <Sketch />
+    <span className="absolute left-1/2 top-2 flex -translate-x-1/2 gap-0.5 rounded-lg border border-line bg-bg/90 p-0.5">
+      {TOOLS.map((I, i) => <span key={i} className={cn("flex size-5 items-center justify-center rounded", i === 0 ? "bg-accent text-brand" : "text-dim")}><I className="size-3" /></span>)}
+    </span>
+    <span className="hov-pop absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-bg/90 px-2.5 py-1 text-[12px] font-medium"><PenTool className="size-3.5 text-brand" />Edit in Excalidraw</span>
+    <span className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-lg border border-line bg-bg/90 px-2 py-0.5 text-[12px]"><FileText className="size-3.5 text-brand" />lisbon.excalidraw</span>
+  </div>
+);
+
+const Line = ({ w, className }: { w: number; className?: string }) => <div className={cn("h-1.5 rounded bg-dim/50", className)} style={{ width: `${w}%` }} />;
+const Ad = ({ className }: { className?: string }) => <div className={cn("flex items-center justify-center rounded bg-raised text-[9px] font-semibold tracking-wider text-faint", className)}>AD</div>;
+
+/** A page as the web hands it over, a column of text hemmed in by a header, adverts and a cookie bar; hovered, it is
+ *  the article alone, as the web app's Reader view shows it (components/reader.tsx): a title bar, the picture, the
+ *  title, a line about it, the text. */
 const Reader = () => (
-  <div className="relative h-36 overflow-hidden rounded-xl border border-line bg-card p-2.5">
-    <div className="hov-clutter absolute inset-x-2.5 top-2.5 h-5 rounded bg-raised" />
-    <div className="hov-clutter absolute bottom-2.5 right-2.5 top-10 w-[30%] space-y-1.5 rounded bg-raised/70 p-1.5" style={{ transitionDelay: "60ms" }}>
-      <div className="h-8 rounded bg-raised" /><div className="h-1.5 w-4/5 rounded bg-line" /><div className="h-1.5 w-3/5 rounded bg-line" /><div className="h-8 rounded bg-raised" />
-    </div>
-    <div className="hov-clutter absolute bottom-2.5 left-2.5 h-6 w-[62%] rounded bg-raised" style={{ transitionDelay: "120ms" }} />
-    <div className="hov-article absolute left-2.5 top-10 w-[62%]">
-      <div className="h-3 w-5/6 rounded bg-fg/80" />
-      <div className="mt-2 space-y-1.5">
-        {[1, 0.92, 0.97, 0.7, 0.95, 0.88].map((w, i) => <div key={i} className="h-1.5 rounded bg-dim/60" style={{ width: `${w * 100}%` }} />)}
+  <div className="relative h-36 overflow-hidden rounded-xl border border-line bg-card">
+    <div className="hov-out absolute inset-0 p-2.5">
+      <div className="flex h-5 items-center gap-1.5 rounded bg-raised px-1.5">
+        <span className="size-2.5 rounded-full bg-brand/70" /><span className="h-1.5 w-8 rounded bg-line" /><span className="h-1.5 w-6 rounded bg-line" /><span className="h-1.5 w-7 rounded bg-line" />
+        <span className="ml-auto h-3 w-9 rounded-full bg-line" />
+      </div>
+      <div className="mt-2 flex gap-2">
+        <div className="flex-1">
+          <Ad className="h-6" />
+          <div className="mt-2 h-2.5 w-5/6 rounded bg-fg/80" />
+          <div className="mt-1 h-1 w-1/3 rounded bg-faint/60" />
+          <div className="mt-2 space-y-1.5"><Line w={100} /><Line w={94} /><Line w={72} /></div>
+        </div>
+        <div className="w-[30%] space-y-1.5">
+          <Ad className="h-10" />
+          <Line w={90} className="bg-line" /><Line w={70} className="bg-line" />
+          <Ad className="h-6" />
+        </div>
+      </div>
+      <div className="absolute inset-x-2.5 bottom-2.5 flex h-6 items-center gap-2 rounded border border-line bg-bg/95 px-2">
+        <span className="h-1.5 flex-1 rounded bg-line" /><span className="h-3.5 w-10 rounded-full bg-brand/80" />
       </div>
     </div>
-    <span className="hov-pop absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-bg/90 px-2.5 py-1 text-[12px] font-medium"><BookOpen className="size-3.5 text-brand" />Reader</span>
+    <div className="hov-in absolute inset-0 flex flex-col">
+      <div className="flex h-7 shrink-0 items-center gap-2 border-b border-line px-3"><span className="min-w-0 flex-1 truncate text-[11px] font-semibold">Ten tascas worth the queue</span><X className="size-3 text-dim" /></div>
+      <div className="px-5 pt-3">
+        <Picture kind="sun" className="h-9 w-full rounded-md" />
+        <p className="mt-2 text-[12px] font-semibold leading-tight">Ten tascas worth the queue</p>
+        <p className="mt-0.5 text-[9px] text-faint">food-on-foot.example · 6 min</p>
+        <div className="mt-2 space-y-1.5"><Line w={100} /><Line w={96} /><Line w={88} /></div>
+      </div>
+      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-bg/90 px-2.5 py-1 text-[12px] font-medium"><BookOpen className="size-3.5 text-brand" />Reader</span>
+    </div>
   </div>
 );
 
@@ -157,13 +220,7 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Drawings, in the page", text: "An Excalidraw sketch, saved with the note.",
-    art: (
-      <div className="relative overflow-hidden rounded-xl border border-line bg-card">
-        <Sketch />
-        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full border border-line bg-bg/90 px-2.5 py-1 text-[12px] font-medium"><PenTool className="size-3.5 text-brand" />Edit in Excalidraw</span>
-        <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-lg border border-line bg-bg/90 px-2 py-0.5 text-[12px]"><FileText className="size-3.5 text-brand" />kitchen-plan.excalidraw</span>
-      </div>
-    ),
+    art: <Drawing />,
   },
   {
     title: "Terminal and agents", text: "A CLI, and MCP if you want it.",

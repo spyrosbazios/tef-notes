@@ -6,7 +6,7 @@ import type { Mark, Node } from "prosemirror-model";
 import { Plugin } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
-import { bareUrl } from "./link-cards";
+import { cardUrl } from "./link-cards";
 import { schema } from "./markdown";
 import { readButton, summarised, summaryButton, type Summarize } from "./link-tools";
 
@@ -21,9 +21,9 @@ export type ReadableRun = { href: string; end: number };
  *  A paragraph that is nothing but a URL is skipped: its card carries the button. */
 export function readableRuns(doc: Node): ReadableRun[] {
   const out: ReadableRun[] = [];
-  doc.descendants((block, at) => {
+  doc.descendants((block, at, parent) => {
     if (!block.isTextblock) return true;
-    if (bareUrl(block)) return false;
+    if (parent === doc && cardUrl(block)) return false;   // its card carries the buttons (cards are top-level only)
     let run: { mark: Mark; from: number; to: number } | null = null;
     const close = () => {
       if (run && readableLink(run.mark.attrs.href)) out.push({ href: run.mark.attrs.href, end: run.to });
