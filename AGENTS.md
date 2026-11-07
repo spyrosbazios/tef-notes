@@ -6,7 +6,7 @@ all sharing `packages/core/`. What it is and how to run it: `README.md`. The not
 the server's jobs: `ARCHITECTURE.md` (not repeated here). Rules for changes: `CONTRIBUTING.md`. Security model: `SECURITY.md`.
 Each module has its own `README.md` and, for `mobile/` and `extension/`, an `AGENTS.md`.
 
-<!-- reviewed: 2026-11-07 -->
+<!-- reviewed: 2026-11-08 -->
 
 ## Where facts live
 
@@ -32,6 +32,7 @@ Each module has its own `README.md` and, for `mobile/` and `extension/`, an `AGE
 | `packages/core/src/pocketbase.ts` | The client every writer uses (phone, web, CLI, agent); `noteColumns` | ⭐ |
 | `packages/core/src/notes.ts` | Frontmatter parse and serialize, ids, 3-way merge | ⭐ note format in code |
 | `packages/core/src/agent.ts` | Card shapes (`NoteCard`, `TaskCard`) and builders, the model pick, a write's diff and flags, the confirm reasons | ⭐ |
+| `packages/core/src/citations.ts` | The sources an agent answer cites: the notes, pages and PDFs a turn's tool calls read, the inline links that name them and their numbering; the web's chips and previews (`web/src/components/citations.tsx`) and the phone's source list under the answer are drawn from it | ⭐ citations |
 | `packages/core/src/theme.ts` | The themes (`THEMES`): the phone's `src/theme.css`, the web app's CSS variables and `app.config.ts` colours are generated from it | ⭐ colours |
 | `web/src/services/` | The web app's transport (axios), errors mapped to the core's `Conflict` | |
 | `mobile/AGENTS.md` | The app's architecture and sync contract | |

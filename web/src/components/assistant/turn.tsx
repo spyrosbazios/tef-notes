@@ -9,13 +9,16 @@ import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type WriteInput } from "@/core/agent";
+import { citedIn, sourcesOf } from "@/core/citations";
 import { plainShared } from "@/core/share";
 import { isAskTool, type ChoiceOutput } from "@/core/assistant";
 import { isWidgetTool, widgetOf } from "@/core/widgets";
+import { Sources } from "@/components/citations";
 import { useNotes } from "@/hooks/notes";
 import { useTasks } from "@/hooks/todo";
 import { isAppTool, uiTrouble, uiWords, type AppTool } from "@/lib/assistant";
 import { isTool, toolName, type Part, type ToolPart } from "@/lib/ask";
+import { useNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { Cards } from "./cards";
 import { Choice } from "./choice";
@@ -130,6 +133,11 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
       : name === "open_task" ? tasks?.find((t) => t.id === i.id)?.title : undefined;
 
   const cards = useMemo(() => cardsByPart(m.parts), [m.parts]);
+  const { openNote } = useNav();
+  // The sources this turn read and the ones its answer cites (packages/core/src/citations.ts): the two clients draw them
+  const sources = useMemo(() => sourcesOf(m.parts), [m.parts]);
+  const answer = useMemo(() => m.parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n").trim(), [m.parts]);
+  const cited = useMemo(() => citedIn(answer, sources), [answer, sources]);
 
   if (m.role === "user") {
     // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
@@ -137,7 +145,6 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
     return <Rise live={live}><div className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-raised px-3.5 py-2 text-sm">{text}</p></div></Rise>;
   }
   const { parts } = m;
-  const answer = parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n").trim();
 
   const show = ({ i, end }: Step) => {
     const p = parts[i];
@@ -151,7 +158,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
         </Fold>
       );
     }
-    if (p.type === "text") return <Markdown key={i} body={streaming && i === parts.length - 1 ? remend(p.text) : p.text} />;
+    if (p.type === "text") return <Markdown key={i} body={streaming && i === parts.length - 1 ? remend(p.text) : p.text} cites={cited} onNote={openNote} />;
     if (!isTool(p)) return null;
     const name = toolName(p), shown = cards.get(i);
     // The question: buttons while it waits for the owner, then what they chose
@@ -221,6 +228,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
   return (
     <div className="space-y-3">
       {rows}
+      {cited.length ? <Sources cited={cited} onNote={openNote} /> : null}
       {answer && !live ? <CopyAnswer text={answer} /> : null}
     </div>
   );

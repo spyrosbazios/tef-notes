@@ -3,12 +3,14 @@
 // in the PDF viewer, a drawing chip as its picture.
 import type { Element, Root, RootContent } from "hast";
 import { ImageOff } from "lucide-react";
-import { memo, useRef, useState } from "react";
+import { memo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { findCite, type Citation } from "@/core/citations";
 import { noteLinkPath } from "@/core/links";
 import { noteIdOf } from "@/core/notes";
+import { SourceChip } from "@/components/citations";
 import { Lightbox, type LightboxItem } from "@/components/lightbox";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { attachmentLink, drawingPreview, isDrawing, isPdf } from "@/core/photos";
@@ -32,9 +34,11 @@ type Props = {
   body: string;
   className?: string;
   onNote?: (id: string) => void;
+  /** The sources an agent answer cited: a link that names one draws its citation chip. */
+  cites?: readonly Citation[];
 };
 
-export const Markdown = memo(function Markdown({ body, className, onNote }: Props) {
+export const Markdown = memo(function Markdown({ body, className, onNote, cites }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const [pictures, setPictures] = useState<{ items: LightboxItem[]; index: number | null }>({ items: [], index: null });
   const [pdf, setPdf] = useState<{ url: string; name: string } | null>(null);
@@ -53,23 +57,26 @@ export const Markdown = memo(function Markdown({ body, className, onNote }: Prop
         components={{
           input: (p) => (p.type === "checkbox" ? <input type="checkbox" checked={!!p.checked} readOnly onClick={(e) => e.stopPropagation()} /> : null),
           a: ({ href = "", title, children }) => {
+            // The link that names a source the agent read this turn: the chip follows it (packages/core/src/citations.ts)
+            const cite = cites?.length ? findCite(href, cites) : undefined;
+            const withCite = (node: ReactNode) => (cite ? <>{node}<SourceChip cite={cite} onNote={onNote} /></> : node);
             // A PDF of this note's: a chip, opening in a new tab once the page has its URL (see useShown), plain until then
             const file = attachmentLink(href);
             if (file && (isPdf(file.name) || isDrawing(file.name))) {
               const drawing = isDrawing(file.name), shown = /^https?:/.test(href);
-              return shown
+              return withCite(shown
                 ? <a className={cn("file-chip", drawing && "drawing-chip")} href={href} title={title}
                     onClick={(e) => {
                       e.preventDefault(); e.stopPropagation();
                       if (drawing) setPictures({ items: [{ url: drawingPreview(href), alt: file.name }], index: 0 });
                       else setPdf({ url: href, name: file.name });
                     }}>{children}</a>
-                : <span className={cn("file-chip", drawing && "drawing-chip")} title="Not on the server yet">{children}</span>;
+                : <span className={cn("file-chip", drawing && "drawing-chip")} title="Not on the server yet">{children}</span>);
             }
             const note = noteLinkPath(href);
-            return note ? (
+            return withCite(note ? (
               <a href={`/note/${encodeURIComponent(noteIdOf(note))}`} title={title} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onNote?.(noteIdOf(note)); }}>{children}</a>
-            ) : <a href={href} title={title} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{children}</a>;
+            ) : <a href={href} title={title} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{children}</a>);
           },
           img: ({ src, alt }) =>
             // A photo of this note's that the server doesn't list (yet) still reads `attachments/…`: a placeholder, not a broken image

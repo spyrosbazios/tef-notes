@@ -12,6 +12,7 @@ import { KeyboardEvents } from "react-native-keyboard-controller";
 import remend from "remend";
 import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type ToolName, type WriteInput } from "@/core/agent";
 import { choiceFrom, chosenOf, isAskTool } from "@/core/assistant";
+import { citedIn, sourcesOf } from "@/core/citations";
 import { plainShared } from "@/core/share";
 import { isWidgetTool, widgetOf } from "@/core/widgets";
 import { useNotes } from "@/store/notes";
@@ -24,6 +25,7 @@ import { Appear, MessageBubble } from "./bubble";
 import { Cards } from "./cards";
 import { Choice } from "./choice";
 import { Reasoning } from "./reasoning";
+import { Sources } from "./sources";
 import { useChatScroller } from "./scroller";
 import { ToolLine, ToolRow } from "./tool-row";
 import { WidgetView } from "./widgets";
@@ -92,13 +94,16 @@ function stepsOf(parts: Part[]) {
  *  or left a note to open stays a row of its own. */
 export const Turn = memo(function Turn({ m, streaming, live, last, respond, choose }: { m: UIMessage; streaming: boolean; live: boolean; last: boolean; respond: ChatAddToolApproveResponseFunction; choose: (toolCallId: string, chosen: string[]) => void }) {
   const cards = useMemo(() => cardsByPart(m.parts), [m.parts]);
+  // The sources this turn read and the ones its answer cites (packages/core/src/citations.ts): the phone lists them
+  const sources = useMemo(() => sourcesOf(m.parts), [m.parts]);
+  const answer = useMemo(() => m.parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n").trim(), [m.parts]);
+  const cited = useMemo(() => citedIn(answer, sources), [answer, sources]);
   if (m.role === "user")
     return (
       // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
       <MessageBubble align="end" animate={live} text={plainShared(m.parts.map((p) => (p.type === "text" ? p.text : "")).join(""))} />
     );
   const { parts } = m;
-  const answer = parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n").trim();
 
   const show = ({ i, end }: Step) => {
     const p = parts[i];
@@ -178,6 +183,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
   return (
     <View className="gap-3">
       {rows}
+      {cited.length ? <Sources cited={cited} /> : null}
       {answer && !live ? <CopyAnswer text={answer} /> : null}
     </View>
   );
