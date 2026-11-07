@@ -80,7 +80,7 @@ type Tools = { read?: (url: string) => void; summarize?: Summarize; done: boolea
  *  description and site, and Read and Summary always beside them. `p` null: the page told nothing (or has not yet), so
  *  the item is the URL itself, still with its buttons. */
 function card(url: string, p: LinkPreview | null, open: (url: string) => void, t: Tools): HTMLElement {
-  const root = el("div", "pm-card");
+  const root = el("div", t.done ? "pm-card pm-card-joined" : "pm-card");
   root.contentEditable = "false";
   root.tabIndex = 0;
   root.setAttribute("role", "link");
@@ -149,7 +149,8 @@ function video(url: string, v: { id: string; start: number }, open: (url: string
 }
 
 /** The plugin. `resolve`: where previews come from; `open`: what a click on a card does; `read`: its Read button and
- *  `summarize`: its Summary button (none without them; Summary shown done once the link has one under it);
+ *  `summarize`: its Summary button (none without them; Summary shown done once the link has one under it, and that
+ *  summary drawn as the card's lower half);
  *  `inlineVideo`: a YouTube link's player plays in the note (see `video`). */
 export function linkCards(resolve: ResolveLink, open: (url: string) => void, read?: (url: string) => void, summarize?: Summarize, inlineVideo = true): Plugin {
   const known = new Map<string, LinkPreview | null>();      // looked up: a preview, or null for nothing to show
@@ -204,6 +205,9 @@ export function linkCards(resolve: ResolveLink, open: (url: string) => void, rea
           const done = summarised(state.doc, end);
           out.push(Decoration.widget(end, (view, getPos) => card(url, p, open, { read, summarize, done, view, getPos }),
             { key: `card:${url}:${known.has(url) ? 1 : 0}:${done ? 1 : 0}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
+          // Its summary (the blockquote under the link) drawn as the card's lower half: still the note's own, editable text
+          const summary = done ? state.doc.resolve(end).nodeAfter : null;
+          if (summary) out.push(Decoration.node(end, end + summary.nodeSize, { class: "pm-card-summary" }));
         }
         return out.length ? DecorationSet.create(state.doc, out) : null;
       },
