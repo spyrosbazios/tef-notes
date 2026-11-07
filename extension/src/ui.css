@@ -9,7 +9,11 @@ body {
 }
 h1 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
 h1 svg { color: var(--tf-brand); }
-.popup { width: 380px; padding: 14px; }
+/* The popup scrolls inside itself at a fixed height: grown past Chrome's 600px cap, its auto-size and the page's
+   scrollbar fed each other, and the popup stopped answering. The toolbar popup is .action; the menu's window fills itself. */
+html:has(.popup) { height: 100%; }
+html.action { height: 600px; }
+.popup { width: 380px; height: 100%; padding: 14px; overflow-y: auto; scrollbar-gutter: stable; }
 .popup h1 { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--tf-line); font-size: 16px; }
 .section { margin-top: 10px; padding: 10px 12px 12px; border: 1px solid var(--tf-line); border-radius: 10px; background: var(--tf-card); }
 .section[hidden], .status[hidden] { display: none; }

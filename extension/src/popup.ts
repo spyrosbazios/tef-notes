@@ -32,6 +32,7 @@ const summaryBox = document.getElementById("summary") as HTMLInputElement;
 document.getElementById("brand")!.append(mark(20), "TEF Notes");
 
 const handoff = new URLSearchParams(location.search).get("handoff");
+if (!handoff) document.documentElement.classList.add("action");
 const CLOSE_MS = 1500;   // the context menu's window, once saved: long enough to read the result
 const CLOSE_NOTICE_MS = 5000;   // ... and long enough to read that a summary was left out
 const RERANK_MS = 900;   // a pause in typing the note before asking again
