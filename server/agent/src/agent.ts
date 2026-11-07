@@ -64,6 +64,8 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
     (await bad) || (writesWithoutAsking && !(await web(messages))) ? "not-applicable" as const : "user-approval" as const;
   type O = { messages: ModelMessage[] };
   return {
+    create_tag: (_: unknown, { messages }: O) => ask(messages),
+    update_tag: (_: unknown, { messages }: O) => ask(messages),
     create_note: (_: unknown, { messages }: O) => ask(messages),
     append_to_note: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     rewrite_note: ({ path, text }: { path: string; text: string }, { messages }: O) => ask(messages, checkWrite(notes, path, text)),

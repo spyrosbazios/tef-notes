@@ -184,7 +184,7 @@ function snippetAt(body: string, folded: string, words: string[]) {
 }
 
 /** A tag list an agent tool takes, for notes and tasks alike. */
-export const TAGS = z.array(z.string().min(1).max(30)).max(10).describe("Only tags list_tags returns (defined in Settings or already on a note). Never invent one");
+export const TAGS = z.array(z.string().min(1).max(40)).max(10).describe("Only tags list_tags returns (defined in Settings or already on a note). Never invent one");
 
 /** `tags` as the defined names they match (case and tonos ignored), or an error naming the ones no definition or note has. */
 export async function definedTags(notes: Notes, tags: string[]): Promise<{ tags: string[] } | { error: string }> {

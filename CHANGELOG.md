@@ -5,6 +5,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+- The assistant and MCP tools can create and update tag definitions, including their colour and auto-tagger description.
+
 ## 0.1.0 - 2026-11-07
 
 The first public release.

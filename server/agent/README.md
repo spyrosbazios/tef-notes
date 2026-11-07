@@ -49,7 +49,7 @@ stateless), so Claude Code, Codex, Cursor or any MCP client can work on your not
 assistant doesn't use it and needs no change; leave it off if you don't connect anything. `src/mcp.ts` holds it.
 
 - **The same tools as the chat** (`src/tools.ts`, `src/todoTools.ts`): search, list and read notes and tasks; create,
-  append, rewrite, flag; add, update, complete and delete tasks. Every write is the same `rev` compare-and-swap.
+  append, rewrite, flag; create and update tag definitions; add, update, complete and delete tasks. Note and task writes use the same `rev` compare-and-swap. Tag definitions use the shared Settings API (last save wins, no `rev`); renaming a definition leaves assigned tag names unchanged.
 - **Left out:** web search and page reading (the harness has its own), the agent's memory, preview cards, the app's UI tools.
 - **No confirm cards.** The harness's own approval prompt stands in for them; each tool is marked read-only, write or
   destructive (`readOnlyHint`, `destructiveHint`) so the harness can ask accordingly.

@@ -30,6 +30,7 @@ function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unkn
     case "search_notes": case "web_search": return str(i.query);
     case "list_notes": return [str(i.filter), str(i.tag)].filter(Boolean).join(" · ");
     case "read_note": case "append_to_note": case "delete_note": return titleOf(i.path);
+    case "create_tag": case "update_tag": return str(i.name) || str(i.id);
     case "create_note": return str(i.title);
     case "rewrite_note": return str(i.why) || titleOf(i.path);
     case "set_note_flags": return `${titleOf(i.path)} · ${flagLine(i as WriteInput, true)}`;

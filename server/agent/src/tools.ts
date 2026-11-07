@@ -6,6 +6,7 @@ import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import { z } from "zod";
 import { cardKey, noteCardOf, type Card } from "@/core/agent";
 import { appendToNote, COLORS, MEMORY, NOTES, parseNote, serializeNote, snippetOf, withBody, withFlags } from "@/core/notes";
+import { createTag, listTags, updateTag } from "@/core/tags";
 import { localDay } from "@/core/time";
 import { uiTools } from "./assistant";
 import { capList, clip, fromWeb } from "./guard";
@@ -89,9 +90,44 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
 
   return {
     list_tags: tool({
-      description: "Every existing tag: those defined in Settings (with what each means) and any already on a note. A note may carry only these.",
+      description: "Every existing tag: those defined in Settings (with what each means) and any already on a note. Notes and tasks may carry only these. Definitions have an id for update_tag; a tag without one is only in use, so create_tag to define it.",
       inputSchema: z.object({}),
-      execute: async () => ({ tags: (await notes.tags()).map((d) => ({ name: d.name, ...(d.description ? { means: d.description } : {}) })) }),
+      execute: async () => ({ tags: (await notes.tags()).map((d) => ({ name: d.name, ...(d.rec ? { id: d.rec } : {}), ...(d.color ? { color: d.color } : {}), ...(d.description ? { means: d.description } : {}) })) }),
+    }),
+
+    create_tag: tool({
+      description: "Create a tag definition in Settings, with a name, optional badge colour and description (the auto-tagger's hint). Only when the user asks for a new tag; list_tags first to avoid duplicates. This may cause the server to tag matching notes automatically.",
+      inputSchema: z.object({
+        name: z.string().trim().min(1).max(40),
+        color: COLOR.optional(),
+        description: z.string().trim().max(500).optional(),
+      }),
+      execute: async ({ name, color, description = "" }) => {
+        try { return { tag: await createTag(notes.server, { name, color, description }) }; }
+        catch (e) { return { error: `Couldn't create tag: ${(e as Error).message}` }; }
+      },
+    }),
+
+    update_tag: tool({
+      description: "Update a tag definition from list_tags by id. Only passed fields change; null clears its colour and an empty description clears its hint. Renaming the definition leaves tag names already on notes and tasks unchanged. A changed definition may cause the server to tag notes automatically.",
+      inputSchema: z.object({
+        id: z.string().min(1).describe("The definition's id from list_tags"),
+        name: z.string().trim().min(1).max(40).optional(),
+        color: COLOR.nullable().optional(),
+        description: z.string().trim().max(500).optional(),
+      }),
+      execute: async ({ id, name, color, description }) => {
+        if (name === undefined && color === undefined && description === undefined) return { error: "Pass a name, color or description to change." };
+        try {
+          const before = (await listTags(notes.server)).find((t) => t.rec === id);
+          if (!before) return { error: "No tag definition with that id. Use list_tags." };
+          return { tag: await updateTag(notes.server, id, {
+            name: name ?? before.name,
+            color: color === undefined ? before.color : color ?? undefined,
+            description: description ?? before.description,
+          }) };
+        } catch (e) { return { error: `Couldn't update tag: ${(e as Error).message}` }; }
+      },
     }),
 
     search_notes: tool({

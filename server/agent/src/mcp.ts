@@ -16,13 +16,13 @@ import { Todo } from "./todo";
 import { tools, type Tools } from "./tools";
 
 const READS = ["list_tags", "search_notes", "list_notes", "read_note", "read_attachment", "list_tasks"] as const;
-const WRITES = ["create_note", "append_to_note", "rewrite_note", "set_note_flags", "add_task", "add_tasks", "update_task", "complete_task"] as const;
+const WRITES = ["create_tag", "update_tag", "create_note", "append_to_note", "rewrite_note", "set_note_flags", "add_task", "add_tasks", "update_task", "complete_task"] as const;
 const DELETES = ["delete_note", "delete_task"] as const;
 /** What the endpoint offers, of the chat's tools. */
 export const MCP_TOOLS: readonly (keyof Tools)[] = [...READS, ...WRITES, ...DELETES];
 
 const INSTRUCTIONS = (today: string) => `TEF Notes: the user's own notes (markdown, paths notes/<file>.md) and tasks (Things-style: inbox, today, upcoming, logbook). Today is ${today}.
-Find before you write: search_notes, list_notes, list_tasks. Add to a note that fits (append_to_note) before creating one. Write in the user's words and language. Tags only from list_tags.
+Find before you write: search_notes, list_notes, list_tasks. Add to a note that fits (append_to_note) before creating one. Write in the user's words and language. Tags only from list_tags; create_tag or update_tag to manage definitions when asked.
 The tools' descriptions mention a confirm card: here your own harness's approval is that card. Every write is checked against the version it was based on, and a note changed meanwhile is merged or refused: re-read and redo, never retry blindly.`;
 
 type Exec = (input: unknown, o: { toolCallId: string; messages: []; abortSignal?: AbortSignal }) => Promise<unknown>;
