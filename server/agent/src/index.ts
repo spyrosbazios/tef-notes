@@ -2,6 +2,7 @@
 // PocketBase's JS hooks can't stream. Served same-origin under /agent/* by a reverse proxy on a private network (e.g.
 // a tunnel such as `tailscale serve`); no sign-in, like PocketBase: that network is the gate, so it listens on loopback only on the host.
 import { chat } from "./agent";
+import { find } from "./find";
 import { mcp } from "./mcp";
 import { catalog } from "./models";
 import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
@@ -20,6 +21,7 @@ Bun.serve({
   idleTimeout: 255,                          // a reply can think for a while between chunks; keep-alives come every 15 s
   routes: {
     "/agent/chat": { POST: (req) => chat(req, server) },
+    "/agent/find": { POST: (req) => find(req, server) },
     "/agent/reader": { GET: (req) => reader(req, server) },
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },

@@ -1,8 +1,9 @@
 // Global search: notes and tasks by their text and tags, plus navigation. Enter opens the selected result.
 // A note shows as it does in the notes list (its picture, title, opening prose, tags, age, colour), and on a wide screen
-// the highlighted one is previewed beside the results.
-import { Hash, House, ListTodo, Pin, Plus, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+// the highlighted one is previewed beside the results. When nothing matches, "Search with the assistant" asks the agent to
+// look for what was meant (core/find.ts); its hits fill the same list, each with why it fits. No chat opens.
+import { Hash, House, ListTodo, Loader2, Pin, Plus, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ago } from "@/core/time";
 import { TagBadge } from "@/components/tag-badge";
 import { useNow } from "@/hooks/now";
@@ -11,6 +12,9 @@ import { Mosaic } from "./note-pictures";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
+import { findByAsking } from "@/services/find";
+import { message } from "@/services/api";
+import type { Found } from "@/core/find";
 import { snippetOf } from "@/core/notes";
 import { matchesTask, parseTagQuery, suggestTags, typingTag } from "@/core/tags";
 import { DeleteDialog, MenuAt, TagsDialog } from "@/components/note-actions";
@@ -31,8 +35,8 @@ function Thumb({ n, className }: { n: NoteRec; className: string }) {
 }
 
 /** A note as a result row: its picture, title, two lines of prose, tags and age. Its colour shows in the preview. */
-function NoteHit({ n, now }: { n: NoteRec; now: number }) {
-  const snippet = useMemo(() => snippetOf(n.note.body, 200), [n.note.body]);
+function NoteHit({ n, now, why }: { n: NoteRec; now: number; why?: string }) {
+  const snippet = useMemo(() => why || snippetOf(n.note.body, 200), [why, n.note.body]);
   return (
     <span className="flex w-full min-w-0 items-start gap-3">
       <Thumb n={n} className="size-14 shrink-0 rounded-md border border-line" />
@@ -41,7 +45,7 @@ function NoteHit({ n, now }: { n: NoteRec; now: number }) {
           <span className="truncate font-semibold">{n.note.title}</span>
           <span className="ml-auto shrink-0 text-[11px] tabular-nums text-faint">{n.note.pinned ? <Pin className="mr-1 inline size-3" /> : null}{ago(ms(n.updated), now)}</span>
         </span>
-        <span className="line-clamp-2 text-xs text-dim">{snippet || "Empty"}</span>
+        <span className={cn("line-clamp-2 text-xs", why ? "text-fg" : "text-dim")}>{why ? <Sparkles className="mr-1 inline size-3 text-dim" /> : null}{snippet || "Empty"}</span>
         {n.note.tags.length ? <span className="flex flex-wrap gap-1 pt-0.5">{n.note.tags.slice(0, 4).map((t) => <TagBadge key={t} name={t} />)}</span> : null}
       </span>
     </span>
@@ -79,17 +83,33 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const tags = useMemo(() => suggestTags(names, typingTag(q) ?? parseTagQuery(q).tags.at(-1) ?? q), [names, q]);
   const now = useNow();
   const [active, setActive] = useState("");
-  const previewed = hits.find((n) => n.path === active);
+  // The assistant's search for `q`: running, its hits, or why it failed. Typing on drops it (and stops one running).
+  const [asked, setAsked] = useState<{ q: string; found?: Found; error?: string } | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+  const type = (v: string) => { setQ(v); abort.current?.abort(); setAsked(null); };
+  const askAgent = () => {
+    abort.current?.abort();
+    const c = abort.current = new AbortController(), asking = q;
+    setAsked({ q: asking });
+    findByAsking(asking, c.signal).then((found) => { if (!c.signal.aborted) setAsked({ q: asking, found }); },
+      (e) => { if (!c.signal.aborted) setAsked({ q: asking, error: message(e) }); });
+  };
+  const byPath = useMemo(() => new Map(sorted.map((n) => [n.path, n])), [sorted]);
+  const foundNotes = asked?.found?.notes.flatMap((h) => byPath.get(h.path) ? [{ n: byPath.get(h.path)!, why: h.why }] : []) ?? [];
+  const foundTasks = asked?.found?.tasks.flatMap((h) => { const t = tasks.data.find((x) => x.id === h.id); return t ? [{ t, why: h.why }] : []; }) ?? [];
+  const empty = !!q.trim() && !hits.length && !taskHits.length;
+  const previewed = hits.find((n) => n.path === active) ?? foundNotes.find((h) => h.n.path === active)?.n;
   const [menu, setMenu] = useState<{ path: string; x: number; y: number } | null>(null);   // a note row's right-click menu
   const [dialog, setDialog] = useState<"tags" | "delete" | null>(null);                 // opened from it, over `target`
   const [target, setTarget] = useState<string[]>([]);
   const ask = (kind: "tags" | "delete") => { if (menu) setTarget([menu.path]); setDialog(kind); };
-  const run = (f: () => void) => { onOpenChange(false); setQ(""); f(); };
+  const run = (f: () => void) => { onOpenChange(false); type(""); f(); };
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags and views. #tag narrows to a tag." className="sm:max-w-2xl md:max-w-4xl">
       <Command shouldFilter={false} value={active} onValueChange={setActive}>
-        <CommandInput value={q} onValueChange={setQ} placeholder="Search notes, tasks, or #tag…" />
+        <CommandInput value={q} onValueChange={type} placeholder="Search notes, tasks, or #tag…" />
         <div className="flex min-h-0">
         <CommandList className="max-h-[65vh] min-w-0 flex-1">
           <CommandEmpty>Nothing matches.</CommandEmpty>
@@ -101,6 +121,22 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
                   <NoteHit n={n} now={now} />
                 </CommandItem>
               ))}
+            </CommandGroup>
+          ) : null}
+          {empty ? (
+            <CommandGroup heading="Assistant">
+              {!asked ? <CommandItem value="find" onSelect={askAgent}><Sparkles /> Search with the assistant <span className="ml-auto text-xs text-faint">finds what you meant</span></CommandItem>
+                : !asked.found && !asked.error ? <CommandItem value="finding" disabled><Loader2 className="animate-spin" /> Looking through your notes and tasks…</CommandItem>
+                : asked.error ? <CommandItem value="find" onSelect={askAgent}><Sparkles /> Couldn't search: {asked.error}. Try again</CommandItem>
+                : !foundNotes.length && !foundTasks.length ? <CommandItem value="none" disabled>The assistant found nothing either.</CommandItem> : null}
+              {foundNotes.map(({ n, why }) => (
+                <CommandItem key={n.path} value={n.path} onSelect={() => run(() => openNote(n.note.id))} className="items-start py-2">
+                  <NoteHit n={n} now={now} why={why} />
+                </CommandItem>
+              ))}
+              {foundTasks.map(({ t, why }) => <CommandItem key={t.id} value={`task:${t.id}`} onSelect={() => run(() => showTask(homeOfTask(t), t.id))}>
+                <ListTodo /><span className="min-w-0"><span className="block truncate">{t.title}</span><span className="block truncate text-xs">{why}</span></span>
+              </CommandItem>)}
             </CommandGroup>
           ) : null}
           {taskHits.length ? <CommandGroup heading="Tasks">
