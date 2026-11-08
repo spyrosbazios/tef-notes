@@ -30,6 +30,8 @@ import { dictateInto } from "@/hooks/dictation";
 import { useDraft, type Status } from "@/hooks/draft";
 import { deleteNote, NOTES, setFlags, write, type FlagEdit } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
+import { useKeyboard } from "@/hooks/keyboard";
+import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
 import { attachable, useAddFiles } from "@/hooks/photos";
 import { noteHref, useNav } from "@/lib/nav";
@@ -125,6 +127,10 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
     return () => removeEventListener("keydown", key);
   });
 
+  // On a phone the format tools ride on top of the keyboard (the viewport resizes with it, index.html), not in the top bar
+  const narrow = useNarrow(), keyboard = useKeyboard();
+  const tools = raw || !ed ? null : <FormatTools editor={ed} side={narrow ? "top" : "bottom"} />;
+
   const source = (
     <textarea ref={area} value={d.body} onChange={(e) => d.setBody(e.target.value)} spellCheck
       onPaste={(e) => { const f = [...e.clipboardData.files]; if (f.length) { e.preventDefault(); void attach(f); } }}
@@ -138,7 +144,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
       onDrop={(e) => { const f = [...e.dataTransfer.files]; if (f.length) { e.preventDefault(); void attach(f); } }}>
       <header className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 md:px-4">
         {leading}
-        {raw || !ed ? null : <FormatTools editor={ed} />}
+        {narrow ? null : tools}
         <Turns className={cn("ml-2 shrink-0 place-items-start text-xs", d.status !== "error" && "max-sm:hidden")} aria-live="polite" state={d.status} states={STATUS} />
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
@@ -198,6 +204,10 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           )}
         </div>
       </div>
+
+      {narrow && keyboard && tools ? (
+        <div className="flex h-11 shrink-0 items-center overflow-x-auto border-t border-line bg-bg px-2">{tools}</div>
+      ) : null}
 
       <DrawingDialog noteId={note.id} name={drawing?.name ?? null} open={drawing !== null} onClose={() => setDrawing(null)} onCreated={place} />
 

@@ -1,5 +1,5 @@
 // The note pane's format tools (bold, italic, checklist, link, and the rest under ⋯), the one set of editing tools:
-// they sit in the pane's single top bar, driven by the editor instance the body hands up. A mousedown on a tool is
+// they sit in the pane's top bar (on a phone, in a bar on top of the keyboard), driven by the editor instance the body hands up. A mousedown on a tool is
 // prevented, so the editor keeps its selection and focus.
 import {
   Bold, Code, CodeXml, Italic, Link2, List, ListOrdered, ListTodo, Minus, Quote, Redo2, Strikethrough, Table2, Undo2, type LucideIcon,
@@ -53,7 +53,7 @@ function Tool({ label, pressed, onRun, children }: { label: string; pressed?: bo
   );
 }
 
-function LinkTool({ editor }: { editor: Editor }) {
+function LinkTool({ editor, side }: { editor: Editor; side: "top" | "bottom" }) {
   const [open, setOpen] = useState(false), [href, setHref] = useState("");
   const on = editor.isActive("link");
   const apply = () => {
@@ -71,7 +71,7 @@ function LinkTool({ editor }: { editor: Editor }) {
         </TooltipTrigger>
         <TooltipContent>{on ? "Remove link" : "Link"}</TooltipContent>
       </Tooltip>
-      <PopoverContent align="start" className="w-72">
+      <PopoverContent side={side} align="start" className="w-72">
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); apply(); }}>
           <Input autoFocus value={href} onChange={(e) => setHref(e.target.value)} placeholder="https://…" aria-label="Link address" />
           <Button type="submit" size="sm" className="rounded-full">Link</Button>
@@ -82,7 +82,7 @@ function LinkTool({ editor }: { editor: Editor }) {
 }
 
 /** The format tools in the note bar: the few used most, the rest under ⋯. Redraws with the editor's state. */
-export function FormatTools({ editor }: { editor: Editor }) {
+export function FormatTools({ editor, side = "bottom" }: { editor: Editor; side?: "top" | "bottom" }) {
   const [, redraw] = useReducer((n: number) => n + 1, 0);
   useEffect(() => editor.subscribe(redraw), [editor]);
   const primary: CommandName[] = ["bold", "italic", "taskList"];
@@ -92,12 +92,12 @@ export function FormatTools({ editor }: { editor: Editor }) {
       {commands.filter(({ name }) => primary.includes(name)).map(({ name, label, icon: Icon }) => (
         <Tool key={name} label={label} pressed={editor.isActive(name)} onRun={() => editor.run(name)}><Icon /></Tool>
       ))}
-      <LinkTool editor={editor} />
+      <LinkTool editor={editor} side={side} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon-sm" aria-label="More formatting" onMouseDown={(e) => e.preventDefault()}><Ellipsis /></Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52" onCloseAutoFocus={(e) => { e.preventDefault(); editor.focus(); }}>
+        <DropdownMenuContent side={side} align="start" className="w-52 max-h-[60dvh] overflow-y-auto" onCloseAutoFocus={(e) => { e.preventDefault(); editor.focus(); }}>
           {GROUPS.map((group, i) => (
             <div key={i}>
               {i > 0 ? <DropdownMenuSeparator /> : null}
