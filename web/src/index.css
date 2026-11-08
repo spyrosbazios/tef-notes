@@ -279,10 +279,12 @@
   .ProseMirror-gapcursor::after { animation: none; }
 }
 
-/* The theme and accent wipe (hooks/appearance.ts `set`): the new page is revealed left to right over the old, which stays put. Timing is
-   Animate UI's `transition.overlay` (400ms, ease.soft), printed by `.agents/skills/animate-ui/scripts/css-timing.mjs transition.overlay`.
-   Nothing in the app carries a view-transition-name, so the root is the only thing that moves. Reduced motion never starts one. */
-::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; } /* the UA's plus-lighter would add two opaque pages */
-::view-transition-old(root) { animation: none; }
-::view-transition-new(root) { animation: look-wipe 400ms cubic-bezier(0.215, 0.61, 0.355, 1); }
+/* The theme and accent wipe (hooks/appearance.ts `set`, which starts its transition with the type `look`): the new page is revealed left
+   to right over the old, which stays put. Scoped to that type: a route's transition (router.ts, type `route`) keeps the browser's
+   crossfade until its own rules are written here. Timing is Animate UI's `transition.overlay` (400ms, ease.soft), printed by
+   `.agents/skills/animate-ui/scripts/css-timing.mjs transition.overlay`. Nothing in the app carries a view-transition-name, so the
+   root is the only thing that moves. Reduced motion never starts one. */
+:root:active-view-transition-type(look)::view-transition-old(root), :root:active-view-transition-type(look)::view-transition-new(root) { mix-blend-mode: normal; } /* the UA's plus-lighter would add two opaque pages */
+:root:active-view-transition-type(look)::view-transition-old(root) { animation: none; }
+:root:active-view-transition-type(look)::view-transition-new(root) { animation: look-wipe 400ms cubic-bezier(0.215, 0.61, 0.355, 1); }
 @keyframes look-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }

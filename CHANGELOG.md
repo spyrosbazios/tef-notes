@@ -5,6 +5,10 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Changed
+
+- The web app's navigation runs on TanStack Router in place of wouter: typed routes and search params, loaders over the query cache with links and note tiles fetching ahead on hover or touch, and the router's scroll restoration in place of the app's own. A note opens as `?note=<id>` over the screen it came from; `/note/<id>` links still work.
+
 ### Fixed
 
 - Going back from a note to Home no longer plays the notes layout in again or reloads the thumbnails: the screen a note was opened from stays mounted under the note's page, so Back finds it exactly as it was (the same for the task lists and Settings).

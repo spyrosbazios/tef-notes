@@ -9,9 +9,14 @@ import { homeOfTask, isTaskView, titleOf, type View } from "@/lib/nav";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
 
-/** Where the app is, as the contract says it: Home filtered to one tag is the contract's `tag`. */
+/** Where the app is, as the contract says it: Home filtered to one tag is the contract's `tag`, Settings' agent section its `memory`
+ *  (`webView`'s way back), the rest of Settings its `settings`. */
 export function assistantView(v: View): AssistantView {
-  return v.kind === "home" ? (v.tags?.length === 1 ? { kind: "tag", tag: v.tags[0] } : { kind: "home" }) : v;
+  switch (v.kind) {
+    case "home": return v.tags?.length === 1 ? { kind: "tag", tag: v.tags[0] } : { kind: "home" };
+    case "settings": return { kind: v.section === "agent" ? "memory" : "settings" };
+    default: return v;
+  }
 }
 
 /** A view the contract names, as the web has it; null for the chat, the dock itself and not a view. Every note view is
@@ -19,7 +24,7 @@ export function assistantView(v: View): AssistantView {
 export function webView(v: AssistantView): View | null {
   if (v.kind === "tag") return { kind: "home", tags: [v.tag] };
   const { kind } = v;
-  return kind === "ask" ? null : kind === "notes" || kind === "home" || kind === "pinned" ? { kind: "home" } : kind === "memory" ? { kind: "settings" } : { kind };
+  return kind === "ask" ? null : kind === "notes" || kind === "home" || kind === "pinned" ? { kind: "home" } : kind === "memory" ? { kind: "settings", section: "agent" } : { kind };
 }
 
 /** The URL's state: the open note's id and the open task's id (a task opens only in a task list). */

@@ -56,7 +56,7 @@ export function payloadOf(v: unknown): PushPayload | null {
   return title && task ? { title, body: str(p.body), task, url: isPath(url) ? url : taskUrl(task), tag: str(p.tag) || `task:${task}` } : null;
 }
 
-/** Where a task opens in the web app: a task list with the task beside it (web/src/lib/nav.ts). */
+/** Where a task opens in the web app: the Today list with the task beside it, `?t=<id>` (`listSearch`, web/src/lib/route-search.ts, read by the route `routes/_app/today.tsx`). */
 export const taskUrl = (id: string) => `/today?t=${encodeURIComponent(id)}`;
 
 /** The VAPID public key (`PushKey.publicKey`, URL-safe base64) as the bytes `pushManager.subscribe` takes for

@@ -1,5 +1,5 @@
 // A note's photos, PDFs and drawings as URLs for the preview, and new ones added from a file pick, a paste or a drop (or drawn).
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { rewriteImagePaths } from "@/core/notes";
 import { drawingName, drawingPreview, fileMarkdown, MAX_PDF, PDF, pdfName, photoMarkdown, photoName } from "@/core/photos";
@@ -12,10 +12,14 @@ const listKey = (note: string) => [...PHOTOS, note] as const;
 /** Every note's photos at once: the list's thumbnails (hooks/thumbs.ts). */
 export const ALL_PHOTOS = [...PHOTOS, "all"] as const;
 
+/** A note's attachments as the server lists them: what a note's page shows its pictures from, fetched ahead when a link to it is
+ *  hovered or touched (the shell's loader, routes/_app.tsx). */
+export const photoListQuery = (noteId: string) => queryOptions({ queryKey: listKey(noteId), queryFn: () => photos.list(noteId) });
+
 /** The URL of each of this note's photos by name; null while the list loads or when the body shows none. */
 function usePhotoUrls(noteId: string, body: string): Map<string, string> | null {
   const refs = /attachments\//.test(body);
-  const { data } = useQuery({ queryKey: listKey(noteId), queryFn: () => photos.list(noteId), enabled: refs });
+  const { data } = useQuery({ ...photoListQuery(noteId), enabled: refs });
   return useMemo(() => (refs ? new Map((data ?? []).map((p) => [p.name, photos.url(p)])) : null), [refs, data]);
 }
 

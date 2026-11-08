@@ -35,6 +35,7 @@ import { isTool, type Part } from "@/lib/ask";
 import { attachment } from "@/lib/attach";
 import { pageContext } from "@/lib/assistant";
 import { titleOf, useNav } from "@/lib/nav";
+import { chatScroll } from "@/lib/scroll";
 
 const shown = (p: Part) => p.type === "reasoning" || isTool(p) || (p.type === "text" && !!p.text);
 const settled = (p: Part) => isTool(p) && (p.state === "output-available" || p.state === "output-error" || p.state === "output-denied");
@@ -153,7 +154,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
 
       {listing ? <ChatList current={chat.id} idle={!busy} onDone={onHistory} /> : (
         <>
-          <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div ref={scroller} data-scroll-restoration-id={chatScroll(chat.id)} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="space-y-4 px-4 py-5">
               {!messages.length && (
                 <div className="space-y-3 pt-4">

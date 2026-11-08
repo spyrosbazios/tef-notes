@@ -6,21 +6,22 @@ import { pageTheme, THEMES, withAccent, type AccentName, type ThemeName } from "
 import { lensAccent } from "@/core/lens";
 import { applyPageTheme } from "@/page-theme";
 import { useActiveLens } from "./lens";
-import { calm } from "./media";
+import { calm, typedTransitions } from "./media";
 import { setPrefs, usePrefs } from "./prefs";
 
 type Look = { theme: ThemeName; accent: AccentName };
 
 /** The chosen theme and accent, and the scheme of the theme; `set` merges a pick and tells every hook using them, wiping the
  *  page from one look to the next (a View Transition, `::view-transition-new(root)` in index.css) unless the OS asks for less
- *  motion or the browser has none. Only a pick made here wipes: a lens's accent (`useApplyAppearance`) switches all day, so it cuts. */
+ *  motion or the browser has no typed transitions. Only a pick made here wipes: a lens's accent (`useApplyAppearance`) switches all day, so it cuts. */
 export function useAppearance() {
   const { theme, accent } = usePrefs();
   const set = useCallback((patch: Partial<Look>) => {
     const apply = () => setPrefs(patch);
     // flushSync: the new look (and its layout effect, which writes the variables) is in the DOM when the browser takes the new snapshot.
-    if (calm() || !document.startViewTransition) apply();
-    else document.startViewTransition(() => flushSync(apply));
+    // The type `look` is what index.css's wipe is scoped to, so a route's transition (router.ts) never plays it.
+    if (calm() || !typedTransitions()) apply();
+    else document.startViewTransition({ update: () => flushSync(apply), types: ["look"] });
   }, []);
   return { theme, accent, scheme: THEMES[theme].scheme, set };
 }

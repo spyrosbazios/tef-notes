@@ -21,6 +21,11 @@ export const TASK_LISTS = ["today", "inbox", "upcoming"] as const;
 export type TaskList = (typeof TASK_LISTS)[number];
 export const TASK_LIST_LABEL: Record<TaskList, string> = { today: "Today", inbox: "Inbox", upcoming: "Upcoming" };
 
+/** Which tabs in the bar show their name. */
+export const TAB_LABELS = ["active", "always", "never"] as const;
+export type TabLabels = (typeof TAB_LABELS)[number];
+export const TAB_LABELS_LABEL: Record<TabLabels, string> = { active: "Active tab", always: "Every tab", never: "None" };
+
 /** Where the app opens. */
 export const STARTS = ["home", "inbox", "today", "upcoming", "notes"] as const;
 export type Start = (typeof STARTS)[number];
@@ -36,6 +41,8 @@ export type Prefs = {
   /** Every tab in order, hidden ones included, so one shown again comes back where it was. */
   tabs: Tab[];
   hidden: Tab[];
+  /** The bar's labels: the tab in front shows its name, every tab does, or none (icons alone). */
+  tabLabels: TabLabels;
   start: Start;
   /** The list Home's task box shows first, and the one the Tasks tab opens on. */
   homeList: TaskList;
@@ -50,7 +57,7 @@ export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), unasked: false },
-  tabs: [...TABS], hidden: [...OFF], start: "home", homeList: "today", tasksList: "today",
+  tabs: [...TABS], hidden: [...OFF], tabLabels: "active", start: "home", homeList: "today", tasksList: "today",
   voice: { keep: keepOf(undefined) },
 };
 
@@ -77,6 +84,7 @@ export function prefsOf(raw: unknown): Prefs {
     tabs: [...tabs, ...TABS.filter((t) => !tabs.includes(t))],
     // A tab the stored order doesn't know yet is new to this record: it starts as a new record's would
     hidden: [...new Set([...tabsIn(p.hidden).filter((t) => HIDEABLE.includes(t)), ...OFF.filter((t) => !tabs.includes(t))])],
+    tabLabels: TAB_LABELS.find((l) => l === p.tabLabels) ?? "active",
     start: STARTS.find((s) => s === p.start) ?? "home",
     homeList: TASK_LISTS.find((l) => l === p.homeList) ?? "today",
     tasksList: TASK_LISTS.find((l) => l === p.tasksList) ?? "today",

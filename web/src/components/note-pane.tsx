@@ -32,8 +32,9 @@ import { deleteNote, NOTES, setFlags, write, type FlagEdit } from "@/hooks/notes
 import { useNoteOut } from "@/hooks/note-out";
 import { useNow } from "@/hooks/now";
 import { attachable, useAddFiles } from "@/hooks/photos";
-import { useNav } from "@/lib/nav";
+import { noteHref, useNav } from "@/lib/nav";
 import { ms } from "@/lib/search";
+import { noteScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
 import type { NoteRec } from "@/services/notes";
@@ -171,7 +172,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem checked={raw} onCheckedChange={setRaw}><FileCode /> Markdown source</DropdownMenuCheckboxItem>
-            <DropdownMenuItem onSelect={() => { void navigator.clipboard.writeText(`${location.origin}/note/${encodeURIComponent(note.id)}`); toast("Link copied"); }}>
+            <DropdownMenuItem onSelect={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}>
               <Link2 /> Copy link
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { void sendOut("ask"); }}><Sparkles /> Ask about this note</DropdownMenuItem>
@@ -181,7 +182,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         </DropdownMenu>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div data-scroll-restoration-id={noteScroll(note.id)} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
           <input ref={title} value={d.title} onChange={(e) => d.setTitle(e.target.value)} aria-label="Title" placeholder="Title"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}

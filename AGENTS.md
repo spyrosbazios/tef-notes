@@ -6,7 +6,7 @@ all sharing `packages/core/`. What it is and how to run it: `README.md`. The not
 the server's jobs: `ARCHITECTURE.md` (not repeated here). Rules for changes: `CONTRIBUTING.md`. Security model: `SECURITY.md`.
 Each module has its own `README.md` and, for `mobile/` and `extension/`, an `AGENTS.md`.
 
-<!-- reviewed: 2026-11-07 -->
+<!-- reviewed: 2026-11-08 -->
 
 ## Where facts live
 
@@ -81,7 +81,7 @@ cd mobile && npx pnpm@11 install && pnpm typecheck && pnpm test
 | `packages/core/` | The pure, dependency-free code every client imports: note format, merge, PocketBase client, task logic, agent card shapes, theme | Dependencies, I/O of its own, anything platform-specific |
 | `mobile/` | Offline cache, merge, conflict UI, the assistant over the server's agent (the Ask tab) | Talking to anything but the server; holding a model key |
 | `cli/` | Terminal access for the user and coding agents: notes and tasks | A second copy of client logic: it imports `@/core/*` |
-| `web/` | The laptop's UI: shadcn animated by Animate UI's npm package (`web/README.md` "Motion"), TanStack Query, axios services, the assistant dock over the server's agent; served by PocketBase from `pb_public` | Talking to anything but the server. Note format, merge, ids, the Ask wording, colours of its own: all from `@/core/*`; a model key |
+| `web/` | The laptop's UI: shadcn animated by Animate UI's npm package (`web/README.md` "Motion"), TanStack Query, TanStack Router (file routes, `web/README.md` "Routing"), axios services, the assistant dock over the server's agent; served by PocketBase from `pb_public` | Talking to anything but the server. Note format, merge, ids, the Ask wording, colours of its own: all from `@/core/*`; a model key |
 | `extension/` | The browser's "Save to TEF Notes": reads the page, or fetches the picture and downscales it as the phone does, shows the server's suggestions, takes an optional note, saves where the user picks | Filing logic (the server's), any key or sign-in, colours of its own: all from `@/core/theme` |
 | `site/` | The public page: copy, device frames, the app screens it draws | Talking to any server; a palette, font or icon set of its own: all from `@/core/theme`, `mobile/assets/` and lucide |
 

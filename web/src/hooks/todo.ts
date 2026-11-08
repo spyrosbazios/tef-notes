@@ -3,7 +3,7 @@
 // at the rev it was based on and, when another device moved the task on, merges the two field by field with the edit made here
 // winning a field both changed (`mergeRecord`), so a write here never meets a conflict. `rev` is the server's as of the last
 // sync: 0 for a task made here and not up yet.
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, type QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { inheritTags, inLens } from "@/core/lens";
 import { recordId } from "@/core/pocketbase";
@@ -32,7 +32,9 @@ export function readTasks(): TaskRec[] {
 
 export const projectTasks = (qc: QueryClient) => qc.setQueryData<TaskRec[]>(TASKS, readTasks());
 
-export const useTasks = () => useQuery({ queryKey: TASKS, queryFn: async () => { await opened(); return readTasks(); }, ...LOCAL_QUERY });
+export const tasksQuery = queryOptions({ queryKey: TASKS, queryFn: async () => { await opened(); return readTasks(); }, ...LOCAL_QUERY });
+
+export const useTasks = () => useQuery(tasksQuery);
 
 /** `YYYY-MM-DD` today, local, moving on at midnight. */
 export function useToday(): string {

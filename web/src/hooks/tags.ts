@@ -1,5 +1,5 @@
 // The tag definitions as TanStack Query state: one list, refetched after every change made here.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
 import { tagColor, tagGuesser, type TagDef, type TagFields } from "@/core/tags";
 import type { Color } from "@/core/notes";
@@ -7,7 +7,9 @@ import * as tags from "@/services/tags";
 
 export const TAGS = ["tags"] as const;
 
-export const useTags = () => useQuery({ queryKey: TAGS, queryFn: tags.list, refetchOnWindowFocus: true });
+export const tagsQuery = queryOptions({ queryKey: TAGS, queryFn: tags.list, refetchOnWindowFocus: true });
+
+export const useTags = () => useQuery(tagsQuery);
 
 /** A tag name's badge colour (gray when it has no definition). Stable across renders until the definitions change. */
 export function useTagColor(): (name: string) => Color {

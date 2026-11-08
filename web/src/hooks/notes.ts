@@ -2,7 +2,7 @@
 // read from the copy, never from the server: every write goes to the copy first and shows at once, and the sync (lib/sync.ts,
 // packages/core/src/sync.ts) sends it, offline or not, and brings other devices' edits in. `rev` and `rec` are the server's as of
 // the last sync: a note made here has `rec` "" until it first goes up, and cannot be linked to before.
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { isNotePath, newNotePath, parseNote, serializeNote, withFlags, type Color, type Flags } from "@/core/notes";
 import { inheritTags, inLens } from "@/core/lens";
@@ -49,7 +49,10 @@ function readNotes(): NoteRec[] {
 
 export const projectNotes = (qc: QueryClient) => qc.setQueryData<NoteRec[]>(NOTES, readNotes());
 
-export const useNotes = () => useQuery({ queryKey: NOTES, queryFn: async () => { await opened(); return readNotes(); }, ...LOCAL_QUERY });
+/** Every note, from the local copy once it has opened: what the routes' loaders wait for (router.ts) and the lists read. */
+export const notesQuery = queryOptions({ queryKey: NOTES, queryFn: async () => { await opened(); return readNotes(); }, ...LOCAL_QUERY });
+
+export const useNotes = () => useQuery(notesQuery);
 
 /** The list as the phone orders it: pinned first, then newest edit. */
 export function useSorted(): NoteRec[] {

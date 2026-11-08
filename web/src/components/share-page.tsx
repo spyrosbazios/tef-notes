@@ -8,7 +8,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, ChevronLeft, ClipboardPaste, FilePlus2, FileText, Link2, ListPlus, ListTodo, Loader2, SquarePlus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useSearchParams } from "wouter";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -23,7 +23,8 @@ import { ALL_PHOTOS } from "@/hooks/photos";
 import { previewQuery } from "@/hooks/previews";
 import { clipSummary, saveShared, takeShared } from "@/hooks/share";
 import { downscale, look } from "@/lib/picture";
-import { hrefOf, noteHref } from "@/lib/nav";
+import { INSETS } from "@/hooks/shell";
+import { cn } from "@/lib/utils";
 import { syncNow } from "@/lib/sync";
 import { message } from "@/services/api";
 import * as clips from "@/services/clip";
@@ -80,10 +81,10 @@ function Shown({ shared, files, title, image }: { shared: Shared; files: File[];
 
 export function SharePage() {
   const qc = useQueryClient(), assistant = useAssistant(), lens = useActiveLens();
-  const [, go] = useLocation(), [params] = useSearchParams();
+  const navigate = useNavigate(), { shared: arrived } = useSearch({ from: "/share" });
   // `?shared=err`: the worker could not read what was shared; the box is shown with a line saying so
-  const [failed, setFailed] = useState(params.get("shared") === "err");
-  const [held, setHeld] = useState<Held | null | "loading">(params.get("shared") && !failed ? "loading" : null);
+  const [failed, setFailed] = useState(arrived === "err");
+  const [held, setHeld] = useState<Held | null | "loading">(arrived && !failed ? "loading" : null);
   const [{ on: summary }, setSummary] = clipSummary.use();
   const [busy, setBusy] = useState<"note" | "agent" | "clip" | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -99,16 +100,16 @@ export function SharePage() {
     void takeShared().then((p) => {
       if (!live) return;
       setHeld(p ? { shared: fromPost(p), files: p.files } : null);
-      go("/share", { replace: true });
+      void navigate({ to: "/share", search: {}, replace: true });
     });
     return () => { live = false; };
-  }, [held, go]);
+  }, [held, navigate]);
 
   // A share that could not be read may have left a stash half-written: emptied, and the address loses `?shared=err`
   useEffect(() => {
     if (!failed) return;
-    void takeShared().then(() => go("/share", { replace: true }));
-  }, [failed, go]);
+    void takeShared().then(() => navigate({ to: "/share", search: {}, replace: true }));
+  }, [failed, navigate]);
 
   const shared = held && held !== "loading" ? held.shared : null, files = held && held !== "loading" ? held.files : [];
   const url = shared?.url ?? null;
@@ -148,7 +149,7 @@ export function SharePage() {
    *  fetched yet), and the page opened in place of this one: Back from it is Home, not an empty share. */
   const open = async (r: ClipResult) => {
     await Promise.all([syncNow(), qc.invalidateQueries({ queryKey: ALL_PHOTOS })]);
-    go(r.kind === "task" ? `${hrefOf({ kind: "inbox" })}?t=${encodeURIComponent(r.id)}` : noteHref(noteIdOf(r.path)), { replace: true });
+    await navigate(r.kind === "task" ? { to: "/inbox", search: { t: r.id }, replace: true } : { to: "/", search: { note: noteIdOf(r.path) }, replace: true });
   };
 
   /** File it where the owner chose; the server answering with a refusal is shown, and nothing is written. */
@@ -172,7 +173,7 @@ export function SharePage() {
     setBusy("note"); setErr(null);
     try {
       const path = await saveShared(qc, shared, files, title, note);
-      go(noteHref(noteIdOf(path)), { replace: true });
+      await navigate({ to: "/", search: { note: noteIdOf(path) }, replace: true });
     } catch (e) {
       setErr(`Couldn't save it: ${message(e)}`);
       setBusy(null);
@@ -187,7 +188,7 @@ export function SharePage() {
     try {
       const filesAt = shared.images.length || shared.pdfs.length ? await saveShared(qc, shared, files, title, "", true) : undefined;
       const text = askText(shared, title, filesAt);
-      go("/", { replace: true });
+      await navigate({ to: "/", replace: true });
       if (await assistant.send(text)) assistant.show(); else assistant.show(text);
     } catch (e) {
       setErr(`Couldn't hand it over: ${message(e)}`);
@@ -199,10 +200,10 @@ export function SharePage() {
   const rows = clip && ask.state === "ready" ? choices(ask.s, !!clip.image) : clip ? choices({ suggestions: [], pick: { kind: "new" } }, !!clip.image) : [];
 
   return (
-    <div className="h-full overflow-y-auto bg-bg">
+    <div className={cn("h-dvh", INSETS)}><div className="h-full overflow-y-auto bg-bg">
       <div className="mx-auto max-w-xl space-y-4 px-4 pb-10">
         <header className="sticky top-0 z-10 -mx-4 flex h-12 items-center gap-1 border-b border-line bg-bg px-2">
-          <Button variant="ghost" size="sm" aria-label="Back" onClick={() => go("/", { replace: true })}><ChevronLeft /> Back</Button>
+          <Button variant="ghost" size="sm" aria-label="Back" onClick={() => navigate({ to: "/", replace: true })}><ChevronLeft /> Back</Button>
           <h1 className="font-semibold">Shared with TEF Notes</h1>
         </header>
 
@@ -269,7 +270,7 @@ export function SharePage() {
           </>
         )}
       </div>
-    </div>
+    </div></div>
   );
 }
 

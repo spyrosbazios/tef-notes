@@ -1,7 +1,7 @@
 // Lenses (core/lens.ts) as state: the definitions are TanStack Query state like the tag definitions, the active lens is one of
 // the owner's preferences (hooks/prefs.ts), so every device has the same on, and none is the unfiltered app. The lists read the active lens through
 // `useActiveLens`; code outside a component (a new note, a new task) reads it with `activeLensOf`.
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { activeLens, type Lens, type LensFields } from "@/core/lens";
 import * as lenses from "@/services/lenses";
@@ -9,7 +9,9 @@ import { prefsNow, setPrefs, usePrefs } from "./prefs";
 
 export const LENSES = ["lenses"] as const;
 
-export const useLenses = () => useQuery({ queryKey: LENSES, queryFn: lenses.list, refetchOnWindowFocus: true });
+export const lensesQuery = queryOptions({ queryKey: LENSES, queryFn: lenses.list, refetchOnWindowFocus: true });
+
+export const useLenses = () => useQuery(lensesQuery);
 
 /** Turn the lens `rec` on, or none with null. */
 export const setActiveLens = (rec: string | null) => setPrefs({ lens: rec ?? undefined });

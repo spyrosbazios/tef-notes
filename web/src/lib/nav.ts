@@ -1,16 +1,23 @@
-// Where the app is, in the URL: the view in the path (Home `/`, the task lists `/inbox` `/today` `/upcoming` `/logbook`,
-// `/notes`, `/settings`), Home's tag filter as `?tags=a,b`, and a note as its own page `/note/<id>` (the view behind it is Home).
-// The id is the filename, which never changes, so a link to a note survives a retitle. The open task is `?t=<id>` (its
-// record id) in a task list.
+// The app's places in the router's terms (router.ts, routes/): Home `/` (its tag filter `?tags=a,b`), the task lists `/inbox`
+// `/today` `/upcoming` `/logbook` (the task open beside one `?t=<id>`), `/notes` (the notes alone, `?tags=` too), `/settings` (`?section=`), and a note laid over any of
+// them as `?note=<id>` (the id is the filename's, which never changes, so a link survives a retitle). `/note/<id>`, the link the
+// phone and "Copy link" use, is a route that redirects to Home with the note open (routes/note.$id.tsx). `View` is the place
+// without the open note or task: what the assistant, the palette and the rail speak. Navigation goes through the router only;
+// `useNav` is its verbs, typed against the route tree.
 import { fold } from "@/core/notes";
-import { createContext, useContext, useMemo, useState } from "react";
-import { useLocation, useRoute, useSearch } from "wouter";
+import type { SettingsSection } from "@/lib/route-search";
+import { linkOptions, useCanGoBack, useLocation, useMatch, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef } from "react";
 
 export const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
 export type TaskView = (typeof TASK_VIEWS)[number];
 
 export type View =
-  | { kind: "home"; tags?: string[] } | { kind: TaskView } | { kind: "notes" } | { kind: "settings" };
+  | { kind: "home"; tags?: string[] } | { kind: TaskView } | { kind: "notes"; tags?: string[] } | { kind: "settings"; section?: SettingsSection };
+
+/** A view that lists notes under a tag filter: Home and the Notes page. */
+export type NotesView = Extract<View, { kind: "home" | "notes" }>;
+export const isNotesView = (v: View): v is NotesView => v.kind === "home" || v.kind === "notes";
 
 /** A view that lists tasks, not notes: a Things list. Its list is the task list, with the open task beside it. */
 export const isTaskView = (v: View): v is { kind: TaskView } => (TASK_VIEWS as readonly string[]).includes(v.kind);
@@ -18,19 +25,15 @@ export const isTaskView = (v: View): v is { kind: TaskView } => (TASK_VIEWS as r
 /** The list a task is opened in when the view it was found from has none of it: the Logbook once done, else the Inbox. */
 export const homeOfTask = (t: { done?: string }): View => (t.done ? { kind: "logbook" } : { kind: "inbox" });
 
-/** The view at a path; Home's tags come from the query, `tags`. */
-export function viewOf(path: string, tags?: string | null): View {
-  if (path === "/settings") return { kind: "settings" };
-  if (path === "/notes") return { kind: "notes" };
+/** The view at a path (anything else is Home); Home's and Notes' tags and Settings' section from its search. */
+export function viewOf(path: string, search: { tags?: readonly string[]; section?: SettingsSection } = {}): View {
+  if (path === "/settings") return search.section ? { kind: "settings", section: search.section } : { kind: "settings" };
+  const tags = search.tags;
+  if (path === "/notes") return tags?.length ? { kind: "notes", tags: [...tags] } : { kind: "notes" };
   const task = TASK_VIEWS.find((k) => path === `/${k}`);
   if (task) return { kind: task };
-  const t = tags?.split(",").filter(Boolean) ?? [];
-  return t.length ? { kind: "home", tags: t } : { kind: "home" };
+  return tags?.length ? { kind: "home", tags: [...tags] } : { kind: "home" };
 }
-
-/** A view's URL; Home's tags as the query, each encoded (a tag may hold a comma's neighbours, never a comma). */
-export const hrefOf = (v: View) =>
-  v.kind === "home" ? (v.tags?.length ? `/?tags=${v.tags.map(encodeURIComponent).join(",")}` : "/") : `/${v.kind}`;
 
 const TITLES: Record<View["kind"], string> = {
   home: "Home", notes: "Notes", settings: "Settings",
@@ -38,65 +41,83 @@ const TITLES: Record<View["kind"], string> = {
 };
 export const titleOf = (v: View) => TITLES[v.kind];
 
-/** A note's page. */
+/** What is open on a view: the task beside a task list, the note over any of them. */
+export type Open = { task?: string; note?: string };
+
+/** Where a view is, as the router's typed link, with what is open on it. */
+export function linkOf(v: View, { task, note }: Open = {}) {
+  switch (v.kind) {
+    case "home": return linkOptions({ to: "/", search: { tags: v.tags, note } });
+    case "notes": return linkOptions({ to: "/notes", search: { tags: v.tags, note } });
+    case "settings": return linkOptions({ to: "/settings", search: { section: v.section, note } });
+    case "inbox": return linkOptions({ to: "/inbox", search: { t: task, note } });
+    case "today": return linkOptions({ to: "/today", search: { t: task, note } });
+    case "upcoming": return linkOptions({ to: "/upcoming", search: { t: task, note } });
+    case "logbook": return linkOptions({ to: "/logbook", search: { t: task, note } });
+  }
+}
+
+/** A typed link, as `linkOf` makes them. */
+export type AppLink = ReturnType<typeof linkOf>;
+
+/** A note's address to hand out (Copy link, a note's link to another): `/note/<id>`, which opens it over Home. */
 export const noteHref = (id: string) => `/note/${encodeURIComponent(id)}`;
 
-/** Marks a history entry as one the app pushed, so a note's Back can go back to it rather than leave the app. */
-const FROM_APP = { fromApp: true };
+/** A note laid over the screen on view (`under`, with its open task), which stays where it is; from anywhere else (the share
+ *  page), over Home. */
+export const noteLink = (id: string, under: { view: View; task?: string } | null): AppLink =>
+  linkOf(under?.view ?? { kind: "home" }, { task: under?.task, note: id });
 
-/** A place in the URL. */
-export type Here = { path: string; search: string };
-
-/** The view and the open task at a place. */
-export function placeOf({ path, search }: Here): { view: View; task: string | undefined } {
-  const params = new URLSearchParams(search);
-  return { view: viewOf(path, params.get("tags")), task: params.get("t") ?? undefined };
-}
-
-/** A note's page lies over the screen it was opened from, which stays mounted and keeps its scroll, tiles and pictures. That screen
- *  reads its place from here, not from the URL: the URL is the note's. */
-export const Behind = createContext<Here | null>(null);
-
-/** The last place that was not a note's page (Home at first: a note opened from a link has nothing behind it). */
-export function useBehind(): Here {
-  const [path] = useLocation(), search = useSearch(), [onNote] = useRoute("/note/:id");
-  const live = useMemo(() => ({ path, search }), [path, search]);
-  const [kept, keep] = useState<Here>({ path: "/", search: "" });
-  if (!onNote && kept !== live) keep(live);
-  return onNote ? kept : live;
-}
-
-/** Where the screen on view is: the URL's place, or what lies behind a note's page when it is the screen being read. */
-export function useHere() {
-  const behind = useContext(Behind), [path, go] = useLocation(), search = useSearch();
-  const here = behind ?? { path, search };
-  const params = useMemo(() => new URLSearchParams(here.search), [here.search]);
-  return { here, params, go };
+/** Where the app is: the view on screen, the note over it, the task open beside its list. */
+export function usePlace(): { view: View; note: string | undefined; task: string | undefined } {
+  const path = useLocation({ select: (l) => l.pathname });
+  // Each route's own validated search: the loose one (`strict: false`) merges the raw query in, a `tags` still a string
+  const search = useSearch({ strict: false });
+  const homeTags = useSearch({ from: "/_app/", shouldThrow: false })?.tags?.join(",");
+  const notesTags = useSearch({ from: "/_app/notes", shouldThrow: false })?.tags?.join(",");
+  const tags = homeTags ?? notesTags;
+  const section = useSearch({ from: "/_app/settings", shouldThrow: false })?.section;
+  const view = useMemo(() => viewOf(path, { tags: tags?.split(","), section }), [path, tags, section]);
+  const note = useSearch({ from: "/_app", shouldThrow: false })?.note;
+  return { view, note, task: isTaskView(view) && typeof search.t === "string" ? search.t : undefined };
 }
 
 export function useNav() {
-  const { here, go } = useHere();
-  const [onNote, note] = useRoute("/note/:id");
-  const { view, task } = placeOf(here);
-  /** The note on the page. */
-  const open = onNote ? note.id : undefined;
+  const { view, note, task } = usePlace();
+  const navigate = useNavigate(), canGoBack = useCanGoBack(), router = useRouter();
+  const inShell = !!useMatch({ from: "/_app", shouldThrow: false });
+  const here = inShell ? { view, task } : null;
   return {
-    view, open, task,
-    /** A note, on its own page, from wherever it was found. */
-    openNote: (id: string) => go(noteHref(id), { state: FROM_APP }),
-    /** The way back from a note's page: where the app came from, else Home. */
-    leaveNote: () => { if (history.state?.fromApp) history.back(); else go("/"); },
+    view, open: note, task,
+    /** A note, over the screen it was found from. */
+    openNote: (id: string) => navigate(noteLink(id, here)),
+    /** The way back from a note: where the app came from, else the screen under it (a note opened by its address). */
+    leaveNote: () => {
+      if (canGoBack) router.history.back();
+      else void navigate({ ...linkOf(view, { task }), replace: true });
+    },
     /** A task opened beside its list (null closes it). */
-    openTask: (id: string | null) => go(id ? `${hrefOf(view)}?t=${encodeURIComponent(id)}` : hrefOf(view)),
+    openTask: (id: string | null) => navigate(linkOf(view, { task: id ?? undefined })),
     /** A task opened in a task list of `v`, from a view that has none (a card in the assistant). */
-    showTask: (v: View, id: string) => go(`${hrefOf(v)}?t=${encodeURIComponent(id)}`),
-    goView: (v: View) => go(hrefOf(v)),
-    /** Home's notes under exactly these tags. */
-    setTags: (tags: string[]) => go(hrefOf({ kind: "home", tags })),
-    /** What clicking a badge does: the tag added to Home's filter. */
+    showTask: (v: View, id: string) => navigate(linkOf(v, { task: id })),
+    goView: (v: View) => navigate(linkOf(v)),
+    /** The notes (the Notes page's when on it, else Home's) under exactly these tags. */
+    setTags: (tags: string[]) => navigate(linkOf({ kind: view.kind === "notes" ? "notes" : "home", tags })),
+    /** What clicking a badge does: the tag added to the notes' filter (the Notes page's when on it, else Home's). */
     filterTag: (tag: string) => {
-      const now = view.kind === "home" ? view.tags ?? [] : [];
-      go(hrefOf({ kind: "home", tags: now.some((t) => fold(t) === fold(tag)) ? now : [...now, tag] }));
+      const now = isNotesView(view) ? view.tags ?? [] : [];
+      return navigate(linkOf({ kind: view.kind === "notes" ? "notes" : "home", tags: now.some((t) => fold(t) === fold(tag)) ? now : [...now, tag] }));
     },
   };
+}
+
+/** A link's intent, for what is not an `<a>` (a note's tile, which holds buttons of its own): the route and its data fetched
+ *  ahead on a hover or a focus after the router's preload delay, at once on a touch, as `Link`'s `preload="intent"` does. */
+export function useIntent(link: () => AppLink) {
+  const router = useRouter(), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const now = () => { clearTimeout(timer.current); void router.preloadRoute(link()).catch(() => {}); };
+  const soon = () => { clearTimeout(timer.current); timer.current = setTimeout(now, router.options.defaultPreloadDelay ?? 50); };
+  const cancel = () => clearTimeout(timer.current);
+  return { onPointerEnter: soon, onPointerLeave: cancel, onFocus: soon, onTouchStart: now };
 }

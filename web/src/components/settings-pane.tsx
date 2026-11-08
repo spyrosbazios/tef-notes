@@ -8,13 +8,14 @@
 import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearch } from "@tanstack/react-router";
 import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
+import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { KEEP_LABEL, KEEPS } from "@/core/voice";
 import { ModelMenu } from "@/components/assistant/model-menu";
@@ -48,7 +49,8 @@ import { useNotes } from "@/hooks/notes";
 import { downloadZip } from "@/lib/export";
 import { importNotes, type ImportTally, type Source } from "@/core/import";
 import { folderSource, zipSource } from "@/lib/import";
-import { useHere } from "@/lib/nav";
+import type { SettingsSection } from "@/lib/route-search";
+import { settingsScroll } from "@/lib/scroll";
 import { localDay } from "@/core/time";
 import { useCreateTag, useDescribeTag, useRemoveTag, useTags, useUpdateTag } from "@/hooks/tags";
 import { message } from "@/services/api";
@@ -60,7 +62,7 @@ import { appVersion, forceUpdate } from "@/lib/update";
 /** A tag is one word: it is written on the note's `tags:` line and typed as `#tag` in search. */
 const clean = (v: string) => v.trim().replace(/^#/, "");
 /** A section's title stays at the top of the scrolling page. */
-const HEAD = "sticky top-(--settings-top,0px) z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
+const HEAD = "sticky top-0 z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
 const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). */
@@ -241,7 +243,7 @@ function TabOptions({ tab }: { tab: Tab }) {
 /** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger by the grip), shown or
  *  hidden, and Home and Tasks tapped open for the list each starts on. */
 function Layout() {
-  const { tabs, hidden, start } = usePrefs();
+  const { tabs, hidden, start, tabLabels } = usePrefs();
   const [open, setOpen] = useState<Tab | null>(null);
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ tabs: movedTab(prefsNow().tabs, id as Tab, over as Tab, after) }));
   return (
@@ -252,6 +254,10 @@ function Layout() {
         <div className="space-y-2.5 px-3 py-2.5">
           <p className="text-sm font-semibold">Open the app on</p>
           <Choice label="Open the app on" value={start} options={STARTS} names={START_LABEL} onPick={(v) => setPrefs({ start: v })} />
+        </div>
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p className="text-sm font-semibold">Tab labels</p>
+          <Choice label="Tab labels" value={tabLabels} options={TAB_LABELS} names={TAB_LABELS_LABEL} onPick={(v) => setPrefs({ tabLabels: v })} />
         </div>
         <div className="px-3 py-2.5">
           <p className="text-sm font-semibold">Tabs</p>
@@ -636,6 +642,7 @@ function Maintenance() {
   );
 }
 
+/** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
   { id: "layout", label: "Layout", about: "Phone tabs, what they open on, the start screen", icon: LayoutGrid, body: Layout },
@@ -646,68 +653,62 @@ const SECTIONS = [
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
   { id: "transfer", label: "Import & export", about: "Markdown folders and zips, in and out", icon: ArrowDownUp, body: ImportExport },
   { id: "maintenance", label: "Maintenance", about: "Version, get the latest", icon: Wrench, body: Maintenance },
-] as const satisfies readonly { id: string; label: string; about: string; icon: LucideIcon; body: () => ReactNode }[];
-type SectionId = (typeof SECTIONS)[number]["id"];
+] as const satisfies readonly { id: SettingsSection; label: string; about: string; icon: LucideIcon; body: () => ReactNode }[];
 
 export function SettingsPane() {
-  const narrow = useNarrow(), { params, go } = useHere();
-  const asked = SECTIONS.find((s) => s.id === params.get("section"));
-  const open = (id: SectionId) => go(`/settings?section=${id}`);
+  const narrow = useNarrow(), { section } = useSearch({ from: "/_app/settings" });
+  const asked = SECTIONS.find((s) => s.id === section);
   const at = asked ?? (narrow ? undefined : SECTIONS[0]);
 
   if (narrow) {
     return (
-      <div className="h-full overflow-y-auto">
-        <div className="px-4 pt-3 pb-28">
-          {at ? (
-            <>
-              <div className="sticky top-0 z-20 -mx-4 -mt-3 h-11 bg-bg/95 px-2 pt-0.5 backdrop-blur">
-                <button type="button" onClick={() => go("/settings")} className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-dim hover:bg-muted"><ChevronLeft className="size-4" />Settings</button>
-              </div>
-              <div className="[--settings-top:2.75rem]"><at.body /></div>
-            </>
-          ) : (
-            <>
-              <PageHeader title="Settings" className="-mx-4 -mt-3 mb-2" />
+      <main className="flex h-full min-w-0 flex-1 flex-col">
+        {at ? (
+          <PageHeader title={at.label} className="pl-1" icon={
+            <Link to="/settings" search={{}} aria-label="Back to Settings" className="grid size-9 shrink-0 place-items-center rounded-lg text-dim hover:bg-muted"><ChevronLeft className="size-[22px]" /></Link>} />
+        ) : <PageHeader title="Settings" />}
+        <div data-scroll-restoration-id={settingsScroll(at?.id ?? "")} className="min-h-0 flex-1 overflow-y-auto">
+          <div className="px-4 pt-1 pb-28">
+            {at ? <at.body /> : (
               <ul className="divide-y divide-line rounded-xl border border-line">
                 {SECTIONS.map(({ id, label, about, icon: Icon }) => (
                   <li key={id}>
-                    <button type="button" onClick={() => open(id)} className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                    <Link to="/settings" search={{ section: id }} className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
                       <Icon className="size-5 shrink-0 text-brand" />
                       <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">{label}</span><span className="block text-[13px] text-dim">{about}</span></span>
                       <ChevronRight className="size-4 shrink-0 text-faint" />
-                    </button>
+                    </Link>
                   </li>
                 ))}
               </ul>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </main>
     );
   }
-  const Body = (at ?? SECTIONS[0]).body;
+  const shown = at ?? SECTIONS[0], Body = shown.body;
   return (
-    <div className="flex h-full min-h-0">
+    <main className="flex h-full min-h-0 min-w-0 flex-1">
       <nav aria-label="Settings sections" className="w-52 shrink-0 border-r border-line px-3 pt-8">
         <div className="mb-3 flex items-center gap-2 px-2 text-brand"><Settings className="size-5" /><span className="text-xs font-semibold uppercase tracking-wider">Settings</span></div>
-        <Highlight controlledItems value={(at ?? SECTIONS[0]).id} className="inset-0 rounded-lg bg-muted">
+        <Highlight controlledItems value={shown.id} className="inset-0 rounded-lg bg-muted">
           <div className="space-y-1">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <HighlightItem key={id} value={id}>
-                <button type="button" aria-current={id === (at ?? SECTIONS[0]).id ? "page" : undefined} onClick={() => open(id)}
+                <Link to="/settings" search={{ section: id }} aria-current={id === shown.id ? "page" : undefined}
                   className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                    id === (at ?? SECTIONS[0]).id ? "font-semibold text-fg" : "text-dim")}>
+                    id === shown.id ? "font-semibold text-fg" : "text-dim")}>
                   <Icon className="size-4" />{label}
-                </button>
+                </Link>
               </HighlightItem>
             ))}
           </div>
         </Highlight>
       </nav>
-      <article className="min-w-0 flex-1 overflow-y-auto">
+      <article data-scroll-restoration-id={settingsScroll(shown.id)} className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10"><Body /></div>
       </article>
-    </div>
+    </main>
   );
 }
