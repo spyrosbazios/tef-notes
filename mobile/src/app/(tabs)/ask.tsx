@@ -7,7 +7,7 @@ import type { UIMessage } from "ai";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { ChevronRight, History, NotebookPen, Sparkles, SquarePen } from "lucide-react-native";
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
-import { Keyboard, TextInput, View } from "react-native";
+import { AppState, Keyboard, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { held, replied, replying, seen, useService } from "@/agent/background";
 import { isAppTool, resumes, runUiTool } from "@/agent/ui-tools";
@@ -60,10 +60,16 @@ export default function Ask() {
   // it's the same messages, as after this phone's own reply, where it could only undo a confirm card's tap not yet sent
   const adopt = useEffectEvent((server: UIMessage[]) => { if (!busy && ids(server) !== ids(messages)) setMessages(server); });
   useEffect(() => { if (current.state === "ready") adopt(current.messages); }, [current]);
+  // On screen: opening the tab, or coming back to the app on it, may start a new chat (the newChatOn pref, enterAsk)
   useFocusEffect(useCallback(() => {
-    if (useChats.getState().enterAsk(!!replying())) setInput("");
+    const enter = (via: "tab" | "app") => { if (useChats.getState().enterAsk(!!replying(), via)) setInput(""); };
+    enter("tab");
     seen.ask = true;
-    return () => { seen.ask = false; useChats.setState({ resumeOnEntry: false }); };
+    const app = AppState.addEventListener("change", (s) => {
+      if (s === "active") enter("app");
+      else if (s === "background") useChats.getState().leaveAsk();
+    });
+    return () => { app.remove(); seen.ask = false; useChats.getState().leaveAsk(); useChats.setState({ resumeOnEntry: false }); };
   }, []));
 
   const field = useRef<TextInput>(null);

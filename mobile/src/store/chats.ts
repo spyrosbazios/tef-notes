@@ -3,17 +3,30 @@
 // chat's messages, and which chat is open (MMKV, so a relaunch comes back to it). A new chat gets its id here and
 // its record just before its first message goes (ensureChat, from the transport in src/store/agent.ts). A message
 // handed over from elsewhere (Home's box, a share) waits in `pending` until the Ask tab sends it; a draft (a note's
-// "Ask about this note") waits in `draft` until the Ask tab puts it in its field.
+// "Ask about this note") waits in `draft` until the Ask tab puts it in its field. When Ask opens on a new chat instead
+// of the last one is the `newChatOn` pref (`enterAsk`).
 import type { UIMessage } from "ai";
+import { AppState } from "react-native";
 import { create } from "zustand";
 import * as pb from "@/core/pocketbase";
 import { chatTitle } from "@/core/share";
 import { serverOf } from "./keys";
 import type { LiveEvent } from "./live";
+import { usePrefs } from "./prefs";
 import { mmkvStorage } from "./storage";
 
 const { mmkv } = mmkvStorage("chat");
 const CURRENT = "current";
+/** When the chat was last on screen (ms), and whether the app went to the background since: kept across a relaunch, so
+ *  a killed app counts as left. */
+const SEEN = "seen", LEFT = "left";
+
+/** When Ask opens on a new chat rather than the last one (Settings > Agent): each time the tab is opened, once the
+ *  app has been left, once the chat has been off screen for `IDLE_MS`, or only from the New chat button. */
+export type NewChatOn = "tab" | "app" | "idle" | "never";
+export const IDLE_MS = 30 * 60_000;
+
+AppState.addEventListener("change", (s) => { if (s === "background") mmkv.set(LEFT, "1"); });
 
 /** The chat on the Ask tab. `state`: its messages are loading, here, or failed to load — and a chat whose history
  *  didn't load can't be sent to, or the server would save it without that history. */
@@ -27,8 +40,11 @@ type S = {
   fresh: () => void;
   /** An explicit history selection or handoff survives the next Ask focus. */
   resumeOnEntry: boolean;
-  /** Returns whether entry started a fresh chat. Never switches a reply in flight. */
-  enterAsk: (streaming: boolean) => boolean;
+  /** Ask is on screen: by opening the tab (`via` "tab") or by coming back to the app on it ("app"). Starts a fresh
+   *  chat when `newChatOn` says it is due, and returns whether it did. Never switches a reply in flight. */
+  enterAsk: (streaming: boolean, via: "tab" | "app") => boolean;
+  /** Ask went off screen (another tab, or the app left from it): the idle clock starts. */
+  leaveAsk: () => void;
   /** A message the Ask tab sends as soon as it is in front and idle (`startWith`), then clears. */
   pending: string | null;
   /** Hand the agent a first message: a fresh chat opens with it on the Ask tab, unless `join` (a reply is streaming,
@@ -77,13 +93,18 @@ export const useChats = create<S>()((set, get) => ({
     set({ chats });
   },
   resumeOnEntry: false,
-  enterAsk: (streaming) => {
+  enterAsk: (streaming, via) => {
     const { pending, draft, resumeOnEntry } = get();
-    const reset = !streaming && !pending && !draft && !resumeOnEntry;
+    const on = usePrefs.getState().newChatOn, left = mmkv.getString(LEFT) === "1", seen = Number(mmkv.getString(SEEN) ?? 0);
+    const due = on === "tab" ? via === "tab" : on === "app" ? left : on === "idle" ? Date.now() - seen >= IDLE_MS : false;
+    const reset = due && !streaming && !pending && !draft && !resumeOnEntry;
     if (reset) get().fresh();
+    mmkv.remove(LEFT);
+    mmkv.set(SEEN, String(Date.now()));
     set({ resumeOnEntry: false });
     return reset;
   },
+  leaveAsk: () => mmkv.set(SEEN, String(Date.now())),
   open: (id) => { set({ current: pick(id), resumeOnEntry: true }); load(id); },
   fresh: () => set({ current: pick(pb.recordId(), [], "ready") }),
   pending: null,

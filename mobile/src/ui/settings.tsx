@@ -1,5 +1,5 @@
 // Settings' sub-pages, one per category: Appearance (theme and primary colour), Server (address, sync, conflicts), Photos
-// (Wi-Fi uploads), Agent (model, write cards, its memory) and Tags. The Settings tab lists them (`SECTIONS`);
+// (Wi-Fi uploads), Agent (model, write cards, when Ask starts a new chat, its memory) and Tags. The Settings tab lists them (`SECTIONS`);
 // app/settings/[section].tsx shows one. The server's address goes to SecureStore (src/store/keys.ts); prefs to MMKV (src/store/prefs.ts).
 import * as Haptics from "expo-haptics";
 import { Camera, Check, Palette, PenLine, RefreshCw, Server, Sparkles, Tag as TagIcon, Wifi, type LucideIcon } from "lucide-react-native";
@@ -8,6 +8,7 @@ import { ActivityIndicator, Pressable, View } from "react-native";
 import { serverUrl } from "@/core/pocketbase";
 import { hm } from "@/core/time";
 import { useModel } from "@/store/agent";
+import type { NewChatOn } from "@/store/chats";
 import { useKeys } from "@/store/keys";
 import { setServer, syncNotes, useNoteText, useNotes } from "@/store/notes";
 import { usePrefs } from "@/store/prefs";
@@ -186,9 +187,32 @@ function AgentPage() {
         <ToggleRow title="Write notes without asking" subtitle="Off: each change waits for your OK. Always asked after it read the web." icon={PenLine}
           value={prefs.agentWritesWithoutAsking} onChange={(v) => prefs.set({ agentWritesWithoutAsking: v })} />
       </ListSection>
+      <NewChat />
       <Memory />
       <ModelSheet open={choosing} onOpenChange={setChoosing} />
     </>
+  );
+}
+
+/** When Ask opens on a new chat (src/store/chats.ts enterAsk), in the order of how often. */
+const NEW_CHAT: { on: NewChatOn; title: string; subtitle: string }[] = [
+  { on: "tab", title: "Every time you open Ask", subtitle: "Switching tabs starts over." },
+  { on: "app", title: "After you leave the app", subtitle: "Other tabs keep the chat; closing or switching apps starts over." },
+  { on: "idle", title: "After 30 minutes away", subtitle: "Back sooner, and the last chat is still there." },
+  { on: "never", title: "Never", subtitle: "Only the New chat button starts one." },
+];
+
+function NewChat() {
+  const { C } = useTheme();
+  const { newChatOn, set } = usePrefs();
+  return (
+    <ListSection title="New chat" footer="A started chat is never cut off, and past chats stay in the history.">
+      {NEW_CHAT.map(({ on, title, subtitle }) => (
+        <ListRow key={on} title={title} subtitle={subtitle} selected={on === newChatOn}
+          onPress={() => { if (on !== newChatOn) { void Haptics.selectionAsync(); set({ newChatOn: on }); } }}
+          trailing={on === newChatOn ? <Check size={20} color={C.brand} strokeWidth={2.6} /> : null} />
+      ))}
+    </ListSection>
   );
 }
 
@@ -199,6 +223,6 @@ export const SECTIONS: Record<SectionId, { title: string; about: string; icon: L
   appearance: { title: "Appearance", about: "Theme and primary colour", icon: Palette, Page: () => <><Appearance /><Accent /></> },
   server: { title: "Server & sync", about: "Address, sync, conflicts", icon: Server, Page: ServerPage },
   photos: { title: "Photos", about: "Uploads on Wi-Fi", icon: Camera, Page: PhotosPage },
-  agent: { title: "Agent", about: "Model, effort, write confirmations, memory", icon: Sparkles, Page: AgentPage },
+  agent: { title: "Agent", about: "Model, effort, write confirmations, new chats, memory", icon: Sparkles, Page: AgentPage },
   tags: { title: "Tags", about: "Colours and descriptions", icon: TagIcon, Page: TagList },
 };
