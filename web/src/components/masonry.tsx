@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
 
 export function Masonry({ children, animate = false, className }: { children: ReactNode; animate?: boolean; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [n, setN] = useState(1);
+  // Unknown until measured: dealt into one column first, then two, the tiles' `layout` glided them from the one into the two on every
+  // arrival (seen at the top of the Notes page; on Home the same happens below the fold)
+  const [n, setN] = useState<number | null>(null);
   const narrow = useNarrow(), glide = animate && !narrow;
   useLayoutEffect(() => {
     const el = ref.current;
@@ -24,7 +26,7 @@ export function Masonry({ children, animate = false, className }: { children: Re
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const columns = deal(Children.toArray(children), n).map((col, i) => (
+  const columns = n === null ? [] : deal(Children.toArray(children), n).map((col, i) => (
     <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">
       {animate ? <AnimatePresence initial={false}>{col}</AnimatePresence> : col}
     </div>
