@@ -1,8 +1,8 @@
 // README artwork. Run from the repository root: bun docs/assets/render.ts
-// The web image is a frame of the sample recording. The Android view is an illustration
-// of mobile's Home screen, with the same sample content, rather than a device screenshot.
+// The web image is a frame of the sample recording. The phone view is an illustration
+// of the installed web app's Home screen, with the same sample content, rather than a device screenshot.
 import { createCanvas, GlobalFonts, loadImage } from '../../server/agent/node_modules/@napi-rs/canvas/index.js';
-import { THEMES, withAccent } from '../../packages/core/src/theme';
+import { THEMES, alpha, withAccent } from '../../packages/core/src/theme';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -34,63 +34,127 @@ function text(ctx: any, value: string, x: number, y: number, size: number, color
   ctx.font = `${size}px "Atkinson ${face}"`; ctx.fillStyle = color; ctx.fillText(value, x, y);
 }
 
-// Illustrate the phone using the Home layout in mobile/ and site/src/components/mock/PhoneHome.tsx.
-const phone = createCanvas(390, 875), p = phone.getContext('2d');
-p.fillStyle = C.bg; p.fillRect(0, 0, 390, 875);
-text(p, '9:41', 22, 28, 14, C.fg, 'Semibold');
-p.drawImage(await icon('wifi', C.fg), 318, 13, 18, 18);
-p.drawImage(await icon('battery-full', C.fg), 344, 11, 24, 22);
-p.drawImage(logo, 20, 53, 24, 30);
-p.drawImage(await icon('chevron-down'), 52, 63, 12, 12);
-p.drawImage(await icon('search'), 344, 57, 24, 24);
-text(p, 'November', 20, 112, 15, C.dim, 'Medium');
-const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-for (let i = 0; i < 7; i++) {
-  const x = 20 + i * 51;
-  text(p, days[i]!, x + 14, 141, 12, C.dim);
-  if (i === 5) panel(p, x, 152, 42, 42, 15, C.brand);
-  text(p, String(i + 2), x + 14, 180, 16, i === 5 ? C.bg : C.fg, 'Medium');
+// Illustrate the phone as the installed web app draws Home (web/src/components/home.tsx below `md`; the site's
+// site/src/components/mock/PhoneHome.tsx and parts.tsx are the same screen in markup). Drawn at 2x and scaled down.
+const PW = 390, PH = 932, S = 2;
+const phone = createCanvas(PW * S, PH * S), p = phone.getContext('2d');
+p.scale(S, S);
+p.fillStyle = C.bg; p.fillRect(0, 0, PW, PH);
+const ico = async (name: string, x: number, y: number, size: number, color = C.dim) => p.drawImage(await icon(name, color), x, y, size, size);
+const width = (value: string, size: number, face: string) => { p.font = `${size}px "Atkinson ${face}"`; return p.measureText(value).width; };
+
+// The system bars take the theme's ground, as the installed app colours them.
+text(p, '9:41', 36, 27, 13, C.fg, 'Medium');
+await ico('signal', 300, 14, 14, C.fg); await ico('wifi', 320, 14, 14, C.fg); await ico('battery-full', 340, 12, 18, C.fg);
+
+// Header: the mark (it is the lens) and Search.
+p.drawImage(logo, 16, 47, 22.6, 28);
+await ico('search', 346, 51, 22);
+
+// The days strip: the month above, a slot for the chosen day, planned tasks shading each box.
+text(p, 'November', PW / 2 - width('November', 11, 'Medium') / 2, 100, 11, C.faint, 'Medium');
+const shade = [alpha(C.fg, 0.05), alpha(C.brand, 0.2), alpha(C.brand, 0.4), alpha(C.brand, 0.65), C.brand];
+const strip: [string, number, number, number][] = [['Sat', 31, 0, -2], ['Sun', 1, 0, -1], ['Mon', 2, 2, 0], ['Tue', 3, 1, 1], ['Wed', 4, 3, 2], ['Thu', 5, 1, 3]];
+for (const [i, [wd, dn, n, off]] of strip.entries()) {
+  const x = 24 + i * 58, y = 110, far = Math.abs(off);
+  p.globalAlpha = off < 0 ? 0.35 : far <= 1 ? 1 : 0.55;
+  if (far === 0) { p.beginPath(); p.roundRect(x + 1, y + 1, 50, 54, 12); p.strokeStyle = C.brand; p.lineWidth = 2; p.stroke(); }
+  panel(p, x + 4, y + 4, 44, 48, 10, shade[n]!);
+  const ink = n >= 3 ? C.bg : far === 0 ? C.brand : C.dim;
+  p.globalAlpha *= 0.8; text(p, wd, x + 26 - width(wd, 11, 'Medium') / 2, y + 24, 11, ink, 'Medium'); p.globalAlpha /= 0.8;
+  text(p, String(dn), x + 26 - width(String(dn), 17, far === 0 ? 'Bold' : 'Medium') / 2, y + 43, 17, ink, far === 0 ? 'Bold' : 'Medium');
+  p.globalAlpha = 1;
 }
-p.drawImage(await icon('star', C.brand), 20, 218, 20, 20);
-text(p, 'Today', 48, 236, 23, C.fg, 'Bold');
-text(p, 'Inbox', 131, 236, 18, C.faint, 'Medium');
-text(p, 'Upcoming', 200, 236, 18, C.faint, 'Medium');
-p.drawImage(await icon('plus', C.brand), 345, 218, 22, 22);
-for (const [i, task] of ['Sketch the workspace layout', 'Pick up a new notebook', 'Plan the mountain weekend'].entries()) {
-  const y = 270 + i * 51;
-  p.strokeStyle = C.faint; p.lineWidth = 1.5; p.beginPath(); p.arc(29, y + 4, 9, 0, Math.PI * 2); p.stroke();
-  text(p, task, 49, y + 9, 16);
-  if (i === 0) text(p, 'A quieter workspace', 49, y + 27, 11, C.dim);
+for (const [x0, x1] of [[12, 12 + 36], [378, 378 - 36]] as const) {
+  const g = p.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, C.bg); g.addColorStop(1, alpha(C.bg, 0));
+  p.fillStyle = g; p.fillRect(Math.min(x0, x1), 106, 36, 64);
 }
-text(p, 'Notes', 20, 452, 23, C.fg, 'Bold');
-text(p, '6', 86, 451, 13, C.faint);
-p.drawImage(await icon('list-filter'), 277, 432, 19, 19);
-p.drawImage(await icon('tags'), 310, 432, 19, 19);
-p.drawImage(await icon('plus', C.brand), 346, 431, 22, 22);
-for (const [i, color] of [[0, 'blue'], [1, 'green']] as const) {
-  const x = 16 + i * 183, n = NOTE_COLORS[color];
-  panel(p, x, 470, 175, 237, 17, n.bg, n.line);
-  p.save(); p.beginPath(); p.roundRect(x + 1, 471, 173, 105, [16, 16, 0, 0]); p.clip();
-  if (i === 0) p.drawImage(web, 220, 416, 248, 100, x + 1, 471, 173, 105);
-  else p.drawImage(web, 482, 416, 125, 100, x + 1, 471, 173, 105);
-  p.restore();
-  const lines = i === 0 ? ['A quieter', 'workspace'] : ['Weekend in', 'the mountains'];
-  lines.forEach((line, j) => text(p, line, x + 12, 598 + j * 19, 16, n.fg, 'Semibold'));
-  const body = i === 0 ? ['A small studio, a clear', 'desk, and space to think.'] : ['Two days off the grid.', 'Take the scenic route.'];
-  body.forEach((line, j) => text(p, line, x + 12, 649 + j * 19, 13, n.fg));
-  text(p, i === 0 ? '#work' : '#travel', x + 12, 690, 12, n.fg);
+
+// The task box: Today on a capsule, Inbox and Upcoming quiet, a tag filter and Add.
+const todayW = width('Today', 17, 'Bold');
+panel(p, 6, 186, 8 + 17 + 6 + todayW + 8, 28, 14, TINT.accent);
+await ico('star', 14, 191, 17, C.brand);
+text(p, 'Today', 37, 206, 17, C.fg, 'Bold');
+p.globalAlpha = 0.25;
+text(p, 'Inbox', 6 + 8 + 17 + 6 + todayW + 8 + 2 + 8, 206, 17, C.fg, 'Bold');
+text(p, 'Upcoming', 6 + 8 + 17 + 6 + todayW + 8 + 2 + 8 + width('Inbox', 17, 'Bold') + 16 + 2, 206, 17, C.fg, 'Bold');
+p.globalAlpha = 1;
+const ghost = async (name: string, x: number, y: number, brand = false) => {
+  if (brand) return ico(name, x + 7, y + 7, 22, C.brand);
+  p.beginPath(); p.roundRect(x + 0.5, y + 0.5, 31, 31, 8); p.strokeStyle = C.line; p.lineWidth = 1; p.stroke();
+  return ico(name, x + 8, y + 8, 16);
+};
+await ghost('hash', 306, 184); await ghost('plus', 346, 182, true);
+
+const tagPill = (label: string, x: number, y: number, color: { fg: string; line: string }) => {
+  panel(p, x, y, width(label, 10.5, 'Medium') + 16, 18, 9, alpha(color.line, 0.22));
+  text(p, label, x + 8, y + 13, 10.5, color.fg, 'Medium');
+};
+const tasks = [
+  { title: 'Sketch the workspace layout', meta: 'A quieter workspace', icon: 'notebook-text' },
+  { title: 'Pick up a new notebook', meta: '18:30', icon: 'bell' },
+  { title: 'Plan the mountain weekend', tag: '#travel', icon: 'flag', meta: 'Friday' },
+  { title: 'Water the plants', meta: 'Every 3 days', icon: 'repeat' },
+];
+p.save(); p.beginPath(); p.rect(0, 224, PW, 214); p.clip();
+let ty = 224;
+for (const task of tasks) {
+  const h = 60, mid = ty + 8 + 11;
+  for (const dx of [0, 5]) for (const dy of [-5, 0, 5]) { p.fillStyle = C.faint; p.beginPath(); p.arc(18 + dx, mid + dy, 1.4, 0, Math.PI * 2); p.fill(); }
+  p.strokeStyle = C.faint; p.lineWidth = 1.5; p.beginPath(); p.arc(48, mid, 9, 0, Math.PI * 2); p.stroke();
+  text(p, task.title, 70, ty + 8 + 16, 16);
+  const mcolor = task.icon === 'flag' ? C.warn : C.faint;
+  await ico(task.icon, 70, ty + 33, 13, mcolor);
+  text(p, task.meta, 87, ty + 44, 12, mcolor);
+  if (task.tag) tagPill(task.tag, 87 + width(task.meta, 12, 'Regular') + 12, ty + 31, NOTE_COLORS.blue);
+  ty += h;
 }
-panel(p, 16, 720, 175, 66, 17, NOTE_COLORS.pink.bg, NOTE_COLORS.pink.line);
-text(p, 'The reading list', 28, 746, 16, NOTE_COLORS.pink.fg, 'Semibold');
-panel(p, 199, 720, 175, 66, 17, NOTE_COLORS.purple.bg, NOTE_COLORS.purple.line);
-text(p, 'Ideas worth keeping', 211, 746, 15, NOTE_COLORS.purple.fg, 'Semibold');
-p.fillStyle = C.card; p.fillRect(0, 802, 390, 73);
-p.fillStyle = C.line; p.fillRect(0, 802, 390, 1);
-for (const [i, name, label] of [[0, 'house', 'Home'], [1, 'circle-check', 'Tasks'], [2, 'sparkles', 'Ask'], [3, 'settings', 'Settings']] as const) {
-  const x = 31 + i * 97;
-  if (i === 0) panel(p, x - 10, 809, 56, 32, 16, TINT.accent);
-  p.drawImage(await icon(name, i === 0 ? C.brand : C.dim), x + 7, 814, 22, 22);
-  text(p, label, x + (label === 'Settings' ? -6 : 4), 858, 12, i === 0 ? C.brand : C.dim, 'Medium');
+p.restore();
+const fade = p.createLinearGradient(0, 388, 0, 438); fade.addColorStop(0, alpha(C.bg, 0)); fade.addColorStop(1, C.bg);
+p.fillStyle = fade; p.fillRect(0, 388, PW, 50);
+
+// The notes: a heading with the count and its controls, then tiles in two columns.
+text(p, 'Notes', 16, 470, 20, C.fg, 'Bold');
+text(p, '6', 16 + width('Notes', 20, 'Bold') + 6, 465, 12, C.faint);
+await ghost('hash', 222, 448); await ghost('tags', 262, 448); await ghost('arrow-down-up', 302, 448); await ghost('plus', 346, 446, true);
+
+const TW = 173, TOP = 496;
+const tiles = [
+  { col: 0, y: TOP, h: 250, color: 'blue', pic: [220, 416, 248, 100], lines: ['A quieter', 'workspace'], body: ['A small studio, a clear', 'desk, and space to think.'], tag: '#work', age: '2m' },
+  { col: 1, y: TOP, h: 250, color: 'green', pic: [482, 416, 125, 100], lines: ['Weekend in', 'the mountains'], body: ['Two days off the grid.', 'Take the scenic route.'], tag: '#travel', age: '1h' },
+  { col: 0, y: TOP + 262, h: 150, color: 'purple', lines: ['Ideas worth', 'keeping'], body: ['A running list. No', 'filtering. Quiet, yours.'], tag: '#reading', age: '3h' },
+  { col: 1, y: TOP + 262, h: 150, color: 'pink', lines: ['The reading', 'list'], body: ['Slow books for the', 'long evenings ahead.'], tag: '#reading', age: '1d' },
+] as const;
+for (const t of tiles) {
+  const x = 16 + t.col * (TW + 12), n = NOTE_COLORS[t.color];
+  panel(p, x, t.y, TW, t.h, 16, n.bg, n.line);
+  let top = t.y + 12;
+  if ('pic' in t) {
+    p.save(); p.beginPath(); p.roundRect(x + 1, t.y + 1, TW - 2, 105, [15, 15, 0, 0]); p.clip();
+    p.drawImage(web, t.pic[0], t.pic[1], t.pic[2], t.pic[3], x + 1, t.y + 1, TW - 2, 105); p.restore();
+    top = t.y + 118;
+  }
+  t.lines.forEach((line, j) => text(p, line, x + 12, top + 16 + j * 19, 16, n.fg, 'Semibold'));
+  t.body.forEach((line, j) => text(p, line, x + 12, top + 66 + j * 18, 13, n.fg));
+  tagPill(t.tag, x + 12, top + 92, n);
+  text(p, t.age, x + 12, top + 126, 11, n.line);
+}
+
+// The tab bar: a floating pill, the active tab's label shown on a brand capsule.
+p.fillStyle = C.bg; p.fillRect(0, 838, PW, 94);
+panel(p, 16, 850, 358, 60, 30, C.raised, C.line);
+const tabs = [['house', 'Home'], ['list-checks', 'Tasks'], ['sparkles', 'Ask'], ['settings', 'Settings']] as const;
+const widths = tabs.map(([, label], i) => (i === 0 ? 16 + 22 + 8 + width(label, 14, 'Semibold') + 16 : 12 + 22 + 12));
+const gap = (346 - widths.reduce((a, b) => a + b, 0)) / 3;
+let tx = 22;
+for (const [i, [name, label]] of tabs.entries()) {
+  const w = widths[i]!;
+  if (i === 0) {
+    panel(p, tx, 856, w, 48, 24, TINT.accent);
+    await ico(name, tx + 16, 869, 22, C.brand);
+    text(p, label, tx + 16 + 22 + 8, 886, 14, C.brand, 'Semibold');
+  } else await ico(name, tx + 12, 869, 22);
+  tx += w + gap;
 }
 
 const canvas = createCanvas(1600, 1050), c = canvas.getContext('2d');
@@ -103,10 +167,10 @@ text(c, 'Your own server. Your everyday tools.', 920, 115, 21, C.dim);
 text(c, 'WEB APP', 48, 170, 13, C.dim, 'Semibold');
 panel(c, 48, 190, 1120, 788, 18, C.bg, C.line);
 c.save(); c.beginPath(); c.roundRect(49, 191, 1118, 786, 17); c.clip(); c.drawImage(web, 49, 191, 1118, 786); c.restore();
-text(c, 'ANDROID', 1238, 201, 13, C.dim, 'Semibold');
+text(c, 'INSTALLED WEB APP', 1238, 201, 13, C.dim, 'Semibold');
 panel(c, 1218, 221, 334, 765, 40, C.bg, C.line);
 c.save(); c.beginPath(); c.roundRect(1230, 233, 310, 741, 30); c.clip(); c.drawImage(phone, 1230, 233, 310, 741); c.restore();
-text(c, 'Web · Android · CLI · Chrome clipper', 48, 1018, 17, C.dim);
-text(c, 'Sample content · Android interface illustration', 1100, 1018, 14, C.faint);
+text(c, 'Web · Phone · CLI · Chrome clipper', 48, 1018, 17, C.dim);
+text(c, 'Sample content · Phone interface illustration', 1100, 1018, 14, C.faint);
 await Bun.write(`${dir}/overview.png`, canvas.toBuffer('image/png'));
 console.log('Generated mark.svg and overview.png');

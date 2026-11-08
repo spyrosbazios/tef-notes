@@ -4,7 +4,7 @@
 // the app. Photos are drawn stand-ins in the note colours (index.css `.pic`), never pictures.
 import {
   ArrowUp, BatteryFull, Bell, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleCheckBig, Eye, Flag, Focus,
-  History, House, Inbox, ListChecks, Mic, Moon, NotebookText, Pin, Repeat, Search, Settings, Settings2, Signal, Sparkles,
+  History, House, Inbox, ListChecks, Moon, NotebookText, Pin, Repeat, Search, Settings, Settings2, Signal, Sparkles,
   SquarePen, Star, Wifi, X, type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -132,18 +132,17 @@ export const NOTES: DemoNote[] = [
 
 const clamp = (n: number) => ({ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: n, overflow: "hidden" }) as const;
 
-/** A note as a tile: its pictures on top, its colour's tint, title, a preview, tags, pin and age. `phone` is the phone's tile. */
-export function NoteTile({ note, phone }: { note: DemoNote; phone?: boolean }) {
+/** A note as a tile (web/src/components/note-list.tsx): its pictures flush on top, its colour's tint, title, a preview, tags, pin
+ *  and age. The installed app draws the same tile at phone width, two columns, with no more than two tags (`maxTags`). */
+export function NoteTile({ note, maxTags }: { note: DemoNote; maxTags?: number }) {
   const tinted = !!note.color;
   return (
-    <div data-color={note.color} className={cn("overflow-hidden border", tinted ? "border-tile-line/40 bg-tile text-tile-fg" : "border-line bg-card", phone ? "rounded-2xl" : "rounded-2xl")}>
-      {note.pics ? <Mosaic pics={note.pics} className={cn(phone ? "m-1.5 mb-0 rounded-xl" : "", note.pics.length >= 3 ? (phone ? "h-[150px]" : "h-44") : phone ? "h-28" : "h-32")} /> : null}
-      <div className={cn("flex flex-col", phone ? "gap-2 p-3.5" : "gap-1.5 p-3")}>
+    <div data-color={note.color} className={cn("overflow-hidden rounded-2xl border", tinted ? "border-tile-line/50 bg-tile text-tile-fg" : "border-line bg-card")}>
+      {note.pics ? <Mosaic pics={note.pics} className={note.pics.length >= 3 ? "h-44" : "h-32"} /> : null}
+      <div className="flex flex-col gap-1.5 p-3">
         <h3 className="text-[15px] font-semibold leading-snug" style={clamp(2)}>{note.title}</h3>
-        {note.snippet ? <p className={cn("text-[13px] leading-snug", tinted ? "opacity-85" : "text-dim")} style={clamp(phone ? 5 : 6)}>{note.snippet}</p> : null}
-        {phone
-          ? <span className="flex gap-1.5 overflow-hidden">{note.tags.slice(0, 2).map((t) => <PTag key={t} name={t} />)}{note.tags.length > 2 ? <span className="text-[10.5px] text-faint">+{note.tags.length - 2}</span> : null}</span>
-          : <span className="flex flex-wrap gap-1">{note.tags.map((t) => <Tag key={t} name={t} />)}</span>}
+        {note.snippet ? <p className={cn("text-[13px] leading-snug", tinted ? "opacity-85" : "text-dim")} style={clamp(6)}>{note.snippet}</p> : null}
+        <span className="flex flex-wrap gap-1">{note.tags.slice(0, maxTags).map((t) => <Tag key={t} name={t} />)}</span>
         <span className={cn("flex items-center gap-1.5 text-[11px] tabular-nums", tinted ? "text-tile-line" : "text-faint")}>{note.pinned ? <Pin className="size-3" /> : null}{note.age}</span>
       </div>
     </div>
@@ -187,54 +186,44 @@ export type DemoTask = {
   title: string; checklist?: [number, number]; when?: string; every?: string; remind?: string; due?: string; note?: string; tags?: string[]; done?: boolean;
 };
 
-/** A task row: round box, title, a quiet second line (checklist, day, repeat, reminder, its note, its tags), the deadline
- *  in the warn colour: beside the row on the web, in its second line on the phone. */
-export function TaskRow({ task, selected, phone }: { task: DemoTask; selected?: boolean; phone?: boolean }) {
-  const due = task.due ? <Meta key="d" icon={Flag} className={cn("text-warn", phone && "font-semibold")}>{phone ? `Due ${task.due}` : task.due}</Meta> : null;
-  // The phone's row (mobile/src/ui/tasks.tsx): checklist, due, reminder, repeat, a bare icon for its note; tags on a row of their own.
-  const meta = phone
-    ? [
-      task.checklist ? <Meta key="c" icon={ListChecks} className="tabular-nums">{task.checklist[0]}/{task.checklist[1]}</Meta> : null,
-      due,
-      task.remind ? <Meta key="r" icon={Bell}>{task.remind}</Meta> : null,
-      task.every ? <Meta key="e" icon={Repeat}>{task.every}</Meta> : null,
-      task.note ? <NotebookText key="n" className="size-[11px]" /> : null,
-    ].filter(Boolean)
-    : [
-      task.note ? <Meta key="n" icon={NotebookText}>{task.note}</Meta> : null,
-      task.checklist ? <Meta key="c" icon={ListChecks} className="tabular-nums">{task.checklist[0]}/{task.checklist[1]}</Meta> : null,
-      task.when ? <Meta key="w" icon={Calendar}>{task.when}</Meta> : null,
-      task.every ? <Meta key="e" icon={Repeat}>{task.every}</Meta> : null,
-      task.remind ? <Meta key="r" icon={Bell}>{task.remind}</Meta> : null,
-      ...(task.tags ?? []).map((t) => <Tag key={t} name={t} />),
-    ].filter(Boolean);
+/** A task row: round box, title, a quiet second line (its note, checklist, day, repeat, reminder, tags), the deadline in
+ *  the warn colour beside the row (web/src/components/task-row.tsx). The installed app draws the same row at phone width. */
+export function TaskRow({ task, selected }: { task: DemoTask; selected?: boolean }) {
+  const due = task.due ? <Meta key="d" icon={Flag} className="text-warn">{task.due}</Meta> : null;
+  const meta = [
+    task.note ? <Meta key="n" icon={NotebookText}>{task.note}</Meta> : null,
+    task.checklist ? <Meta key="c" icon={ListChecks} className="tabular-nums">{task.checklist[0]}/{task.checklist[1]}</Meta> : null,
+    task.when ? <Meta key="w" icon={Calendar}>{task.when}</Meta> : null,
+    task.every ? <Meta key="e" icon={Repeat}>{task.every}</Meta> : null,
+    task.remind ? <Meta key="r" icon={Bell}>{task.remind}</Meta> : null,
+    ...(task.tags ?? []).map((t) => <Tag key={t} name={t} />),
+  ].filter(Boolean);
   return (
-    <div className={cn("flex items-start rounded-xl", phone ? "gap-3.5 px-5 py-3" : "gap-3 px-3 py-2", selected && "bg-muted", task.done && phone && "opacity-50")}>
-      <span className={phone ? "mt-px" : "mt-0.5"}><Radio on={task.done} size={phone ? 24 : 18} /></span>
+    <div className={cn("flex items-start gap-3 rounded-xl px-3 py-2", selected && "bg-muted")}>
+      <span className="mt-0.5"><Radio on={task.done} size={18} /></span>
       <div className="min-w-0 flex-1">
-        <p className={cn("leading-snug", phone ? "text-[16px] font-medium" : "text-[15px]", task.done ? "text-dim line-through decoration-faint" : "text-fg")}>{task.title}</p>
-        {meta.length ? <div className={cn(phone ? "mt-1" : "mt-0.5", "flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs", phone ? "text-dim" : "text-faint")}>{meta}</div> : null}
-        {phone && task.tags?.length ? <div className="mt-1.5 flex gap-1.5">{task.tags.slice(0, 3).map((t) => <PTag key={t} name={t} />)}</div> : null}
+        <p className={cn("text-[15px] leading-snug", task.done ? "text-faint line-through decoration-faint" : "text-fg")}>{task.title}</p>
+        {meta.length ? <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-faint">{meta}</div> : null}
       </div>
-      {!phone && due ? <span className="mt-0.5 shrink-0 text-xs">{due}</span> : null}
+      {due ? <span className="mt-0.5 shrink-0 text-xs">{due}</span> : null}
     </div>
   );
 }
 
-/** This Evening's heading inside a list. */
+/** This Evening's heading inside a list; on the phone a title over a hairline (task-list.tsx). */
 export const Evening = ({ phone }: { phone?: boolean }) => (
-  <p className={cn("flex items-center font-semibold", phone ? "mx-3 mb-1 mt-4 gap-2 border-b border-line px-2 pb-2 text-[15px] font-bold" : "gap-1.5 px-3 pb-1 pt-5 text-sm")}>
-    <Moon className={phone ? "size-4 text-brand" : "size-3.5 text-dim"} />This Evening
+  <p className={cn("flex items-center font-semibold", phone ? "mx-3 mb-1 mt-5 gap-2 border-b border-line pb-2 text-[15px] font-extrabold" : "gap-1.5 px-3 pb-1 pt-5 text-sm")}>
+    <Moon className={phone ? "size-3.5 text-brand" : "size-3.5 text-dim"} />This Evening
   </p>
 );
 
-/** The task box's head: Today, the Inbox and Upcoming as quiet words, the chosen one in full. */
+/** The task box's head: Today, the Inbox and Upcoming as quiet words, the chosen one in full (on the phone on a capsule). */
 export function BoxWords({ phone }: { phone?: boolean }) {
   return (
-    <div className={cn("flex min-w-0 flex-1 items-center", phone ? "gap-3.5 text-[17px]" : "gap-5 text-[22px] tracking-tight")}>
-      <span className="flex items-center gap-2 font-bold"><Star className={cn("text-brand", phone ? "size-[17px]" : "size-5")} />Today</span>
-      <span className="font-bold opacity-25">Inbox</span>
-      <span className="font-bold opacity-25">Upcoming</span>
+    <div className={cn("flex min-w-0 flex-1 items-center", phone ? "gap-0.5 text-[17px]" : "gap-5 text-[22px] tracking-tight")}>
+      <span className={cn("flex items-center gap-2 font-bold", phone && "gap-1.5 rounded-full bg-accent px-2 py-0.5 font-extrabold")}><Star className={cn("text-brand", phone ? "size-[17px]" : "size-5")} />Today</span>
+      <span className={cn("font-bold opacity-25", phone && "px-2 py-0.5 font-extrabold")}>Inbox</span>
+      <span className={cn("font-bold opacity-25", phone && "px-2 py-0.5 font-extrabold")}>Upcoming</span>
     </div>
   );
 }
@@ -303,11 +292,10 @@ export function Days() {
 
 // ---- chat ----
 
-/** The owner's message: on the web a quiet raised bubble (turn.tsx), on the phone a brand one with its bottom-right
- *  corner squared (ui/chat/bubble.tsx). */
-export const UserBubble = ({ children, phone }: { children: ReactNode; phone?: boolean }) => (
+/** The owner's message: a quiet raised bubble (web/src/components/assistant/turn.tsx), on the phone too. */
+export const UserBubble = ({ children }: { children: ReactNode }) => (
   <div className="flex justify-end">
-    <p className={phone ? "max-w-[85%] rounded-3xl rounded-br-lg bg-brand px-4 py-3 text-[15px] leading-snug text-bg" : "max-w-[85%] rounded-2xl bg-raised px-3.5 py-2 text-sm leading-snug"}>{children}</p>
+    <p className="max-w-[85%] rounded-2xl bg-raised px-3.5 py-2 text-sm leading-snug">{children}</p>
   </div>
 );
 
@@ -357,23 +345,37 @@ export function ConfirmCard({ title, why, tasks }: { title: string; why?: string
   );
 }
 
-/** The web assistant's dock: model, past chats, a new chat; the chat; what it sees of the page; the composer. */
+/** The assistant's header (assistant/panel.tsx): model, past chats, a new chat, and the X that closes the dock (not on the phone, where Ask is a tab). */
+export function AssistantHeader({ close }: { close?: boolean }) {
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-3 text-dim">
+      <Sparkles className="size-4 text-brand" /><h2 className="px-1 text-[15px] font-bold tracking-tight text-fg">Assistant</h2><span className="flex-1" />
+      <span className="flex h-8 items-center gap-0.5 px-2 text-faint"><Settings2 className="size-4" /><ChevronDown className="size-3" /></span>
+      {[History, SquarePen, ...(close ? [X] : [])].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
+    </header>
+  );
+}
+
+/** What the assistant sees of the page, and the composer: a field and the round Send, which waits for a message. */
+export function AssistantComposer({ sees, ready }: { sees: string; ready?: boolean }) {
+  return (
+    <div className="shrink-0 border-t border-line p-3">
+      <p className="flex items-center gap-1.5 px-1 pb-1.5 text-xs text-faint"><Eye className="size-3.5" /><span className="truncate">{sees}</span></p>
+      <div className="flex items-end gap-2 rounded-2xl border border-line bg-card p-2">
+        <span className="min-h-9 flex-1 px-2 py-1.5 text-sm text-faint">Ask, or say what to note</span>
+        <span className={cn("flex size-8 items-center justify-center rounded-full bg-brand text-bg", !ready && "opacity-50")}><ArrowUp className="size-4" /></span>
+      </div>
+    </div>
+  );
+}
+
+/** The web assistant's dock: its header; the chat; what it sees of the page; the composer. */
 export function Dock({ sees, children }: { sees: string; children: ReactNode }) {
   return (
     <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-line bg-bg">
-      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-3 text-dim">
-        <Sparkles className="size-4 text-brand" /><h2 className="px-1 text-[15px] font-bold tracking-tight text-fg">Assistant</h2><span className="flex-1" />
-        <span className="flex h-8 items-center gap-0.5 px-2 text-faint"><Settings2 className="size-4" /><ChevronDown className="size-3" /></span>
-        {[History, SquarePen, X].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
-      </header>
+      <AssistantHeader close />
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-5">{children}</div>
-      <div className="shrink-0 border-t border-line p-3">
-        <p className="flex items-center gap-1.5 px-1 pb-1.5 text-xs text-faint"><Eye className="size-3.5" /><span className="truncate">{sees}</span></p>
-        <div className="flex items-end gap-2 rounded-2xl border border-line bg-card p-2">
-          <span className="min-h-9 flex-1 px-2 py-1.5 text-sm text-faint">Ask, or say what to note</span>
-          <span className="flex size-8 items-center justify-center rounded-full bg-brand text-bg"><ArrowUp className="size-4" /></span>
-        </div>
-      </div>
+      <AssistantComposer sees={sees} />
     </aside>
   );
 }
@@ -421,29 +423,17 @@ export function PhoneShell({ tab, children }: { tab?: PhoneTab; children: ReactN
   );
 }
 
-/** Home's header: the mark, which is the lens (its name on an accent pill while one is on), and Search in the corner. */
+/** Home's header (web/src/components/home.tsx): the mark, which is the lens (its name beside it while one is on), and Search in the corner. */
 export function HomeHeader({ lens, searching }: { lens?: string; searching?: boolean }) {
   return (
     <div className="flex h-11 items-center gap-1 pl-4 pr-2">
-      <span className="flex-1">
-        <span className={cn("inline-flex h-10 items-center gap-2", lens ? "rounded-full bg-accent pl-1.5 pr-3" : "")}>
+      <span className="flex min-w-0 flex-1">
+        <span className="flex h-11 items-center gap-2.5">
           <Mark className="h-7" />
-          {lens ? <span className="text-[14px] font-semibold text-brand">{lens}</span> : null}
-          <ChevronDown className={cn("size-3.5", lens ? "text-brand" : "text-dim")} />
+          {lens ? <span className="text-[15px] font-extrabold tracking-tight text-brand">{lens}</span> : null}
         </span>
       </span>
-      <span className={cn("flex size-12 items-center justify-center", searching ? "text-brand" : "text-dim")}>{searching ? <X className="size-[22px]" /> : <Search className="size-[22px]" />}</span>
-    </div>
-  );
-}
-
-/** The phone's composer (mobile/src/ui/chat/composer.tsx): the field, and one round button: a tonal microphone while it is
- *  empty, the brand send once there is text. */
-export function PhoneComposer({ placeholder }: { placeholder: string }) {
-  return (
-    <div className="flex min-h-14 items-center gap-2 rounded-[28px] border border-line bg-card py-1 pl-5 pr-1.5">
-      <span className="flex-1 truncate text-[16px] text-faint">{placeholder}</span>
-      <span className="flex size-12 items-center justify-center rounded-full bg-raised text-fg"><Mic className="size-5" /></span>
+      <span className={cn("flex size-9 items-center justify-center", searching ? "text-brand" : "text-dim")}>{searching ? <X className="size-[22px]" /> : <Search className="size-[22px]" />}</span>
     </div>
   );
 }

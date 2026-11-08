@@ -12,7 +12,7 @@ that most changes have to respect. Security reports go through [SECURITY.md](SEC
 | `packages/core/` | Dependency-free TypeScript shared by every client, imported as `@/core/*` |
 | `server/` | PocketBase hooks and migrations; `server/agent/` is the chat agent |
 | `web/` | The web app; also builds the phone's editor and PDF pages |
-| `mobile/` | The Android app |
+| `mobile/` | The Android app, frozen: the phone runs the web app installed from Chrome |
 | `cli/` | The `tefnotes` command |
 | `extension/` | The Chrome clipper |
 | `site/` | The public marketing page |
@@ -66,9 +66,9 @@ on your first pull request, a bot asks you to comment the sentence it quotes. Yo
 
 The whole repository has one semver version, and the git tag is its only source: nothing stores it in a `package.json`.
 `scripts/version.sh` prints it (`TEF_NOTES_VERSION` if set, else the latest tag without its `v`, else `0.0.0`), and the
-extension's manifest and the Android app's `versionName` read it from there. The Android `versionCode` is
-`major * 10000 + minor * 100 + patch` (0.1.0 is 100, 1.2.3 is 10203), at least 1.
+extension's manifest reads it from there.
 
 To release: move the `## Unreleased` entries of `CHANGELOG.md` under `## X.Y.Z - date`, commit to `main`, then tag
-`vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and the signed APK and attaches both
-to a GitHub release whose notes are that changelog section.
+`vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and attaches it to a GitHub release
+whose notes are that changelog section; `docker.yml` publishes the server images. The phone runs the web app installed
+from Chrome, so no APK is built.

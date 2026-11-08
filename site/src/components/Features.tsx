@@ -236,7 +236,7 @@ export function Features() {
   return (
     <section id="features" className="relative mx-auto max-w-6xl px-5 py-24 sm:px-8 md:py-32">
       <Heading eyebrow="Features" title="Everything a notebook should do." />
-      <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-16 grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((f, i) => (
           <Reveal key={f.title} delay={(i % 3) * 80} className="h-full">
             <Spotlight className="group flex h-full flex-col rounded-card border border-line bg-glass p-5 backdrop-blur transition-colors hover:bg-card">

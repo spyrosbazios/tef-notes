@@ -9,6 +9,7 @@ export function Footer() {
         <div className="space-y-3">
           <Brand />
           <p className="max-w-xs text-[15px] text-dim">Made for one person's notes; yours too.</p>
+          <p className="max-w-xs text-[13px] text-faint">Built on shadcn/ui, with its motion from <a href="https://animate-ui.com" className="underline decoration-line underline-offset-4 transition-colors hover:text-fg">Animate UI</a>.</p>
         </div>
         <div className="space-y-3 md:text-right">
           <p className="text-[15px] text-dim">Open source, <a href={`${REPO}/blob/main/LICENSE`} className="underline decoration-line underline-offset-4 transition-colors hover:text-fg">AGPL licensed</a>, and self-hosted. Read it, run it, change it.</p>

@@ -19,12 +19,12 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-ffa070?style=flat-square" alt="License: AGPL-3.0"></a>
   <a href="web/README.md"><img src="https://img.shields.io/badge/client-Web-403d52?style=flat-square" alt="Web client"></a>
-  <a href="mobile/README.md"><img src="https://img.shields.io/badge/client-Android-403d52?style=flat-square" alt="Android client"></a>
+  <a href="web/README.md#offline"><img src="https://img.shields.io/badge/client-Phone%20(PWA)-403d52?style=flat-square" alt="Phone client: the installed web app"></a>
 </p>
 
-![TEF Notes web app beside an illustration of its Android interface, with sample notes and tasks](docs/assets/overview.png)
+![TEF Notes web app beside an illustration of its phone interface, with sample notes and tasks](docs/assets/overview.png)
 
-*The web app and an illustrated Android screen, using sample content. Rosé Pine theme, orange accent.*
+*The web app and an illustrated phone screen, using sample content. Rosé Pine theme, orange accent.*
 
 ## Notes and tasks, together
 
@@ -46,8 +46,8 @@ Ollama. Auto-tagging and web search are optional too.
 
 ### Keep control of your data
 
-Run the server yourself. The Android app keeps an offline copy and merges edits when it reconnects. Export notes
-and their attachments as files with the CLI. Notes and tasks remain usable without configuring an AI provider.
+Run the server yourself. The web app, installed on your phone from Chrome, keeps an offline copy and merges edits when it
+reconnects. Export notes and their attachments as files with the CLI. Notes and tasks remain usable without configuring an AI provider.
 
 ### Focus with lenses
 
@@ -88,17 +88,21 @@ docker compose up -d
 
 On the server machine, open [localhost:8097](http://localhost:8097). To use the app from your phone or another
 computer, configure the private reverse proxy described in the [server setup](server/README.md#security-model-read-first).
-Both `/api` and `/agent` must reach the same private origin. AI keys are optional; add them when you want those features.
+Both `/api` and `/agent` must reach the same private origin, and it must be HTTPS for a phone to install the app
+(Tailscale Serve gives you one). AI keys are optional; add them when you want those features. Task reminders on the phone
+need a push key and your `TZ`: [Push reminders](server/README.md#push-reminders).
 
 ### Use it where you are
 
 | Client | How to get it |
 |---|---|
-| **Web** | Included in the server build; open your server’s URL. [Web guide](web/README.md) |
-| **Android** | Install the APK from the [latest release](https://github.com/spyrosbazios/tef-notes/releases/latest), then enter your server’s URL. [Android guide](mobile/README.md) |
+| **Web** | Included in the server build; open your server’s URL on a laptop. [Web guide](web/README.md) |
+| **Phone** | Open your server’s HTTPS address in Chrome on Android and choose **Install app**. It works offline, is in the Share sheet of other apps and sends task reminders as notifications. [Web guide](web/README.md#offline) |
 | **Chrome clipper** | Build and sign it with the server, then install from its private HTTPS origin. [Clipper guide](extension/README.md) |
 | **CLI** | Run `tefnotes` with Bun to read, edit and export notes and tasks. [CLI guide](cli/README.md) |
 | **MCP** | Enable the server endpoint to connect another agent harness. [MCP guide](server/agent/README.md#mcp-the-tools-for-another-agent-harness) |
+
+The Android app in [`mobile/`](mobile/README.md) is the earlier phone client: it stays in the repository for 0.3.0 and gets no new features. Use the installed web app.
 
 The UI is in English. Notes can be in any language.
 

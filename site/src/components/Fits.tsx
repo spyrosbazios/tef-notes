@@ -2,7 +2,7 @@ import { Boxes, Container, Database, Globe, Puzzle, Smartphone, SquareTerminal, 
 import { Heading, Reveal } from "./ui";
 
 const CLIENTS: [LucideIcon, string, string][] = [
-  [Smartphone, "Phone", "Android, offline copy"],
+  [Smartphone, "Phone", "Installed from Chrome, works offline"],
   [Globe, "Web", "Served by the server"],
   [SquareTerminal, "CLI", "Notes and tasks from the shell"],
   [Puzzle, "Extension", "Chrome clipper"],

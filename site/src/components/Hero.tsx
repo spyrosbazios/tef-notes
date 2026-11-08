@@ -1,11 +1,11 @@
 import { ArrowRight, GitBranch, Globe, Smartphone, SquareTerminal, Sparkles, Puzzle } from "lucide-react";
-import { RELEASES, REPO } from "@/lib";
+import { REPO } from "@/lib";
 import { PhoneHome } from "./mock/PhoneHome";
 import { WebHome } from "./mock/WebHome";
 import { BrowserFrame, PhoneFrame, Reveal, ScrollStage } from "./ui";
 
 const SURFACES = [
-  [Smartphone, "Android"],
+  [Smartphone, "Phone"],
   [Globe, "Web"],
   [Puzzle, "Chrome"],
   [SquareTerminal, "Terminal"],
@@ -29,11 +29,11 @@ export function Hero() {
             </h1>
             <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-dim text-pretty sm:text-xl">
               TEF Notes keeps your notes, your to-dos and an assistant that has read them both, on a server you own.
-              Nothing to sign up for, nothing that leaves your network.
+              One polished app for the laptop and, installed from Chrome, the phone. Nothing to sign up for, nothing that leaves your network.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a href={RELEASES} className="group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-7 text-[15px] font-bold text-bg shadow-[0_0_44px_-6px_var(--tf-glow)] transition-transform hover:scale-[1.03] sm:w-auto">
-                Get the app <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+              <a href="#get" className="group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-7 text-[15px] font-bold text-bg shadow-[0_0_44px_-6px_var(--tf-glow)] transition-transform hover:scale-[1.03] sm:w-auto">
+                Run your own <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
               </a>
               <a href={REPO} className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-line bg-glass px-7 text-[15px] font-semibold backdrop-blur transition-colors hover:border-brand-line hover:bg-accent sm:w-auto">
                 <GitBranch className="size-4 text-brand" /> See the source

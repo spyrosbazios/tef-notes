@@ -2,9 +2,11 @@ import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { THEMES, withAccent } from "@/core/theme";
 import { cn } from "@/lib";
+import { PhoneAsk } from "./mock/PhoneAsk";
 import { PhoneHome } from "./mock/PhoneHome";
 import { PhoneSearch } from "./mock/PhoneSearch";
 import { PhoneShare } from "./mock/PhoneShare";
+import { PhoneTasks } from "./mock/PhoneTasks";
 import { AskDock, DOCK } from "./mock/WebAsk";
 import { LisbonPage } from "./mock/WebNote";
 import { WebTasks } from "./mock/WebTasks";
@@ -65,10 +67,18 @@ const ROWS: Row[] = [
     ),
   },
   {
-    eyebrow: "On the phone",
+    eyebrow: "Install",
+    title: "The same app, in your pocket.",
+    text: "Open your server in Chrome on Android and choose Install app. It is the web app laid out for a thumb, with an animated interface that follows your device's reduced-motion setting.",
+    points: ["Bottom tabs for Home, Tasks, Ask and Settings, and a strip of days", "Swipe a task for When or Delete; tick it, with a moment to Undo", "Task reminders as notifications, no store and no APK"],
+    caption: "Tasks and Ask in the installed app.",
+    visual: <Pair a={<PhoneFrame label="The Tasks tab on Today: the lists as tabs, the day's tasks and This Evening"><PhoneTasks /></PhoneFrame>} b={<PhoneFrame label="The Ask tab: a chat with a note the assistant found and a task it points to"><PhoneAsk /></PhoneFrame>} />,
+  },
+  {
+    eyebrow: "Search and share",
     title: "Find anything. File anything.",
     text: "Search drops down from Home and works offline, forgiving accents. Share a page, a photo or a screenshot from any app and the server suggests where it goes.",
-    points: ["A #tag in the search narrows notes and tasks alike", "Today and Quick widgets; replies as an Android 16 Live Update", "The same editor as the web, offline"],
+    points: ["A #tag in the search narrows notes and tasks alike", "Offline edits are kept and merged when you reconnect", "A link, text, photos or a PDF shared from any app"],
     caption: "Search over Home, and a page shared from the browser.",
     visual: <Pair a={<PhoneFrame label="Search on the phone, notes and tasks as you type"><PhoneSearch /></PhoneFrame>} b={<PhoneFrame label="A shared page, with the server's suggestions of where it goes"><PhoneShare /></PhoneFrame>} />,
   },

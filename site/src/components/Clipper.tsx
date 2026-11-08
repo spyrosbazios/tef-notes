@@ -6,7 +6,7 @@ const POINTS = [
   "The toolbar button, or right-click a page, a selection, a link or a picture",
   "Your own notes and open tasks suggested, the best one focused: Enter saves",
   "A few words of your own re-rank the suggestions; a summary if you tick it",
-  "Pictures saved into the note, downscaled as the phone does it",
+  "Pictures saved into the note, downscaled as the app does it",
   "Installed from your own server, updates itself; talks to nothing else",
 ];
 

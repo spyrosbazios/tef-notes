@@ -98,7 +98,7 @@ in PocketBase's logs (admin UI, Logs).
 ## Push reminders
 
 The installed web app gets a task's reminder (its `when` day and `remind` time) as a Web Push notification, sent by the
-agent every minute; the phone app rings its own local ones. Set up once: generate a VAPID key pair with
+agent every minute; the older Android app, which is frozen, rings its own local ones. Set up once: generate a VAPID key pair with
 `bunx web-push generate-vapid-keys --json`, put its `privateKey` alone in `keys/push/api-key` (the public key is derived
 from it; keep it unreadable to others, `chmod 600`, owned by uid 1000), and set `TEF_NOTES_VAPID_SUBJECT` to
 `mailto:you@example.com` in `.env`. Then `docker compose up -d`; `docker compose logs agent` says "web push is off" once

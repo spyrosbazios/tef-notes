@@ -1,6 +1,6 @@
 ---
 name: self-host
-description: Install, deploy, set up, run or self-host TEF Notes (PocketBase server plus bun chat agent in Docker), put it behind a private reverse proxy, and point the Android app, the CLI or the Chrome extension at the server. Use when the user wants to host their own TEF Notes, upgrade it, or connect a device to it.
+description: Install, deploy, set up, run or self-host TEF Notes (PocketBase server plus bun chat agent in Docker), put it behind a private reverse proxy, and install the web app on a phone, or point the CLI or the Chrome extension at the server. Use when the user wants to host their own TEF Notes, upgrade it, or connect a device to it.
 license: AGPL-3.0
 compatibility: Needs Docker with Compose v2 and network access to ghcr.io (or git, to build from source). Written for Linux hosts; Tailscale or Caddy for the proxy.
 ---
@@ -54,6 +54,7 @@ directory and `cp .env.example .env`. Every variable has a default; edit `.env` 
 | `PB_PORT`, `AGENT_PORT` | Host ports, loopback only. Defaults `8097`, `8098` |
 | `TEF_NOTES_URL` | The public origin devices use, i.e. the proxy's address (step 5). Not the loopback one |
 | `TEF_NOTES_VERSION` | The version of the images/builds; see its comment in `.env.example` |
+| `TEF_NOTES_KEY_PUSH`, `TEF_NOTES_VAPID_SUBJECT` | Task reminders as push notifications on the phone: the key directory (default `./keys/push`) and a `mailto:` contact. Empty subject = off. Set `TZ` too. Steps: `server/README.md#push-reminders` |
 | `TEF_NOTES_MCP` | `1` serves the note and task tools at `/agent/mcp` for another agent harness (default `0`) |
 | `TEF_NOTES_CRX_KEY` | Extension signing key path, inside `server/` (step 7). Default `./no-crx-key` = no extension |
 
@@ -65,7 +66,7 @@ Each key is a file `api-key` holding the key alone, in its own directory. Create
 `up`, or Docker creates them root-owned:
 
 ```sh
-mkdir -p keys/typesafe keys/deepseek keys/exa      # keys/<provider> for another TEF_NOTES_PROVIDER
+mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<provider> for another TEF_NOTES_PROVIDER
 chmod 644 keys/*/api-key                            # the containers run as uid 1000 and must be able to read them
 ```
 
@@ -74,6 +75,7 @@ chmod 644 keys/*/api-key                            # the containers run as uid 
 | `keys/<provider>/api-key` | Chat agent, clipper write-up and summary, tag descriptions | Chat refused; models `available: false` |
 | `keys/typesafe/api-key` | Auto-tagging, the clipper's "where does this fit" suggestions | Nothing auto-tagged; clips still save |
 | `keys/exa/api-key` | The agent's web search and page reading | Agent runs without web tools |
+| `keys/push/api-key` | Task reminders as push notifications to the installed web app (the VAPID private key, with `TEF_NOTES_VAPID_SUBJECT`) | Reminders do not ring; the agent logs "web push is off" |
 
 Ollama needs no key. **The agent never asks for a key value in chat and never writes one.** Tell the owner:
 "Put your key, alone, in `server/keys/<provider>/api-key` (e.g. `printf '%s' '<key>' > ...`, or paste it in an
@@ -163,8 +165,12 @@ typesafe key being present.
 
 ## 7. Point the clients
 
-- **Android app** (arm64, built from source: `mobile/README.md`): Settings, then Server, type `https://<proxy-origin>`.
-  Without a server it works on-device only.
+- **Phone (the installed web app)**: on Android, open `https://<proxy-origin>` in Chrome and choose Install app (the menu, or
+  Chrome's prompt). Installing needs HTTPS, which the Tailscale Serve or Caddy step 5 gives; an `http://` address only opens in
+  the browser. The app then works offline, is in the Share sheet of other apps, and can ring task reminders once the
+  owner has set up push (`server/README.md#push-reminders`: a VAPID key in `keys/push/api-key` made by the owner, never by
+  the agent; `TEF_NOTES_VAPID_SUBJECT`; `TZ`), then turns them on in Settings, Reminders, per device. The older Android
+  app (`mobile/README.md`) is kept for 0.3.0 but gets no new features; do not install it for a new setup.
 - **CLI** (needs [bun](https://bun.sh) and the cloned repo):
   ```sh
   cd cli && bun install

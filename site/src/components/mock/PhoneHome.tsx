@@ -1,4 +1,4 @@
-import { ArrowDownUp, ListFilter, Plus, Tags } from "lucide-react";
+import { ArrowDownUp, Hash, Plus, Tags } from "lucide-react";
 import { BoxWords, Days, Evening, HomeHeader, NOTES, NoteTile, PhoneShell, TaskRow, type DemoNote, type DemoTask } from "./parts";
 
 type View = { tasks: DemoTask[]; evening?: DemoTask; notes: DemoNote[]; count: number };
@@ -32,36 +32,43 @@ const LENSES: Record<"Home" | "Work", View> = {
   },
 };
 
-/** Home: the mark (the lens), Search in the corner, the days strip, the task box, then every note in two columns. */
+const Ghost = ({ children, brand }: { children: React.ReactNode; brand?: boolean }) => (
+  <span className={brand ? "flex size-9 items-center justify-center text-brand" : "flex size-8 items-center justify-center rounded-lg border border-line text-dim"}>{children}</span>
+);
+
+/** Home as the installed app draws it (web/src/components/home.tsx below `md`): the mark (the lens) and Search, the days strip, the
+ *  task box at a fixed height, then every note in two columns. */
 export function PhoneHome({ lens = "Home" }: { lens?: "Home" | "Work" }) {
   const v = LENSES[lens];
   const cols = [v.notes.filter((_, i) => i % 2 === 0), v.notes.filter((_, i) => i % 2 === 1)];
   return (
     <PhoneShell tab="Home">
-      <div className="flex flex-col gap-2 pt-2">
-        <HomeHeader lens={lens} />
-        <Days />
-        <div>
-          <div className="mx-4 flex items-center gap-2">
-            <BoxWords phone />
-            <span className="flex h-8 items-center rounded-full border border-line px-2 text-dim"><ListFilter className="size-3.5" /></span>
-            <span className="flex size-9 items-center justify-center text-brand"><Plus className="size-[22px]" /></span>
-          </div>
-          <div className="relative mt-1 h-[288px] overflow-hidden">
-            {v.tasks.map((t) => <TaskRow key={t.title} phone task={t} />)}
-            {v.evening ? <><Evening phone /><TaskRow phone task={v.evening} /></> : null}
-            <span className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-bg" />
+      <div className="flex flex-col gap-4 pt-2">
+        <div className="flex flex-col gap-2">
+          <HomeHeader lens={lens} />
+          <Days />
+          <div>
+            <div className="flex items-center gap-2 pl-1.5 pr-2 pb-2">
+              <BoxWords phone />
+              <Ghost><Hash className="size-4" /></Ghost>
+              <Ghost brand><Plus className="size-[22px]" /></Ghost>
+            </div>
+            <div className="relative h-72 overflow-hidden">
+              {v.tasks.map((t) => <TaskRow key={t.title} task={t} />)}
+              {v.evening ? <><Evening phone /><TaskRow task={v.evening} /></> : null}
+              <span className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-bg" />
+            </div>
           </div>
         </div>
-        <div className="mx-4 flex items-center gap-2 text-dim">
-          <b className="text-[18px] font-bold text-fg">Notes</b><span className="flex-1 text-[13px] tabular-nums text-faint">{v.count}</span>
-          <span className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] font-medium text-fg"><ListFilter className="size-3.5 text-dim" />All</span>
-          <span className="flex size-9 items-center justify-center"><Tags className="size-5" /></span>
-          <span className="flex size-9 items-center justify-center"><ArrowDownUp className="size-5" /></span>
-          <span className="flex size-9 items-center justify-center text-brand"><Plus className="size-[22px]" /></span>
+        <div className="flex items-center gap-2 px-4">
+          <b className="text-lg font-extrabold tracking-tight">Notes</b><span className="flex-1 pt-1 text-xs tabular-nums text-faint">{v.count}</span>
+          <Ghost><Hash className="size-4" /></Ghost>
+          <Ghost><Tags className="size-4" /></Ghost>
+          <Ghost><ArrowDownUp className="size-4" /></Ghost>
+          <Ghost brand><Plus className="size-[22px]" /></Ghost>
         </div>
-        <div className="flex gap-2 px-3 pb-4">
-          {cols.map((c, i) => <div key={i} className="flex min-w-0 flex-1 flex-col gap-2">{c.map((n) => <NoteTile key={n.title} note={n} phone />)}</div>)}
+        <div className="flex items-start gap-3 px-4 pb-4">
+          {cols.map((c, i) => <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">{c.map((n) => <NoteTile key={n.title} note={n} maxTags={2} />)}</div>)}
         </div>
       </div>
     </PhoneShell>
