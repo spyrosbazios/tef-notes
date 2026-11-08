@@ -5,10 +5,9 @@
 // made on the laptop reaches the phone next time it is opened. `usePrefsSync` does the fetching: mounted once, in root.tsx.
 import { useQuery } from "@tanstack/react-query";
 import { prefsOf, type Prefs } from "@/core/prefs";
+import { PREFS_STORAGE as KEY } from "@/lib/boot";
 import * as remote from "@/services/prefs";
 import { persisted } from "./store";
-
-const KEY = "tefnotes.prefs";
 
 // One-shot: the settings this browser kept per key before they moved to the server become its first copy, which seeds the
 // server's record if there is none yet. Delete once every browser has opened the app since (2026-11).

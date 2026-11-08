@@ -4,24 +4,26 @@ import react from "@vitejs/plugin-react";
 import { execFileSync } from "node:child_process";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { boot } from "./vite-boot";
 import { alias, at, identity, theme } from "./vite-shared";
 
 export default defineConfig({
   plugins: [
     // The file routes (src/routes/) into src/routeTree.gen.ts, each route's component split into its own chunk; before react()
     tanstackRouter({ target: "react", autoCodeSplitting: true, quoteStyle: "double" }),
-    react(), tailwindcss(), theme(), identity({ manifest: true }),
+    react(), tailwindcss(), theme(), identity({ manifest: true }), boot(),
     // The service worker (sw/sw.ts): the built app precached, so a return visit opens what is installed and a new deploy is
     // announced by a toast (src/components/update-toast.tsx) rather than taken mid-session; and the share target's POST to
     // /share, which Android's Share sheet sends. Nothing from the server is ever cached: /api, /agent, the admin UI and the
-    // extension's files bypass the fallback. The manifest is identity()'s.
+    // extension's files bypass the fallback. The manifest is identity()'s, and never cached: the server serves it in the
+    // owner's theme (server/pb_hooks/manifest.pb.js), and Chrome must see that copy when it checks for an update.
     VitePWA({
       strategies: "injectManifest",
       srcDir: "sw",
       filename: "sw.ts",
       registerType: "prompt",
       manifest: false,
-      includeAssets: ["icon.png", "manifest.webmanifest"],
+      includeAssets: ["icon.png"],
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,woff2,ttf,png,svg}"],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
