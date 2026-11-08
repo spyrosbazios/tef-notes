@@ -13,3 +13,6 @@ services:
   agent:
     labels:
       glance.parent: tefnotes
+  stt:
+    labels:
+      glance.parent: tefnotes

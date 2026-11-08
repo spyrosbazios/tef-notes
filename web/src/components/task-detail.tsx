@@ -99,7 +99,7 @@ function TaskNotes({ task, onSave }: { task: TaskRec; onSave: (notes: string) =>
   if (editing || !readsAsMarkdown(task.notes)) {
     return (
       <div onBlur={() => setEditing(false)}>
-        <DraftTextarea value={task.notes} aria-label="Notes" placeholder="Notes" onSave={onSave} autoFocus={editing} onFocus={() => setEditing(true)}
+        <DraftTextarea dictate value={task.notes} aria-label="Notes" placeholder="Notes" onSave={onSave} autoFocus={editing} onFocus={() => setEditing(true)}
           className="min-h-16 border-transparent bg-transparent px-2 text-sm shadow-none hover:border-input dark:bg-transparent" />
       </div>
     );

@@ -3,9 +3,10 @@
 // cursor isn't in a field, and by the + on a task list or a Home section.
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, Calendar, Flag, Moon, Repeat, Tag } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { dayLabel, whenLabel, type Schedule } from "@/core/dates";
+import { MicButton } from "@/components/mic-button";
 import { InSheet } from "@/components/pick";
 import { TagEditor } from "@/components/tag-editor";
 import { chip, Clear, RemindPicker, RepeatPicker, Row } from "@/components/task-fields";
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Turns } from "@/components/swap";
 import { WhenPick, type WhenState } from "@/components/when-picker";
+import { dictateInto } from "@/hooks/dictation";
 import { useNarrow } from "@/hooks/media";
 import { useShake } from "@/hooks/shake";
 import { useGuessedTags } from "@/hooks/tags";
@@ -36,6 +38,7 @@ function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; on
   const [every, setEvery] = useState(""), [remind, setRemind] = useState(""), [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
   const [field, shake] = useShake<HTMLInputElement>();
+  const notesBox = useRef<HTMLTextAreaElement>(null);
   const dismiss = useGuessedTags(title, notes, setTags);
   const state = stateOf(schedule, due), when = whenLabel(state, today);
   const pick = (s: Schedule | null) => { setSchedule(s); if (!s) setRemind(""); };
@@ -51,8 +54,14 @@ function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; on
   return (
     <form onSubmit={add} className="space-y-4">
       {narrow ? <DrawerTitle className="text-center text-[15px] font-semibold">New task</DrawerTitle> : <DialogHeader><DialogTitle>New task</DialogTitle></DialogHeader>}
-      <Input ref={field} autoFocus value={title} aria-invalid={failed || undefined} onChange={(e) => { setTitle(e.target.value); setFailed(false); }} placeholder="What needs doing?" aria-label="Task" className="h-11 text-base" />
-      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" aria-label="Notes" className="min-h-20 text-sm" />
+      <div className="relative">
+        <Input ref={field} autoFocus value={title} aria-invalid={failed || undefined} onChange={(e) => { setTitle(e.target.value); setFailed(false); }} placeholder="What needs doing? Type or tap the mic" aria-label="Task" className="h-11 pr-12 text-base" />
+        <MicButton className="absolute top-1/2 right-1.5 -translate-y-1/2" onText={(t) => { setFailed(false); dictateInto(field.current, field.current?.value ?? title, t, setTitle); }} />
+      </div>
+      <div className="relative">
+        <Textarea ref={notesBox} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" aria-label="Notes" className="min-h-20 pr-12 text-sm" />
+        <MicButton className="absolute top-1.5 right-1.5" onText={(t) => dictateInto(notesBox.current, notesBox.current?.value ?? notes, t, setNotes)} />
+      </div>
       <div className="space-y-0.5 border-t border-line pt-3">
         <Row icon={schedule?.evening ? Moon : Calendar} label="When">
           <WhenPick align="start" value={state} today={today} onSchedule={pick} onDue={setDue}>

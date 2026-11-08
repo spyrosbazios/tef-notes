@@ -8,7 +8,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
@@ -16,8 +16,10 @@ import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, ty
 import { Conflict } from "@/core/pocketbase";
 import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
+import { KEEP_LABEL, KEEPS } from "@/core/voice";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Markdown } from "@/components/markdown";
+import { MicButton } from "@/components/mic-button";
 import { Conflicts } from "@/components/sync-conflicts";
 import { TagBadge } from "@/components/tag-badge";
 import {
@@ -589,6 +591,33 @@ function Reminders() {
   );
 }
 
+/** Voice input: the server's speech model (core/voice.ts), and how long it stays in the server's memory between clips. */
+function Voice() {
+  const { voice } = usePrefs();
+  const [heard, setHeard] = useState("");
+  return (
+    <section className="space-y-3" aria-labelledby="voice-h">
+      <h2 id="voice-h" className={HEAD}>Voice</h2>
+      <p className="text-sm text-dim">Tap the mic in the assistant, a new task, a task's notes, a note or search, and speak English. Your server turns the speech into text with Parakeet, on its own CPU: the recording never leaves it and is not kept.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <div className="space-y-2.5 px-3 py-2.5">
+          <div>
+            <p className="text-sm font-semibold">Keep the model loaded</p>
+            <p className="text-[13px] leading-snug text-dim">The model takes about 1.5 GB of the server's memory while loaded. Loading it takes a few seconds, and starts the moment you tap the mic. Longer keeps the next dictation instant; shorter frees the memory sooner.</p>
+          </div>
+          <div role="radiogroup" aria-label="Keep the model loaded" className="flex flex-wrap gap-2">
+            {KEEPS.map((k) => (
+              <Button key={k} type="button" role="radio" aria-checked={k === voice.keep} size="sm" variant={k === voice.keep ? "default" : "outline"}
+                onClick={() => setPrefs({ voice: { keep: k } })}>{KEEP_LABEL[k]}</Button>
+            ))}
+          </div>
+        </div>
+        <Line title="Try it" detail={heard || "Tap the mic and say something."} trailing={<MicButton onText={setHeard} />} />
+      </div>
+    </section>
+  );
+}
+
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 /** Which build this is, and fetching a newer one when the update toast hasn't shown up yet. */
 function Maintenance() {
@@ -612,6 +641,7 @@ const SECTIONS = [
   { id: "layout", label: "Layout", about: "Phone tabs, what they open on, the start screen", icon: LayoutGrid, body: Layout },
   { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
+  { id: "voice", label: "Voice", about: "Dictation, how long the model stays loaded", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
   { id: "transfer", label: "Import & export", about: "Markdown folders and zips, in and out", icon: ArrowDownUp, body: ImportExport },

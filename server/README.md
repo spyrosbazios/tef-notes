@@ -4,7 +4,9 @@
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
-(`agent/`, see [agent/README.md](agent/README.md)). `docker compose up -d` pulls both as multi-arch (amd64, arm64)
+(`agent/`, see [agent/README.md](agent/README.md)), and a Python one for voice input (`stt/`: Parakeet speech to text
+on the CPU, ~1.5 GB of memory while its model is loaded, unloaded after the idle time set in the app's Settings, Voice).
+`docker compose up -d` pulls them as multi-arch (amd64, arm64)
 images from GHCR, the web app already in PocketBase's `pb_public`. The signed Chrome extension is not in them: it needs
 your origin and your key, so you build it yourself ("The browser extension's CRX").
 
@@ -130,6 +132,7 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `POST` | `/api/tefnotes/tags/describe` | Drafts a tag's description (`{tag}`) or all tags' (`{all: true}`) from notes carrying it; returned, never saved. |
 | `POST` | `/agent/chat` | Streams a chat turn (the agent sidecar, not PocketBase). |
 | `GET` | `/agent/models` | Lists the provider's models and whether its key is present (the agent sidecar). |
+| `POST` | `/agent/transcribe?keep=S` | Voice input: raw mono 16 kHz float32 samples in, `{ text }` out, through the `stt` service; the model stays loaded `S` seconds once idle. `/agent/transcribe/warm?keep=S` loads it ahead. 404 without `TEF_NOTES_STT`. Contract: `packages/core/src/voice.ts`. |
 | `GET` | `/agent/push/key` | `{ publicKey }` a browser subscribes to push with; 404 while push is off (the agent sidecar). |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Stores a browser's `PushSubscription` (and a `label`), the same endpoint again replacing it, a new one beyond 20 devices a 409; `DELETE` takes `{ endpoint }`. Shapes: `packages/core/src/push.ts`. |
 

@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { DrawingDialog } from "@/components/drawing-dialog";
 import { FormatTools } from "@/components/format-tools";
+import { MicButton } from "@/components/mic-button";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { COLORS, UNTITLED } from "@/core/notes";
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Editor } from "@/editor";
+import { dictateInto } from "@/hooks/dictation";
 import { useDraft, type Status } from "@/hooks/draft";
 import { deleteNote, NOTES, setFlags, write, type FlagEdit } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
@@ -139,6 +141,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         <Turns className={cn("ml-2 shrink-0 place-items-start text-xs", d.status !== "error" && "max-sm:hidden")} aria-live="polite" state={d.status} states={STATUS} />
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
+        <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>

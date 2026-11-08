@@ -5,6 +5,7 @@
 // Pure and platform-neutral.
 import { effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
+import { keepOf, type Keep } from "./voice";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 
 /** The phone's bottom bar: its tabs, in the order the owner put them. Settings is always shown (it is where the bar is set). */
@@ -39,6 +40,8 @@ export type Prefs = {
   /** The list Home's task box shows first, and the one the Tasks tab opens on. */
   homeList: TaskList;
   tasksList: TaskList;
+  /** Voice input: how long the server keeps its speech model loaded once idle, in seconds (voice.ts). */
+  voice: { keep: Keep };
   /** The lens on (its record id; lens.ts), none for the unfiltered app. */
   lens?: string;
 };
@@ -48,6 +51,7 @@ export const DEFAULT_PREFS: Prefs = {
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), unasked: false },
   tabs: [...TABS], hidden: [...OFF], start: "home", homeList: "today", tasksList: "today",
+  voice: { keep: keepOf(undefined) },
 };
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {});
@@ -56,7 +60,7 @@ const tabsIn = (v: unknown): Tab[] => [...new Set(strings(v).filter((t): t is Ta
 
 /** Whatever was stored as Prefs: the one defensive reader. Tabs keep their stored order, any missing ones appended. */
 export function prefsOf(raw: unknown): Prefs {
-  const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent);
+  const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent), voice = obj(p.voice);
   const tabs = tabsIn(p.tabs);
   return {
     theme: THEME_NAMES.find((n) => n === p.theme) ?? DEFAULT_THEME,
@@ -76,6 +80,7 @@ export function prefsOf(raw: unknown): Prefs {
     start: STARTS.find((s) => s === p.start) ?? "home",
     homeList: TASK_LISTS.find((l) => l === p.homeList) ?? "today",
     tasksList: TASK_LISTS.find((l) => l === p.tasksList) ?? "today",
+    voice: { keep: keepOf(voice.keep) },
     ...(typeof p.lens === "string" && p.lens ? { lens: p.lens } : {}),
   };
 }

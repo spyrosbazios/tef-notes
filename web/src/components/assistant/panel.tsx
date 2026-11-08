@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { MicButton } from "@/components/mic-button";
+import { dictateInto } from "@/hooks/dictation";
 import { SUGGEST } from "@/core/agent";
 import { ATTACH_ACCEPT, ATTACH_MAX, type ChoiceOutput } from "@/core/assistant";
 import { useModel } from "@/hooks/agent";
@@ -195,7 +197,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
             <div className="rounded-3xl border border-line bg-card p-2 focus-within:border-ring">
               <Attached files={files} remove={(i) => setFiles((fs) => fs.filter((_, j) => j !== i))} />
               <Textarea ref={field} autoFocus value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} rows={1} disabled={!model}
-                placeholder={asked ? "Answer the card above first" : "Ask, or say what to note"}
+                placeholder={asked ? "Answer the card above first" : "Ask, or tap the mic and say what to note"}
                 className="max-h-48 min-h-9 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:ring-0 dark:bg-transparent" />
               <div className="flex items-center gap-1 pt-1">
                 <input ref={picker} type="file" accept={ATTACH_ACCEPT} multiple hidden onChange={(e) => { void pick(e); }} />
@@ -203,6 +205,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
                   disabled={!model || files.length >= ATTACH_MAX} onPointerDown={keep} onMouseDown={keep} onClick={() => picker.current?.click()}><Plus /></Button>
                 <div className="flex-1" />
                 <ModelMenu disabled={busy} align="end" />
+                <MicButton onText={(t) => dictateInto(field.current, field.current?.value ?? input, t, setInput)} />
                 {busy ? (
                   <Button size="icon" className="shrink-0 rounded-full" aria-label="Stop" onPointerDown={keep} onMouseDown={keep} onClick={() => { void stop(); }}><Square className="fill-current" /></Button>
                 ) : (
