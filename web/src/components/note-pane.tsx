@@ -129,7 +129,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
 
   // On a phone the format tools ride on top of the keyboard (the viewport resizes with it, index.html), not in the top bar
   const narrow = useNarrow(), keyboard = useKeyboard();
-  const tools = raw || !ed ? null : <FormatTools editor={ed} side={narrow ? "top" : "bottom"} />;
+  const tools = raw || !ed ? null : <FormatTools editor={ed} side={narrow ? "top" : "bottom"} flat={narrow} />;
 
   const source = (
     <textarea ref={area} value={d.body} onChange={(e) => d.setBody(e.target.value)} spellCheck

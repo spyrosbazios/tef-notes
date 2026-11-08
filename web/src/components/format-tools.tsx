@@ -82,9 +82,31 @@ function LinkTool({ editor, side }: { editor: Editor; side: "top" | "bottom" }) 
 }
 
 /** The format tools in the note bar: the few used most, the rest under ⋯. Redraws with the editor's state. */
-export function FormatTools({ editor, side = "bottom" }: { editor: Editor; side?: "top" | "bottom" }) {
+export function FormatTools({ editor, side = "bottom", flat = false }: { editor: Editor; side?: "top" | "bottom"; flat?: boolean }) {
   const [, redraw] = useReducer((n: number) => n + 1, 0);
   useEffect(() => editor.subscribe(redraw), [editor]);
+  // The bar on top of a phone's keyboard: every tool in one scrolling row. A menu there would take the focus from the
+  // editor, which drops the keyboard and the bar with it
+  if (flat) {
+    const extra = [...(editor.canMove() ? MOVE : []), ...(editor.inTable() ? TABLE : [])];
+    return (
+      <div role="toolbar" aria-label="Format" className="flex items-center gap-0.5 text-dim">
+        {GROUPS.map((group, i) => (
+          <div key={i} className="flex shrink-0 items-center gap-0.5">
+            {i > 0 ? <div className="mx-1 h-5 w-px bg-line" /> : null}
+            {group.map(({ name, label, icon: Icon }) => (
+              <Tool key={name} label={label} pressed={editor.isActive(name)} onRun={() => editor.run(name)}><Icon /></Tool>
+            ))}
+            {i === 0 ? <LinkTool editor={editor} side={side} /> : null}
+          </div>
+        ))}
+        {extra.length ? <div className="mx-1 h-5 w-px shrink-0 bg-line" /> : null}
+        {extra.map(({ name, label, icon: Icon }) => (
+          <Tool key={name} label={label} onRun={() => editor.run(name)}><Icon /></Tool>
+        ))}
+      </div>
+    );
+  }
   const primary: CommandName[] = ["bold", "italic", "taskList"];
   const commands = GROUPS.flat();
   return (
