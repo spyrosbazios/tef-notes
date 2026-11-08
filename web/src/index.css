@@ -297,8 +297,15 @@
 :root:active-view-transition-type(view) [data-vt="page"] { view-transition-name: page; }
 /* The phone's tab bar floats over the page: without a name of its own it would be in the root, painted under the page's snapshot, and
    wink out for the crossfade. Named, it is a group stacked above the page (it comes later in the tree) and holds still */
-:root:active-view-transition-type(view) [data-vt="tabs"] { view-transition-name: tabs; }
-:root:active-view-transition-type(view)::view-transition-old(tabs), :root:active-view-transition-type(view)::view-transition-new(tabs) { animation: none; }
+:root:active-view-transition-type(view, note-close, note-shrink) [data-vt="tabs"] { view-transition-name: tabs; }
+:root:active-view-transition-type(view, note-close, note-shrink)::view-transition-old(tabs),
+:root:active-view-transition-type(view, note-close, note-shrink)::view-transition-new(tabs) { animation: none; }
+/* A note going: the bar comes back in the new page, live. Left in the root it is painted from the live DOM, and on Android its glass
+   (a backdrop-filter) was composited over the note's snapshot, so the bar showed through the note sinking or shrinking away. Named,
+   it is a snapshot like the rest, stacked below the note's group here (the pseudo tree's order is the old page's paint order, the
+   bar's z-50 above the note's z-20, so the note is lifted by hand). Opening needs none of this: the bar is in the old root, a still image. */
+:root:active-view-transition-type(note-close)::view-transition-group(note),
+:root:active-view-transition-type(note-shrink)::view-transition-group(note-card) { z-index: 1; }
 :root:active-view-transition-type(note-open, note-close, note-swap) [data-vt="note"] { view-transition-name: note; }
 :root:active-view-transition-type(note-grow, note-shrink) [data-vt="note"] { view-transition-name: note-card; } /* the tile has it on the other side: lib/morph.ts */
 :root:active-view-transition-type(view, note-open, note-close, note-swap, note-grow, note-shrink)::view-transition-old(root),
