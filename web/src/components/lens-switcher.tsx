@@ -1,7 +1,7 @@
 // The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens on, or none (every device follows), make, edit and delete lenses.
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
 // carries its first tag. The definitions are the server's, shared by every device; which one is on is a preference too (hooks/prefs.ts).
-import { Check, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
@@ -109,7 +109,7 @@ function LensAccent({ value, onChange }: { value: LensAccentName | null; onChang
   );
 }
 
-/** `header`: Home's header on a phone (mobile/src/ui/lens.tsx), where the app's mark is the control, with the lens's name beside it while one is on. */
+/** `header`: Home's header on a phone (mobile/src/ui/lens.tsx), where the app's mark is the control, with the lens's name ("All" while none is on) and a chevron beside it, so it reads as a picker. */
 export function LensSwitcher({ header = false }: { header?: boolean }) {
   const { data: lenses = [] } = useLenses(), active = useActiveLens(), remove = useRemoveLens();
   const [form, setForm] = useState<{ lens?: Lens } | null>(null), [asking, setAsking] = useState<Lens | null>(null);
@@ -125,7 +125,8 @@ export function LensSwitcher({ header = false }: { header?: boolean }) {
             <button type="button" aria-label={active ? `Lens: ${active.name}` : "Lens: none"}
               className="flex h-11 min-w-0 items-center gap-2.5 rounded-lg pr-2 text-left transition-opacity active:opacity-60">
               <Mark className="size-7 shrink-0 text-brand" />
-              {active ? <span className="truncate text-[15px] font-extrabold tracking-tight text-brand">{active.name}</span> : null}
+              <span className={cn("truncate text-[15px] font-extrabold tracking-tight", active ? "text-brand" : "text-dim")}>{active ? active.name : "All"}</span>
+              <ChevronDown className={cn("size-4 shrink-0", active ? "text-brand" : "text-dim")} />
             </button>
           ) : (
             <button type="button" aria-label={active ? `Lens: ${active.name}` : "Lens: none"}
