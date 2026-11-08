@@ -45,7 +45,9 @@ export function TabBar() {
       <LiquidGlass data-vt="tabs" config={glass} className="pointer-events-auto h-full max-w-full rounded-full [&>.ql-content]:h-full">
       <BottomNavigation aria-label="Tabs" value={now} onValueChange={(v) => go(v as Tab)} scrollBehavior="none"
         className="flex h-full items-center gap-1 p-1.5">
-        <BottomNavigationHighlight className="inset-0 rounded-full bg-accent">
+        {/* The capsule glides on spring.selection, but its width on the slower spring.dialog: its target dips as the old label folds and
+            the new one unfolds, and chased at the glide's pace the capsule shrank to a circle mid-way; lagging, it keeps near its size */}
+        <BottomNavigationHighlight className="inset-0 rounded-full bg-accent" transition={{ ...spring.selection, width: spring.dialog, height: spring.dialog }}>
           {tabs.map((key) => {
             const label = TAB_LABEL[key], Icon = TAB_ICON[key];
             const dot = key === "ask" && unread;
