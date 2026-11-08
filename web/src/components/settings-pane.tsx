@@ -1,5 +1,6 @@
-// Settings: the look (theme and accent: this browser's), the server and the offline copy this browser keeps, the agent (which model
-// Ask uses, how hard it thinks, whether it writes notes without asking: this browser's choices; what it remembers of the owner,
+// Settings: the look (theme and accent), the phone's tabs and where the app opens (all the owner's preferences, on the server,
+// hooks/prefs.ts), the server and the offline copy this browser keeps, the agent (which model
+// Ask uses, how hard it thinks, whether it writes notes without asking: preferences too; what it remembers of the owner,
 // agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
 // definition), and import and export. A window lists the sections beside the page; below `md` the list is the page and a
@@ -7,12 +8,13 @@
 import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Bot, Check, ChevronLeft, ChevronRight, Download, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
+import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Markdown } from "@/components/markdown";
@@ -30,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useModel } from "@/hooks/agent";
 import { useAppearance } from "@/hooks/appearance";
+import { setPrefs, usePrefs } from "@/hooks/prefs";
 import { useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
 import { useSyncStatus } from "@/hooks/sync";
@@ -157,7 +160,7 @@ function Appearance() {
   return (
     <section className="space-y-3" aria-labelledby="appearance-h">
       <h2 id="appearance-h" className={HEAD}>Appearance</h2>
-      <p className="text-sm text-dim">The theme and the primary colour are this browser's, as the phone keeps its own.</p>
+      <p className="text-sm text-dim">Kept on the server: every device you open the app on has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
           <div className="flex items-baseline justify-between gap-2">
@@ -199,6 +202,49 @@ function Appearance() {
             })}
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/** The phone's bottom bar and where the app opens (core/prefs.ts). */
+function Layout() {
+  const { tabs, hidden, start } = usePrefs();
+  return (
+    <section className="space-y-3" aria-labelledby="layout-h">
+      <h2 id="layout-h" className={HEAD}>Layout</h2>
+      <p className="text-sm text-dim">The tabs at the bottom of the phone and the screen the app opens on. Kept on the server, like the look.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p id="start-h" className="text-sm font-semibold">Open on</p>
+          <div role="radiogroup" aria-labelledby="start-h" className="flex flex-wrap gap-2">
+            {STARTS.map((s) => (
+              <Button key={s} type="button" role="radio" aria-checked={s === start} size="sm" variant={s === start ? "default" : "outline"} onClick={() => setPrefs({ start: s })}>
+                {START_LABEL[s]}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="px-3 py-2.5">
+          <p className="text-sm font-semibold">Tabs</p>
+          <p className="text-[13px] leading-snug text-dim">Their order on the bar. Settings stays, so the bar can always be changed back.</p>
+        </div>
+        <ul aria-label="Tabs">
+          {tabs.map((t, i) => {
+            const shown = !hidden.includes(t);
+            return (
+              <li key={t} className="flex items-center gap-2 border-t border-line px-3 py-1.5">
+                <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{TAB_LABEL[t]}</span>
+                {HIDEABLE.includes(t) ? (
+                  <Switch checked={shown} aria-label={`Show ${TAB_LABEL[t]}`}
+                    onCheckedChange={(on) => setPrefs({ hidden: on ? hidden.filter((h) => h !== t) : [...hidden, t] })} />
+                ) : null}
+                <Button variant="ghost" size="icon" aria-label={`Move ${TAB_LABEL[t]} up`} disabled={i === 0} onClick={() => setPrefs({ tabs: movedTab(tabs, t, -1) })}><ArrowUp /></Button>
+                <Button variant="ghost" size="icon" aria-label={`Move ${TAB_LABEL[t]} down`} disabled={i === tabs.length - 1} onClick={() => setPrefs({ tabs: movedTab(tabs, t, 1) })}><ArrowDown /></Button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
@@ -288,7 +334,7 @@ function Agent() {
     <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
       <h2 id="agent-h" className={HEAD}>Agent</h2>
-      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys; the model and the switch below are this browser's.</p>
+      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys, and the model and the switch below, so every device has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
@@ -500,6 +546,7 @@ function Reminders() {
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
+  { id: "layout", label: "Layout", about: "Phone tabs, the screen it opens on", icon: LayoutGrid, body: Layout },
   { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },

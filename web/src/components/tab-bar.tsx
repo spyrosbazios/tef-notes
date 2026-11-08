@@ -1,4 +1,4 @@
-// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Ask and Settings, on Animate UI's
+// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Ask and Settings (in the owner's order, Tasks and Ask hideable: core/prefs.ts), on Animate UI's
 // Bottom Navigation. The tab in front shows its label (`show="active"`) on a capsule tinted by the brand that glides to the next
 // one, the others are icons; a press scales them. `scrollBehavior` stays "none": the bar never hides or shrinks on scroll, every
 // view scrolls its own container and the shell reserves `--tab-bar` for it (App.tsx). Below `md` only; the rail does this job from
@@ -9,20 +9,19 @@ import { House, ListChecks, Settings, Sparkles, type LucideIcon } from "lucide-r
 import { BottomNavigation, BottomNavigationHighlight, BottomNavigationHighlightItem, BottomNavigationItem, BottomNavigationLabel } from "@animate-ui/react/primitives/bottom-navigation";
 import { spring } from "@animate-ui/react/utils/motion";
 import { useEffect, useRef } from "react";
+import { shownTabs, TAB_LABEL, type Tab } from "@/core/prefs";
 import { useAskUnread } from "@/hooks/ask-badge";
 import { setDock, useDock } from "@/hooks/dock";
+import { usePrefs } from "@/hooks/prefs";
 import { isTaskView, useNav, type View } from "@/lib/nav";
 
-type Tab = "home" | "tasks" | "ask" | "settings";
-const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
-  { key: "home", label: "Home", icon: House }, { key: "tasks", label: "Tasks", icon: ListChecks },
-  { key: "ask", label: "Ask", icon: Sparkles }, { key: "settings", label: "Settings", icon: Settings },
-];
+const ICON: Record<Tab, LucideIcon> = { home: House, tasks: ListChecks, ask: Sparkles, settings: Settings };
 
 export function TabBar() {
   const { view, goView } = useNav();
   const [{ open }] = useDock();
   const unread = useAskUnread();
+  const tabs = shownTabs(usePrefs());
   const now: Tab = open ? "ask" : isTaskView(view) ? "tasks" : view.kind === "settings" ? "settings" : "home";
   // The list Tasks goes back to: the one last in front, Today at first
   const lastList = useRef<View>({ kind: "today" });
@@ -37,7 +36,8 @@ export function TabBar() {
       <BottomNavigation aria-label="Tabs" value={now} onValueChange={(v) => go(v as Tab)} scrollBehavior="none"
         className="flex h-full items-center justify-between rounded-full border border-line bg-raised p-1.5 shadow-lg">
         <BottomNavigationHighlight className="inset-0 rounded-full bg-accent">
-          {TABS.map(({ key, label, icon: Icon }) => {
+          {tabs.map((key) => {
+            const label = TAB_LABEL[key], Icon = ICON[key];
             const dot = key === "ask" && unread;
             return (
               <BottomNavigationHighlightItem key={key} value={key} className="h-full">
