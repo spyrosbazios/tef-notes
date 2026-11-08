@@ -28,7 +28,7 @@ export function useModel() {
   const { data } = useModels();
   const prefs = usePrefs().agent;
   const model = useMemo(() => pickModel(data, prefs.model), [data, prefs.model]);
-  return { model, models: data, unasked: prefs.unasked, effort: prefs.effort, set: setAgent };
+  return { model, models: data, unasked: prefs.unasked, newChat: prefs.newChat, effort: prefs.effort, set: setAgent };
 }
 
 /** What a request to the agent carries from the settings, read as it is sent: a reply resumed by a card's

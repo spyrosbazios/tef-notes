@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
+import { HIDEABLE, movedTab, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { KEEP_LABEL, KEEPS } from "@/core/voice";
 import { ModelMenu } from "@/components/assistant/model-menu";
@@ -378,7 +378,7 @@ function Tags() {
 }
 
 function Agent() {
-  const { models, unasked, set } = useModel();
+  const { models, unasked, newChat, set } = useModel();
   return (
     <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
@@ -396,6 +396,13 @@ function Agent() {
           </span>
           <Switch checked={unasked} onCheckedChange={(v) => set({ unasked: v })} aria-label="Write notes without asking" />
         </label>
+        <div className="space-y-2.5 px-3 py-2.5">
+          <div>
+            <p className="text-sm font-semibold">Start a new chat</p>
+            <p className="text-[13px] leading-snug text-dim">When opening the assistant clears the last chat. It stays in the list either way, and a reply still running is never cut off.</p>
+          </div>
+          <Choice label="Start a new chat" value={newChat} options={NEW_CHATS} names={NEW_CHAT_LABEL} onPick={(v) => set({ newChat: v })} />
+        </div>
         {models ? (
           <div className="px-3 py-2.5">
             <p className="text-sm font-semibold">Web</p>

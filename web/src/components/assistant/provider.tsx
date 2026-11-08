@@ -13,11 +13,13 @@ import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
+import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
+import { prefsNow } from "@/hooks/prefs";
 import { activeLensOf } from "@/hooks/lens";
 import { NOTES } from "@/hooks/notes";
 import { TASKS } from "@/hooks/todo";
@@ -47,6 +49,15 @@ async function halt(chat: Chat<UIMessage>) {
   await chat.stop();
   chat.messages = closeUnfinished(chat.messages);
 }
+
+// When the dock was last on screen (kept across a reload) and whether the app was left since: a page loaded fresh counts as
+// left, so a killed PWA does too
+const SEEN = "tefnotes.chat-seen";
+const seen = {
+  left: true,
+  at: () => { try { return Number(localStorage.getItem(SEEN)) || 0; } catch { return 0; } },
+  mark: () => { try { localStorage.setItem(SEEN, String(Date.now())); } catch { /* storage unavailable */ } },
+};
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
@@ -145,20 +156,32 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setFocusKey((k) => k + 1);
   }, [build]);
 
-  // Opening the dock starts a new chat; the last one stays in the list. Not while a reply runs or a card waits: then the
+  // The dock back on screen (opened, or the app come back to with it open) starts a new chat when the owner's setting says
+  // it is due (core/prefs.ts `newChatDue`); the last one stays in the list. Not while a reply runs or a card waits: then the
   // dock was opened for that conversation (a card, a UI tool), not by the owner for a new one
   const latest = useRef({ chat, newChat });
   useEffect(() => { latest.current = { chat, newChat }; });
   useEffect(() => {
     let wasOpen = dockNow().open;
-    return onDock(() => {
-      const open = dockNow().open, opened = open && !wasOpen;
-      wasOpen = open;
-      const { chat: c, newChat: fresh } = latest.current;
-      if (!opened || !c?.messages.length || c.status === "submitted" || c.status === "streaming") return;
+    const enter = () => {
+      const { chat: c, newChat: fresh } = latest.current, left = seen.left;
+      seen.left = false;
+      if (!c?.messages.length || c.status === "submitted" || c.status === "streaming") return;
       if (c.lastMessage?.parts.some((p) => isTool(p) && p.state === "approval-requested")) return;
-      fresh();
+      if (newChatDue(prefsNow().agent.newChat, left, seen.at(), Date.now())) fresh();
+    };
+    const off = onDock(() => {
+      const open = dockNow().open;
+      if (open && !wasOpen) enter();
+      if (!open && wasOpen) seen.mark();
+      wasOpen = open;
     });
+    const vis = () => {
+      if (document.visibilityState === "hidden") { seen.left = true; if (dockNow().open) seen.mark(); }
+      else if (dockNow().open) enter();
+    };
+    document.addEventListener("visibilitychange", vis);
+    return () => { off(); document.removeEventListener("visibilitychange", vis); };
   }, []);
 
   const openChat = useCallback((id: string) => {

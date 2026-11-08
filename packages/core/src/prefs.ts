@@ -31,13 +31,28 @@ export const STARTS = ["home", "inbox", "today", "upcoming", "notes"] as const;
 export type Start = (typeof STARTS)[number];
 export const START_LABEL: Record<Start, string> = { home: "Home", inbox: "Inbox", today: "Today", upcoming: "Upcoming", notes: "Notes" };
 
+/** When the assistant opens on a new chat rather than the last one: each time it is opened, once the app has been left,
+ *  once it has been off screen for `NEW_CHAT_IDLE_MS`, or only from the New chat button. */
+export const NEW_CHATS = ["open", "app", "idle", "never"] as const;
+export type NewChat = (typeof NEW_CHATS)[number];
+export const NEW_CHAT_LABEL: Record<NewChat, string> = { open: "Every time", app: "After leaving the app", idle: "After 30 minutes away", never: "Never" };
+export const NEW_CHAT_IDLE_MS = 30 * 60_000;
+
+/** Whether the assistant, back on screen, starts a new chat: `left` the app since it was last seen at `seen` (ms). */
+export function newChatDue(on: NewChat, left: boolean, seen: number, now: number): boolean {
+  if (on === "open") return true;
+  if (on === "app") return left;
+  if (on === "idle") return now - seen >= NEW_CHAT_IDLE_MS;
+  return false;
+}
+
 export type Prefs = {
   theme: ThemeName;
   accent: AccentName;
   /** The notes list: grouped under its tags, which groups are folded (NO_TAG "" for "No tag"), its sort. */
   notes: { grouped: boolean; collapsed: string[]; sort: NoteSort };
-  /** The assistant: the model picked (none is the server's default), its effort, notes written without asking. */
-  agent: { model?: string; effort: Effort; unasked: boolean };
+  /** The assistant: the model picked (none is the server's default), its effort, notes written without asking, when a new chat starts. */
+  agent: { model?: string; effort: Effort; unasked: boolean; newChat: NewChat };
   /** Every tab in order, hidden ones included, so one shown again comes back where it was. */
   tabs: Tab[];
   hidden: Tab[];
@@ -56,7 +71,7 @@ export type Prefs = {
 export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
-  agent: { effort: effortOf(undefined), unasked: false },
+  agent: { effort: effortOf(undefined), unasked: false, newChat: "app" },
   tabs: [...TABS], hidden: [...OFF], tabLabels: "active", start: "home", homeList: "today", tasksList: "today",
   voice: { keep: keepOf(undefined) },
 };
@@ -80,6 +95,7 @@ export function prefsOf(raw: unknown): Prefs {
     agent: {
       ...(typeof agent.model === "string" && agent.model ? { model: agent.model } : {}),
       effort: effortOf(agent.effort), unasked: agent.unasked === true,
+      newChat: NEW_CHATS.find((n) => n === agent.newChat) ?? "app",
     },
     tabs: [...tabs, ...TABS.filter((t) => !tabs.includes(t))],
     // A tab the stored order doesn't know yet is new to this record: it starts as a new record's would

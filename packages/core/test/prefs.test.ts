@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { DEFAULT_PREFS, movedTab, prefsOf, shownTabs } from "../src/prefs";
+import { describe, expect, it, test } from "bun:test";
+import { DEFAULT_PREFS, movedTab, NEW_CHAT_IDLE_MS, newChatDue, prefsOf, shownTabs } from "../src/prefs";
 
 describe("prefsOf", () => {
   test("nothing is the defaults", () => {
@@ -16,7 +16,7 @@ describe("prefsOf", () => {
     expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
     expect(prefsOf({ lens: "" }).lens).toBeUndefined();
     expect(p.notes).toEqual({ grouped: true, collapsed: ["a"], sort: "created" });
-    expect(p.agent).toEqual({ effort: "deep", unasked: false });
+    expect(p.agent).toEqual({ effort: "deep", unasked: false, newChat: "app" });
   });
 });
 
@@ -34,4 +34,20 @@ test("shownTabs and movedTab", () => {
   expect(movedTab(["home", "tasks", "ask", "settings"], "ask", "home", false)).toEqual(["ask", "home", "tasks", "settings"]);
   expect(movedTab(["home", "tasks", "ask", "settings"], "home", "ask", true)).toEqual(["tasks", "ask", "home", "settings"]);
   expect(movedTab(["home", "tasks"], "home", "home", true)).toEqual(["home", "tasks"]);
+});
+
+describe("newChatDue", () => {
+  it("follows the setting", () => {
+    expect(newChatDue("open", false, Date.now(), Date.now())).toBe(true);
+    expect(newChatDue("app", false, 0, 1)).toBe(false);
+    expect(newChatDue("app", true, 0, 1)).toBe(true);
+    expect(newChatDue("idle", true, 0, NEW_CHAT_IDLE_MS - 1)).toBe(false);
+    expect(newChatDue("idle", false, 0, NEW_CHAT_IDLE_MS)).toBe(true);
+    expect(newChatDue("never", true, 0, 1e12)).toBe(false);
+  });
+  it("reads an unknown or missing value as after leaving the app", () => {
+    expect(prefsOf({}).agent.newChat).toBe("app");
+    expect(prefsOf({ agent: { newChat: "x" } }).agent.newChat).toBe("app");
+    expect(prefsOf({ agent: { newChat: "idle" } }).agent.newChat).toBe("idle");
+  });
 });
