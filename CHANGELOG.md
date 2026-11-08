@@ -5,16 +5,25 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-08
+
 ### Added
 
 - Web: route transitions. Switching tabs or screens crossfades the page (quick on a phone), a note slides up over the screen on a phone and back down on Back, and a note opened from its tile grows out of it and shrinks back into it.
-- Web (phone): the tab bar folds to icons while a screen scrolls down and unfolds on scroll up; the search drawer slides down from the header.
+- Web (phone): the search drawer slides down from the header as a sheet.
 - Web: pictures and viewers. The lightbox is a carousel (swipe on a phone, arrow keys and buttons on a laptop) that grows out of the picture tapped, with zoom where the pointer is on a laptop and a rolling counter; the reader view shows how far down the article you are; the PDF viewer and the drawing editor fade in over a skeleton.
 - Web: the Planned heatmap shows one tooltip that glides from day to day. Empty lists enter calmly; the task tabs' counts and the heatmap's total roll when they change; the checklist, the saved chats and the tags animate as they come and go; the When picker's options share one gliding highlight and the update toast's Reload says "Reloading…".
+
+- Voice input: Parakeet speech to text on the server (its own `stt` container), a mic wherever text is typed, and how long the model stays loaded in Settings.
+- Preferences live on the server and are shared by every device: theme and accent (18 accents), notes layout, assistant settings, the lens that is on, the phone's tab order, hidden tabs and label mode (active, every, none), and the screen the app opens on; tabs are dragged into order in Settings → Layout, Home and Tasks open on the list each starts on, and an optional Notes tab gives the notes a page of their own.
+- Assistant input: the model and effort pill sits inside the field; photos and PDFs can be attached (PDFs read as text on the server; an attachment taints the turn).
+- Settings: a Maintenance section with the app's version and build time and a reload that fetches the latest build; Import and Export as one section; the tag dialog fits a phone, tags searchable and sorted by use.
 
 ### Changed
 
 - The web app's navigation runs on TanStack Router in place of wouter: typed routes and search params, loaders over the query cache with links and note tiles fetching ahead on hover or touch, and the router's scroll restoration in place of the app's own. A note opens as `?note=<id>` over the screen it came from; `/note/<id>` links still work.
+- Phone headers stay put: Home, Notes, Tasks, the assistant and Settings scroll under one header shape; a Settings section wears it with a back chevron. Home's tag filter buttons are gone: the lens is the filter, and a badge click's tag shows as a clear chip. The task sheet's title wraps, its header is a close and a trash icon, and the keyboard no longer shrinks it.
+- Thumbnails already drawn this session show at once on return.
 
 ### Fixed
 
