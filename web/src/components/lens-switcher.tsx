@@ -15,10 +15,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Label } from "@/components/ui/label";
-import { useNarrow } from "@/hooks/media";
+import { FormSheet, SheetForm, useInDrawer } from "@/components/form-sheet";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -32,9 +30,10 @@ import { cn } from "@/lib/utils";
 const NONE = "";
 const add = (c: string[], t: string) => (c.some((x) => fold(x) === fold(t)) ? c : [...c, t]);
 
-/** The name and tags of a lens, made or edited. `lens` undefined: a new one, which is turned on once it is made.
- *  `sheet`: the phone's bottom sheet, where the body scrolls between a fixed title and fixed buttons, and the keyboard is not raised unasked. */
-function LensForm({ lens, sheet, onDone }: { lens?: Lens; sheet: boolean; onDone: () => void }) {
+/** The name and tags of a lens, made or edited. `lens` undefined: a new one, which is turned on once it is made. In the phone's
+ *  sheet the keyboard is not raised unasked. */
+function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
+  const sheet = useInDrawer();
   const create = useCreateLens(), update = useUpdateLens(), { data: all = [] } = useLenses();
   const [name, setName] = useState(lens?.name ?? ""), [tags, setTags] = useState<string[]>(lens?.tags ?? []);
   const [exclude, setExclude] = useState<string[]>(lens?.exclude ?? []);
@@ -55,43 +54,28 @@ function LensForm({ lens, sheet, onDone }: { lens?: Lens; sheet: boolean; onDone
     }
   };
   const busy = create.isPending || update.isPending;
-  const title = lens ? "Edit lens" : "New lens", blurb = "Every list shows only what matches, until you turn it off.";
   return (
-    <form onSubmit={save} className={cn("flex min-h-0 flex-col", !sheet && "gap-5")}>
-      {sheet ? (
-        <DrawerHeader className="px-5 pb-2 text-left">
-          <DrawerTitle>{title}</DrawerTitle>
-          <DrawerDescription>{blurb}</DrawerDescription>
-        </DrawerHeader>
-      ) : (
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{blurb}</DialogDescription>
-        </DialogHeader>
-      )}
-      <div className={cn("space-y-5", sheet && "min-h-0 overflow-y-auto px-5 py-3")}>
-        <Field label="Name" htmlFor={nameId}>
-          <Input id={nameId} ref={field} autoFocus={!sheet} value={name} maxLength={LENS_NAME_MAX} aria-invalid={taken || undefined} aria-describedby={taken ? takenId : undefined} onChange={(e) => setName(e.target.value)} placeholder="e.g. Work" />
-          {taken ? <p id={takenId} role="alert" className="text-xs text-down">A lens by that name exists.</p> : null}
-        </Field>
-        <Field label="Show" hint="Items with any of these. New items get the first.">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <TagEditor tags={tags} onAdd={(t) => setTags((c) => add(c, t))} onRemove={(t) => setTags((c) => c.filter((x) => x !== t))} />
-          </div>
-        </Field>
-        <Field label="Hide" hint="Items with any of these are left out.">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <TagEditor tags={exclude} onAdd={(t) => setExclude((c) => add(c, t))} onRemove={(t) => setExclude((c) => c.filter((x) => x !== t))} />
-          </div>
-        </Field>
-        <LensAccent value={accent} onChange={setAccent} />
-        {problem && (tags.length || exclude.length) ? <p className="text-xs text-down">{problem}</p> : null}
-      </div>
-      <div className={cn("grid grid-cols-2 gap-2", sheet ? "border-t border-border px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]" : "sm:flex sm:justify-end")}>
-        <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
-        <Button type="submit" className="rounded-full" disabled={busy || !!problem || taken}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: "Save", busy: "Saving…" }} /></Button>
-      </div>
-    </form>
+    <SheetForm title={lens ? "Edit lens" : "New lens"} description="Every list shows only what matches, until you turn it off." onSubmit={save} className="space-y-5" actions={<>
+      <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
+      <Button type="submit" className="rounded-full" disabled={busy || !!problem || taken}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: "Save", busy: "Saving…" }} /></Button>
+    </>}>
+      <Field label="Name" htmlFor={nameId}>
+        <Input id={nameId} ref={field} autoFocus={!sheet} value={name} maxLength={LENS_NAME_MAX} aria-invalid={taken || undefined} aria-describedby={taken ? takenId : undefined} onChange={(e) => setName(e.target.value)} placeholder="e.g. Work" />
+        {taken ? <p id={takenId} role="alert" className="text-xs text-down">A lens by that name exists.</p> : null}
+      </Field>
+      <Field label="Show" hint="Items with any of these. New items get the first.">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TagEditor tags={tags} onAdd={(t) => setTags((c) => add(c, t))} onRemove={(t) => setTags((c) => c.filter((x) => x !== t))} />
+        </div>
+      </Field>
+      <Field label="Hide" hint="Items with any of these are left out.">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TagEditor tags={exclude} onAdd={(t) => setExclude((c) => add(c, t))} onRemove={(t) => setExclude((c) => c.filter((x) => x !== t))} />
+        </div>
+      </Field>
+      <LensAccent value={accent} onChange={setAccent} />
+      {problem && (tags.length || exclude.length) ? <p className="text-xs text-down">{problem}</p> : null}
+    </SheetForm>
   );
 }
 
@@ -139,7 +123,6 @@ function LensAccent({ value, onChange }: { value: LensAccentName | null; onChang
 /** `header`: Home's header on a phone (mobile/src/ui/lens.tsx), where the app's mark is the control, with the lens's name ("All" while none is on) and a chevron beside it, so it reads as a picker. */
 export function LensSwitcher({ header = false }: { header?: boolean }) {
   const { data: lenses = [] } = useLenses(), active = useActiveLens(), remove = useRemoveLens();
-  const narrow = useNarrow();
   const [form, setForm] = useState<{ lens?: Lens } | null>(null), [asking, setAsking] = useState<Lens | null>(null);
   const del = (l: Lens) => {
     remove.mutate(l, { onSuccess: () => { if (active?.rec === l.rec) setActiveLens(null); }, onError: (x) => toast.error(message(x)) });
@@ -188,15 +171,7 @@ export function LensSwitcher({ header = false }: { header?: boolean }) {
       ) : null}
       </div>
 
-      {narrow ? (
-        <Drawer open={form != null} onOpenChange={(o) => { if (!o) setForm(null); }} repositionInputs>
-          <DrawerContent className="max-h-[92dvh]">{form ? <LensForm key={form.lens?.rec ?? "new"} sheet lens={form.lens} onDone={() => setForm(null)} /> : null}</DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog open={form != null} onOpenChange={(o) => { if (!o) setForm(null); }}>
-          <DialogContent className="sm:max-w-md">{form ? <LensForm key={form.lens?.rec ?? "new"} sheet={false} lens={form.lens} onDone={() => setForm(null)} /> : null}</DialogContent>
-        </Dialog>
-      )}
+      <FormSheet open={form != null} onClose={() => setForm(null)}>{form ? <LensForm key={form.lens?.rec ?? "new"} lens={form.lens} onDone={() => setForm(null)} /> : null}</FormSheet>
       <AlertDialog open={asking != null} onOpenChange={(o) => { if (!o) setAsking(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
