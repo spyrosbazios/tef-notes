@@ -44,7 +44,7 @@ services:
     depends_on: [pocketbase]
     restart: unless-stopped
   # Voice input: Parakeet speech to text (English) on the CPU, reached only by the agent (/agent/transcribe), no port on
-  # the host. Loads its model (~560 MB of memory) on first use and drops it after the idle time set in the app's Settings.
+  # the host. Loads its model (~650 MB of memory) on first use and drops it after the idle time set in the app's Settings.
   stt:
     image: ghcr.io/spyrosbazios/tef-notes-stt:${TEF_NOTES_VERSION:-latest}
     volumes:

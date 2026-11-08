@@ -1,7 +1,7 @@
 """Speech to text: NVIDIA Parakeet TDT_CTC 110M (English) on the CPU, through onnx-asr.
 
 Reached only by the agent (server/agent/src/transcribe.ts) on the compose network; never published. Holds nothing: a
-clip is transcribed in memory and dropped. The model (~460 MB on disk, ~560 MB resident) is loaded on the first request
+clip is transcribed in memory and dropped. The model (~460 MB on disk, ~650 MB resident) is loaded on the first request
 in a worker process, and unloaded (the process ended) once it has sat idle for the `keep` seconds the last request asked for (the owner's setting, prefs.ts
 `voice.keep`): 0 unloads it as soon as the clip is done.
 
