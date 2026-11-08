@@ -1,5 +1,5 @@
 // Home, the first view: the day at a glance and every note. The date; then the task box (Today, the Inbox and Upcoming as
-// quiet words, opening on the owner's pick (core/prefs.ts `homeList`), the one chosen in full and the others faint; its + beside it) next to the
+// quiet words, opening on the owner's pick (core/prefs.ts `homeList`), the one chosen in full and the others faint, the list picked sliding in as a tab panel; its + beside it) next to the
 // month of planned tasks as a heatmap; Hovering either lights or scrolls to the same day in the other; then every note as the Notes view's tiles, in a masonry a page at a time. A task opens beside its own
 // list, a note over Home (which stays mounted under it). The route is routes/_app/index.tsx; a badge's tag is `?tags=`, and the task
 // box's list is kept here for as long as the app is open (not in the URL: the rail's and the tabs' Home finds the
@@ -29,10 +29,20 @@ import { homeScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { Plus, Search, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { blur, ReducedMotionConfig, shift, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { AnimatePresence, motion, type Transition, type Variants } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const TABS = [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]] as const satisfies readonly [TaskView, string][];
+
+/** A list taking the box's place as a tab panel does (Animate UI's `shift.tabs`, `blur.panel`): the one leaving slides away from the
+ *  side of the tab picked as it fades out, then the picked one comes in from that side. `custom` is +1 for a tab to the right, -1 left. */
+const panel = (panelIn: Transition, panelOut: Transition): Variants => ({
+  enter: (dir: number) => ({ opacity: 0, x: dir * shift.tabs, filter: blur.panel }),
+  shown: { opacity: 1, x: 0, filter: "blur(0px)", transition: panelIn },
+  leave: (dir: number) => ({ opacity: 0, x: -dir * shift.tabs, filter: blur.panel, transition: panelOut }),
+});
+const order = (k: TaskView) => TABS.findIndex(([t]) => t === k);
 
 /** Home's task box: the list in front, kept while another screen takes Home's place. */
 type Box = { tab: (typeof TABS)[number][0] };
@@ -52,6 +62,10 @@ export function Home() {
   // box as it was left
   const [tab, setTab] = useState<Box["tab"]>(() => box?.tab ?? prefsNow().homeList);
   useEffect(() => { box = { tab }; }, [tab]);
+  // Which way the list moves: toward the tab picked, from the one in front before it (set as the tab is, so the leaving list reads it too)
+  const [dir, setDir] = useState(1);
+  const show = (k: Box["tab"]) => { if (k !== tab) setDir(order(k) > order(tab) ? 1 : -1); setTab(k); };
+  const panels = panel(useTempoTransition(transition.panelIn), useTempoTransition(transition.panelOut));
   // Home's own scroll is the router's, per tag filter and lens: another one is another list (the lens switched on the page is `useScrollSwitch`'s)
   const { view } = usePlace(), lens = useActiveLens();
   const scrollId = homeScroll(view.kind === "home" ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec);
@@ -62,7 +76,7 @@ export function Home() {
   const [focus, setFocus] = useState<{ day: string; n: number } | null>(null);
   // The day Upcoming was scrolled to by hand, which the days strip follows (phone)
   const [viewing, setViewing] = useState<string | null>(null);
-  const pick = (day: string) => { setTab(day === today ? "today" : "upcoming"); setFocus(day === today ? null : { day, n: (focus?.n ?? 0) + 1 }); setViewing(null); };
+  const pick = (day: string) => { show(day === today ? "today" : "upcoming"); setFocus(day === today ? null : { day, n: (focus?.n ?? 0) + 1 }); setViewing(null); };
   // Planner and task box follow each other on hover: a planner day scrolls Upcoming to it (after a short rest, so a pointer
   // crossing the month doesn't drag the list along), and a row or Upcoming day lights its day in the planner
   const [hot, setHot] = useState<string | null>(null);
@@ -103,7 +117,7 @@ export function Home() {
                   <Highlight controlledItems value={tab} className="inset-0 rounded-full bg-accent">
                     {TABS.map(([k, name]) => { const Icon = TASK_ICON[k]; return (
                       <HighlightItem key={k} value={k}>
-                        <button type="button" aria-current={tab === k ? "true" : undefined} onClick={() => { setTab(k); setViewing(null); if (phone) setFocus(null); }}
+                        <button type="button" aria-current={tab === k ? "true" : undefined} onClick={() => { show(k); setViewing(null); if (phone) setFocus(null); }}
                           className={cn("flex items-center gap-2 rounded-full px-2.5 py-0.5 text-lg font-bold tracking-tight transition-opacity sm:text-[22px] max-md:gap-1.5 max-md:px-2 max-md:text-[17px] max-md:font-extrabold focus-visible:outline-2 focus-visible:outline-brand/60",
                             tab === k ? "text-fg" : "text-fg opacity-25 hover:opacity-55")}>
                           {tab === k ? <Icon className="size-5 text-brand max-md:size-[17px]" /> : null}{name}
@@ -114,7 +128,16 @@ export function Home() {
                 </nav>
                 <Button variant={phone ? "outline" : "ghost"} size="icon-sm" aria-label="New task" title="New task (Q)" onClick={add} className={cn("shrink-0 text-brand hover:text-brand", TOOL)}><Plus className="max-md:size-5" /></Button>
               </header>
-              <div className="min-h-0 flex-1 max-md:h-72 max-md:flex-none"><TaskList key={tab} embedded view={{ kind: tab }} focus={tab === "upcoming" ? focus : null} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} /></div>
+              {/* The list picked takes the box as a tab panel: the old one out first, then the new one in (no two lists scrolling at once) */}
+              <div className="min-h-0 flex-1 max-md:h-72 max-md:flex-none">
+                <ReducedMotionConfig>
+                  <AnimatePresence mode="wait" initial={false} custom={dir}>
+                    <motion.div key={tab} className="h-full" custom={dir} variants={panels} initial="enter" animate="shown" exit="leave">
+                      <TaskList embedded view={{ kind: tab }} focus={tab === "upcoming" ? focus : null} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} />
+                    </motion.div>
+                  </AnimatePresence>
+                </ReducedMotionConfig>
+              </div>
             </section>
 
             {phone ? null : <Planned onPick={pick} lit={hot} onHover={peek} onAdd={(day) => onAdd({ schedule: { when: day, evening: false } })} />}

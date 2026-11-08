@@ -310,6 +310,26 @@
 :root:active-view-transition-type(view)::view-transition-group(page),
 :root:active-view-transition-type(view)::view-transition-old(page),
 :root:active-view-transition-type(view)::view-transition-new(page) { animation-duration: 150ms; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+/* One task list for another (router.ts `list`): the list moves as Home's task box does (components/home.tsx), as a tab panel. The one
+   left slides shift.tabs (12px) away from the list picked into blur.panel on transition.panelOut (150ms, ease.leave), then the picked
+   one comes in from that side on transition.panelIn (300ms, ease.enter); `list-back` mirrors it. The phone's tab underline glides to
+   the list picked on spring.selection (500ms as its linear()); its tabs remount with the route, so its own glide never plays */
+:root:active-view-transition-type(list) [data-vt="list"] { view-transition-name: list; }
+:root:active-view-transition-type(list) [data-vt="lists"] [data-slot="motion-highlight"] { view-transition-name: list-tab; }
+:root:active-view-transition-type(list)::view-transition-group(list) { animation: none; }
+:root:active-view-transition-type(list)::view-transition-old(list) { animation: list-out 150ms cubic-bezier(0, 0, 0.58, 1) both; }
+:root:active-view-transition-type(list)::view-transition-new(list) { animation: list-in 300ms cubic-bezier(0.25, 0.1, 0.35, 1) 150ms both; }
+:root:active-view-transition-type(list)::view-transition-group(list-tab) {
+  animation-duration: 500ms;
+  animation-timing-function: linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1);
+}
+:root:active-view-transition-type(list)::view-transition-old(list-tab), :root:active-view-transition-type(list)::view-transition-new(list-tab) { animation: none; }
+:root:active-view-transition-type(list)::view-transition-old(list-tab) { opacity: 0; }
+:root { --list-shift: 12px; }
+:root:active-view-transition-type(list-back) { --list-shift: -12px; }
+@keyframes list-out { to { opacity: 0; transform: translateX(calc(-1 * var(--list-shift))); filter: blur(5px); } }
+@keyframes list-in { from { opacity: 0; transform: translateX(var(--list-shift)); filter: blur(5px); } }
+
 /* One note for another, and the share page, outside the shell, for the whole window */
 :root:active-view-transition-type(note-swap)::view-transition-old(note), :root:active-view-transition-type(note-swap)::view-transition-new(note),
 :root:active-view-transition-type(whole)::view-transition-old(root), :root:active-view-transition-type(whole)::view-transition-new(root) { animation-duration: 200ms; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
@@ -339,6 +359,8 @@
   :root:active-view-transition-type(note-open)::view-transition-new(note) { animation: vt-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   :root:active-view-transition-type(note-close)::view-transition-old(note) { animation: vt-out 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   :root:active-view-transition-type(note-grow, note-shrink)::view-transition-group(note-card) { animation: none; }
+  :root, :root:active-view-transition-type(list-back) { --list-shift: 0px; }
+  :root:active-view-transition-type(list)::view-transition-group(list-tab) { animation: none; }
 }
 @keyframes vt-in { from { opacity: 0; } }
 @keyframes vt-out { to { opacity: 0; } }

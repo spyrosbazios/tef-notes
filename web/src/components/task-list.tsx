@@ -92,7 +92,7 @@ function Section({ day, fade, children }: { day?: string; fade: Transition; chil
 function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: number }) {
   const count = { inbox, today, upcoming: 0, logbook: 0 };
   return (
-    <nav aria-label="Lists" className="flex gap-1 overflow-x-auto border-b border-line px-3 md:hidden">
+    <nav aria-label="Lists" data-vt="lists" className="flex gap-1 overflow-x-auto border-b border-line px-3 md:hidden">
       {/* One underline glides to the list in front, as Home's tabs do */}
       <Highlight controlledItems value={kind} className="inset-x-0 top-auto bottom-0 h-0.5 rounded-none bg-brand">
         {TASK_VIEWS.map((k) => (
@@ -245,7 +245,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
       {embedded ? null : <Tabs kind={kind} inbox={views.inbox.length} today={views.today.length + views.evening.length} />}
       {/* The list fades into the page where rows are scrolled out of view (top and bottom), rather than cutting one in half */}
       <ScrollFade asChild size={48} shrink={0} blur={0}>
-      <div ref={scroller} data-scroll-restoration-id={scrollId} data-task-list tabIndex={-1} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
+      <div ref={scroller} data-scroll-restoration-id={scrollId} data-task-list data-vt={embedded ? undefined : "list"} tabIndex={-1} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
         // Focus is the hover of a finger and a keyboard: a tapped or tabbed row lights its day too, until focus leaves the list
         onFocus={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined}
         onBlur={onHoverDay ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) hover(null); } : undefined}
