@@ -9,7 +9,7 @@
 // The writes the agent makes reach the screen through `useLive` (realtime), as any other client's do.
 import { Chat } from "@ai-sdk/react";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
@@ -179,16 +179,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setFocusKey((k) => k + 1);
   }, []);
 
-  const send = useCallback(async (raw: string) => {
+  const send = useCallback(async (raw: string, files: FileUIPart[] = []) => {
     const text = raw.trim();
-    if (!chat || !text) return false;
+    if (!chat || (!text && !files.length)) return false;
     if (!made.current.has(chat.id)) {
-      try { await createChat(chat.id, chatTitle(text)); } catch (e) { toast.error(message(e)); return false; }
+      try { await createChat(chat.id, chatTitle(text || files[0].filename || "Attachment")); } catch (e) { toast.error(message(e)); return false; }
       made.current.add(chat.id);
       setDock({ chat: chat.id });
       void qc.invalidateQueries({ queryKey: CHATS });
     }
-    void chat.sendMessage({ text });
+    void chat.sendMessage(text ? { text, files } : { files });
     return true;
   }, [chat, qc]);
 
