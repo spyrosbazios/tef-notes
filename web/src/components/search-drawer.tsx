@@ -21,6 +21,7 @@ import { useAssistant } from "@/hooks/assistant";
 import { useActiveLens } from "@/hooks/lens";
 import { useLongPress } from "@/hooks/long-press";
 import { useNow } from "@/hooks/now";
+import { useLeaving } from "@/hooks/presence";
 import { useFinder } from "@/hooks/search";
 import { homeOfTask, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -52,7 +53,7 @@ function Result({ n, now, why, onOpen, onMenu }: { n: NoteRec; now: number; why?
 }
 
 /** `header`: Home's top row, kept above the field; `onClose` puts the page back. Rendered under an `AnimatePresence` (home.tsx,
- *  notes-page.tsx), which lets it slide away. */
+ *  notes-page.tsx), which lets it slide away, inert (`useLeaving`) while it does. */
 export function SearchDrawer(props: { header: ReactNode; onClose: () => void }) {
   return <ReducedMotionConfig><Drawer {...props} /></ReducedMotionConfig>;
 }
@@ -104,8 +105,11 @@ function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void })
   // The same transform function at both ends: Motion can't interpolate `none` with a translate
   const hidden = { opacity: 0, transform: reduce ? "translateY(0%)" : "translateY(-100%)" };
 
+  // The page behind is live again the moment the drawer starts to leave (home.tsx, notes-page.tsx): the drawer must not stay tabbable over it
+  const root = useLeaving<HTMLDivElement>(undefined, { sibling: false });
+
   return (
-    <div className="flex h-full min-h-0 flex-col" role="search">
+    <div ref={root} className="flex h-full min-h-0 flex-col" role="search">
       <div className="relative z-10 bg-bg">{header}</div>
       {/* Clipped under the header, so the sheet comes out from behind it */}
       <div className="relative min-h-0 flex-1 overflow-hidden">

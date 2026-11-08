@@ -1,22 +1,19 @@
-// A note's pictures full screen, side by side in a row (Animate UI's Carousel, Embla's drop-in): a finger swipes to the next, and the
-// buttons and the arrow keys do on a laptop, where a mouse drag would fight the zoom. Click the picture: on a laptop it zooms in where
+// A note's pictures full screen, side by side in a row (Animate UI's Carousel, Embla's drop-in): a finger swipes to the next (any
+// touch screen, a tablet's too), and the buttons and the arrow keys do on a laptop, where a mouse drag would fight the zoom. Click the picture: on a laptop it zooms in where
 // the pointer is and moving the pointer pans it (Animate UI's Image Zoom); on a phone it shows the picture at its own size, scrolled
 // by hand, and a tap fits it again. The viewer grows out of the place that was tapped. The pictures are the note's photos and its
 // drawings' previews, as the editor or the read view lists them.
 import useEmblaCarousel from "@animate-ui/react/primitives/carousel";
 import { Image as ZoomImage, ImageZoom } from "@animate-ui/react/primitives/effects/image-zoom";
 import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
-import { spring, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { motion, type Transition } from "motion/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useNarrow } from "@/hooks/media";
 import { cn } from "@/lib/utils";
 
-/** `layoutId`: the picture's name where it also shows (`lib/morph.ts` `picId`): Motion glides the one into the other when both are mounted. */
-export type LightboxItem = { url: string; alt: string; layoutId?: string };
+export type LightboxItem = { url: string; alt: string };
 
 type Props = {
   items: LightboxItem[];
@@ -57,9 +54,14 @@ export function Lightbox({ items, index, onIndex }: Props) {
 function Viewer({ items, at, onIndex }: { items: LightboxItem[]; at: number; onIndex: (index: number) => void }) {
   const narrow = useNarrow();
   const [full, setFull] = useState<number | null>(null);       // phone: the picture shown at its own size, which a swipe would not page
-  const [ref, api] = useEmblaCarousel({ startIndex: at, watchDrag: narrow && full === null });
+  // Embla deep-compares its options on every render and re-initialises, which kills a glide in flight: so none of them may change
+  // while the viewer is open. The first picture is the one it opened on, and the drag test is one function reading the latest `full`.
+  const [start] = useState(at);
+  const paging = useRef(full === null);
+  useEffect(() => { paging.current = full === null; }, [full]);
+  const drag = useCallback((_: unknown, e: MouseEvent | TouchEvent) => paging.current && e.type === "touchstart", []);
+  const [ref, api] = useEmblaCarousel({ startIndex: start, watchDrag: drag });
   const item = items[at];
-  const morph = useTempoTransition(spring.morph);       // a picture that is also drawn elsewhere glides there, no overshoot
 
   useEffect(() => {
     if (!api) return;
@@ -83,10 +85,10 @@ function Viewer({ items, at, onIndex }: { items: LightboxItem[]; at: number; onI
         <div className="flex h-full touch-pan-y touch-pinch-zoom">
           {items.map((it, i) => (
             <div key={`${i}:${it.url}`} className="h-full min-w-0 flex-[0_0_100%]" inert={i === at ? undefined : true}>
-              {narrow ? <Fitted item={it} full={full === i} morph={morph} onFull={(on) => setFull(on ? i : null)} />
+              {narrow ? <Fitted item={it} full={full === i} onFull={(on) => setFull(on ? i : null)} />
                 : <div className="h-full p-4 pt-12">
                     <ImageZoom key={i === at ? "here" : "away"} aria-label={it.alt || "Picture"} zoomScale={ZOOM} zoomOnHover={false}>
-                      <ZoomImage as={motion.img} src={it.url} alt={it.alt} objectFit="contain" layoutId={it.layoutId} initial={false} transition={morph} />
+                      <ZoomImage src={it.url} alt={it.alt} objectFit="contain" />
                     </ImageZoom>
                   </div>}
             </div>
@@ -110,10 +112,10 @@ function Viewer({ items, at, onIndex }: { items: LightboxItem[]; at: number; onI
 }
 
 /** A phone's slide: the picture fitted to the screen, or, tapped, at its own size inside a box that scrolls. */
-function Fitted({ item, full, morph, onFull }: { item: LightboxItem; full: boolean; morph: Transition; onFull: (on: boolean) => void }) {
+function Fitted({ item, full, onFull }: { item: LightboxItem; full: boolean; onFull: (on: boolean) => void }) {
   return (
     <div className={cn("flex h-full p-4 pt-12", full ? "overflow-auto" : "items-center justify-center")}>
-      <motion.img src={item.url} alt={item.alt} layoutId={item.layoutId} initial={false} transition={morph} onClick={() => onFull(!full)}
+      <img src={item.url} alt={item.alt} onClick={() => onFull(!full)}
         className={cn("m-auto", full ? "max-w-none cursor-zoom-out" : "max-h-full max-w-full cursor-zoom-in object-contain")} />
     </div>
   );

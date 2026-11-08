@@ -9,10 +9,10 @@ import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/h
 import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
 import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
 import { ReducedMotionConfig, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { AnimatePresence, motion, useIsPresent, type Transition } from "motion/react";
+import { AnimatePresence, motion, type Transition } from "motion/react";
 import { Moon, Plus } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link as RecordLink } from "@/core/record-links";
 import { dateOf } from "@/core/things";
@@ -32,6 +32,7 @@ import { useActiveLens } from "@/hooks/lens";
 import { useLinks } from "@/hooks/links";
 import { calm, useNarrow } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
+import { useLeaving } from "@/hooks/presence";
 import { useScrollSwitch } from "@/hooks/scroll";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
@@ -78,13 +79,7 @@ function Heading({ kind, section, today, lit }: { kind: TaskView; section: strin
 
 /** A section of rows. When the last of its rows goes the whole section fades out: it is inert from then on and hands the focus to the list. */
 function Section({ day, fade, children }: { day?: string; fade: Transition; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null), present = useIsPresent();
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (!present && el.contains(document.activeElement)) el.closest<HTMLElement>("[data-task-list]")?.focus({ preventScroll: true });
-    el.inert = !present;
-  }, [present]);
+  const ref = useLeaving<HTMLDivElement>("[data-task-list]", { sibling: false });
   return (
     <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
       {children}

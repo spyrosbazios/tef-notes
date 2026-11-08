@@ -2,7 +2,7 @@
 // offers to reload rather than swapping the page under an open note. Dismissed, it stays away until the next check.
 // Also the one place the page hears its service worker: a tapped reminder asks the open app to go to its task (sw/sw.ts), an
 // address the router takes as it is (`href`), validated by the route it lands on. Reload is a status button (Animate UI's recipe): once
-// pressed it says "Reloading…" in place, through a light blur, while the new worker takes over.
+// pressed it says "Reloading…" in place, through a light blur, while the new worker takes over, and back to "Reload" if the page has not gone after a few seconds.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRegisterSW } from "virtual:pwa-register/react";
@@ -12,6 +12,8 @@ import { useRouter } from "@tanstack/react-router";
 
 const CHECK_MS = 60 * 60 * 1000;
 const ID = "update";
+/** How long "Reloading…" waits for the page to go before it gives the button back. */
+const RELOAD_MS = 4000;
 
 export function UpdateToast() {
   const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW({
@@ -40,7 +42,12 @@ export function UpdateToast() {
           e.preventDefault();                                 // the toast stays up, showing the status, until the page reloads
           if (reloading) return;
           setReloading(true);
-          updateServiceWorker(true).catch((x: unknown) => { setReloading(false); toast.error(message(x)); });
+          // The page reloads when the new worker takes over, which this never sees. If it has not by RELOAD_MS (no worker waiting, a
+          // failed hand-over), the button is a button again rather than "Reloading…" for good
+          updateServiceWorker(true)
+            .then(() => new Promise((done) => setTimeout(done, RELOAD_MS)))
+            .catch((x: unknown) => { toast.error(message(x)); })
+            .finally(() => setReloading(false));
         },
       },
       cancel: { label: "Later", onClick: () => {} },

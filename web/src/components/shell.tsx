@@ -106,7 +106,7 @@ export function Shell() {
         <div className="flex min-h-0 flex-1">
           <div className="relative flex min-w-0 flex-1">
             {/* The screen behind a note's page: hidden and inert, but laid out and mounted, so it keeps its scroll and its pictures */}
-            <div className={cn("flex min-w-0 flex-1", onNote && "invisible")} inert={onNote}>
+            <div className={cn("flex min-w-0 flex-1", onNote && "invisible")} inert={onNote} data-under-note={onNote || undefined}>
               <aside className="hidden w-60 shrink-0 border-r border-line bg-bg lg:block">{rail}</aside>
               <Sheet open={menu} onOpenChange={setMenu}>
                 <SheetContent side="left" className="w-64 p-0"><SheetTitle className="sr-only">Views</SheetTitle>{rail}</SheetContent>

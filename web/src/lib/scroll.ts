@@ -29,7 +29,3 @@ export const chatScroll = (id: string) => of("chat", id);
 
 /** The scrollers that start at the top when the router has no place for them (another filter, lens, section, note, task or chat). */
 export const SCROLL_TOP = ["home", "notes", "list", "box", "settings", "note", "task", "chat"].map((kind) => `[data-scroll-restoration-id^="${kind}|"]`);
-
-/** A screen's own page scroller (Home's, the Notes page, a task list, a settings section), not one inside it (a task box, a chat):
- *  what the phone's tab bar folds to icons with (components/tab-bar.tsx). */
-export const PAGE_SCROLLERS = ["home", "notes", "list", "settings"].map((kind) => `[data-scroll-restoration-id^="${kind}|"]`).join(",");
