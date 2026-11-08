@@ -63,7 +63,11 @@ def serve(conn):
     asr = onnx_asr.load_model("nemo-conformer-tdt", path, sess_options=opts)
     vad = onnx_asr.load_vad("silero", os.path.join(DATA, "silero"))
     long = asr.with_vad(vad)
-    asr.recognize(np.zeros(RATE, dtype=np.float32), sample_rate=RATE)  # the first run sets up onnxruntime (~4 s): do it now, not on the first clip
+    # The first runs set onnxruntime up for a clip's length (~2-4 s): do them now, on 10 s of faint noise (silence is cut
+    # short), not on the first clip
+    noise = np.random.default_rng(0).normal(0, 0.01, 10 * RATE).astype(np.float32)
+    for _ in range(2):
+        asr.recognize(noise, sample_rate=RATE)
     print(f"stt: loaded {MODEL} in {time.monotonic() - t:.1f}s", flush=True)
     conn.send(None)
     while True:
