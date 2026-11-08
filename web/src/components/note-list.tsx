@@ -8,6 +8,7 @@
 import { ReducedMotionConfig, scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Sparkles, Tags, X } from "lucide-react";
 import { motion } from "motion/react";
+import { LiquidGlass } from "quick-liquid/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
 import { groupNotes } from "@/core/note-groups";
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useGlass } from "@/hooks/glass";
 import { useLongPress } from "@/hooks/long-press";
 import { useNarrow, useTouch } from "@/hooks/media";
 import { useLensSorted, useNotes } from "@/hooks/notes";
@@ -224,6 +226,7 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
   const ask = (kind: "tags" | "delete", paths: string[]) => { setTarget(paths); setDialog(kind); };
   const check = (path: string) => { setSel(toggled(picked, path)); anchor.current = path; };
 
+  const glass = useGlass({ borderRadius: 0, elevation: 0.4 });
   const tile = (t: NoteRec, key: string) => {
     const on = picked.includes(t.path), menuPaths = on ? picked : [t.path];
     return (
@@ -235,8 +238,9 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
 
   return (
     <section className="flex flex-col max-md:px-4" aria-label="Notes">
-      {/* Stays at the top of the scroller, so the bulk bar it turns into is in view when a tile far down is selected */}
-      <header className="sticky top-0 z-20 -mt-2 bg-bg pt-2 pb-3 max-md:-mx-4 max-md:px-4">
+      {/* Stays at the top of the scroller, so the bulk bar it turns into is in view when a tile far down is selected; glass
+          (hooks/glass.ts, square: it runs edge to edge), the tiles scrolling under it seen through */}
+      <LiquidGlass as="header" config={glass} className="sticky top-0 z-20 -mt-2 pt-2 pb-3 max-md:-mx-4 max-md:px-4">
         {selecting ? (
           <BulkBar paths={picked} onClear={() => setSel([])} onAll={() => setSel(order)}
             onTags={() => ask("tags", picked)} onDelete={() => ask("delete", picked)} />
@@ -280,7 +284,7 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
             </Button>
           </div>
         )}
-      </header>
+      </LiquidGlass>
       <div className={cn(selecting && "select-none")} aria-busy={isPending || undefined}>
         {/* Home's tiles are too large a surface to blur: the content fades in alone */}
         <Loaded loading={isPending} blurred={false} skeleton={<Masonry>{SHAPES.map((s, i) => <SkeletonTile key={i} shape={s} />)}</Masonry>}>

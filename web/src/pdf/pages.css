@@ -3,11 +3,13 @@
 .pdf-pages { display: flex; flex-direction: column; gap: 8px; }
 .pdf-page { position: relative; width: calc(var(--pdf-zoom, 1) * 100%); flex: none; margin-inline: auto; background: var(--tf-card); }
 .pdf-page canvas { display: block; width: 100%; height: 100%; }
+/* Glass (pages.ts `counter`): the engine paints its fill, edge and shadow, and its layers sit under `.ql-content`, the label's wrapper */
 .pdf-pill {
-  position: sticky; bottom: 12px; align-self: center; z-index: 1; display: flex; align-items: center; height: 32px; padding: 0 12px;
-  border: 1px solid var(--tf-line); border-radius: 16px; background: var(--tf-raised); color: var(--tf-fg);
+  position: sticky; bottom: 12px; align-self: center; z-index: 1; display: flex; align-items: center; height: 32px; padding: 0;
+  border: 0; border-radius: 16px; background: none; color: var(--tf-fg);
   font: 500 13px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; cursor: pointer;
 }
+.pdf-pill .ql-content { position: relative; z-index: 10; display: flex; align-items: center; height: 100%; padding: 0 12px; }
 .pdf-pill input { width: 3.5ch; margin-right: 4px; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; text-align: right; }
 /* pdf.js's text layer (its pdf_viewer.css, trimmed): transparent text laid over the canvas so it can be selected. */
 .pdf-page .textLayer {

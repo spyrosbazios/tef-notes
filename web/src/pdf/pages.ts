@@ -4,6 +4,8 @@
 import { getDocument, RenderingCancelledException, TextLayer, type PDFPageProxy, type RenderTask } from "pdfjs-dist/legacy/build/pdf.mjs";
 // Sets globalThis.pdfjsWorker, which makes pdf.js run its worker in this thread: no Worker to load from a file:// page
 import "pdfjs-dist/legacy/build/pdf.worker.min.mjs";
+import { LiquidGlassEngine } from "quick-liquid";
+import { glassOfPage } from "../lib/glass";
 import "./pages.css";
 
 /** Canvas memory is the limit, not the file: only the pages near the screen hold a bitmap. */
@@ -50,13 +52,17 @@ function drop(s: Slot) {
   s.drawn = false;
 }
 
-/** The counter: "n / total", and a tap turns it into a field for the page to jump to. */
+/** The counter: "n / total", and a tap turns it into a field for the page to jump to. Liquid glass (lib/glass.ts), the pages
+ *  scrolling under it seen through: the engine's layers sit beside `content` (its `.ql-content`), which is what the label swaps in. */
 function counter(total: number, goto: (n: number) => void) {
-  const pill = document.createElement("button"), label = document.createElement("span");
+  const pill = document.createElement("button"), content = document.createElement("span"), label = document.createElement("span");
   pill.type = "button";
   pill.className = "pdf-pill";
   pill.setAttribute("aria-label", "Go to page");
-  pill.append(label);
+  content.className = "ql-content";
+  pill.append(content);
+  content.append(label);
+  const engine = new LiquidGlassEngine(pill, glassOfPage({ material: "thin", borderRadius: 16, elevation: 0.5 }));
   const show = (n: number) => { label.textContent = `${n} / ${total}`; };
   const ask = () => {
     const input = document.createElement("input");
@@ -64,16 +70,16 @@ function counter(total: number, goto: (n: number) => void) {
     const done = (jump: boolean) => {
       const n = Math.round(Number(input.value));
       input.remove();
-      pill.replaceChildren(label);
+      content.replaceChildren(label);
       if (jump && n >= 1 && n <= total) goto(n);
     };
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") done(true); else if (e.key === "Escape") done(false); });
     input.addEventListener("blur", () => done(false));
-    pill.replaceChildren(input, ` / ${total}`);
+    content.replaceChildren(input, ` / ${total}`);
     input.focus();
   };
   pill.addEventListener("click", (e) => { if (!(e.target instanceof HTMLInputElement)) ask(); });
-  return { pill, show };
+  return { pill, show, destroy: () => engine.destroy() };
 }
 
 /** Draw `bytes` into `root` (emptied first). `onFirst` is told the page count when the first page is in place; the
@@ -92,7 +98,7 @@ export async function showPdf(root: HTMLElement, bytes: Uint8Array, onFirst?: (p
   }, { rootMargin: "100% 0px" });
 
   const goto = (n: number) => list[Math.min(Math.max(n, 1), list.length) - 1]?.el.scrollIntoView({ block: "start" });
-  const { pill, show } = counter(doc.numPages, goto);
+  const { pill, show, destroy: dropCounter } = counter(doc.numPages, goto);
   show(1);
 
   /** The page at the top of the screen: the first whose bottom edge is below the line a third of the way down. */
@@ -133,6 +139,7 @@ export async function showPdf(root: HTMLElement, bytes: Uint8Array, onFirst?: (p
       cancelAnimationFrame(frame);
       seen.disconnect();
       list.forEach(drop);
+      dropCounter();
       void doc.loadingTask.destroy();
       root.replaceChildren();
     },
