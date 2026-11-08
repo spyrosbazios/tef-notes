@@ -17,9 +17,9 @@ export function keepScroll(key: string, top: number) {
   if (t > 0) tops.set(key, t); else tops.delete(key);
 }
 
-/** Home's task box: the list in front and its tag filter. */
-export type Box = { tab: "today" | "inbox" | "upcoming"; tags: string[] };
-let box: Box = { tab: "today", tags: [] };
+/** Home's task box: the list in front. */
+export type Box = { tab: "today" | "inbox" | "upcoming" };
+let box: Box = { tab: "today" };
 export const boxOf = (): Box => box;
 export const keepBox = (b: Box) => { box = b; };
 

@@ -28,9 +28,9 @@ describe("scroll memory", () => {
   });
 
   test("Home's task box comes back as it was left", () => {
-    expect(boxOf()).toEqual({ tab: "today", tags: [] });
-    keepBox({ tab: "upcoming", tags: ["chores"] });
-    expect(boxOf()).toEqual({ tab: "upcoming", tags: ["chores"] });
-    keepBox({ tab: "today", tags: [] });
+    expect(boxOf()).toEqual({ tab: "today" });
+    keepBox({ tab: "upcoming" });
+    expect(boxOf()).toEqual({ tab: "upcoming" });
+    keepBox({ tab: "today" });
   });
 });

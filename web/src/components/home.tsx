@@ -1,5 +1,5 @@
 // Home, the first view: the day at a glance and every note. The date; then the task box (Today, the Inbox and Upcoming as
-// quiet words, Today first, the one chosen in full and the others faint; its tag filter and + beside them) next to the
+// quiet words, Today first, the one chosen in full and the others faint; its + beside it) next to the
 // month of planned tasks as a heatmap; Hovering either lights or scrolls to the same day in the other; then every note as the Notes view's tiles, in a masonry a page at a time. A task opens beside its own
 // list, a note on a page of its own.
 // Below `md` it is the phone's Home (mobile/src/ui/home.tsx): one header row (the app's mark, which is the lens control, and the
@@ -12,7 +12,7 @@ import { LensSwitcher } from "@/components/lens-switcher";
 import { Planned } from "@/components/planned";
 import { SearchDrawer } from "@/components/search-drawer";
 import { TASK_ICON } from "@/components/task-icons";
-import { NoteList, TagFilter, TOOL } from "@/components/note-list";
+import { NoteList, TOOL } from "@/components/note-list";
 import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
 import { addDays } from "@/core/dates";
@@ -26,7 +26,7 @@ import { boxOf, keepBox, scrollKey } from "@/lib/scroll-memory";
 import { cn } from "@/lib/utils";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { Plus, Search, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const TABS = [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]] as const satisfies readonly [TaskView, string][];
 
@@ -35,19 +35,14 @@ export function Home({ onNew, onAdd }: { onNew: () => void; onAdd: (s: Start) =>
   const phone = useNarrow();
   const [searching, setSearching] = useState(false);
   const closeSearch = useCallback(() => setSearching(false), []);
-  const { views, today } = useViews();
-  // The task box's list and its own tag filter (over its three lists; the notes below keep theirs): kept while another tab
-  // takes Home's place, so coming back finds the box as it was left
-  const [tab, setTab] = useState(() => boxOf().tab), [tags, setTags] = useState(() => boxOf().tags);
-  useEffect(() => { keepBox({ tab, tags }); }, [tab, tags]);
-  // Home's own scroll, kept the same way (per tag filter and lens: another one is another list)
+  const { today } = useViews();
+  // The task box's list (the lens is the only filter): kept while another tab takes Home's place, so coming back finds the
+  // box as it was left
+  const [tab, setTab] = useState(() => boxOf().tab);
+  useEffect(() => { keepBox({ tab }); }, [tab]);
+  // Home's own scroll, kept the same way (per lens: another one is another list)
   const { view } = useNav(), lens = useActiveLens();
   const page = useScrollMemory<HTMLDivElement>(scrollKey(hrefOf(view), lens?.rec), !(phone && searching));
-  const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const t of [...views.today, ...views.evening, ...views.inbox, ...views.upcoming.flatMap((g) => g.tasks)]) for (const g of t.tags) m.set(g, (m.get(g) ?? 0) + 1);
-    return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [views]);
   // A day picked in the planner: today's list, or Upcoming scrolled to it; `n` makes picking the same day again count
   const [focus, setFocus] = useState<{ day: string; n: number } | null>(null);
   // The day Upcoming was scrolled to by hand, which the days strip follows (phone)
@@ -99,10 +94,9 @@ export function Home({ onNew, onAdd }: { onNew: () => void; onAdd: (s: Start) =>
                   ); })}
                 </Highlight>
               </nav>
-              <TagFilter what="Tasks" counts={counts} chosen={tags} onChange={setTags} />
               <Button variant={phone ? "outline" : "ghost"} size="icon-sm" aria-label="New task" title="New task (Q)" onClick={add} className={cn("shrink-0 text-brand hover:text-brand", TOOL)}><Plus className="max-md:size-5" /></Button>
             </header>
-            <div className="min-h-0 flex-1 max-md:h-72 max-md:flex-none"><TaskList key={tab} embedded view={{ kind: tab }} tags={tags} focus={tab === "upcoming" ? focus : null} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} /></div>
+            <div className="min-h-0 flex-1 max-md:h-72 max-md:flex-none"><TaskList key={tab} embedded view={{ kind: tab }} focus={tab === "upcoming" ? focus : null} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} /></div>
           </section>
 
           {phone ? null : <Planned onPick={pick} lit={hot} onHover={peek} onAdd={(day) => onAdd({ schedule: { when: day, evening: false } })} />}

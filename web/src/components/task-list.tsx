@@ -15,7 +15,6 @@ import { dayLabel, dayParts } from "@/core/dates";
 import type { Link } from "@/core/record-links";
 import { dateOf } from "@/core/things";
 import { landing, reorder } from "@/core/task-order";
-import { matchesTags } from "@/core/tags";
 import { views as viewsOf, type Task, type Views } from "@/core/todo";
 import { TASK_ICON } from "@/components/task-icons";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
@@ -47,7 +46,6 @@ const EMPTY: Record<TaskView, string> = {
 };
 
 const NO_LINKS: Link[] = [];
-const NO_TAGS: string[] = [];
 
 /** A day's heading counts as the list's top once it is this far (px) below the box's top edge: its own margin and a little more. */
 const HEADING_REACH = 44;
@@ -113,11 +111,11 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
 }
 
 /** `embedded`: a list inside Home's task box, which draws the heading and the +: no header, no frame, scrolling inside the box's
- * fixed height, a row opening beside its own list rather than Home's. `tags`: only tasks carrying every one (Home's filter).
+ * fixed height, a row opening beside its own list rather than Home's.
  * `focus`: a day Home's planner picked or is hovering: scrolled to that day (or the next one with tasks), its heading lit.
  * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves.
  * `onView`: Upcoming scrolled by hand: the day whose section is at the top of the list, reported as it changes (the phone's strip follows). */
-export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus = null, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; tags?: string[]; focus?: { day: string; n: number } | null; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
+export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; focus?: { day: string; n: number } | null; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
   const qc = useQueryClient();
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
@@ -132,12 +130,11 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   // Kept where it was left: Home's box per list, a view's own list per view. On a phone a task open takes the list's place (it is hidden)
   const scroller = useScrollMemory<HTMLDivElement>(scrollKey(embedded ? `box:${kind}` : hrefOf(view), lens?.rec), !(narrow && !embedded && open));
   // What the list is of: when it changes the rows are a new list, not rows coming and going
-  const of = `${kind}|${lens?.rec ?? ""}|${tags.join(",")}`;
+  const of = `${kind}|${lens?.rec ?? ""}`;
 
   const noteTitles = useMemo(() => new Map((notes ?? []).map((n) => [n.rec, n.note.title])), [notes]);
 
-  const tagged = useMemo(() => (t: Task) => matchesTags(t.tags, tags, true), [tags]);
-  const base = useMemo(() => listOf(views, kind).filter(tagged), [views, kind, tagged]);
+  const base = useMemo(() => listOf(views, kind), [views, kind]);
 
   // The list in its sections, with each task still lingering slipped back in where it was: in its section, by `order`
   const sections = useMemo((): Section[] => {
@@ -146,14 +143,14 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
     const have = new Set(base.map((t) => t.id));
     for (const { task: t } of lingering.values()) {
       const was = listOf(viewsOf([t], today), kind).length > 0;
-      if (have.has(t.id) || !was || !tagged(t)) continue;
+      if (have.has(t.id) || !was) continue;
       const k = sectionOf(kind, t), rows = [...(m.get(k) ?? [])], at = kind === "logbook" ? rows.findIndex((r) => r.done < t.done) : rows.findIndex((r) => r.order > t.order);
       rows.splice(at < 0 ? rows.length : at, 0, t);
       m.set(k, rows);
     }
     const out = [...m].map(([key, rows]) => ({ key, rows }));
     return kind === "today" ? out.sort((a, b) => (a.key === "today" ? -1 : b.key === "today" ? 1 : 0)) : out;
-  }, [base, lingering, kind, today, tagged]);
+  }, [base, lingering, kind, today]);
   const byId = useMemo(() => new Map(sections.flatMap((x) => x.rows.map((t) => [t.id, t] as const))), [sections]);
   const hovered = useRef<string | null>(null);
   const hover = (day: string | null) => { if (day !== hovered.current) { hovered.current = day; onHoverDay?.(day); } };
