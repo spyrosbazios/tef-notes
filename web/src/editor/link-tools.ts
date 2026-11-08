@@ -1,4 +1,4 @@
-// The buttons beside a link (./link-read) and on a link's card (./link-cards). Read: the page as an article, in the app.
+// The buttons beside a link (./link-read) and on a link's card (./link-cards). Copy: the URL. Read: the page as an article, in the app.
 // Summary: the server writes a summary of the page
 // (server/pb_hooks/summary.pb.js) and it goes in as the block right under the link's paragraph, the place a clip with
 // "Add a summary" puts it. A link already followed by one gets no button. The insert is an ordinary edit (`onChange`).
@@ -25,6 +25,37 @@ export function readButton(cls: string, href: string, read: (url: string) => voi
   btn.title = "Reader view: the page as an article";
   btn.textContent = "Read";
   btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); read(href); });
+  btn.addEventListener("keydown", (e) => e.stopPropagation());
+  return btn;
+}
+
+/** The Copy button: a lucide copy icon and "Copy"; a click puts the URL on the clipboard. The phone's editor is a file://
+ *  page, where `navigator.clipboard` can be missing or refuse: a selected textarea and the copy command there. */
+export function copyButton(cls: string, href: string): HTMLElement {
+  const btn = document.createElement("button");
+  btn.className = cls;
+  btn.type = "button";
+  btn.contentEditable = "false";
+  btn.dataset.icon = "copy";
+  btn.title = "Copy the link";
+  btn.textContent = "Copy";
+  const shown = (text: string) => { btn.textContent = text; setTimeout(() => { btn.textContent = "Copy"; }, 1500); };
+  const fallback = () => {
+    const area = document.createElement("textarea");
+    area.value = href;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    shown(ok ? "Copied" : "Copy failed");
+  };
+  btn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(href).then(() => shown("Copied"), fallback);
+    else fallback();
+  });
   btn.addEventListener("keydown", (e) => e.stopPropagation());
   return btn;
 }

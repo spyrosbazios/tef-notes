@@ -1,4 +1,4 @@
-// A paragraph that is only a URL (bare, or one labelled link) gets a card under it, always (the URL alone until the page answers): picture, title, description, site, as Notion and
+// A paragraph that is only a URL (bare, or one labelled link) is drawn as a card, its own line hidden until the caret is on it, always (the URL alone until the page answers): picture, title, description, site, as Notion and
 // Outline unfurl a pasted link. The card is a widget decoration, not a node: the note stays the one line of markdown
 // it was, a `[text](url)` link inside a sentence stays a link, and delete the line and the card is gone.
 // Where the page's metadata comes from is the caller's (`resolve`): the server reads it (CORS keeps a browser out), and
@@ -11,7 +11,7 @@ import type { EditorView } from "prosemirror-view";
 import type { LinkPreview } from "@/core/pocketbase";
 import { youtubeEmbed, youtubeVideo } from "@/core/links";
 import { isPdfLink } from "./files";
-import { readButton, summarised, summaryButton, type Summarize } from "./link-tools";
+import { copyButton, readButton, summarised, summaryButton, type Summarize } from "./link-tools";
 
 /** The preview of a URL. null: the page has nothing to show (no card). A rejection: it could not be asked (offline), so
  *  it is asked again later. */
@@ -103,9 +103,10 @@ function card(url: string, p: LinkPreview | null, open: (url: string) => void, t
   site.append(el("span", "pm-card-host", p?.site || host));
   body.append(site);
   root.append(thumb, body);
-  // Read and Summary: buttons of their own, so a click on the rest of the item still opens the page
-  if (t.read || t.summarize) {
+  // Copy, Read and Summary: buttons of their own, so a click on the rest of the item still opens the page
+  {
     const tools = el("div", "pm-card-tools");
+    tools.append(copyButton("pm-link-tool", url));
     if (t.read) tools.append(readButton("pm-link-tool", url, t.read));
     if (t.summarize) {
       const btn = summaryButton("pm-link-tool", url, t.view, t.getPos, t.summarize);
@@ -195,7 +196,11 @@ export function linkCards(resolve: ResolveLink, open: (url: string) => void, rea
       decorations(state) {
         want(state);
         const out: Decoration[] = [];
-        for (const { url, end } of bareUrls(state.doc)) {
+        const { from: selFrom, to: selTo } = state.selection;
+        for (const { url, from, end } of bareUrls(state.doc)) {
+          // The line itself is hidden under its card or player: the card is the link. The caret on it (arrows, a click
+          // where it sits, a selection across it) shows it again to edit, and the note's markdown never changes.
+          if (selTo < from || selFrom > end) out.push(Decoration.node(from, end, { class: "pm-card-line" }));
           const v = youtubeVideo(url);
           if (v) {
             out.push(Decoration.widget(end, () => video(url, v, open, inlineVideo), { key: `video:${url}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
