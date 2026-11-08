@@ -62,8 +62,10 @@ export function Days({ today, day: picked, onPick, onAdd }: { today: string; day
   useLayoutEffect(() => { slide(latest.current.picked ?? today, false); }, [slide, today]);        // first drawn on the box's day (today at the start), no scroll to see
   useEffect(() => { if (picked) slide(picked); }, [picked, slide]);
 
-  // The slot follows the scroll; once it stops the day in it becomes the box's (a past one settles back on today)
-  const rest = useRef<number | undefined>(undefined);
+  // The slot follows the scroll; once it stops the day in it becomes the box's (a past one settles back on today), but only a scroll the
+  // owner made: the strip sliding to the box's day by itself (first drawn, a tap, Upcoming scrolled by hand) is the box's day already, and
+  // answering it would put the box back on Today when it shows the Inbox
+  const rest = useRef<number | undefined>(undefined), byHand = useRef(false);
   useEffect(() => () => window.clearTimeout(rest.current), []);
   const scrolled = () => {
     const el = strip.current;
@@ -72,18 +74,21 @@ export function Days({ today, day: picked, onPick, onAdd }: { today: string; day
     setSlot(i);
     window.clearTimeout(rest.current);
     rest.current = window.setTimeout(() => {
-      const d = days[i];
+      const d = days[i], mine = byHand.current;
+      byHand.current = false;
+      if (!mine) return;
       if (d < today) slide(today);
       else if (d !== latest.current.picked) latest.current.onPick(d);
     }, 140);
   };
+  const grabbed = () => { byHand.current = true; };
 
   return (
     <div className="mx-3 min-w-0" role="group" aria-label="The days' plan">
       <p className="h-[18px] text-center text-[11px] font-medium text-faint">{monthOf(days[slot], today)}</p>
       {/* The strip's edges fade into the page where more days are scrolled away, rather than cutting a day in half */}
       <ScrollFade asChild orientation="horizontal" size={28} shrink={0} blur={0}>
-        <div ref={strip} onScroll={scrolled} style={{ gap: GAP, paddingInline: `calc(50% - ${CELL / 2}px)` }}
+        <div ref={strip} onScroll={scrolled} onPointerDown={grabbed} onTouchStart={grabbed} onWheel={grabbed} style={{ gap: GAP, paddingInline: `calc(50% - ${CELL / 2}px)` }}
           className="flex snap-x snap-mandatory items-center overscroll-x-contain py-[5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {days.map((d, i) => <Day key={d} day={d} n={byDay.get(d)?.length ?? 0} near={Math.min(4, Math.abs(i - slot))} today={today} picked={d === picked} onPick={pickDay} onAdd={addDay} />)}
         </div>

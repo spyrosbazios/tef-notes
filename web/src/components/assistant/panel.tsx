@@ -37,6 +37,9 @@ const settled = (p: Part) => isTool(p) && (p.state === "output-available" || p.s
  *  shifts under the finger and the tap misses. */
 const keep = (e: SyntheticEvent) => e.preventDefault();
 
+/** A finger or a phone-width window: sending closes the on-screen keyboard. A laptop keeps the field focused for the next line. */
+const shutKeyboard = () => matchMedia("(pointer: coarse), (max-width: 767px)").matches;
+
 /** What the assistant sees right now, in a few words: the open note or task, else the list. */
 function Seeing() {
   const { view, open, task } = useNav();
@@ -84,7 +87,9 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
     if (!text || !ready || busy) return;
     setInput("");
     follow();
-    if (!(await send(text))) setInput(text);
+    if (!(await send(text))) { setInput(text); return; }
+    // On the phone the answer is read, not typed over: the keyboard closes (the Send button's tap kept the focus so that tap landed)
+    if (shutKeyboard()) field.current?.blur();
   };
   const suggest = (s: string) => { if (s.endsWith("?")) void go(s); else { setInput(s.replace(/…$/, " ")); field.current?.focus(); } };
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {

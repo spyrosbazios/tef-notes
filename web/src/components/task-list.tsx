@@ -27,13 +27,15 @@ import { useRowDrag } from "@/hooks/drag";
 import { toggleTask, useLingering } from "@/hooks/linger";
 import { useActiveLens } from "@/hooks/lens";
 import { useLinks } from "@/hooks/links";
-import { calm } from "@/hooks/media";
+import { calm, useNarrow } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
+import { useScrollMemory } from "@/hooks/scroll-memory";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
-import { TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
+import { hrefOf, TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
 import { report } from "@/lib/report";
 import { scheduleOf } from "@/lib/schedule";
+import { scrollKey } from "@/lib/scroll-memory";
 import { cn } from "@/lib/utils";
 
 const EMPTY: Record<TaskView, string> = {
@@ -45,6 +47,9 @@ const EMPTY: Record<TaskView, string> = {
 
 const NO_LINKS: Link[] = [];
 const NO_TAGS: string[] = [];
+
+/** A day's heading counts as the list's top once it is this far (px) below the box's top edge: its own margin and a little more. */
+const HEADING_REACH = 44;
 
 /** The Logbook shows this many of the latest, as the phone's does. */
 const LOGBOOK = 100;
@@ -109,19 +114,22 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
 /** `embedded`: a list inside Home's task box, which draws the heading and the +: no header, no frame, scrolling inside the box's
  * fixed height, a row opening beside its own list rather than Home's. `tags`: only tasks carrying every one (Home's filter).
  * `focus`: a day Home's planner picked or is hovering: scrolled to that day (or the next one with tasks), its heading lit.
- * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves. */
-export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus = null, onHoverDay }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; tags?: string[]; focus?: { day: string; n: number } | null; onHoverDay?: (day: string | null) => void }) {
+ * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves.
+ * `onView`: Upcoming scrolled by hand: the day whose section is at the top of the list, reported as it changes (the phone's strip follows). */
+export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus = null, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; tags?: string[]; focus?: { day: string; n: number } | null; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
   const qc = useQueryClient();
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
   const { openTask, showTask, task: open } = useNav();
   const lingering = useLingering();
   const records = useTasks().data;
-  const scroller = useRef<HTMLDivElement>(null);
+  const narrow = useNarrow();
   const [deleting, setDeleting] = useState<string | null>(null);
   const doomed = (deleting && records?.find((r) => r.id === deleting)) || null;
   const kind = view.kind;
   const lens = useActiveLens(), fade = useTempoTransition(transition.fade);
+  // Kept where it was left: Home's box per list, a view's own list per view. On a phone a task open takes the list's place (it is hidden)
+  const scroller = useScrollMemory<HTMLDivElement>(scrollKey(embedded ? `box:${kind}` : hrefOf(view), lens?.rec), !(narrow && !embedded && open));
   // What the list is of: when it changes the rows are a new list, not rows coming and going
   const of = `${kind}|${lens?.rec ?? ""}|${tags.join(",")}`;
 
@@ -155,15 +163,45 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   };
   const count = sections.reduce((n, s) => n + s.rows.length, 0);
   const lit = focus ? sections.find((x) => x.key >= focus.day)?.key : undefined;
+  // The section at the top of the box while the owner scrolls Upcoming. A scroll the owner did not start (the one to a picked day) is not
+  // reported, or the strip and the list would chase each other; a hand on the list (finger, wheel, key) starts reporting, the scroll
+  // to a picked day stops it.
+  const byHand = useRef(false), viewed = useRef<string | null>(null), seen = useRef(onView);
+  useEffect(() => { seen.current = onView; });
+  const watching = !!onView && kind === "upcoming";
+  useEffect(() => {
+    const box = scroller.current;
+    if (!watching || !box) return;
+    const hand = () => { byHand.current = true; };
+    let raf = 0;
+    const look = () => {
+      raf = 0;
+      if (!byHand.current) return;
+      const top = box.getBoundingClientRect().top;
+      let day: string | undefined, best = -Infinity;
+      for (const h of box.querySelectorAll<HTMLElement>("[data-day]")) {
+        const y = h.getBoundingClientRect().top - top;
+        if (y <= HEADING_REACH && y > best) { best = y; day = h.dataset.day; }
+      }
+      if (day && day !== viewed.current) { viewed.current = day; seen.current?.(day); }
+    };
+    const scrolled = () => { if (!raf) raf = requestAnimationFrame(look); };
+    const hands = ["touchstart", "wheel", "keydown"] as const;
+    for (const t of hands) box.addEventListener(t, hand, { passive: true });
+    box.addEventListener("scroll", scrolled, { passive: true });
+    return () => { cancelAnimationFrame(raf); for (const t of hands) box.removeEventListener(t, hand); box.removeEventListener("scroll", scrolled); };
+  }, [watching, scroller]);
   useEffect(() => {
     if (!focus || !lit) return;
+    byHand.current = false;
+    viewed.current = null;
     // Only the list's own box scrolls, never the page around it
     const id = requestAnimationFrame(() => {
       const box = scroller.current, el = box?.querySelector(`[data-day="${lit}"]`);
       if (box && el) box.scrollTo({ top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top, behavior: calm() ? "instant" : "smooth" });
     });
     return () => cancelAnimationFrame(id);
-  }, [focus, lit]);
+  }, [focus, lit, scroller]);
 
   // Dragging a row within its section writes `order` as the phone does (core/task-order.ts), each at its rev. Upcoming and
   // the Logbook are sorted by day, so those stay as they are.

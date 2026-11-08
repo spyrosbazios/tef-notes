@@ -92,7 +92,12 @@ drawer taking Home's place (`components/search-drawer.tsx`): `#tag` chips, notes
 assistant" when nothing matches; it and the palette (⌘K, laptop) share their data in `hooks/search.ts` and the note row in
 `components/note-hit.tsx`. Differences from the Android app: scroll-snap stands in for the strip's drag physics (a day does not
 spring as it nears the slot, it steps), the strip does not follow Upcoming scrolled by hand, and a search result's long press opens
-the laptop's note menu. Where `md` and up draws the laptop's layout, nothing changes.
+the laptop's note menu. A list comes back where it was left: `lib/scroll-memory.ts` keeps each list's scroll (per view URL and lens) and
+Home's task box (the list in front, its tag filter), and `hooks/scroll-memory.ts` puts the place back instantly when Home returns from a note,
+a tab switch or a hidden list shows again, re-applying it while tiles and pictures lay out. Upcoming scrolled by hand moves the days strip to the
+section at its top (`TaskList`'s `onView`); the strip answers only a drag of its own, never its own sliding. The phone's header controls (tag
+filter, layout, sort, +) are one 40px outlined square each (`TOOL` in `note-list.tsx`, shared by the task box). Sending closes the assistant's keyboard
+(the Send tap still keeps the focus, so it lands first time). Where `md` and up draws the laptop's layout, nothing changes.
 
 ## Links
 

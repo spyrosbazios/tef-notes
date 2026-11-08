@@ -137,6 +137,10 @@ const PAGE = 30;
 /** What Home's sort reads off a note record. */
 const recSortable = (n: NoteRec) => ({ pinned: n.note.pinned, updated: n.updated, created: n.note.created, path: n.path });
 
+/** The phone's header controls (Home's task box and its notes): one 40px outlined rounded square each, an icon of 20px, `gap-2` between. Where a
+ *  control is wider (the tag filter naming what it has chosen) it keeps the height and the corners. */
+export const TOOL = "max-md:h-10 max-md:min-w-10 max-md:rounded-xl";
+
 /** The tag filter: a button naming what is chosen, opening every tag in the list (with its count) to tick on or off. Home's tasks use it
  *  too (`what`). The "Tags" word folds into the icon when none is chosen: on a phone, and under 20rem when a `@container` holds it (Home's
  *  task box, where the three list names and this would collide). */
@@ -145,8 +149,9 @@ export function TagFilter({ counts, chosen, onChange, what = "Notes" }: { counts
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Filter by tag" className={cn("max-w-64 max-sm:max-w-28", chosen.length ? "text-fg" : "text-dim")}>
-          <Hash /><span className={cn("truncate", !chosen.length && "max-sm:hidden @max-xs:hidden")}>{chosen.length ? chosen.join(", ") : "Tags"}</span>
+        <Button variant="outline" size="sm" aria-label="Filter by tag"
+          className={cn("max-w-64 max-sm:max-w-28", TOOL, chosen.length ? "text-fg max-md:px-3" : "text-dim max-sm:px-0 max-md:px-3")}>
+          <Hash className="max-md:size-5" /><span className={cn("truncate", !chosen.length && "max-sm:hidden @max-xs:hidden")}>{chosen.length ? chosen.join(", ") : "Tags"}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
@@ -250,16 +255,19 @@ export function NoteList({ onNew }: { onNew: () => void }) {
           <BulkBar paths={picked} onClear={() => setSel([])} onAll={() => setSel(order)}
             onTags={() => ask("tags", picked)} onDelete={() => ask("delete", picked)} />
         ) : (
-          <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-2">
-            <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
-            <span className="mr-auto self-baseline pt-1 text-xs tabular-nums text-faint">{shown.length}</span>
+          <div className="flex min-h-8 flex-wrap items-center gap-2 max-md:min-h-10">
+            {/* The title and its count sit on one baseline, the controls centred beside them (the wrapper only exists on a phone) */}
+            <div className="max-md:mr-auto max-md:flex max-md:items-baseline max-md:gap-2 md:contents">
+              <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
+              <span className="text-xs tabular-nums text-faint md:mr-auto md:self-baseline md:pt-1">{shown.length}</span>
+            </div>
             <TagFilter counts={counts} chosen={chips} onChange={setTags} />
             {narrow ? (
               // The phone's toggle: one button showing the other layout (the animated group's gliding highlight has
               // nothing to sit on when the selected item is hidden, and paints a stray surface)
-              <Button variant="outline" size="icon-sm" className="text-dim" aria-pressed={grouped}
+              <Button variant="outline" size="icon-sm" className={cn("text-dim", TOOL)} aria-pressed={grouped}
                 aria-label={grouped ? "Show notes as tiles" : "Group notes by tag"} onClick={() => setGrouped(!grouped)}>
-                {grouped ? <LayoutGrid /> : <Tags />}
+                {grouped ? <LayoutGrid className="size-5" /> : <Tags className="size-5" />}
               </Button>
             ) : (
               <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={grouped ? "tags" : "list"} aria-label="Layout"
@@ -269,12 +277,17 @@ export function NoteList({ onNew }: { onNew: () => void }) {
               </ToggleGroup>
             )}
             <Select value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
-              <SelectTrigger size="sm" aria-label="Sort notes" className="text-dim max-md:[&_[data-slot=select-value]]:hidden max-md:[&>svg:last-child]:hidden"><ArrowDownUp /><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" aria-label="Sort notes"
+                className="text-dim max-md:w-10 max-md:min-w-10 max-md:justify-center max-md:p-0 max-md:data-[size=sm]:h-10 max-md:data-[size=sm]:rounded-xl max-md:[&_[data-slot=select-value]]:hidden max-md:[&>svg:last-child]:hidden">
+                <ArrowDownUp className="max-md:size-5" /><SelectValue />
+              </SelectTrigger>
               <SelectContent align="end">
                 {NOTE_SORTS.map((k) => <SelectItem key={k} value={k}>{NOTE_SORT_LABEL[k]}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button size="sm" className="rounded-full max-md:size-9 max-md:bg-transparent max-md:p-0 max-md:text-brand max-md:hover:bg-transparent" aria-label="New note" onClick={onNew}><Plus className="max-md:size-[22px]" /><span className="max-md:hidden">New note</span></Button>
+            <Button size="sm" variant={narrow ? "outline" : "default"} className={cn("rounded-full", TOOL, "max-md:px-0 max-md:text-brand max-md:hover:text-brand")} aria-label="New note" onClick={onNew}>
+              <Plus className="max-md:size-5" /><span className="max-md:hidden">New note</span>
+            </Button>
           </div>
         )}
       </header>
