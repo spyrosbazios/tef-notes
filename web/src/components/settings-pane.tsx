@@ -1,15 +1,15 @@
 // Settings: the look (theme and accent), the phone's tabs and where the app opens (all the owner's preferences, on the server,
-// hooks/prefs.ts), the server and the offline copy this browser keeps, the agent (which model
+// hooks/prefs.ts), the agent (which model
 // Ask uses, how hard it thinks, whether it writes notes without asking: preferences too; what it remembers of the owner,
 // agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
-// definition), and import and export. A window lists the sections beside the page; below `md` the list is the page and a
+// definition), import and export, and maintenance (the server, the offline copy this browser keeps, the version). A window lists the sections beside the page; below `md` the list is the page and a
 // section opens over it (`?section=`), as the phone's Settings tab does.
 import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
@@ -532,7 +532,7 @@ function ImportExport() {
   );
 }
 
-/** The server this app talks to, what this browser keeps of it for offline, and clearing that. */
+/** The server this app talks to, what this browser keeps of it for offline, and clearing that: Maintenance's first box. */
 function ServerSync() {
   const qc = useQueryClient();
   const online = useOnline(), { waiting } = useSyncStatus();
@@ -542,8 +542,7 @@ function ServerSync() {
   const worker = "serviceWorker" in navigator && !!navigator.serviceWorker.controller;
   const sync = () => { void Promise.all([syncNow(), qc.invalidateQueries()]).then(() => toast("Up to date")); };
   return (
-    <section className="space-y-3" aria-labelledby="server-h">
-      <h2 id="server-h" className={TITLE}>Server &amp; sync</h2>
+    <>
       <p className="text-sm text-dim">Notes, photos and the agent live on the server this page was loaded from. There is no sign-in: it must only be reachable on a private network.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Server" detail={location.host} trailing={<span className={cn("text-[13px]", online ? "text-dim" : "text-warn")}>{online ? "Reachable" : "Not reachable"}</span>} />
@@ -566,7 +565,7 @@ function ServerSync() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </>
   );
 }
 
@@ -640,8 +639,7 @@ function Voice() {
   );
 }
 
-/** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
-/** Which build this is, and fetching a newer one when the update toast hasn't shown up yet. */
+/** The server and the offline copy, which build this is, and fetching a newer one when the update toast hasn't shown up yet. */
 function Maintenance() {
   const online = useOnline();
   const [busy, setBusy] = useState(false);
@@ -649,6 +647,7 @@ function Maintenance() {
   return (
     <section className="space-y-3" aria-labelledby="maintenance-h">
       <h2 id="maintenance-h" className={TITLE}>Maintenance</h2>
+      <ServerSync />
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Version" detail={`Built ${builtAt().toLocaleString()}`} trailing={<span className="text-[13px] text-dim tabular-nums">{appVersion()}</span>} />
         <Line title="Get the latest version" detail="Checks the server for a newer build and reloads into it now, instead of waiting for the update notice. Changes not sent yet stay on this device."
@@ -662,13 +661,12 @@ function Maintenance() {
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
   { id: "layout", label: "Layout", about: "Phone tabs, what they open on, the start screen", icon: LayoutGrid, body: Layout },
-  { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "voice", label: "Voice", about: "Dictation, how long the model stays loaded", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
   { id: "transfer", label: "Import & export", about: "Markdown folders and zips, in and out", icon: ArrowDownUp, body: ImportExport },
-  { id: "maintenance", label: "Maintenance", about: "Version, get the latest", icon: Wrench, body: Maintenance },
+  { id: "maintenance", label: "Maintenance", about: "Server, sync, offline copy, version", icon: Wrench, body: Maintenance },
 ] as const satisfies readonly { id: SettingsSection; label: string; about: string; icon: LucideIcon; body: () => ReactNode }[];
 
 export function SettingsPane() {

@@ -45,7 +45,7 @@ export type ListSearch = { t?: string };
 export const listSearch = (raw: Raw): ListSearch => ({ t: text(raw.t) });
 
 /** Settings' sections, in their order (settings-pane.tsx draws each). */
-export const SETTINGS_SECTIONS = ["appearance", "layout", "server", "agent", "voice", "reminders", "tags", "transfer", "maintenance"] as const;
+export const SETTINGS_SECTIONS = ["appearance", "layout", "agent", "voice", "reminders", "tags", "transfer", "maintenance"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 /** Settings: the section open. */
