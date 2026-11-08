@@ -1,5 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { execFileSync } from "node:child_process";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { alias, at, identity, theme } from "./vite-shared";
@@ -26,7 +27,11 @@ export default defineConfig({
   ],
   resolve: { alias },
   // This build's id: the persisted query cache is only honoured by the build that wrote it (src/lib/persist.ts).
-  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
+  // __APP_VERSION__: the repo's one version (scripts/version.sh), shown in Settings → Maintenance with the build's time.
+  define: {
+    __BUILD_ID__: JSON.stringify(Date.now().toString(36)),
+    __APP_VERSION__: JSON.stringify(execFileSync("sh", [at("../scripts/version.sh")], { encoding: "utf8" }).trim()),
+  },
   // The fonts and the core come from mobile/, outside this root. TEF_NOTES_SERVER: the server `bun dev` talks to.
   server: { fs: { allow: [at("..")] }, proxy: process.env.TEF_NOTES_SERVER ? Object.fromEntries(["/api", "/agent"].map((p) => [p, { target: process.env.TEF_NOTES_SERVER, changeOrigin: true }])) : undefined },
   build: { outDir: "dist", emptyOutDir: true },

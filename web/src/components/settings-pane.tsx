@@ -8,7 +8,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
@@ -50,6 +50,8 @@ import { useCreateTag, useDescribeTag, useRemoveTag, useTags, useUpdateTag } fro
 import { message } from "@/services/api";
 import { memory } from "@/services/notes";
 import { cn } from "@/lib/utils";
+import { builtAt } from "@/lib/persist";
+import { appVersion, forceUpdate } from "@/lib/update";
 
 /** A tag is one word: it is written on the note's `tags:` line and typed as `#tag` in search. */
 const clean = (v: string) => v.trim().replace(/^#/, "");
@@ -544,6 +546,23 @@ function Reminders() {
 }
 
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
+/** Which build this is, and fetching a newer one when the update toast hasn't shown up yet. */
+function Maintenance() {
+  const online = useOnline();
+  const [busy, setBusy] = useState(false);
+  const reload = () => { setBusy(true); forceUpdate().catch((e) => { setBusy(false); toast.error(message(e)); }); };
+  return (
+    <section className="space-y-3" aria-labelledby="maintenance-h">
+      <h2 id="maintenance-h" className={HEAD}>Maintenance</h2>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <Line title="Version" detail={`Built ${builtAt().toLocaleString()}`} trailing={<span className="text-[13px] text-dim tabular-nums">{appVersion()}</span>} />
+        <Line title="Get the latest version" detail="Checks the server for a newer build and reloads into it now, instead of waiting for the update notice. Changes not sent yet stay on this device."
+          trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={!online || busy} onClick={reload}>{busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Reload</Button>} />
+      </div>
+    </section>
+  );
+}
+
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
   { id: "layout", label: "Layout", about: "Phone tabs, the screen it opens on", icon: LayoutGrid, body: Layout },
@@ -553,6 +572,7 @@ const SECTIONS = [
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
   { id: "import", label: "Import", about: "Markdown folders and zips", icon: Upload, body: Import },
   { id: "export", label: "Export", about: "Every note as a zip", icon: Download, body: Export },
+  { id: "maintenance", label: "Maintenance", about: "Version, get the latest", icon: Wrench, body: Maintenance },
 ] as const satisfies readonly { id: string; label: string; about: string; icon: LucideIcon; body: () => ReactNode }[];
 type SectionId = (typeof SECTIONS)[number]["id"];
 
