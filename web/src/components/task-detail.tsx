@@ -11,7 +11,7 @@ import { readsAsMarkdown, withLineBreaks } from "@/core/task-notes";
 import { retagTask } from "@/core/todo";
 import { chip, Clear, RemindPicker, RepeatPicker, Row } from "@/components/task-fields";
 import { Checklist } from "@/components/checklist";
-import { DraftInput, DraftTextarea } from "@/components/draft-field";
+import { DraftTextarea } from "@/components/draft-field";
 import { Markdown } from "@/components/markdown";
 import { TagEditor } from "@/components/tag-editor";
 import { InSheet, Pick } from "@/components/pick";
@@ -100,7 +100,7 @@ function TaskNotes({ task, onSave }: { task: TaskRec; onSave: (notes: string) =>
     return (
       <div onBlur={() => setEditing(false)}>
         <DraftTextarea value={task.notes} aria-label="Notes" placeholder="Notes" onSave={onSave} autoFocus={editing} onFocus={() => setEditing(true)}
-          className="min-h-16 border-transparent bg-transparent px-2 text-sm shadow-none hover:border-input dark:bg-transparent" />
+          className="min-h-16 resize-none border-transparent bg-transparent px-2 text-sm shadow-none hover:border-input dark:bg-transparent" />
       </div>
     );
   }
@@ -124,23 +124,21 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
 
   const card = (
     <article className="flex h-full min-h-0 flex-col" aria-label={task.title}>
-      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-2 md:px-4">
+      <header className="flex h-11 shrink-0 items-center gap-1 px-2 md:h-12 md:border-b md:border-line md:px-4">
         {leading}
         <div className="flex-1" />
-        <WhenPick value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
-          <Button variant="ghost" size="icon" aria-label="When" title="When"><Calendar className={when || task.due ? "text-brand" : "text-dim"} /></Button>
-        </WhenPick>
-        <Button variant="destructive" size="sm" aria-label="Delete the task" title="Delete" onClick={() => setConfirm(true)} className="ml-1"><Trash2 />Delete</Button>
+        <Button variant="ghost" size="icon-sm" aria-label="Delete the task" title="Delete" onClick={() => setConfirm(true)} className="text-dim hover:text-destructive"><Trash2 /></Button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-xl space-y-5 px-6 pt-8 pb-24 md:px-10">
+        <div className="mx-auto max-w-xl space-y-4 px-4 pt-2 pb-24 md:space-y-5 md:px-10 md:pt-8">
           <div className="flex items-start gap-3">
-            <TickBox size="lg" checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(qc, task); }} className="mt-2" />
-            <DraftInput value={task.title} aria-label="Title" placeholder="Title" onSave={(title) => editTask(qc, task.id, { title })}
-              className={cn("h-10 border-transparent bg-transparent px-2 text-2xl font-extrabold tracking-tight shadow-none hover:border-input md:text-2xl dark:bg-transparent", checked && "text-faint line-through decoration-faint")} />
+            <TickBox size="lg" checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(qc, task); }} className="mt-1.5 shrink-0" />
+            <DraftTextarea value={task.title} rows={1} aria-label="Title" placeholder="Title" onSave={(title) => editTask(qc, task.id, { title: title.replace(/\s*\n\s*/g, " ") })}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
+              className={cn("min-h-0 resize-none border-transparent bg-transparent px-2 py-1 text-2xl leading-tight font-extrabold tracking-tight shadow-none hover:border-input md:text-2xl dark:bg-transparent", checked && "text-faint line-through decoration-faint")} />
           </div>
-          {task.done ? <p className="-mt-3 pl-9 text-xs text-dim">Done {dayLabel(task.done, today)}</p> : null}
+          {task.done ? <p className="-mt-3 pl-11 text-xs text-dim">Done {dayLabel(task.done, today)}</p> : null}
 
           <TaskNotes key={task.id} task={task} onSave={(notes) => editTask(qc, task.id, { notes })} />
 
@@ -172,7 +170,7 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
   );
   if (!narrow) return card;
   return (
-    <Drawer open onOpenChange={(o) => { if (!o) openTask(null); }}>
+    <Drawer open repositionInputs={false} onOpenChange={(o) => { if (!o) openTask(null); }}>
       <DrawerContent className="data-[vaul-drawer-direction=bottom]:h-[92dvh] data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
         <DrawerTitle className="sr-only">{task.title}</DrawerTitle>
         <InSheet value>{card}</InSheet>
