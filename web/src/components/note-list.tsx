@@ -33,7 +33,7 @@ import { useSavedScroll } from "@/hooks/scroll";
 import { useTagNames } from "@/hooks/tag-names";
 import { useNotePictures } from "@/hooks/thumbs";
 import { Mosaic } from "./note-pictures";
-import { noteLink, useIntent, useNav, type AppLink } from "@/lib/nav";
+import { isNotesView, noteLink, useIntent, useNav, type AppLink } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
@@ -147,11 +147,11 @@ const recSortable = (n: NoteRec) => ({ pinned: n.note.pinned, updated: n.updated
  *  wider control keeps the height and the corners. */
 export const TOOL = "max-md:h-10 max-md:min-w-10 max-md:rounded-xl";
 
-/** `scrollId`: Home's scroller, whose place is put back: by the router for a badge's tag, by `useScrollSwitch` for a lens (lib/scroll.ts). */
+/** `scrollId`: its page's scroller (Home's or the Notes page's), whose place is put back: by the router for a badge's tag, by `useScrollSwitch` for a lens (lib/scroll.ts). */
 export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: string }) {
   const { isPending } = useNotes();
   const { view, openNote, filterTag, setTags } = useNav();
-  const chips = useMemo(() => (view.kind === "home" ? view.tags ?? [] : []), [view]);
+  const chips = useMemo(() => (isNotesView(view) ? view.tags ?? [] : []), [view]);
   const place = useSavedScroll(scrollId);
   const [limit, setLimit] = useState(() => startLimit(place));
   const end = useRef<HTMLDivElement>(null);

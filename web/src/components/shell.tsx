@@ -1,12 +1,12 @@
 // The laptop's layout: rail | page | assistant, all in view from a wide window, where the phone shows one screen at a time. The page
-// is the router's (`Outlet`: routes/_app/, Home, the task lists, Settings); a note is laid over it (`?note=<id>`, note-page.tsx) with
+// is the router's (`Outlet`: routes/_app/, Home, the task lists, Notes, Settings); a note is laid over it (`?note=<id>`, note-page.tsx) with
 // no rail, and the screen it was opened from stays matched and mounted underneath, hidden and inert, so closing the note finds it
 // exactly as it was: no reload of the tiles, no scroll to restore. A task opens beside its list (task-screen.tsx). The assistant is a
 // dock on the right (components/assistant/dock.tsx), mounted here once so it outlives every screen. Narrower windows fold the rail
 // into a sheet and lay the dock over the page, and on a phone-width one the list and the task take turns. An open task brings its
 // own bar, so the narrow app bar steps aside and its back and menu buttons sit in that bar. Installed on a phone it is the whole
 // screen (`h-dvh`, which follows the keyboard: index.html's `interactive-widget`), padded by the safe-area insets.
-// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Ask, Settings, in the owner's order) instead of the rail and the app bar, Home
+// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Notes, Ask, Settings, as the owner set them) instead of the rail and the app bar, Home
 // drawing its own header (lens, search), the Tasks tab the list with its own switcher (task-list.tsx), Ask the dock opened whole. From `md` to
 // `lg` the app bar's buttons are the touch way to everything the keys do: Views, Assistant (a), Search (/ and ⌘K), New note or task (n, q).
 import { Command as CommandIcon, Menu, Plus, Sparkles } from "lucide-react";

@@ -10,8 +10,8 @@ describe("prefsOf", () => {
     const p = prefsOf({ theme: "nope", tabs: ["ask", "ask", "bogus", "home"], hidden: ["settings", "tasks"], start: "today",
       notes: { grouped: true, collapsed: ["a", 1, "a"], sort: "created" }, agent: { model: "", effort: "deep", unasked: "yes" } });
     expect(p.theme).toBe(DEFAULT_PREFS.theme);
-    expect(p.tabs).toEqual(["ask", "home", "tasks", "settings"]);
-    expect(p.hidden).toEqual(["tasks"]);
+    expect(p.tabs).toEqual(["ask", "home", "tasks", "notes", "settings"]);
+    expect(p.hidden).toEqual(["tasks", "notes"]);
     expect(p.start).toBe("today");
     expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
     expect(prefsOf({ lens: "" }).lens).toBeUndefined();
@@ -20,8 +20,18 @@ describe("prefsOf", () => {
   });
 });
 
+test("Notes: off by default, kept once placed", () => {
+  expect(prefsOf({}).hidden).toEqual(["notes"]);
+  expect(prefsOf({ tabs: ["notes", "home"], hidden: [] }).hidden).toEqual([]);
+});
+
+test("task lists", () => {
+  expect(prefsOf({ homeList: "inbox", tasksList: "nope" })).toMatchObject({ homeList: "inbox", tasksList: "today" });
+});
+
 test("shownTabs and movedTab", () => {
   expect(shownTabs({ tabs: ["ask", "home", "tasks", "settings"], hidden: ["tasks"] })).toEqual(["ask", "home", "settings"]);
-  expect(movedTab(["home", "tasks", "ask", "settings"], "ask", -1)).toEqual(["home", "ask", "tasks", "settings"]);
-  expect(movedTab(["home", "tasks"], "home", -1)).toEqual(["home", "tasks"]);
+  expect(movedTab(["home", "tasks", "ask", "settings"], "ask", "home", false)).toEqual(["ask", "home", "tasks", "settings"]);
+  expect(movedTab(["home", "tasks", "ask", "settings"], "home", "ask", true)).toEqual(["tasks", "ask", "home", "settings"]);
+  expect(movedTab(["home", "tasks"], "home", "home", true)).toEqual(["home", "tasks"]);
 });

@@ -3,13 +3,15 @@
 // at the corner (assistant/fab.tsx), and tags are Home's filter. It replaces the phone's tabs: every view is one click away. One
 // Highlight glides the view's background between the lists and Settings (Home, the logo, has none).
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
-import { Search, Settings, type LucideIcon } from "lucide-react";
+import { NotebookText, Search, Settings, type LucideIcon } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { LensSwitcher } from "@/components/lens-switcher";
 import { TASK_ICON } from "@/components/task-icons";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { useViews } from "@/hooks/todo";
+import { usePrefs } from "@/hooks/prefs";
+import { shownTabs } from "@/core/prefs";
 import { TASK_VIEWS, titleOf, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +34,7 @@ export function Rail({ onSearch, onPick }: { onSearch: () => void; onPick?: () =
   const counts = { inbox: views.inbox.length, today: views.today.length + views.evening.length };
   const { view, goView } = useNav();
   const is = (v: View) => view.kind === v.kind;
+  const notesOn = shownTabs(usePrefs()).includes("notes");
   const go = (v: View) => { goView(v); onPick?.(); };
 
   return (
@@ -48,6 +51,7 @@ export function Rail({ onSearch, onPick }: { onSearch: () => void; onPick?: () =
             <Item key={k} icon={TASK_ICON[k]} label={titleOf({ kind: k })} value={k} count={counts[k as keyof typeof counts] || undefined} active={is({ kind: k })} onClick={() => go({ kind: k })} />
           ))}
         </div>
+        {notesOn ? <Item icon={NotebookText} value="notes" label="Notes" active={is({ kind: "notes" })} onClick={() => go({ kind: "notes" })} /> : null}
         <div className="flex-1" />
         <div className="space-y-0.5 border-t border-line pt-3">
           <LensSwitcher />

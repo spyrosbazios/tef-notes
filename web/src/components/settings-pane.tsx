@@ -9,13 +9,13 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDown, ArrowDownUp, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL } from "@/core/prefs";
+import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Markdown } from "@/components/markdown";
@@ -33,7 +33,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useModel } from "@/hooks/agent";
 import { useAppearance } from "@/hooks/appearance";
-import { setPrefs, usePrefs } from "@/hooks/prefs";
+import { useRowDrag } from "@/hooks/drag";
+import { prefsNow, setPrefs, usePrefs } from "@/hooks/prefs";
+import { TAB_ICON } from "@/components/tab-icons";
 import { useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
 import { useSyncStatus } from "@/hooks/sync";
@@ -211,40 +213,70 @@ function Appearance() {
   );
 }
 
-/** The phone's bottom bar and where the app opens (core/prefs.ts). */
+/** A row of small radio buttons. */
+function Choice<T extends string>({ label, value, options, names, onPick }: { label: string; value: T; options: readonly T[]; names: Record<T, string>; onPick: (v: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <Button key={o} type="button" role="radio" aria-checked={o === value} size="sm" variant={o === value ? "default" : "outline"} onClick={() => onPick(o)}>{names[o]}</Button>
+      ))}
+    </div>
+  );
+}
+
+/** What a tab's row opens to, when it has a choice of its own. */
+function TabOptions({ tab }: { tab: Tab }) {
+  const { homeList, tasksList } = usePrefs();
+  if (tab === "home") return (
+    <div className="space-y-2 pb-1"><p className="text-[13px] text-dim">Home's task box opens on</p>
+      <Choice label="Home's task box opens on" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ homeList: v })} /></div>
+  );
+  if (tab === "tasks") return (
+    <div className="space-y-2 pb-1"><p className="text-[13px] text-dim">The Tasks tab opens on</p>
+      <Choice label="The Tasks tab opens on" value={tasksList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ tasksList: v })} /></div>
+  );
+  return null;
+}
+
+/** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger by the grip), shown or
+ *  hidden, and Home and Tasks tapped open for the list each starts on. */
 function Layout() {
   const { tabs, hidden, start } = usePrefs();
+  const [open, setOpen] = useState<Tab | null>(null);
+  const drag = useRowDrag((_g, id, over, after) => setPrefs({ tabs: movedTab(prefsNow().tabs, id as Tab, over as Tab, after) }));
   return (
     <section className="space-y-3" aria-labelledby="layout-h">
       <h2 id="layout-h" className={HEAD}>Layout</h2>
-      <p className="text-sm text-dim">The tabs at the bottom of the phone and the screen the app opens on. Kept on the server, like the look.</p>
+      <p className="text-sm text-dim">The tabs at the bottom of the phone, what each opens on, and the screen the app starts on. Kept on the server, like the look.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
-          <p id="start-h" className="text-sm font-semibold">Open on</p>
-          <div role="radiogroup" aria-labelledby="start-h" className="flex flex-wrap gap-2">
-            {STARTS.map((s) => (
-              <Button key={s} type="button" role="radio" aria-checked={s === start} size="sm" variant={s === start ? "default" : "outline"} onClick={() => setPrefs({ start: s })}>
-                {START_LABEL[s]}
-              </Button>
-            ))}
-          </div>
+          <p className="text-sm font-semibold">Open the app on</p>
+          <Choice label="Open the app on" value={start} options={STARTS} names={START_LABEL} onPick={(v) => setPrefs({ start: v })} />
         </div>
         <div className="px-3 py-2.5">
           <p className="text-sm font-semibold">Tabs</p>
-          <p className="text-[13px] leading-snug text-dim">Their order on the bar. Settings stays, so the bar can always be changed back.</p>
+          <p className="text-[13px] leading-snug text-dim">Drag to reorder. Tap Home or Tasks to pick the list it opens on. Settings stays, so the bar can always be changed back.</p>
         </div>
-        <ul aria-label="Tabs">
-          {tabs.map((t, i) => {
-            const shown = !hidden.includes(t);
+        <ul aria-label="Tabs" className="divide-y divide-line">
+          {tabs.map((t) => {
+            const shown = !hidden.includes(t), d = drag("tabs", t), opens = t === "home" || t === "tasks", Icon = TAB_ICON[t];
             return (
-              <li key={t} className="flex items-center gap-2 border-t border-line px-3 py-1.5">
-                <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{TAB_LABEL[t]}</span>
-                {HIDEABLE.includes(t) ? (
-                  <Switch checked={shown} aria-label={`Show ${TAB_LABEL[t]}`}
-                    onCheckedChange={(on) => setPrefs({ hidden: on ? hidden.filter((h) => h !== t) : [...hidden, t] })} />
-                ) : null}
-                <Button variant="ghost" size="icon" aria-label={`Move ${TAB_LABEL[t]} up`} disabled={i === 0} onClick={() => setPrefs({ tabs: movedTab(tabs, t, -1) })}><ArrowUp /></Button>
-                <Button variant="ghost" size="icon" aria-label={`Move ${TAB_LABEL[t]} down`} disabled={i === tabs.length - 1} onClick={() => setPrefs({ tabs: movedTab(tabs, t, 1) })}><ArrowDown /></Button>
+              <li key={t} {...d.props} className={cn("relative select-none", d.dragging && "opacity-40")}>
+                {d.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", d.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
+                <div className="flex items-center gap-2 px-1.5 py-1">
+                  <span data-drag-handle aria-hidden className="grid size-9 shrink-0 cursor-grab touch-none place-items-center text-faint"><GripVertical className="size-4" /></span>
+                  <button type="button" disabled={!opens} aria-expanded={opens ? open === t : undefined} onClick={() => setOpen(open === t ? null : t)}
+                    className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-muted">
+                    <Icon className={cn("size-4 shrink-0", shown ? "text-brand" : "text-faint")} />
+                    <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{TAB_LABEL[t]}</span>
+                    {opens ? <ChevronDown className={cn("size-4 text-faint transition-transform", open === t && "rotate-180")} /> : null}
+                  </button>
+                  {HIDEABLE.includes(t) ? (
+                    <Switch checked={shown} aria-label={`Show ${TAB_LABEL[t]}`} className="mr-1.5"
+                      onCheckedChange={(on) => setPrefs({ hidden: on ? hidden.filter((h) => h !== t) : [...hidden, t] })} />
+                  ) : null}
+                </div>
+                {open === t ? <div className="pr-3 pl-12"><TabOptions tab={t} /></div> : null}
               </li>
             );
           })}
@@ -579,7 +611,7 @@ function Maintenance() {
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
-  { id: "layout", label: "Layout", about: "Phone tabs, the screen it opens on", icon: LayoutGrid, body: Layout },
+  { id: "layout", label: "Layout", about: "Phone tabs, what they open on, the start screen", icon: LayoutGrid, body: Layout },
   { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },

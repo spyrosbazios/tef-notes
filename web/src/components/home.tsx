@@ -1,5 +1,5 @@
 // Home, the first view: the day at a glance and every note. The date; then the task box (Today, the Inbox and Upcoming as
-// quiet words, Today first, the one chosen in full and the others faint; its + beside it) next to the
+// quiet words, opening on the owner's pick (core/prefs.ts `homeList`), the one chosen in full and the others faint; its + beside it) next to the
 // month of planned tasks as a heatmap; Hovering either lights or scrolls to the same day in the other; then every note as the Notes view's tiles, in a masonry a page at a time. A task opens beside its own
 // list, a note over Home (which stays mounted under it). The route is routes/_app/index.tsx; a badge's tag is `?tags=`, and the task
 // box's list is kept here for as long as the app is open (not in the URL: the rail's and the tabs' Home finds the
@@ -18,6 +18,7 @@ import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
 import { addDays } from "@/core/dates";
 import { useActiveLens } from "@/hooks/lens";
+import { prefsNow } from "@/hooks/prefs";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
 import { useScrollSwitch } from "@/hooks/scroll";
@@ -34,7 +35,8 @@ const TABS = [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]] 
 
 /** Home's task box: the list in front, kept while another screen takes Home's place. */
 type Box = { tab: (typeof TABS)[number][0] };
-let box: Box = { tab: "today" };
+/** The box as last left, or null before it was: it opens on the owner's pick (core/prefs.ts `homeList`). */
+let box: Box | null = null;
 
 const NO_TAGS: string[] = [];
 
@@ -47,7 +49,7 @@ export function Home() {
   const { today } = useViews();
   // The task box's list (the lens is the only filter): kept while another tab takes Home's place, so coming back finds the
   // box as it was left
-  const [tab, setTab] = useState<Box["tab"]>(() => box.tab);
+  const [tab, setTab] = useState<Box["tab"]>(() => box?.tab ?? prefsNow().homeList);
   useEffect(() => { box = { tab }; }, [tab]);
   // Home's own scroll is the router's, per tag filter and lens: another one is another list (the lens switched on the page is `useScrollSwitch`'s)
   const { view } = usePlace(), lens = useActiveLens();

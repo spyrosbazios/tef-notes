@@ -44,7 +44,7 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const { openNote, showTask, goView } = useNav();
   const [q, setQ] = useState("");
   const { hits, taskHits, tags, empty, asked, ask: askAgent, foundNotes, foundTasks } = useFinder(q);
-  const destinations: View[] = [{ kind: "home" }, { kind: "today" }, { kind: "inbox" }, { kind: "upcoming" }, { kind: "logbook" }, { kind: "settings" }];
+  const destinations: View[] = [{ kind: "home" }, { kind: "today" }, { kind: "inbox" }, { kind: "upcoming" }, { kind: "logbook" }, { kind: "notes" }, { kind: "settings" }];
   const now = useNow();
   const [active, setActive] = useState("");
   const previewed = hits.find((n) => n.path === active) ?? foundNotes.find((h) => h.n.path === active)?.n;

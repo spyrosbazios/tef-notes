@@ -14,6 +14,7 @@ import { Route as ShareRouteImport } from "./routes/share"
 import { Route as AppIndexRouteImport } from "./routes/_app/index"
 import { Route as AppInboxRouteImport } from "./routes/_app/inbox"
 import { Route as AppLogbookRouteImport } from "./routes/_app/logbook"
+import { Route as AppNotesRouteImport } from "./routes/_app/notes"
 import { Route as AppSettingsRouteImport } from "./routes/_app/settings"
 import { Route as AppTodayRouteImport } from "./routes/_app/today"
 import { Route as AppUpcomingRouteImport } from "./routes/_app/upcoming"
@@ -43,6 +44,11 @@ const AppLogbookRoute = AppLogbookRouteImport.update({
   path: "/logbook",
   getParentRoute: () => AppRoute,
 } as any)
+const AppNotesRoute = AppNotesRouteImport.update({
+  id: "/notes",
+  path: "/notes",
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: "/settings",
   path: "/settings",
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   "/share": typeof ShareRoute
   "/inbox": typeof AppInboxRoute
   "/logbook": typeof AppLogbookRoute
+  "/notes": typeof AppNotesRoute
   "/settings": typeof AppSettingsRoute
   "/today": typeof AppTodayRoute
   "/upcoming": typeof AppUpcomingRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   "/share": typeof ShareRoute
   "/inbox": typeof AppInboxRoute
   "/logbook": typeof AppLogbookRoute
+  "/notes": typeof AppNotesRoute
   "/settings": typeof AppSettingsRoute
   "/today": typeof AppTodayRoute
   "/upcoming": typeof AppUpcomingRoute
@@ -90,6 +98,7 @@ export interface FileRoutesById {
   "/share": typeof ShareRoute
   "/_app/inbox": typeof AppInboxRoute
   "/_app/logbook": typeof AppLogbookRoute
+  "/_app/notes": typeof AppNotesRoute
   "/_app/settings": typeof AppSettingsRoute
   "/_app/today": typeof AppTodayRoute
   "/_app/upcoming": typeof AppUpcomingRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
     | "/share"
     | "/inbox"
     | "/logbook"
+    | "/notes"
     | "/settings"
     | "/today"
     | "/upcoming"
@@ -112,6 +122,7 @@ export interface FileRouteTypes {
     | "/share"
     | "/inbox"
     | "/logbook"
+    | "/notes"
     | "/settings"
     | "/today"
     | "/upcoming"
@@ -123,6 +134,7 @@ export interface FileRouteTypes {
     | "/share"
     | "/_app/inbox"
     | "/_app/logbook"
+    | "/_app/notes"
     | "/_app/settings"
     | "/_app/today"
     | "/_app/upcoming"
@@ -173,6 +185,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AppLogbookRouteImport
       parentRoute: typeof AppRoute
     }
+    "/_app/notes": {
+      id: "/_app/notes"
+      path: "/notes"
+      fullPath: "/notes"
+      preLoaderRoute: typeof AppNotesRouteImport
+      parentRoute: typeof AppRoute
+    }
     "/_app/settings": {
       id: "/_app/settings"
       path: "/settings"
@@ -207,6 +226,7 @@ declare module "@tanstack/react-router" {
 interface AppRouteChildren {
   AppInboxRoute: typeof AppInboxRoute
   AppLogbookRoute: typeof AppLogbookRoute
+  AppNotesRoute: typeof AppNotesRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTodayRoute: typeof AppTodayRoute
   AppUpcomingRoute: typeof AppUpcomingRoute
@@ -216,6 +236,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppInboxRoute: AppInboxRoute,
   AppLogbookRoute: AppLogbookRoute,
+  AppNotesRoute: AppNotesRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTodayRoute: AppTodayRoute,
   AppUpcomingRoute: AppUpcomingRoute,

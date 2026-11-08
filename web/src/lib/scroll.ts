@@ -12,6 +12,8 @@ const of = (...parts: (string | null | undefined)[]) => parts.map((p) => (p ?? "
 
 /** Home's page, per tag filter and lens. */
 export const homeScroll = (tags: readonly string[], lens?: string | null) => of("home", tags.join(","), lens);
+/** The Notes page, per tag filter and lens. */
+export const notesScroll = (tags: readonly string[], lens?: string | null) => of("notes", tags.join(","), lens);
 /** A task list on a screen of its own, per lens. */
 export const listScroll = (kind: string, lens?: string | null) => of("list", kind, lens);
 /** One of Home's task box lists, per lens. */
@@ -26,4 +28,4 @@ export const taskScroll = (id: string) => of("task", id);
 export const chatScroll = (id: string) => of("chat", id);
 
 /** The scrollers that start at the top when the router has no place for them (another filter, lens, section, note, task or chat). */
-export const SCROLL_TOP = ["home", "list", "box", "settings", "note", "task", "chat"].map((kind) => `[data-scroll-restoration-id^="${kind}|"]`);
+export const SCROLL_TOP = ["home", "notes", "list", "box", "settings", "note", "task", "chat"].map((kind) => `[data-scroll-restoration-id^="${kind}|"]`);

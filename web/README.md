@@ -81,7 +81,7 @@ button at the corner opens it (`assistant/fab.tsx`).
 
 Below `md` (768px) the app is the Android app's layout, so the installed PWA can stand in for it (the phone's own map:
 [`../mobile/AGENTS.md`](../mobile/AGENTS.md)). The shell (`components/shell.tsx`) swaps the rail and the app bar for the phone's bottom tabs
-(`components/tab-bar.tsx`: Home, Tasks, Ask, Settings, a floating pill with the front tab's label on a capsule; hidden on a note
+(`components/tab-bar.tsx`: Home, Tasks, Notes, Ask, Settings in the owner's order, a floating pill with the front tab's label on a capsule; hidden on a note
 page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). A note's page is a layer over whatever screen it was opened
 from (`NoteLayer` in `components/shell.tsx`; Home, a task list or Settings): that screen stays matched and mounted under it, `invisible`
 and `inert` (Routing, below), so Back finds it as it was, with no tiles entering again, no
@@ -115,6 +115,7 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 | (layout) | `_app.tsx` | `components/shell.tsx`: rail, app bar, tabs, dock, palette, and the note over the screen | `note` |
 | `/` | `_app/index.tsx` | Home; a bare launch goes on to the chosen start screen (`lib/start.ts`, `beforeLoad`) | `tags` (a comma list) |
 | `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list and the task beside it | `t` (task id) |
+| `/notes` | `_app/notes.tsx` | `notes-page.tsx`: the notes alone (its tab off until turned on in Settings → Layout) | `tags` (a comma list) |
 | `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
 | `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |
 | `/note/$id` | `note.$id.tsx` | redirects to `/?note=<id>`, replacing itself | |
