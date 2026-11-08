@@ -5,6 +5,10 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Fixed
+
+- Closing the on-screen keyboard with Android's Back gesture while writing to the assistant now also lets the field go and brings the tab bar back: the keyboard's presence is read from the viewport, not from focus alone.
+
 ## 0.4.0 - 2026-11-08
 
 ### Changed
