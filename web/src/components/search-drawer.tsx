@@ -10,6 +10,7 @@
 import { ReducedMotionConfig, transition as motionTransition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { motion } from "motion/react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
+import { MicButton } from "@/components/mic-button";
 import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { absorbTags, dropTyping } from "@/core/tags";
@@ -122,6 +123,7 @@ function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void })
           <input autoFocus value={q} onChange={(e) => change(e.target.value)} onKeyDown={backspace} placeholder={chips.length ? "" : "Search notes, tasks, or #tag"}
             aria-label="Search notes, tasks, or #tag" enterKeyHint="search" autoCapitalize="none" autoCorrect="off"
             className="min-w-24 flex-1 bg-transparent py-1 text-base outline-none placeholder:text-faint" />
+          <MicButton className="-mr-2" onText={(t) => change(q.trim() ? `${q.trimEnd()} ${t}` : t)} />
         </label>
         {lens ? <p className="px-1 pt-2 text-xs text-faint">Searching inside {lens.name}</p> : null}
       </div>

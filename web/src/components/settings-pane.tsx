@@ -9,18 +9,20 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
+import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
+import { KEEP_LABEL, KEEPS } from "@/core/voice";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
+import { MicButton } from "@/components/mic-button";
 import { Conflicts } from "@/components/sync-conflicts";
 import { TagBadge } from "@/components/tag-badge";
 import {
@@ -62,7 +64,7 @@ import { appVersion, forceUpdate } from "@/lib/update";
 /** A tag is one word: it is written on the note's `tags:` line and typed as `#tag` in search. */
 const clean = (v: string) => v.trim().replace(/^#/, "");
 /** A section's title stays at the top of the scrolling page. */
-const HEAD = "sticky top-(--settings-top,0px) z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
+const HEAD = "sticky top-0 z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
 const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). */
@@ -243,7 +245,7 @@ function TabOptions({ tab }: { tab: Tab }) {
 /** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger by the grip), shown or
  *  hidden, and Home and Tasks tapped open for the list each starts on. */
 function Layout() {
-  const { tabs, hidden, start } = usePrefs();
+  const { tabs, hidden, start, tabLabels } = usePrefs();
   const [open, setOpen] = useState<Tab | null>(null);
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ tabs: movedTab(prefsNow().tabs, id as Tab, over as Tab, after) }));
   return (
@@ -254,6 +256,10 @@ function Layout() {
         <div className="space-y-2.5 px-3 py-2.5">
           <p className="text-sm font-semibold">Open the app on</p>
           <Choice label="Open the app on" value={start} options={STARTS} names={START_LABEL} onPick={(v) => setPrefs({ start: v })} />
+        </div>
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p className="text-sm font-semibold">Tab labels</p>
+          <Choice label="Tab labels" value={tabLabels} options={TAB_LABELS} names={TAB_LABELS_LABEL} onPick={(v) => setPrefs({ tabLabels: v })} />
         </div>
         <div className="px-3 py-2.5">
           <p className="text-sm font-semibold">Tabs</p>
@@ -597,6 +603,34 @@ function Reminders() {
   );
 }
 
+/** Voice input: the server's speech model (core/voice.ts), and how long it stays in the server's memory between clips. */
+function Voice() {
+  const { voice } = usePrefs();
+  const [heard, setHeard] = useState("");
+  return (
+    <section className="space-y-3" aria-labelledby="voice-h">
+      <h2 id="voice-h" className={HEAD}>Voice</h2>
+      <p className="text-sm text-dim">Tap the mic in the assistant, a new task, a task's notes, a note or search, and speak English. Your server turns the speech into text with Parakeet, on its own CPU: the recording never leaves it and is not kept.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <div className="space-y-2.5 px-3 py-2.5">
+          <div>
+            <p className="text-sm font-semibold">Keep the model loaded</p>
+            <p className="text-[13px] leading-snug text-dim">The model takes about 1.5 GB of the server's memory while loaded. Loading it takes a few seconds, and starts the moment you tap the mic. Longer keeps the next dictation instant; shorter frees the memory sooner.</p>
+          </div>
+          <div role="radiogroup" aria-label="Keep the model loaded" className="flex flex-wrap gap-2">
+            {KEEPS.map((k) => (
+              <Button key={k} type="button" role="radio" aria-checked={k === voice.keep} size="sm" variant={k === voice.keep ? "default" : "outline"}
+                onClick={() => setPrefs({ voice: { keep: k } })}>{KEEP_LABEL[k]}</Button>
+            ))}
+          </div>
+        </div>
+        <Line title="Try it" detail={heard || "Tap the mic and say something."} trailing={<MicButton onText={setHeard} />} />
+      </div>
+    </section>
+  );
+}
+
+/** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 /** Which build this is, and fetching a newer one when the update toast hasn't shown up yet. */
 function Maintenance() {
   const online = useOnline();
@@ -620,6 +654,7 @@ const SECTIONS = [
   { id: "layout", label: "Layout", about: "Phone tabs, what they open on, the start screen", icon: LayoutGrid, body: Layout },
   { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
+  { id: "voice", label: "Voice", about: "Dictation, how long the model stays loaded", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
   { id: "transfer", label: "Import & export", about: "Markdown folders and zips, in and out", icon: ArrowDownUp, body: ImportExport },
@@ -633,31 +668,25 @@ export function SettingsPane() {
 
   if (narrow) {
     return (
-      <main className="min-w-0 flex-1">
-        <div data-scroll-restoration-id={settingsScroll(at?.id ?? "")} className="h-full overflow-y-auto">
-          <div className="px-4 pt-3 pb-28">
-            {at ? (
-              <>
-                <div className="sticky top-0 z-20 -mx-4 -mt-3 h-11 bg-bg/95 px-2 pt-0.5 backdrop-blur">
-                  <Link to="/settings" search={{}} className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-dim hover:bg-muted"><ChevronLeft className="size-4" />Settings</Link>
-                </div>
-                <div className="[--settings-top:2.75rem]"><at.body /></div>
-              </>
-            ) : (
-              <>
-                <PageHeader title="Settings" className="-mx-4 -mt-3 mb-2" />
-                <ul className="divide-y divide-line rounded-xl border border-line">
-                  {SECTIONS.map(({ id, label, about, icon: Icon }) => (
-                    <li key={id}>
-                      <Link to="/settings" search={{ section: id }} className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-                        <Icon className="size-5 shrink-0 text-brand" />
-                        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">{label}</span><span className="block text-[13px] text-dim">{about}</span></span>
-                        <ChevronRight className="size-4 shrink-0 text-faint" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </>
+      <main className="flex h-full min-w-0 flex-1 flex-col">
+        {at ? (
+          <PageHeader title={at.label} className="pl-1" icon={
+            <Link to="/settings" search={{}} aria-label="Back to Settings" className="grid size-9 shrink-0 place-items-center rounded-lg text-dim hover:bg-muted"><ChevronLeft className="size-[22px]" /></Link>} />
+        ) : <PageHeader title="Settings" />}
+        <div data-scroll-restoration-id={settingsScroll(at?.id ?? "")} className="min-h-0 flex-1 overflow-y-auto">
+          <div className="px-4 pt-1 pb-28">
+            {at ? <at.body /> : (
+              <ul className="divide-y divide-line rounded-xl border border-line">
+                {SECTIONS.map(({ id, label, about, icon: Icon }) => (
+                  <li key={id}>
+                    <Link to="/settings" search={{ section: id }} className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                      <Icon className="size-5 shrink-0 text-brand" />
+                      <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">{label}</span><span className="block text-[13px] text-dim">{about}</span></span>
+                      <ChevronRight className="size-4 shrink-0 text-faint" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>

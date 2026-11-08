@@ -11,6 +11,7 @@ import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
 import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { semantic } from "./semantic";
+import { transcribe, warmSpeech } from "./transcribe";
 
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
 const port = Number(process.env.PORT ?? 8098);
@@ -29,6 +30,8 @@ Bun.serve({
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
     "/agent/push/key": { GET: () => keyRoute() },
     "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
+    "/agent/transcribe": { POST: (req) => transcribe(req) },
+    "/agent/transcribe/warm": { POST: (req) => warmSpeech(req) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/mcp": (req) => (withMcp ? mcp(req, server) : new Response("Not found", { status: 404 })),
   },

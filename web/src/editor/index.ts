@@ -19,6 +19,7 @@ import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
 import type { Summarize } from "./link-tools";
 import { ImageView, ListItemView } from "./views";
+import { spliced } from "@/core/voice";
 import type { ResolveImage } from "./views";
 
 export { normalizeBody };
@@ -67,6 +68,8 @@ export type Editor = {
   setMarkdown(markdown: string): void;
   /** Insert markdown at the cursor (the end, if the editor was never touched). */
   insertMarkdown(markdown: string): void;
+  /** Insert plain text at the cursor (the end, if never touched), spaced from a word before it: what dictation types. */
+  insertText(text: string): void;
   focus(at?: "start" | "end"): void;
   setResolveImage(resolve: ResolveImage): void;
   /** Every picture the note shows, in order: its images and the previews of its drawings. */
@@ -220,6 +223,16 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       const doc = parse(markdown);
       if (!touched) view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
       view.dispatch(view.state.tr.replaceSelection(new Slice(doc.content, 0, 0)).scrollIntoView());
+    },
+
+    insertText(text) {
+      if (!text) return;
+      if (!touched) view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
+      const { $from } = view.state.selection;
+      const before = $from.parent.textBetween(0, $from.parentOffset, undefined, "\ufffc");
+      view.dispatch(view.state.tr.insertText(spliced(before, text)).scrollIntoView());
+      touched = true;
+      view.focus();
     },
 
     focus(at) {

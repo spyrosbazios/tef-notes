@@ -1,5 +1,6 @@
 # Publishes the server images to GHCR on every version tag: ghcr.io/spyrosbazios/tef-notes (PocketBase, hooks, migrations and
-# the web app) and ghcr.io/spyrosbazios/tef-notes-agent (the chat agent), each for amd64 and arm64, tagged <version> and
+# the web app) and ghcr.io/spyrosbazios/tef-notes-agent (the chat agent) and
+# ghcr.io/spyrosbazios/tef-notes-stt (voice input), each for amd64 and arm64, tagged <version> and
 # latest. The signed Chrome extension is not in them (it needs the owner's origin and key): server/docker-compose.build.yml.
 name: Docker images
 
@@ -23,6 +24,9 @@ jobs:
             target: server
           - image: ghcr.io/spyrosbazios/tef-notes-agent
             dockerfile: server/agent/Dockerfile
+            target: ""
+          - image: ghcr.io/spyrosbazios/tef-notes-stt
+            dockerfile: server/stt/Dockerfile
             target: ""
     steps:
       - uses: actions/checkout@v7
