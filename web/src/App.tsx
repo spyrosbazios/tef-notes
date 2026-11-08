@@ -6,7 +6,7 @@
 // fold the rail into a sheet and lay the dock over the page, and on a phone-width one the list and the task take turns. An open
 // task brings its own bar, so the narrow app bar steps aside and its back and menu buttons sit in that bar. Installed on a phone it
 // is the whole screen (`h-dvh`, which follows the keyboard: index.html's `interactive-widget`), padded by the safe-area insets.
-// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Ask, Settings, in the owner's order) instead of the rail and the app bar, Home
+// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Notes, Ask, Settings, as the owner set them) instead of the rail and the app bar, Home
 // drawing its own header (lens, search), the Tasks tab the list with its own switcher (task-list.tsx), Ask the dock opened whole. From `md` to
 // `lg` the app bar's buttons are the touch way to everything the keys do: Views, Assistant (a), Search (/ and ⌘K), New note or task (n, q).
 import { Command as CommandIcon, ListTodo, Menu, Plus, Sparkles } from "lucide-react";
@@ -17,6 +17,7 @@ import { Dock } from "@/components/assistant/dock";
 import { Home } from "@/components/home";
 import { LensChip } from "@/components/lens-switcher";
 import { NotePage } from "@/components/note-page";
+import { NotesPage } from "@/components/notes-page";
 import { OfflineBar } from "@/components/offline-bar";
 import { Palette } from "@/components/palette";
 import { QuickAdd, type Start } from "@/components/quick-add";
@@ -163,7 +164,7 @@ function Shell() {
                 </div>
 
                 <div className="flex min-h-0 flex-1">
-                  {home ? <main className="min-w-0 flex-1"><Home onNew={newNote} onAdd={setAdding} /></main> : !isTaskView(view) ? <main className="min-w-0 flex-1"><SettingsPane /></main> : (
+                  {home ? <main className="min-w-0 flex-1"><Home onNew={newNote} onAdd={setAdding} /></main> : kind === "notes" ? <main className="min-w-0 flex-1"><NotesPage onNew={newNote} /></main> : !isTaskView(view) ? <main className="min-w-0 flex-1"><SettingsPane /></main> : (
                     <>
                       <div className={cn("w-full shrink-0 border-r border-line md:w-[360px] xl:w-[420px]", focus && "max-md:hidden")}>
                         <TaskList key={hrefOf(view)} view={view} onAdd={() => setAdding(startOf(kind))} />

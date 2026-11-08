@@ -1,5 +1,5 @@
 // Where the app is, in the URL: the view in the path (Home `/`, the task lists `/inbox` `/today` `/upcoming` `/logbook`,
-// `/settings`), Home's tag filter as `?tags=a,b`, and a note as its own page `/note/<id>` (the view behind it is Home).
+// `/notes`, `/settings`), Home's tag filter as `?tags=a,b`, and a note as its own page `/note/<id>` (the view behind it is Home).
 // The id is the filename, which never changes, so a link to a note survives a retitle. The open task is `?t=<id>` (its
 // record id) in a task list.
 import { fold } from "@/core/notes";
@@ -10,7 +10,7 @@ export const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
 export type TaskView = (typeof TASK_VIEWS)[number];
 
 export type View =
-  | { kind: "home"; tags?: string[] } | { kind: TaskView } | { kind: "settings" };
+  | { kind: "home"; tags?: string[] } | { kind: TaskView } | { kind: "notes" } | { kind: "settings" };
 
 /** A view that lists tasks, not notes: a Things list. Its list is the task list, with the open task beside it. */
 export const isTaskView = (v: View): v is { kind: TaskView } => (TASK_VIEWS as readonly string[]).includes(v.kind);
@@ -21,6 +21,7 @@ export const homeOfTask = (t: { done?: string }): View => (t.done ? { kind: "log
 /** The view at a path; Home's tags come from the query, `tags`. */
 export function viewOf(path: string, tags?: string | null): View {
   if (path === "/settings") return { kind: "settings" };
+  if (path === "/notes") return { kind: "notes" };
   const task = TASK_VIEWS.find((k) => path === `/${k}`);
   if (task) return { kind: task };
   const t = tags?.split(",").filter(Boolean) ?? [];
@@ -32,7 +33,7 @@ export const hrefOf = (v: View) =>
   v.kind === "home" ? (v.tags?.length ? `/?tags=${v.tags.map(encodeURIComponent).join(",")}` : "/") : `/${v.kind}`;
 
 const TITLES: Record<View["kind"], string> = {
-  home: "Home", settings: "Settings",
+  home: "Home", notes: "Notes", settings: "Settings",
   inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook",
 };
 export const titleOf = (v: View) => TITLES[v.kind];

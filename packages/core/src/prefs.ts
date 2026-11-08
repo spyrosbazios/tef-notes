@@ -8,15 +8,22 @@ import { isNoteSort, type NoteSort } from "./note-sort";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 
 /** The phone's bottom bar: its tabs, in the order the owner put them. Settings is always shown (it is where the bar is set). */
-export const TABS = ["home", "tasks", "ask", "settings"] as const;
+export const TABS = ["home", "tasks", "notes", "ask", "settings"] as const;
 export type Tab = (typeof TABS)[number];
-export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", ask: "Ask", settings: "Settings" };
-export const HIDEABLE: readonly Tab[] = ["tasks", "ask"];
+export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", notes: "Notes", ask: "Ask", settings: "Settings" };
+export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask"];
+/** Tabs off until turned on: Notes, a page of only the notes, which Home already lists under its tasks. */
+const OFF: readonly Tab[] = ["notes"];
+
+/** The task lists Home's box and the Tasks tab open on. */
+export const TASK_LISTS = ["today", "inbox", "upcoming"] as const;
+export type TaskList = (typeof TASK_LISTS)[number];
+export const TASK_LIST_LABEL: Record<TaskList, string> = { today: "Today", inbox: "Inbox", upcoming: "Upcoming" };
 
 /** Where the app opens. */
-export const STARTS = ["home", "inbox", "today", "upcoming"] as const;
+export const STARTS = ["home", "inbox", "today", "upcoming", "notes"] as const;
 export type Start = (typeof STARTS)[number];
-export const START_LABEL: Record<Start, string> = { home: "Home", inbox: "Inbox", today: "Today", upcoming: "Upcoming" };
+export const START_LABEL: Record<Start, string> = { home: "Home", inbox: "Inbox", today: "Today", upcoming: "Upcoming", notes: "Notes" };
 
 export type Prefs = {
   theme: ThemeName;
@@ -29,6 +36,9 @@ export type Prefs = {
   tabs: Tab[];
   hidden: Tab[];
   start: Start;
+  /** The list Home's task box shows first, and the one the Tasks tab opens on. */
+  homeList: TaskList;
+  tasksList: TaskList;
   /** The lens on (its record id; lens.ts), none for the unfiltered app. */
   lens?: string;
 };
@@ -37,7 +47,7 @@ export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), unasked: false },
-  tabs: [...TABS], hidden: [], start: "home",
+  tabs: [...TABS], hidden: [...OFF], start: "home", homeList: "today", tasksList: "today",
 };
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {});
@@ -61,8 +71,11 @@ export function prefsOf(raw: unknown): Prefs {
       effort: effortOf(agent.effort), unasked: agent.unasked === true,
     },
     tabs: [...tabs, ...TABS.filter((t) => !tabs.includes(t))],
-    hidden: tabsIn(p.hidden).filter((t) => HIDEABLE.includes(t)),
+    // A tab the stored order doesn't know yet is new to this record: it starts as a new record's would
+    hidden: [...new Set([...tabsIn(p.hidden).filter((t) => HIDEABLE.includes(t)), ...OFF.filter((t) => !tabs.includes(t))])],
     start: STARTS.find((s) => s === p.start) ?? "home",
+    homeList: TASK_LISTS.find((l) => l === p.homeList) ?? "today",
+    tasksList: TASK_LISTS.find((l) => l === p.tasksList) ?? "today",
     ...(typeof p.lens === "string" && p.lens ? { lens: p.lens } : {}),
   };
 }
@@ -70,12 +83,11 @@ export function prefsOf(raw: unknown): Prefs {
 /** The tabs the bar shows, in order. */
 export const shownTabs = (p: Pick<Prefs, "tabs" | "hidden">): Tab[] => p.tabs.filter((t) => !p.hidden.includes(t));
 
-/** The tab order with `tab` moved one place along (`by` -1 earlier, 1 later); unchanged at an end. */
-export function movedTab(tabs: readonly Tab[], tab: Tab, by: -1 | 1): Tab[] {
-  const i = tabs.indexOf(tab), j = i + by, next = [...tabs];
-  if (i < 0 || j < 0 || j >= tabs.length) return next;
-  [next[i], next[j]] = [next[j]!, next[i]!];
-  return next;
+/** The tab order with `tab` dropped before (or `after`) `over`; unchanged when either is unknown or they are the same. */
+export function movedTab(tabs: readonly Tab[], tab: Tab, over: Tab, after: boolean): Tab[] {
+  if (tab === over || !tabs.includes(tab) || !tabs.includes(over)) return [...tabs];
+  const rest = tabs.filter((t) => t !== tab), at = rest.indexOf(over) + (after ? 1 : 0);
+  return [...rest.slice(0, at), tab, ...rest.slice(at)];
 }
 
 /** The record's key: there is one, the owner's. */

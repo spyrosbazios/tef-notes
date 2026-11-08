@@ -28,7 +28,7 @@ describe("scroll memory", () => {
   });
 
   test("Home's task box comes back as it was left", () => {
-    expect(boxOf()).toEqual({ tab: "today" });
+    expect(boxOf()).toBeNull();          // never left: Home opens it on the owner's pick
     keepBox({ tab: "upcoming" });
     expect(boxOf()).toEqual({ tab: "upcoming" });
     keepBox({ tab: "today" });

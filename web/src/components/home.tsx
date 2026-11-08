@@ -1,5 +1,5 @@
 // Home, the first view: the day at a glance and every note. The date; then the task box (Today, the Inbox and Upcoming as
-// quiet words, Today first, the one chosen in full and the others faint; its + beside it) next to the
+// quiet words, opening on the owner's pick (core/prefs.ts `homeList`), the one chosen in full and the others faint; its + beside it) next to the
 // month of planned tasks as a heatmap; Hovering either lights or scrolls to the same day in the other; then every note as the Notes view's tiles, in a masonry a page at a time. A task opens beside its own
 // list, a note on a page of its own.
 // Below `md` it is the phone's Home (mobile/src/ui/home.tsx): one header row (the app's mark, which is the lens control, and the
@@ -17,6 +17,7 @@ import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
 import { addDays } from "@/core/dates";
 import { useActiveLens } from "@/hooks/lens";
+import { prefsNow } from "@/hooks/prefs";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
 import { useScrollMemory } from "@/hooks/scroll-memory";
@@ -38,7 +39,7 @@ export function Home({ onNew, onAdd }: { onNew: () => void; onAdd: (s: Start) =>
   const { today } = useViews();
   // The task box's list (the lens is the only filter): kept while another tab takes Home's place, so coming back finds the
   // box as it was left
-  const [tab, setTab] = useState(() => boxOf().tab);
+  const [tab, setTab] = useState(() => boxOf()?.tab ?? prefsNow().homeList);
   useEffect(() => { keepBox({ tab }); }, [tab]);
   // Home's own scroll, kept the same way (per lens: another one is another list)
   const { view } = useNav(), lens = useActiveLens();
