@@ -1,8 +1,13 @@
-// Settings: the look (theme and accent: this browser's), the agent (which model Ask uses, whether it writes notes without asking: this browser's choices), what the agent remembers of the owner (agent/memory.md: shown, not edited), the tag definitions, kept on the server, so the phone sees them too, and the server tags notes with
-// them itself. Notes' own tags are not touched by renaming or deleting a definition.
-import { useQuery } from "@tanstack/react-query";
-import { Bot, Brain, Check, Download, Loader2, Palette, Pencil, Plus, Settings, Sparkles, Tag as TagIcon, Trash2, Upload } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+// Settings: the look (theme and accent: this browser's), the server and the offline copy this browser keeps, the agent (which model
+// Ask uses, how hard it thinks, whether it writes notes without asking: this browser's choices; what it remembers of the owner,
+// agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
+// phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
+// definition), and import and export. A window lists the sections beside the page; below `md` the list is the page and a
+// section opens over it (`?section=`), as the phone's Settings tab does.
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, Bot, Check, ChevronLeft, ChevronRight, Download, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useLocation, useSearchParams } from "wouter";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
@@ -10,6 +15,7 @@ import { Conflict } from "@/core/pocketbase";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Markdown } from "@/components/markdown";
+import { Conflicts } from "@/components/sync-conflicts";
 import { TagBadge } from "@/components/tag-badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -23,6 +29,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useModel } from "@/hooks/agent";
 import { useAppearance } from "@/hooks/appearance";
+import { useNarrow } from "@/hooks/media";
+import { useOnline } from "@/hooks/online";
+import { useSyncStatus } from "@/hooks/sync";
+import { usePush } from "@/hooks/push";
+import { clearOffline, keptFiles } from "@/lib/offline";
+import { syncNow } from "@/lib/sync";
 import { useTasks } from "@/hooks/todo";
 import { useNotes } from "@/hooks/notes";
 import { downloadZip } from "@/lib/export";
@@ -260,12 +272,13 @@ function Tags() {
 function Agent() {
   const { models, unasked, set } = useModel();
   return (
+    <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
       <h2 id="agent-h" className="font-bold text-lg tracking-tight">Agent</h2>
       <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys; the model and the switch below are this browser's.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model</p></div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
           <ModelMenu />
         </div>
         <label className="flex items-center gap-3 px-3 py-2.5">
@@ -283,6 +296,8 @@ function Agent() {
         ) : null}
       </div>
     </section>
+    <Memory />
+    </div>
   );
 }
 
@@ -388,28 +403,143 @@ function Import() {
   );
 }
 
-/** The sections, each its own page picked from the settings sidebar. */
+/** The server this app talks to, what this browser keeps of it for offline, and clearing that. */
+function ServerSync() {
+  const qc = useQueryClient();
+  const online = useOnline(), { waiting } = useSyncStatus();
+  const { data: notes } = useNotes(), { data: tasks } = useTasks();
+  const files = useQuery({ queryKey: ["offline-files"], queryFn: keptFiles });
+  const [asking, setAsking] = useState(false);
+  const worker = "serviceWorker" in navigator && !!navigator.serviceWorker.controller;
+  const sync = () => { void Promise.all([syncNow(), qc.invalidateQueries()]).then(() => toast("Up to date")); };
+  return (
+    <section className="space-y-3" aria-labelledby="server-h">
+      <h2 id="server-h" className="font-bold text-lg tracking-tight">Server &amp; sync</h2>
+      <p className="text-sm text-dim">Notes, photos and the agent live on the server this page was loaded from. There is no sign-in: it must only be reachable on a private network.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <Line title="Server" detail={location.host} trailing={<span className={cn("text-[13px]", online ? "text-dim" : "text-warn")}>{online ? "Reachable" : "Not reachable"}</span>} />
+        <Line title="Sync now" detail="Send the changes made here that are waiting and fetch what changed on the server. Changes from other devices arrive by themselves while the app is open."
+          trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={!online} onClick={sync}><RefreshCw /> Sync</Button>} />
+        <Line title="Offline copy" detail={`${notes?.length ?? 0} notes and ${tasks?.length ?? 0} tasks kept for the next visit${waiting ? ` (${waiting} ${waiting === 1 ? "change" : "changes"} not sent yet)` : ""}${files.data ? `, ${files.data} attachment files` : ""}. ${worker ? "The app itself is installed for offline." : "The app's service worker isn't running, so only the page you have open works offline."}`} />
+        <Conflicts />
+        <Line title="Clear the offline copy" detail={waiting ? "Not while changes made here are waiting to be sent: clearing would lose them." : "Forgets what this browser kept. Nothing on the server changes; it comes down again the next time you open the app online."}
+          trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={waiting > 0} onClick={() => setAsking(true)}><Trash2 /> Clear</Button>} />
+      </div>
+      <AlertDialog open={asking} onOpenChange={setAsking}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear the offline copy?</AlertDialogTitle>
+            <AlertDialogDescription>The app reloads and fetches your notes and tasks from the server again. Offline, nothing will open until you are back online once.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { clearOffline().catch((e) => toast.error(message(e))); }}>Clear</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
+}
+
+/** A row of a settings box: a name, a line under it, and a control at the end. */
+function Line({ title, detail, trailing }: { title: string; detail?: string; trailing?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        {detail ? <p className="text-[13px] leading-snug text-dim">{detail}</p> : null}
+      </div>
+      {trailing}
+    </div>
+  );
+}
+
+/** Task reminders on this device: Web Push. The server sends a task's reminder at its time, whether or not the app is open; the
+ *  service worker shows it and a tap opens the task. */
+function Reminders() {
+  const { state, enable, disable, busy } = usePush();
+  const on = state.kind === "on";
+  const flip = (v: boolean) => (v ? enable : disable).mutate(undefined, {
+    onSuccess: () => toast(v ? "Reminders are on for this device" : "Reminders are off for this device"),
+    onError: (e) => toast.error(message(e)),
+  });
+  const detail = state.kind === "unavailable" ? `Not available: ${state.why}`
+    : state.kind === "denied" ? "Notifications are blocked for this app. Allow them in the browser's site settings, then turn this on."
+    : "Rings at the time a task's reminder is set to, even when the app is closed.";
+  return (
+    <section className="space-y-3" aria-labelledby="reminders-h">
+      <h2 id="reminders-h" className="font-bold text-lg tracking-tight">Reminders</h2>
+      <p className="text-sm text-dim">A task with a day and a reminder time can notify you. Each device turns this on for itself; the server keeps the list of devices and sends the notifications.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <label className="flex items-center gap-3 px-3 py-2.5">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">Task reminders on this device</span>
+            <span className="block text-[13px] leading-snug text-dim">{detail}</span>
+          </span>
+          {busy || state.kind === "loading" ? <Loader2 className="size-4 animate-spin text-dim" /> : null}
+          <Switch checked={on} disabled={busy || state.kind === "loading" || state.kind === "unavailable" || state.kind === "denied"} onCheckedChange={flip} aria-label="Task reminders on this device" />
+        </label>
+      </div>
+    </section>
+  );
+}
+
+/** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
-  { id: "appearance", label: "Appearance", icon: Palette, body: Appearance },
-  { id: "agent", label: "Agent", icon: Bot, body: Agent },
-  { id: "memory", label: "Agent memory", icon: Brain, body: Memory },
-  { id: "tags", label: "Tags", icon: TagIcon, body: Tags },
-  { id: "import", label: "Import", icon: Upload, body: Import },
-  { id: "export", label: "Export", icon: Download, body: Export },
-] as const;
+  { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
+  { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
+  { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
+  { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
+  { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
+  { id: "import", label: "Import", about: "Markdown folders and zips", icon: Upload, body: Import },
+  { id: "export", label: "Export", about: "Every note as a zip", icon: Download, body: Export },
+] as const satisfies readonly { id: string; label: string; about: string; icon: LucideIcon; body: () => ReactNode }[];
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 export function SettingsPane() {
-  const [at, setAt] = useState<SectionId>("appearance");
-  const Body = SECTIONS.find((s) => s.id === at)?.body ?? Appearance;
+  const narrow = useNarrow(), [, go] = useLocation(), [params] = useSearchParams();
+  const asked = SECTIONS.find((s) => s.id === params.get("section"));
+  const open = (id: SectionId) => go(`/settings?section=${id}`);
+  const at = asked ?? (narrow ? undefined : SECTIONS[0]);
+
+  if (narrow) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="px-4 pt-3 pb-28">
+          {at ? (
+            <>
+              <button type="button" onClick={() => go("/settings")} className="-ml-2 mb-3 inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-dim hover:bg-muted"><ChevronLeft className="size-4" />Settings</button>
+              <at.body />
+            </>
+          ) : (
+            <>
+              <h1 className="mb-3 px-1 text-[22px] font-bold tracking-tight">Settings</h1>
+              <ul className="divide-y divide-line rounded-xl border border-line">
+                {SECTIONS.map(({ id, label, about, icon: Icon }) => (
+                  <li key={id}>
+                    <button type="button" onClick={() => open(id)} className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                      <Icon className="size-5 shrink-0 text-brand" />
+                      <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">{label}</span><span className="block text-[13px] text-dim">{about}</span></span>
+                      <ChevronRight className="size-4 shrink-0 text-faint" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+  const Body = (at ?? SECTIONS[0]).body;
   return (
     <div className="flex h-full min-h-0">
       <nav aria-label="Settings sections" className="w-52 shrink-0 space-y-1 border-r border-line px-3 pt-8">
         <div className="mb-3 flex items-center gap-2 px-2 text-brand"><Settings className="size-5" /><span className="text-xs font-semibold uppercase tracking-wider">Settings</span></div>
         {SECTIONS.map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" aria-current={id === at ? "page" : undefined} onClick={() => setAt(id)}
+          <button key={id} type="button" aria-current={id === (at ?? SECTIONS[0]).id ? "page" : undefined} onClick={() => open(id)}
             className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-              id === at ? "bg-muted font-semibold text-fg" : "text-dim")}>
+              id === (at ?? SECTIONS[0]).id ? "bg-muted font-semibold text-fg" : "text-dim")}>
             <Icon className="size-4" />{label}
           </button>
         ))}

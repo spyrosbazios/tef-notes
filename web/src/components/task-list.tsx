@@ -6,6 +6,7 @@ import { Moon, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link } from "@/core/record-links";
+import { dateOf } from "@/core/things";
 import { landing, reorder } from "@/core/task-order";
 import { matchesTags } from "@/core/tags";
 import { views as viewsOf, type Task, type Views } from "@/core/todo";
@@ -21,7 +22,7 @@ import { useLinks } from "@/hooks/links";
 import { useNotes } from "@/hooks/notes";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
-import { titleOf, useNav, type TaskView } from "@/lib/nav";
+import { TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
 import { report } from "@/lib/report";
 import { scheduleOf } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -36,19 +37,41 @@ const EMPTY: Record<TaskView, string> = {
 const NO_LINKS: Link[] = [];
 const NO_TAGS: string[] = [];
 
+/** The Logbook shows this many of the latest, as the phone's does. */
+const LOGBOOK = 100;
+
 /** What a view lists, in the order its rows sit in. */
 const listOf = (v: Views, kind: TaskView): Task[] =>
-  kind === "today" ? [...v.today, ...v.evening] : kind === "upcoming" ? v.upcoming.flatMap((g) => g.tasks) : v[kind];
+  kind === "today" ? [...v.today, ...v.evening] : kind === "upcoming" ? v.upcoming.flatMap((g) => g.tasks) : kind === "logbook" ? v.logbook.slice(0, LOGBOOK) : v[kind];
 type Section = { key: string; rows: Task[] };
 
 /** Which section of the view a task sits in: Today's two, Upcoming's days, the Logbook's days; the rest are one. */
 const sectionOf = (kind: TaskView, t: Task) => (kind === "today" ? (t.evening ? "evening" : "today") : kind === "upcoming" ? t.when : kind === "logbook" ? t.done : "");
 
+/** A section's title over a hairline, as the phone draws it: This Evening, a day. */
+const heading = "mx-3 mt-5 mb-1 flex items-baseline gap-2 border-b border-line pb-2 transition-colors duration-700";
+
 function Heading({ kind, section, today, lit }: { kind: TaskView; section: string; today: string; lit?: boolean }) {
-  if (kind === "today" && section === "evening") return <h3 className="flex items-center gap-1.5 px-3 pt-5 pb-1 text-sm font-semibold"><Moon className="size-3.5 text-dim" />This Evening</h3>;
-  if (kind === "upcoming") { const p = dayParts(section, today); return <h3 data-day={section} className={cn("flex scroll-mt-4 items-baseline gap-2 rounded-md px-3 pt-5 pb-1 transition-colors duration-700", lit && "bg-brand/10 text-brand")}><span className="text-sm font-semibold">{p.label}</span><span className="text-xs text-faint">{p.detail}</span></h3>; }
-  if (kind === "logbook") return <h3 className="px-3 pt-5 pb-1 text-sm font-semibold">{section ? dayLabel(section, today) : "Earlier"}</h3>;
+  if (kind === "today" && section === "evening") return <h3 className={cn(heading, "items-center")}><Moon className="size-3.5 self-center text-brand" /><span className="text-[15px] font-extrabold">This Evening</span></h3>;
+  if (kind === "upcoming") { const p = dayParts(section, today); return <h3 data-day={section} className={cn(heading, "scroll-mt-4", lit && "text-brand")}><span className="text-[15px] font-extrabold">{p.label}</span><span className="text-xs text-dim">{p.detail}</span></h3>; }
+  if (kind === "logbook") return <h3 className={heading}><span className="text-[15px] font-extrabold">{section ? dayLabel(section, today) : "Earlier"}</span></h3>;
   return null;
+}
+
+/** The lists as tabs, below `md` where the rail is a drawer: Inbox and Today with their counts, as the phone's Tasks tab. */
+function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: number }) {
+  const { goView } = useNav();
+  const count = { inbox, today, upcoming: 0, logbook: 0 };
+  return (
+    <nav aria-label="Lists" className="flex gap-1 overflow-x-auto border-b border-line px-3 md:hidden">
+      {TASK_VIEWS.map((k) => (
+        <button key={k} type="button" aria-current={k === kind ? "page" : undefined} onClick={() => goView({ kind: k })}
+          className={cn("-mb-px flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-sm font-semibold", k === kind ? "border-brand text-fg" : "border-transparent text-dim")}>
+          {titleOf({ kind: k })}{count[k] ? <span className="text-xs font-normal tabular-nums text-faint">{count[k]}</span> : null}
+        </button>
+      ))}
+    </nav>
+  );
 }
 
 /** `embedded`: a list inside Home's task box, which draws the heading and the +: no header, no frame, scrolling inside the box's
@@ -139,11 +162,17 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
         <header className="flex items-start justify-between px-4 pt-4 pb-2">
           <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Icon className="size-5 text-brand" />{title}</h2>
+            {kind === "today" ? <p className="pl-7 text-sm text-dim">{dateOf(today).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p> : null}
           </div>
           <Button variant="ghost" size="icon-sm" aria-label="New task" title="New task (Q)" onClick={onAdd} className="mt-0.5 shrink-0 text-dim"><Plus /></Button>
         </header>
       )}
-      <div ref={scroller} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined} className={cn("min-h-0 flex-1 overflow-y-auto", embedded ? "pb-2" : "px-2 pb-8",
+      {embedded ? null : <Tabs kind={kind} inbox={views.inbox.length} today={views.today.length + views.evening.length} />}
+      <div ref={scroller} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
+        // Focus is the hover of a finger and a keyboard: a tapped or tabbed row lights its day too, until focus leaves the list
+        onFocus={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined}
+        onBlur={onHoverDay ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) hover(null); } : undefined}
+        className={cn("min-h-0 flex-1 overflow-y-auto", embedded ? "pb-2" : "px-2 pb-24",
         more && "[mask-image:linear-gradient(to_bottom,black_calc(100%-4rem),transparent)]")}>
         {isPending ? <div className="space-y-2 px-2 pt-2">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
           : count ? sections.map(({ key, rows }) => (
@@ -156,7 +185,7 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
             <div className={cn("grid place-items-center gap-3 px-6 text-center", embedded ? "py-10" : "py-16")}>
               <Icon className="size-8 text-line" />
               <p className="text-sm text-faint">{EMPTY[kind]}</p>
-              {kind === "inbox" ? <p className="flex items-center gap-1.5 text-xs text-faint">Press <Kbd>Q</Kbd> to add one</p> : null}
+              {kind === "inbox" ? <p className="flex items-center gap-1.5 text-xs text-faint any-pointer-coarse:hidden">Press <Kbd>Q</Kbd> to add one</p> : null}
             </div>
           )}
       </div>

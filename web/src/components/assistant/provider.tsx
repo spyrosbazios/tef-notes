@@ -16,6 +16,7 @@ import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
 import { chatTitle } from "@/core/share";
 import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
+import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
 import { activeLensOf } from "@/hooks/lens";
 import { NOTES } from "@/hooks/notes";
@@ -23,18 +24,18 @@ import { TASKS } from "@/hooks/todo";
 import { closeUnfinished, pageContext, resumes, runUiTool, type UiHost } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
 import { useNav } from "@/lib/nav";
+import { syncNow } from "@/lib/sync";
 import { message } from "@/services/api";
 import { chat as loadChat, createChat, newChatId } from "@/services/agent";
-import * as notes from "@/services/notes";
-import * as todo from "@/services/todo";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
 
-/** A record from the cache, else from the server (the agent may have just made it and the live feed not yet told us). */
-async function find<T>(qc: QueryClient, key: QueryKey, all: () => Promise<T[]>, is: (r: T) => boolean): Promise<T | undefined> {
+/** A record from the cache, else from the server (the agent may have just made it and the live feed not yet told us): a sync brings
+ *  it into the local copy, and so into the cache. */
+async function find<T>(qc: QueryClient, key: QueryKey, is: (r: T) => boolean): Promise<T | undefined> {
   const held = () => qc.getQueryData<T[]>(key)?.find(is);
   if (held()) return held();
-  await qc.fetchQuery({ queryKey: key, queryFn: all, staleTime: 0 });
+  await syncNow();
   return held();
 }
 
@@ -66,8 +67,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const host = useMemo<UiHost>(() => ({
-    note: (path) => find<NoteRec>(qc, NOTES, notes.all, (n) => n.path === path),
-    task: (id) => find<TaskRec>(qc, TASKS, todo.tasks.all, (t) => t.id === id),
+    note: (path) => find<NoteRec>(qc, NOTES, (n) => n.path === path),
+    task: (id) => find<TaskRec>(qc, TASKS, (t) => t.id === id),
     nav: {
       openNote: (id) => { navNow.current.openNote(id); uncover(); },
       showTask: (v, id) => { navNow.current.showTask(v, id); uncover(); },
@@ -108,6 +109,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       },
       onFinish: ({ message: m, isAbort, isError, isDisconnect }) => {
         void qc.invalidateQueries({ queryKey: CHATS });
+        if (!isAbort) answered();
         // A card waits for its answer: a closed dock would leave the write waiting with nobody to see it
         if (!isAbort && !isError && !isDisconnect && m.parts.some((p) => isTool(p) && p.state === "approval-requested")) setDock({ open: true });
       },

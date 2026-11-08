@@ -2,8 +2,9 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { rewriteImagePaths } from "@/core/notes";
-import { drawingName, drawingPreview, fileMarkdown, fit, MAX, MAX_PDF, PDF, pdfName, photoMarkdown, photoName, QUALITY } from "@/core/photos";
+import { drawingName, drawingPreview, fileMarkdown, MAX_PDF, PDF, pdfName, photoMarkdown, photoName } from "@/core/photos";
 import { Conflict } from "@/core/pocketbase";
+import { downscale } from "@/lib/picture";
 import * as photos from "@/services/photos";
 
 export const PHOTOS = ["photos"] as const;
@@ -35,16 +36,6 @@ export function useResolveImage(noteId: string, body: string): (src: string) => 
   }, [byName, noteId]);
 }
 
-/** Long edge to 1600, JPEG 0.82: what the phone uploads. */
-async function downscale(file: Blob): Promise<Blob> {
-  const bmp = await createImageBitmap(file);
-  const size = fit(bmp.width, bmp.height), scale = size ? MAX / Math.max(bmp.width, bmp.height) : 1;
-  const canvas = new OffscreenCanvas(Math.round(bmp.width * scale), Math.round(bmp.height * scale));
-  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  bmp.close();
-  return canvas.convertToBlob({ type: "image/jpeg", quality: QUALITY });
-}
-
 /** Images and PDFs are what a note takes; anything else pasted or dropped is left alone. */
 export const attachable = (f: File) => f.type.startsWith("image/") || f.type === PDF;
 
@@ -63,26 +54,29 @@ async function putUnder(noteId: string, taken: Set<string>, next: () => string, 
 const refreshed = (qc: QueryClient, noteId: string) =>
   Promise.all([qc.invalidateQueries({ queryKey: listKey(noteId) }), qc.invalidateQueries({ queryKey: ALL_PHOTOS })]);
 
-/** Uploads the images and PDFs among `files`; resolves to the body lines that show them. */
+/** Uploads the images and PDFs among `files` to the note; resolves to the body lines that show them. */
+export async function addFiles(qc: QueryClient, noteId: string, files: File[]): Promise<string> {
+  const mine = files.filter(attachable);
+  if (!mine.length) return "";
+  const taken = new Set((await photos.list(noteId)).map((p) => p.name)), lines: string[] = [];
+  for (const f of mine) {
+    if (f.type === PDF) {
+      if (f.size > MAX_PDF) throw new Error(`${f.name} is over ${MAX_PDF / 1024 / 1024} MB.`);
+      const name = await putUnder(noteId, taken, () => pdfName(f.name, taken), f);
+      lines.push(fileMarkdown(noteId, name, f.name));
+    } else {
+      const name = await putUnder(noteId, taken, () => photoName(Date.now(), taken), await downscale(f));
+      lines.push(photoMarkdown(noteId, [name]));
+    }
+  }
+  await refreshed(qc, noteId);
+  return lines.join("\n");
+}
+
+/** The same for a note on the page: the hook binds the query client and the note. */
 export function useAddFiles(noteId: string) {
   const qc = useQueryClient();
-  return async (files: File[]): Promise<string> => {
-    const mine = files.filter(attachable);
-    if (!mine.length) return "";
-    const taken = new Set((await photos.list(noteId)).map((p) => p.name)), lines: string[] = [];
-    for (const f of mine) {
-      if (f.type === PDF) {
-        if (f.size > MAX_PDF) throw new Error(`${f.name} is over ${MAX_PDF / 1024 / 1024} MB.`);
-        const name = await putUnder(noteId, taken, () => pdfName(f.name, taken), f);
-        lines.push(fileMarkdown(noteId, name, f.name));
-      } else {
-        const name = await putUnder(noteId, taken, () => photoName(Date.now(), taken), await downscale(f));
-        lines.push(photoMarkdown(noteId, [name]));
-      }
-    }
-    await refreshed(qc, noteId);
-    return lines.join("\n");
-  };
+  return (files: File[]) => addFiles(qc, noteId, files);
 }
 
 /** A drawing is two attachments: its Excalidraw scene (`<name>.excalidraw`, JSON) and a PNG of it (`<name>.png`) the chip and

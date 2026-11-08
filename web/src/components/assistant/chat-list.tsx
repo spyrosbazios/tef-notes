@@ -47,7 +47,7 @@ export function ChatList({ current, idle, onDone }: { current: string; idle: boo
                     <span className="text-[11px] tabular-nums text-faint">{ago(ms(c.updated), now)}</span>
                   </button>
                   <Button variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`} disabled={!idle && c.id === current} onClick={() => setRemoving(c)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 text-dim opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-dim opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 any-pointer-coarse:opacity-100">
                     <Trash2 />
                   </Button>
                 </li>

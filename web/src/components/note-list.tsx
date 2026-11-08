@@ -3,6 +3,8 @@
 // badge clicked anywhere lands here filtered. Ctrl/cmd-click or a tile's checkbox selects, shift-click selects a range, and
 // the header becomes the bulk bar until Esc. A toggle groups the notes under a header per tag (this browser's choice,
 // hooks/note-view.ts), as the phone's Notes tab does: a note with several tags shows under each, and a group folds away.
+// Below `md` it is the phone's: two columns, a header of icons (tag filter, tiles or grouped, sort, +), a tile shows two tags, and
+// holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
 import { motion, MotionConfig } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +23,8 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useLongPress } from "@/hooks/long-press";
+import { useNarrow } from "@/hooks/media";
 import { useLensSorted, useNotes } from "@/hooks/notes";
 import { useNoteView } from "@/hooks/note-view";
 import { useNow } from "@/hooks/now";
@@ -36,7 +40,8 @@ import type { NoteRec } from "@/services/notes";
 type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean };
 
 /** A note as a Keep tile: its picture across the top, the title, the opening prose, tags, then pin and age. A note with a colour
- *  wears it as the tile's tint. On hover a checkbox selects it and a ⋮ opens its actions (a right-click does too). */
+ *  wears it as the tile's tint. On hover a checkbox selects it and a ⋮ opens its actions (a right-click does too); under a finger
+ *  both are always there, and holding the tile opens the same menu. */
 function Tile({ n, now, selecting, selected, menuPaths, onPick, onCheck, onTag, onTags, onDelete }: {
   n: NoteRec; now: number; selecting: boolean; selected: boolean; menuPaths: string[];
   onPick: (e: Modifiers) => void; onCheck: () => void; onTag: (t: string) => void; onTags: () => void; onDelete: () => void;
@@ -44,29 +49,31 @@ function Tile({ n, now, selecting, selected, menuPaths, onPick, onCheck, onTag, 
   const snippet = useMemo(() => snippetOf(n.note.body, 280), [n.note.body]);
   const [ref, pictures, more] = useNotePictures<HTMLDivElement>(n.note.id, n.note.body);
   const [menu, setMenu] = useState(false);
+  const phone = useNarrow();
+  const press = useLongPress(() => (phone ? onCheck() : setMenu(true)), { menu: !phone });
   const tint = n.note.color;
   const chrome = cn("absolute top-2 z-10 flex size-6 items-center justify-center rounded-md border border-line bg-card/90 text-dim shadow-sm backdrop-blur hover:text-fg",
-    "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100", menu && "opacity-100");
+    "hit opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 any-pointer-coarse:md:opacity-100", menu && "opacity-100");
   return (
     <motion.div ref={ref} role="button" layout="position" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }} transition={TILE_MOTION} tabIndex={0} onClick={onPick} onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-      onContextMenu={(e) => { e.preventDefault(); setMenu(true); }}
+      {...press}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPick(e); } }}
       aria-selected={selecting ? selected : undefined} data-color={tint}
-      className={cn("group relative w-full cursor-pointer overflow-hidden rounded-2xl border text-left transition-colors",
+      className={cn("group relative w-full cursor-pointer overflow-hidden rounded-2xl border text-left transition-colors any-pointer-coarse:select-none",
         tint ? "bg-tile text-tile-fg" : "bg-card hover:bg-raised",
         selected ? "border-brand ring-2 ring-brand" : tint ? "border-tile-line/50" : "border-line")}>
       <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select ${n.note.title}`} onClick={(e) => { e.stopPropagation(); onCheck(); }}
         className={cn(chrome, "left-2", selecting && "opacity-100", selected && "border-brand bg-brand text-bg hover:text-bg")}>
         {selected ? <Check className="size-3.5" strokeWidth={3} /> : null}
       </button>
-      <TileMenu paths={menuPaths} open={menu} onOpenChange={setMenu} onTags={onTags} onDelete={onDelete} className={cn(chrome, "right-2")} />
+      <TileMenu paths={menuPaths} open={menu} onOpenChange={setMenu} onTags={onTags} onDelete={onDelete} className={cn(chrome, "right-2 max-md:hidden")} />
       <Mosaic sources={pictures} more={more} className={pictures.length > 2 ? "h-44" : "h-32"} />
       <div className="flex flex-col gap-1.5 p-3">
         <h3 className="line-clamp-2 font-semibold text-[15px] leading-snug">{n.note.title}</h3>
         {snippet ? <p className={cn("line-clamp-6 text-[13px] leading-snug", tint ? "opacity-85" : "text-dim")}>{snippet}</p> : null}
         {n.note.tags.length ? (
-          <span className="flex flex-wrap gap-1">
+          <span className="flex flex-wrap gap-1 max-md:[&>*:nth-child(n+3)]:hidden">
             {n.note.tags.map((t) => <TagBadge key={t} name={t} onClick={() => onTag(t)} />)}
           </span>
         ) : null}
@@ -114,8 +121,8 @@ export function TagFilter({ counts, chosen, onChange, what = "Notes" }: { counts
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Filter by tag" className={cn("max-w-64", chosen.length ? "text-fg" : "text-dim")}>
-          <Hash /><span className="truncate">{chosen.length ? chosen.join(", ") : "Tags"}</span>
+        <Button variant="outline" size="sm" aria-label="Filter by tag" className={cn("max-w-64 max-sm:max-w-28", chosen.length ? "text-fg" : "text-dim")}>
+          <Hash /><span className={cn("truncate", !chosen.length && "max-sm:hidden")}>{chosen.length ? chosen.join(", ") : "Tags"}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
@@ -212,28 +219,29 @@ export function NoteList({ onNew }: { onNew: () => void }) {
   };
 
   return (
-    <section className="flex flex-col" aria-label="Notes">
+    <section className="flex flex-col max-md:px-4" aria-label="Notes">
       <header className="pb-3">
         {selecting ? (
           <BulkBar paths={picked} onClear={() => setSel([])} onAll={() => setSel(order)}
             onTags={() => ask("tags", picked)} onDelete={() => ask("delete", picked)} />
         ) : (
-          <div className="flex h-8 items-center gap-2">
-            <h2 className="font-bold text-[22px] tracking-tight">Notes</h2>
+          <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-2">
+            <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
             <span className="mr-auto self-baseline pt-1 text-xs tabular-nums text-faint">{shown.length}</span>
             <TagFilter counts={counts} chosen={chips} onChange={setTags} />
             <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={grouped ? "tags" : "list"} aria-label="Layout"
               onValueChange={(v) => { if (v) setGrouped(v === "tags"); }}>
-              <ToggleGroupItem value="list" aria-label="Show notes as tiles" title="Tiles" className="text-dim"><LayoutGrid /></ToggleGroupItem>
-              <ToggleGroupItem value="tags" aria-label="Group notes by tag" title="Group by tag" className="text-dim"><Tags /></ToggleGroupItem>
+              {/* On a phone one button, the other layout's (the phone's toggle) */}
+              <ToggleGroupItem value="list" aria-label="Show notes as tiles" title="Tiles" className="text-dim max-md:data-[state=on]:hidden"><LayoutGrid /></ToggleGroupItem>
+              <ToggleGroupItem value="tags" aria-label="Group notes by tag" title="Group by tag" className="text-dim max-md:data-[state=on]:hidden"><Tags /></ToggleGroupItem>
             </ToggleGroup>
             <Select value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
-              <SelectTrigger size="sm" aria-label="Sort notes" className="text-dim"><ArrowDownUp /><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" aria-label="Sort notes" className="text-dim max-md:[&_[data-slot=select-value]]:hidden max-md:[&>svg:last-child]:hidden"><ArrowDownUp /><SelectValue /></SelectTrigger>
               <SelectContent align="end">
                 {NOTE_SORTS.map((k) => <SelectItem key={k} value={k}>{NOTE_SORT_LABEL[k]}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button size="sm" className="rounded-full" onClick={onNew}><Plus />New note</Button>
+            <Button size="sm" className="rounded-full max-md:size-9 max-md:bg-transparent max-md:p-0 max-md:text-brand max-md:hover:bg-transparent" aria-label="New note" onClick={onNew}><Plus className="max-md:size-[22px]" /><span className="max-md:hidden">New note</span></Button>
           </div>
         )}
       </header>

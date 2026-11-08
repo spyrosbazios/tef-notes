@@ -1,24 +1,55 @@
-// The notes as TanStack Query state. One query holds every note (the notebook is small, see services/notes.ts);
-// writes put the server's reply straight into it, and the realtime feed puts in what another device wrote (a refetch
-// only after a gap: a reconnect, or the window coming back into focus).
+// The notes as TanStack Query state, over the local copy (lib/local.ts). One query holds every note (the notebook is small); it is
+// read from the copy, never from the server: every write goes to the copy first and shows at once, and the sync (lib/sync.ts,
+// packages/core/src/sync.ts) sends it, offline or not, and brings other devices' edits in. `rev` and `rec` are the server's as of
+// the last sync: a note made here has `rec` "" until it first goes up, and cannot be linked to before.
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { isNotePath, newNotePath, noteKindOf, serializeNote, withFlags, type Color, type Flags } from "@/core/notes";
+import { isNotePath, newNotePath, parseNote, serializeNote, withFlags, type Color, type Flags } from "@/core/notes";
 import { inheritTags, inLens } from "@/core/lens";
-import { Conflict } from "@/core/pocketbase";
+import { removeNote, writeNote, type NoteRow } from "@/core/sync";
 import { localDay } from "@/core/time";
+import { local } from "@/lib/local";
+import { getNet, isOffline } from "@/lib/net";
+import { edited, heard, LOCAL_QUERY, movedTo, onRedraw, opened, settle, startSync, syncing, syncNow, type Settle } from "@/lib/sync";
 import * as notes from "@/services/notes";
-import { watch, type NoteChange } from "@/services/realtime";
+import { watch } from "@/services/realtime";
 import type { NoteRec, Rec } from "@/services/notes";
 import { CHATS } from "./agent";
 import { useActiveLens, activeLensOf } from "./lens";
-import { applyLink, forgetEnd, LINKS } from "./links";
+import { projectLinks } from "./links";
 import { PHOTOS } from "./photos";
-import { applyTask, TASKS } from "./todo";
+import { projectTasks } from "./todo";
 
 export const NOTES = ["notes"] as const;
 
-export const useNotes = () => useQuery({ queryKey: NOTES, queryFn: notes.all, refetchOnWindowFocus: true });
+// ---- the copy, as the cache has it
+
+/** A row's note as the lists read it. Parsed once per version of the row: the list holds the whole notebook and is redrawn
+ *  after every save. */
+const parsed = new Map<string, { sig: string; rec: NoteRec }>();
+
+function noteOf(row: NoteRow): NoteRec {
+  const sig = `${row.updated}|${row.rev}|${row.rec}|${row.kind}`, hit = parsed.get(row.path);
+  if (hit?.sig === sig) return hit.rec;
+  const rec: NoteRec = {
+    rec: row.rec ?? "", path: row.path, rev: row.rev ?? 0, kind: row.kind, text: row.text, updated: new Date(row.updated).toISOString(),
+    note: parseNote(row.path, row.text),
+  };
+  parsed.set(row.path, { sig, rec });
+  return rec;
+}
+
+/** Every note not deleted here, newest change first. */
+function readNotes(): NoteRec[] {
+  const rows = local.notes.all().filter((r) => !r.deleted && isNotePath(r.path));
+  const live = new Set(rows.map((r) => r.path));
+  for (const p of parsed.keys()) if (!live.has(p)) parsed.delete(p);
+  return rows.map(noteOf).sort((a, b) => b.updated.localeCompare(a.updated));
+}
+
+export const projectNotes = (qc: QueryClient) => qc.setQueryData<NoteRec[]>(NOTES, readNotes());
+
+export const useNotes = () => useQuery({ queryKey: NOTES, queryFn: async () => { await opened(); return readNotes(); }, ...LOCAL_QUERY });
 
 /** The list as the phone orders it: pinned first, then newest edit. */
 export function useSorted(): NoteRec[] {
@@ -38,111 +69,73 @@ export const useNote = (id: string | undefined) => {
   return useMemo(() => (id ? data?.find((n) => n.note.id === id) : undefined), [data, id]);
 };
 
-/** A record as the server now has it, in place of the cached one (or gone, when null). */
-export function store(qc: QueryClient, r: Rec | null, path?: string) {
-  qc.setQueryData<NoteRec[]>(NOTES, (all = []) => {
-    const rest = all.filter((n) => n.path !== (r?.path ?? path));
-    return r ? [notes.withNote(r), ...rest] : rest;
-  });
-}
+// ---- the feed and the sync
 
-
-/** The cache after a write: the server's reply goes in over any refetch still out, which started before the write and
- *  would bring the note back as it was — that one is cancelled, and run again once the reply is in. */
-export async function commit(qc: QueryClient, r: Rec | null, path?: string) {
-  const out = qc.isFetching({ queryKey: NOTES }) > 0;
-  await qc.cancelQueries({ queryKey: NOTES });
-  store(qc, r, path);
-  if (out) void qc.invalidateQueries({ queryKey: NOTES });
-}
-
-/** A change another device made, into the cache as it came. Ours (the rev is stored already) and one older than the
- *  cache's copy are left out. */
-function apply(qc: QueryClient, { action, record: r }: NoteChange): boolean {
-  const all = qc.getQueryData<NoteRec[]>(NOTES);
-  if (!all || !isNotePath(r.path)) return true;                  // not loaded yet: its first fetch has it all
-  if (action === "delete") { store(qc, null, r.path); return true; }
-  if (typeof r.text !== "string") return false;
-  const mine = all.find((n) => n.path === r.path);
-  if (mine && mine.rev >= r.rev) return true;
-  store(qc, { rec: r.id, path: r.path, rev: r.rev, kind: noteKindOf(r.kind), text: r.text, updated: r.updated });
-  return true;
-}
-
-/** Edits from the phone, the CLI or the agent, live; the tasks and links the same
- *  (a note or task gone takes its links with it: the server's cascade); a new photo refreshes the photo lists, a chat the chat list. */
+/** Mounted once, in the shell: the sync's triggers (lib/sync.ts), the redraw of the lists after it changes the copy, and what
+ *  the realtime feed says: a note, task or link another device changed is news for the sync (an edit made here echoing back is
+ *  not), a new photo refreshes the photo lists, a chat the chat list. */
 export function useLive() {
   const qc = useQueryClient();
   useEffect(() => {
-    let notes: ReturnType<typeof setTimeout> | undefined, photos: ReturnType<typeof setTimeout> | undefined, chats: ReturnType<typeof setTimeout> | undefined, todo: ReturnType<typeof setTimeout> | undefined, links: ReturnType<typeof setTimeout> | undefined;
-    const refetch = () => { clearTimeout(notes); notes = setTimeout(() => qc.invalidateQueries({ queryKey: NOTES }), 250); };
-    const refetchTodo = () => { clearTimeout(todo); todo = setTimeout(() => qc.invalidateQueries({ queryKey: TASKS }), 250); };
-    const refetchLinks = () => { clearTimeout(links); links = setTimeout(() => qc.invalidateQueries({ queryKey: LINKS }), 250); };
+    let photos: ReturnType<typeof setTimeout> | undefined, chats: ReturnType<typeof setTimeout> | undefined;
     const relist = () => { clearTimeout(chats); chats = setTimeout(() => qc.invalidateQueries({ queryKey: CHATS }), 250); };
+    const redraw = onRedraw(() => { projectNotes(qc); projectTasks(qc); projectLinks(qc); });
+    const stopSync = startSync();
     const stop = watch({
-      onNote: (c) => { if (c.action === "delete") forgetEnd(qc, { type: "note", id: c.record.id }); if (!apply(qc, c)) refetch(); },
+      onNote: (c) => heard("notes", c.action, c.record),
       onPhoto: () => { clearTimeout(photos); photos = setTimeout(() => qc.invalidateQueries({ queryKey: PHOTOS }), 250); },
-      onTask: (c) => { if (c.action === "delete") forgetEnd(qc, { type: "task", id: c.record.id }); applyTask(qc, c); },
-      onLink: (c) => applyLink(qc, c.action, c.record),
+      onTask: (c) => heard("tasks", c.action, c.record),
+      onLink: (c) => heard("links", c.action, c.record),
       onChat: relist,
-      onReconnect: () => { refetch(); refetchTodo(); refetchLinks(); relist(); },
+      onReconnect: () => { void syncNow(); relist(); },
     });
-    return () => { clearTimeout(notes); clearTimeout(photos); clearTimeout(chats); clearTimeout(todo); clearTimeout(links); stop(); };
+    return () => { clearTimeout(photos); clearTimeout(chats); stop(); stopSync(); redraw(); };
   }, [qc]);
 }
+
+// ---- writes
 
 /** The note was deleted elsewhere while it was being changed here. */
 export class Gone extends Error {}
 
-/** `edit` applied to the note's text and written at its rev. When the note moved on meanwhile, `edit` is applied
- *  again to the text as it is now — redoing the change, never resending the old result over the newer one. `edit`
- *  throws to stop (a draft whose lines clash with the newer text). */
+/** `edit` applied to the note's text as the copy has it now (the sync may have merged another device's edit in since the caller
+ *  last looked) and written there, to go up on the next sync. `edit` throws to stop (a draft whose lines clash with the newer text). */
 export async function write(qc: QueryClient, r: Rec, edit: (text: string) => string): Promise<Rec> {
-  let cur: Rec = r;
-  for (let i = 0; ; i++) {
-    try {
-      const out = await notes.update(cur, edit(cur.text));
-      if (!out) throw new Gone("This note was deleted on another device.");
-      await commit(qc, out);
-      return out;
-    } catch (e) {
-      if (!(e instanceof Conflict) || i === 3) throw e;
-      const now = await notes.get(cur.rec);
-      if (!now) { await commit(qc, null, cur.path); throw new Gone("This note was deleted on another device."); }
-      await commit(qc, now);
-      cur = now;
-    }
-  }
+  const path = movedTo(r.path), row = local.notes.get(path);
+  if (!row || row.deleted) throw new Gone("This note was deleted on another device.");
+  if (writeNote(local, path, edit(row.text))) { projectNotes(qc); edited(); }
+  return noteOf(local.notes.get(path)!);
 }
 
 export type FlagEdit = Partial<Omit<Flags, "color">> & { color?: Color | null };
 
 export const setFlags = (qc: QueryClient, r: Rec, flags: FlagEdit) => write(qc, r, (text) => withFlags(r.path, text, flags));
 
-/** A new note, its path made from the title; `-2`, `-3` when the laptop or the phone took it first. Under a lens it carries the
- *  lens's first tag. */
+/** Whether the server has a note at `path` already; false when it can't be asked (offline, slow): the sync moves a clash aside. */
+async function onServer(path: string): Promise<boolean> {
+  if (isOffline(getNet())) return false;
+  try { return !!(await notes.read(path, 3000)); } catch { return false; }
+}
+
+/** A new note, its path made from the title; `-2`, `-3` when this copy or, while the server answers, the server has the name.
+ *  Under a lens it carries the lens's first tag. */
 export async function createNote(qc: QueryClient, title: string, body = ""): Promise<Rec> {
-  const taken = new Set((qc.getQueryData<NoteRec[]>(NOTES) ?? []).map((n) => n.path));
+  const taken = new Set(local.notes.all().map((n) => n.path));
   for (;;) {
     const path = newNotePath(title, Date.now(), taken);
-    try {
-      const r = await notes.create(path, serializeNote({ title: title.trim(), created: localDay(), tags: inheritTags(activeLensOf(qc)) }, body));
-      await commit(qc, r);
-      return r;
-    } catch (e) {
-      if (!(e instanceof Conflict)) throw e;
-      taken.add(path);
-    }
+    if (await onServer(path)) { taken.add(path); continue; }
+    writeNote(local, path, serializeNote({ title: title.trim(), created: localDay(), tags: inheritTags(activeLensOf(qc)) }, body));
+    projectNotes(qc); edited();
+    return noteOf(local.notes.get(path)!);
   }
 }
 
-/** Deleted, if nobody changed it since. Conflict: they did, and the list now shows their version. */
+/** Gone from the lists now, from the server on the next sync, if nobody changed it since (else it comes back with their edit). */
 export async function deleteNote(qc: QueryClient, r: Rec): Promise<void> {
-  try {
-    await notes.remove(r);
-    await commit(qc, null, r.path);
-  } catch (e) {
-    if (e instanceof Conflict) await commit(qc, await notes.get(r.rec), r.path);
-    throw e;
-  }
+  if (removeNote(local, movedTo(r.path), syncing())) { projectNotes(qc); edited(); }
+}
+
+/** A note in conflict settled (Settings > Server & sync). */
+export function settleNote(qc: QueryClient, path: string, how: Settle): void {
+  if (settle(path, how)) projectNotes(qc);
 }

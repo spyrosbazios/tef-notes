@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { mergeDraft, parseNote, withBody } from "@/core/notes";
+import { syncNow } from "@/lib/sync";
 import { message } from "@/services/api";
 import type { NoteRec, Rec } from "@/services/notes";
 import { NOTES, write } from "./notes";
@@ -113,7 +114,7 @@ export function useDraft(r: NoteRec) {
   };
 
   // Leaving the note (or the page) sends what's pending
-  useEffect(() => () => { void flush(); }, [flush]);
+  useEffect(() => () => { void flush().then(syncNow); }, [flush]);
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => { if (pending.current.body != null || pending.current.title != null) { void flush(); e.preventDefault(); } };
     addEventListener("beforeunload", warn);

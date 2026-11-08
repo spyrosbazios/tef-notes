@@ -111,6 +111,28 @@
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+  /* Installed on a phone the page is the app: a pull down at the top of a list must not reload it, a double tap must
+     not zoom (pinch still does). */
+  html, body {
+    overscroll-behavior-y: none;
+  }
+  html {
+    touch-action: manipulation;
+  }
+}
+
+/* Touch. `any-pointer: coarse` (a finger is among the pointers), not the width: a wide phone or a tablet has no hover either.
+   shadcn's icon buttons are 24 to 36px; a finger needs 40. Their call sites keep their classes: this only sets a floor. */
+@media (any-pointer: coarse) {
+  [data-slot="button"][data-size^="icon"] { min-width: 2.5rem; min-height: 2.5rem; }
+}
+
+/* A small control (a tick box) keeps its look but takes touches over a 40px square around it. The element must be
+   positioned (`relative`, or already absolute). */
+@utility hit {
+  @media (any-pointer: coarse) {
+    &::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, 2.5rem); height: max(100%, 2.5rem); transform: translate(-50%, -50%); }
+  }
 }
 
 /* A note's body, read: the phone's MD styles (src/ui/note.tsx) as prose. */

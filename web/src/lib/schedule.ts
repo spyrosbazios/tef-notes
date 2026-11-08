@@ -11,3 +11,7 @@ export const whenState = (t: Pick<Task, "when" | "evening" | "due">): WhenState 
  *  takes it off. */
 export const scheduleOf = (s: Schedule | null): TaskPatch =>
   !s ? { when: "", evening: false, remind: "" } : { when: s.when, evening: s.evening };
+
+/** What a reminder time writes: the time, and, on a task with no day, today (a reminder needs its day). "" takes it off. */
+export const remindFields = (remind: string, dated: boolean, today: string): TaskPatch =>
+  remind && !dated ? { remind, when: today, evening: false } : { remind };

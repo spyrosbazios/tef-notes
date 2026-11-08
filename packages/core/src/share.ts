@@ -1,9 +1,10 @@
 // What Android's Share sheet hands over — a link, clipped text, photos, PDFs — shaped for the two things the app does
 // with it: save it as a note as it is, or hand it to the agent to file. Pure: the intent's parsing and the
 // text it becomes are tested in packages/core/test/share.test.ts; the writing is mobile/src/store/share.ts.
-import type { ClipPage } from "./clip";
-import { linkify } from "./links";
-import { PDF } from "./photos";
+import type { ClipPage, Target } from "./clip";
+import { inheritTags, type Lens } from "./lens";
+import { firstUrl, linkify } from "./links";
+import { isPdf, PDF } from "./photos";
 import { localDay } from "./time";
 
 export type SharedImage = { uri: string; width: number | null; height: number | null };
@@ -29,6 +30,33 @@ export function fromIntent(i: Intent): Shared | null {
   if (!text && !url && !images.length && !pdfs.length) return null;
   return { text, url, images, pdfs, title: i.meta?.title?.trim() || null };
 }
+
+const isUrl = (s: string) => /^https?:\/\/\S+$/.test(s);
+
+/** What the web app's share target received as a Shared (the phone's `fromIntent`, for a form). Android puts the link in
+ *  `text` (after the page's title, or with some words of the app's), sometimes in `title`, rarely in `url`: the first one
+ *  found is the link, and text that says no more than the link and the title is dropped. Images and PDFs only; a file's
+ *  `uri` is its place in `files`, the page's own copy of the bytes. null when nothing usable was shared. */
+export function fromPost(p: { title: string; text: string; url: string; files: readonly { name: string; type: string }[] }): Shared | null {
+  const title = p.title.trim(), url = [p.url.trim(), p.text, p.title].map((s) => (isUrl(s.trim()) ? s.trim() : firstUrl(s))).find(Boolean) ?? null;
+  let text = p.text.trim();
+  if (url && text.replace(url, "").trim() === (isUrl(title) ? "" : title)) text = "";
+  const images: SharedImage[] = [], pdfs: SharedPdf[] = [];
+  p.files.forEach((f, i) => {
+    if (f.type === PDF || isPdf(f.name)) pdfs.push({ uri: String(i), name: f.name });
+    else if (f.type.startsWith("image/")) images.push({ uri: String(i), width: null, height: null });
+  });
+  if (!text && !url && !images.length && !pdfs.length) return null;
+  return { text, url, images, pdfs, title: title && !isUrl(title) ? title : null };
+}
+
+/** Something typed or pasted into the share page's box, as a share. */
+export const fromPasted = (text: string): Shared | null => fromPost({ title: "", text, url: "", files: [] });
+
+/** The tags a clip carries, the owner's: a new note or task takes the lens's first tag (what the app makes under a lens
+ *  does), an existing one is left as it is. */
+export const clipTags = (target: Target, lens: Lens | null | undefined): string[] =>
+  target.kind === "new" || target.kind === "newtask" ? inheritTags(lens) : [];
 
 /** The share as a clip for the server's clip routes (core/clip.ts): its link, the page's title, the text as the selection,
  *  one photo as the picture (its bytes are the store's). null when the clip routes can't take it: a PDF, or several

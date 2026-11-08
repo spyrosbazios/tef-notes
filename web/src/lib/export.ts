@@ -38,3 +38,15 @@ export async function downloadNotes(recs: NoteRec[]) {
   if (recs.length === 1) { downloadMarkdown(recs[0]); return; }
   await downloadZip(recs, `tefnotes-${recs.length}-notes.zip`);
 }
+
+/** The system share sheet takes files here: a touch screen on a browser with Web Share for files (Android's Chrome, an
+ *  installed app). A desktop browser that has it too still downloads: a file is what one wants there. */
+export const sharesFiles = () =>
+  matchMedia("(pointer: coarse)").matches && typeof navigator.canShare === "function" && navigator.canShare({ files: [new File([""], "a.md", { type: "text/markdown" })] });
+
+/** These notes' `.md` files through the share sheet, as the phone shares them (the photos stay on the server: the body's links
+ *  point at them). Closing the sheet is no failure. */
+export async function shareNotes(recs: Pick<NoteRec, "path" | "text">[]) {
+  const files = recs.map((n) => new File([n.text], fileNameOf(n.path), { type: "text/markdown" }));
+  try { await navigator.share({ files }); } catch (e) { if (!(e instanceof DOMException && e.name === "AbortError")) throw e; }
+}

@@ -1,4 +1,4 @@
-// The lens switcher, at the bottom of the rail: pick the lens this browser has on (or none), make, edit and delete lenses.
+// The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens this browser has on (or none), make, edit and delete lenses.
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
 // carries its first tag. The definitions are the server's, shared by every device; which one is on is this browser's.
 import { Check, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -8,6 +8,7 @@ import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/co
 import { fold } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEMES } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
+import { Mark } from "@/components/brand";
 import { TagEditor } from "@/components/tag-editor";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -101,7 +102,8 @@ function LensAccent({ value, onChange }: { value: LensAccentName | null; onChang
   );
 }
 
-export function LensSwitcher() {
+/** `header`: Home's header on a phone (mobile/src/ui/lens.tsx), where the app's mark is the control, with the lens's name beside it while one is on. */
+export function LensSwitcher({ header = false }: { header?: boolean }) {
   const { data: lenses = [] } = useLenses(), active = useActiveLens(), remove = useRemoveLens();
   const [form, setForm] = useState<{ lens?: Lens } | null>(null), [asking, setAsking] = useState<Lens | null>(null);
   const del = (l: Lens) => {
@@ -112,14 +114,22 @@ export function LensSwitcher() {
       <div className="flex items-center gap-1">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label={active ? `Lens: ${active.name}` : "Lens: none"}
-            className={cn("flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm transition-colors",
-              active ? "bg-brand/15 font-semibold text-brand" : "text-dim hover:bg-muted hover:text-fg")}>
-            <Focus className="size-4 shrink-0" />
-            <span className="flex-1 truncate">{active ? active.name : "Lens"}</span>
-          </button>
+          {header ? (
+            <button type="button" aria-label={active ? `Lens: ${active.name}` : "Lens: none"}
+              className="flex h-11 min-w-0 items-center gap-2.5 rounded-lg pr-2 text-left transition-opacity active:opacity-60">
+              <Mark className="size-7 shrink-0 text-brand" />
+              {active ? <span className="truncate text-[15px] font-extrabold tracking-tight text-brand">{active.name}</span> : null}
+            </button>
+          ) : (
+            <button type="button" aria-label={active ? `Lens: ${active.name}` : "Lens: none"}
+              className={cn("flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm transition-colors",
+                active ? "bg-brand/15 font-semibold text-brand" : "text-dim hover:bg-muted hover:text-fg")}>
+              <Focus className="size-4 shrink-0" />
+              <span className="flex-1 truncate">{active ? active.name : "Lens"}</span>
+            </button>
+          )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-56">
+        <DropdownMenuContent side={header ? "bottom" : "top"} align="start" className="w-56">
           <DropdownMenuRadioGroup value={active?.rec ?? NONE} onValueChange={(v) => setActiveLens(v || null)}>
             <DropdownMenuRadioItem value={NONE}>No lens</DropdownMenuRadioItem>
             {lenses.map((l) => <DropdownMenuRadioItem key={l.rec} value={l.rec}><span className="truncate">{l.name}</span></DropdownMenuRadioItem>)}
@@ -134,7 +144,7 @@ export function LensSwitcher() {
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {active ? (
+      {active && !header ? (
         <button type="button" onClick={() => setActiveLens(null)} title={`Turn off the lens ${active.name}`} aria-label={`Turn off the lens ${active.name}`}
           className="grid size-8 shrink-0 place-items-center rounded-lg text-brand transition-colors hover:bg-brand/15">
           <X className="size-4" />

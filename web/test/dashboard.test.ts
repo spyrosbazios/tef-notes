@@ -14,4 +14,6 @@ test("the masonry reads by rows: tiles dealt across the columns in order", () =>
   expect(columnCount(996, 16)).toBe(4);     // 4 x 240 + 3 x 12, as CSS columns-[15rem] gap-3 counts
   expect(columnCount(995, 16)).toBe(3);
   expect(columnCount(200, 16)).toBe(1);
+  expect(columnCount(328, 16)).toBe(2);     // a phone: two narrow columns, as the Android app draws
+  expect(columnCount(287, 16)).toBe(1);
 });

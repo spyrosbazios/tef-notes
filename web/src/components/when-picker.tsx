@@ -1,10 +1,11 @@
 // The When choice of a task, as Things has it: Today, This Evening, Tomorrow or a day (typed in words -- "fri",
-// "in 3d", "nov 12" -- or picked), and a deadline beside it. Used in a popover on a list row and in the quick-add dialog.
+// "in 3d", "nov 12" -- or picked), and a deadline beside it. Used in a popover (a sheet at phone width, components/pick.tsx)
+// on a list row, on the task's card and in the quick-add dialog.
 import { Check, Flag, Moon, Star, Sunrise, X } from "lucide-react";
 import { useState } from "react";
+import { Pick } from "@/components/pick";
 import { addDays, parseWhen, whenLabel, type Schedule } from "@/core/dates";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 /** Where a task stands: what When and Deadline show. */
@@ -13,7 +14,7 @@ export type WhenState = { when: string | null; evening: boolean; due: string | n
 function Choice({ icon: Icon, label, on, onClick }: { icon: typeof Star; label: string; on: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on}
-      className={cn("flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm transition-colors hover:bg-muted", on && "font-semibold")}>
+      className={cn("flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm transition-colors hover:bg-muted any-pointer-coarse:h-11", on && "font-semibold")}>
       <Icon className="size-4 shrink-0 text-dim" />
       <span className="flex-1">{label}</span>
       {on ? <Check className="size-3.5 text-brand" /> : null}
@@ -32,7 +33,7 @@ export function WhenPicker({ value, today, onSchedule, onDue }: {
   return (
     <div className="space-y-2">
       <div className="space-y-1">
-        <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="fri, in 3d, nov 12…" aria-label="When, in words" autoFocus
+        <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="fri, in 3d, nov 12…" aria-label="When, in words" autoFocus={!matchMedia("(pointer: coarse)").matches}
           onKeyDown={(e) => { if (e.key === "Enter" && guess) { e.preventDefault(); onSchedule(guess); } }} />
         {typed.trim() ? (
           <p className={cn("px-1 text-xs", guess ? "text-dim" : "text-faint")}>{preview ? `Press Enter: ${preview}` : "Not a day I know."}</p>
@@ -59,17 +60,18 @@ export function WhenPicker({ value, today, onSchedule, onDue }: {
   );
 }
 
-/** The picker in a popover on `children` (the trigger). It closes once a day is chosen. */
-export function WhenPopover({ children, value, today, onSchedule, onDue, align = "end" }: {
-  children: React.ReactNode; value: WhenState; today: string; onSchedule: (s: Schedule | null) => void; onDue: (day: string | null) => void; align?: "start" | "end";
+/** The picker on `children` (the trigger): a popover, a sheet at phone width. It closes once a day is chosen. `open` and
+ *  `onOpenChange` make it controlled (a row's swipe opens it). */
+export function WhenPick({ children, value, today, onSchedule, onDue, align = "end", open, onOpenChange }: {
+  children: React.ReactNode; value: WhenState; today: string; onSchedule: (s: Schedule | null) => void; onDue: (day: string | null) => void;
+  align?: "start" | "end"; open?: boolean; onOpenChange?: (o: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [own, setOwn] = useState(false);
+  const shown = open ?? own;
+  const set = (o: boolean) => { setOwn(o); onOpenChange?.(o); };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align={align} className="w-64" onClick={(e) => e.stopPropagation()}>
-        <WhenPicker value={value} today={today} onSchedule={(s) => { onSchedule(s); setOpen(false); }} onDue={onDue} />
-      </PopoverContent>
-    </Popover>
+    <Pick trigger={children} title="When" align={align} open={shown} onOpenChange={set}>
+      <WhenPicker value={value} today={today} onSchedule={(s) => { onSchedule(s); set(false); }} onDue={onDue} />
+    </Pick>
   );
 }

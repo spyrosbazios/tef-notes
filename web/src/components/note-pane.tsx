@@ -97,7 +97,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
 
   /** The note as saved just now (an edit still waiting for its save goes first), given to the agent or downloaded. */
   const out = useNoteOut();
-  const sendOut = async (what: "ask" | "download") => {
+  const sendOut = async (what: "ask" | "save") => {
     try { await d.flush(); } catch (e) { toast.error(message(e)); return; }
     await out[what]([fresh()]);
   };
@@ -173,7 +173,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
               <Link2 /> Copy link
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { void sendOut("ask"); }}><Sparkles /> Ask about this note</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => { void sendOut("download"); }}><Download /> Download .md</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { void sendOut("save"); }}><Download /> {out.verb} .md</DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onSelect={() => setConfirm(true)}><Trash2 /> Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

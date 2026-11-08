@@ -89,7 +89,7 @@ function OutItems({ paths }: { paths: string[] }) {
   return (
     <>
       <DropdownMenuItem onSelect={() => out.ask(recs)}><Sparkles /> {many ? "Ask about these" : "Ask about this note"}</DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => { void out.download(recs); }}><Download /> {many ? "Download .zip" : "Download .md"}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => { void out.save(recs); }}><Download /> {out.verb} {many ? (out.verb === "Share" ? ".md files" : ".zip") : ".md"}</DropdownMenuItem>
     </>
   );
 }
@@ -114,7 +114,7 @@ function MenuItems({ paths, onTags, onDelete }: { paths: string[]; onTags: () =>
 export function BulkBar({ paths, onClear, onAll, onTags, onDelete }: { paths: string[]; onClear: () => void; onAll: () => void; onTags: () => void; onDelete: () => void }) {
   const f = useFlagActions(paths);
   return (
-    <div className="flex h-8 items-center gap-0.5" role="toolbar" aria-label="Selected notes">
+    <div className="flex min-h-8 items-center gap-0.5" role="toolbar" aria-label="Selected notes">
       <Button variant="ghost" size="icon-sm" aria-label="Clear selection" title="Clear selection (Esc)" onClick={onClear}><X /></Button>
       <button type="button" onClick={onAll} title="Select every note in the list" className="mr-auto rounded px-1.5 font-semibold text-sm hover:bg-muted">
         {paths.length} selected

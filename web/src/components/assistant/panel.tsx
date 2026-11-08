@@ -45,12 +45,12 @@ function Seeing() {
 
 function Header({ children }: { children?: ReactNode }) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-3">
+    <header className="flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line px-3 pt-[env(safe-area-inset-top)]">
       <Sparkles className="size-4 shrink-0 text-brand" />
       <h2 className="px-1 text-[15px] font-bold tracking-tight">Assistant</h2>
       <div className="flex-1" />
       {children}
-      <Button variant="ghost" size="icon" className="text-dim" aria-label="Close the assistant" onClick={() => setDock({ open: false })}><X /></Button>
+      <Button variant="ghost" size="icon" className="text-dim max-md:hidden" aria-label="Close the assistant" onClick={() => setDock({ open: false })}><X /></Button>
     </header>
   );
 }
@@ -80,7 +80,8 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   };
   const suggest = (s: string) => { if (s.endsWith("?")) void go(s); else { setInput(s.replace(/…$/, " ")); field.current?.focus(); } };
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void go(input); }
+    // Enter sends, Shift+Enter breaks the line: on a touch keyboard there is no Shift, so Enter is the line break and Send the button
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !matchMedia("(pointer: coarse)").matches) { e.preventDefault(); void go(input); }
   };
 
   // Nothing on screen is moving yet: no reply, or the last thing shown is a finished tool call
@@ -97,7 +98,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
 
       {listing ? <ChatList current={chat.id} idle={!busy} onDone={onHistory} /> : (
         <>
-          <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="space-y-4 px-4 py-5">
               {!messages.length && (
                 <div className="space-y-3 pt-4">
@@ -129,7 +130,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-line px-3 py-3">
+          <div className="shrink-0 border-t border-line px-3 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Seeing />
             <div className="flex items-end gap-2 rounded-2xl border border-line bg-card p-2 focus-within:border-ring">
               <Textarea ref={field} autoFocus value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} rows={1} disabled={!model}

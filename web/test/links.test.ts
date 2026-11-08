@@ -1,8 +1,8 @@
 // The web app's questions of the links (lib/links.ts): a task's notes as the cache has them, a note's tasks, a task row's
-// summary, a realtime change into the list, what a cascade leaves, and where a task opens.
+// summary, and where a task opens.
 import { describe, expect, test } from "bun:test";
-import { linkRecord, type Link } from "@/core/record-links";
-import { applyLinkChange, linkedNoteIds, noteSummary, notesFor, taskView, tasksFor, withoutEnd } from "@/lib/links";
+import type { Link } from "@/core/record-links";
+import { linkedNoteIds, noteSummary, notesFor, taskView, tasksFor } from "@/lib/links";
 import type { NoteRec } from "@/services/notes";
 
 const about = (id: string, task: string, note: string): Link => ({ id, from: { type: "task", id: task }, to: { type: "note", id: note }, role: "about" });
@@ -42,21 +42,6 @@ describe("a note's tasks", () => {
     expect(tasksFor([...links, about("l8", "t1", "n1")], "n1", tasks).map((t) => t.id)).toEqual(["t1", "t2", "t3"]);
     expect(tasksFor(links, "n1", [{ id: "t2" }]).map((t) => t.id)).toEqual(["t2"]);
     expect(tasksFor(links, "n9", tasks)).toEqual([]);
-  });
-});
-
-describe("the realtime feed", () => {
-  test("a create goes in once, a delete comes out, a record that isn't a link is left out", () => {
-    const l = about("l9", "t9", "n9");
-    const once = applyLinkChange(links, "create", linkRecord(l));
-    expect(once.at(-1)).toEqual(l);
-    expect(applyLinkChange(once, "create", linkRecord(l))).toHaveLength(once.length);
-    expect(applyLinkChange(once, "delete", { id: "l9" })).toEqual(links);
-    expect(applyLinkChange(links, "create", { id: "bad", fromTask: "t1", role: "about" })).toEqual(links);
-  });
-  test("a note or a task gone takes every link touching it", () => {
-    expect(withoutEnd(links, { type: "note", id: "n1" }).map((l) => l.id)).toEqual(["l2", "l3"]);
-    expect(withoutEnd(links, { type: "task", id: "t1" }).map((l) => l.id)).toEqual(["l4", "l5", "l6"]);
   });
 });
 

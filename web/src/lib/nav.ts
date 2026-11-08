@@ -37,7 +37,7 @@ const TITLES: Record<View["kind"], string> = {
 export const titleOf = (v: View) => TITLES[v.kind];
 
 /** A note's page. */
-const noteHref = (id: string) => `/note/${encodeURIComponent(id)}`;
+export const noteHref = (id: string) => `/note/${encodeURIComponent(id)}`;
 
 /** Marks a history entry as one the app pushed, so a note's Back can go back to it rather than leave the app. */
 const FROM_APP = { fromApp: true };

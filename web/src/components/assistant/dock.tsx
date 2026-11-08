@@ -1,7 +1,9 @@
 // The assistant's dock, mounted once in the shell. From `xl` up it sits beside the page, which shrinks to make room, and
 // its left edge drags to resize; narrower, it covers the page (a right-hand sheet from `md`, the whole screen below): the
 // notes and tasks panes keep their widths, and are not squeezed. Closed, it is gone from the layout, but the chat is not:
-// that is the provider's (provider.tsx).
+// that is the provider's (provider.tsx). Under a finger it is opened by the app bar's Assistant button (or the corner button
+// while closed) and closed by the panel's X: there is no edge to drag and no scrim, the page is behind it, not beside it.
+// Below `md` it is the Ask tab: the whole page above the tab bar (`--dock-bottom`, set by the shell), closed by any other tab.
 import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { Panel } from "@/components/assistant/panel";
 import { clampWidth, DOCK_WIDTH, setDock, useDock } from "@/hooks/dock";
@@ -30,7 +32,7 @@ export function Dock() {
   return (
     <aside data-assistant aria-label="Assistant" style={{ "--dock-w": `${width}px` } as CSSProperties}
       // The rail (240px) and a list with its pane (660px) keep their room: the dock takes what is left, up to its own width
-      className="fixed inset-0 z-40 bg-bg md:left-auto md:w-(--dock-w) md:max-w-full md:border-l md:border-line md:shadow-xl xl:relative xl:inset-auto xl:z-auto xl:max-w-[calc(100vw-900px)] xl:min-w-80 xl:shrink-0 xl:shadow-none">
+      className="fixed inset-0 z-40 bg-bg max-md:bottom-(--dock-bottom) md:left-auto md:w-(--dock-w) md:max-w-full md:border-l md:border-line md:shadow-xl xl:relative xl:inset-auto xl:z-auto xl:max-w-[calc(100vw-900px)] xl:min-w-80 xl:shrink-0 xl:shadow-none">
       <Edge width={width} />
       <Panel />
     </aside>

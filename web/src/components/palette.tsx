@@ -1,56 +1,24 @@
 // Global search: notes and tasks by their text and tags, plus navigation. Enter opens the selected result.
 // A note shows as it does in the notes list (its picture, title, opening prose, tags, age, colour), and on a wide screen
 // the highlighted one is previewed beside the results. When nothing matches, "Search with the assistant" asks the agent to
-// look for what was meant (core/find.ts); its hits fill the same list, each with why it fits. No chat opens.
-import { Hash, House, ListTodo, Loader2, Pin, Plus, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+// look for what was meant (core/find.ts); its hits fill the same list, each with why it fits. No chat opens. A note row's
+// actions are its right-click, and under a finger the ⋮ it shows. On a phone the dialog sits at the top, so the keyboard
+// leaves the results room (the list takes what the viewport has left).
+import { EllipsisVertical, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
 import { ago } from "@/core/time";
+import { fold, snippetOf } from "@/core/notes";
+import { DeleteDialog, MenuAt, TagsDialog } from "@/components/note-actions";
+import { NoteHit, Thumb } from "@/components/note-hit";
 import { TagBadge } from "@/components/tag-badge";
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useAssistant } from "@/hooks/assistant";
 import { useNow } from "@/hooks/now";
-import { useNotePictures } from "@/hooks/thumbs";
-import { Mosaic } from "./note-pictures";
+import { useFinder } from "@/hooks/search";
+import { homeOfTask, titleOf, useNav, type View } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
-import { findByAsking } from "@/services/find";
-import { message } from "@/services/api";
-import type { Found } from "@/core/find";
-import { snippetOf } from "@/core/notes";
-import { matchesTask, parseTagQuery, suggestTags, typingTag } from "@/core/tags";
-import { DeleteDialog, MenuAt, TagsDialog } from "@/components/note-actions";
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useAssistant } from "@/hooks/assistant";
-import { useLensSorted } from "@/hooks/notes";
-import { useTagNames } from "@/hooks/tag-names";
-import { useNav } from "@/lib/nav";
-import { useLensTasks } from "@/hooks/todo";
-import { homeOfTask, titleOf, type View } from "@/lib/nav";
-import { fold } from "@/core/notes";
-import { matches } from "@/lib/search";
-
-/** A note's pictures as a small mosaic, or nothing when it has none or they fail to load. */
-function Thumb({ n, className }: { n: NoteRec; className: string }) {
-  const [ref, pictures, more] = useNotePictures<HTMLSpanElement>(n.note.id, n.note.body);
-  return <span ref={ref} className="contents"><Mosaic sources={pictures} more={more} className={className} /></span>;
-}
-
-/** A note as a result row: its picture, title, two lines of prose, tags and age. Its colour shows in the preview. */
-function NoteHit({ n, now, why }: { n: NoteRec; now: number; why?: string }) {
-  const snippet = useMemo(() => why || snippetOf(n.note.body, 200), [why, n.note.body]);
-  return (
-    <span className="flex w-full min-w-0 items-start gap-3">
-      <Thumb n={n} className="size-14 shrink-0 rounded-md border border-line" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-baseline gap-2">
-          <span className="truncate font-semibold">{n.note.title}</span>
-          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-faint">{n.note.pinned ? <Pin className="mr-1 inline size-3" /> : null}{ago(ms(n.updated), now)}</span>
-        </span>
-        <span className={cn("line-clamp-2 text-xs", why ? "text-fg" : "text-dim")}>{why ? <Sparkles className="mr-1 inline size-3 text-dim" /> : null}{snippet || "Empty"}</span>
-        {n.note.tags.length ? <span className="flex flex-wrap gap-1 pt-0.5">{n.note.tags.slice(0, 4).map((t) => <TagBadge key={t} name={t} />)}</span> : null}
-      </span>
-    </span>
-  );
-}
 
 /** The highlighted note, larger: its picture across the top, the title and more of its prose. */
 function Preview({ n, now }: { n: NoteRec; now: number }) {
@@ -71,47 +39,25 @@ function Preview({ n, now }: { n: NoteRec; now: number }) {
 
 export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenChange: (o: boolean) => void; onNew: () => void }) {
   const assistant = useAssistant();
-  const sorted = useLensSorted();
   const { openNote, showTask, goView } = useNav();
   const [q, setQ] = useState("");
-  const hits = useMemo(() => sorted.filter(matches(q)).slice(0, 50), [sorted, q]);
-  const tasks = useLensTasks();
-  const taskHits = useMemo(() => tasks.data.filter(matchesTask(q)).slice(0, 50), [tasks.data, q]);
+  const { hits, taskHits, tags, empty, asked, ask: askAgent, foundNotes, foundTasks } = useFinder(q);
   const destinations: View[] = [{ kind: "home" }, { kind: "today" }, { kind: "inbox" }, { kind: "upcoming" }, { kind: "logbook" }, { kind: "settings" }];
-  const names = useTagNames();
-  // Tag names holding what is typed, folded (case, tonos): the `#ho` being typed, else the last `#tag`, else the text.
-  const tags = useMemo(() => suggestTags(names, typingTag(q) ?? parseTagQuery(q).tags.at(-1) ?? q), [names, q]);
   const now = useNow();
   const [active, setActive] = useState("");
-  // The assistant's search for `q`: running, its hits, or why it failed. Typing on drops it (and stops one running).
-  const [asked, setAsked] = useState<{ q: string; found?: Found; error?: string } | null>(null);
-  const abort = useRef<AbortController | null>(null);
-  useEffect(() => () => abort.current?.abort(), []);
-  const type = (v: string) => { setQ(v); abort.current?.abort(); setAsked(null); };
-  const askAgent = () => {
-    abort.current?.abort();
-    const c = abort.current = new AbortController(), asking = q;
-    setAsked({ q: asking });
-    findByAsking(asking, c.signal).then((found) => { if (!c.signal.aborted) setAsked({ q: asking, found }); },
-      (e) => { if (!c.signal.aborted) setAsked({ q: asking, error: message(e) }); });
-  };
-  const byPath = useMemo(() => new Map(sorted.map((n) => [n.path, n])), [sorted]);
-  const foundNotes = asked?.found?.notes.flatMap((h) => byPath.get(h.path) ? [{ n: byPath.get(h.path)!, why: h.why }] : []) ?? [];
-  const foundTasks = asked?.found?.tasks.flatMap((h) => { const t = tasks.data.find((x) => x.id === h.id); return t ? [{ t, why: h.why }] : []; }) ?? [];
-  const empty = !!q.trim() && !hits.length && !taskHits.length;
   const previewed = hits.find((n) => n.path === active) ?? foundNotes.find((h) => h.n.path === active)?.n;
   const [menu, setMenu] = useState<{ path: string; x: number; y: number } | null>(null);   // a note row's right-click menu
   const [dialog, setDialog] = useState<"tags" | "delete" | null>(null);                 // opened from it, over `target`
   const [target, setTarget] = useState<string[]>([]);
   const ask = (kind: "tags" | "delete") => { if (menu) setTarget([menu.path]); setDialog(kind); };
-  const run = (f: () => void) => { onOpenChange(false); type(""); f(); };
+  const run = (f: () => void) => { onOpenChange(false); setQ(""); f(); };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags and views. #tag narrows to a tag." className="sm:max-w-2xl md:max-w-4xl">
+    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags and views. #tag narrows to a tag." className="max-sm:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:max-w-[calc(100%-1rem)] sm:max-w-2xl md:max-w-4xl">
       <Command shouldFilter={false} value={active} onValueChange={setActive}>
-        <CommandInput value={q} onValueChange={type} placeholder="Search notes, tasks, or #tag…" />
+        <CommandInput value={q} onValueChange={setQ} placeholder="Search notes, tasks, or #tag…" />
         <div className="flex min-h-0">
-        <CommandList className="max-h-[65vh] min-w-0 flex-1">
+        <CommandList className="max-h-[calc(100dvh-6rem)] min-w-0 flex-1 overscroll-contain md:max-h-[65vh]">
           <CommandEmpty>Nothing matches.</CommandEmpty>
           {hits.length ? (
             <CommandGroup heading="Notes">
@@ -119,6 +65,9 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
                 <CommandItem key={n.path} value={n.path} onSelect={() => run(() => openNote(n.note.id))} className="items-start py-2"
                   onContextMenu={(e) => { e.preventDefault(); setActive(n.path); setMenu({ path: n.path, x: e.clientX, y: e.clientY }); }}>
                   <NoteHit n={n} now={now} />
+                  <button type="button" aria-label="Note actions" title="Note actions"
+                    onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setActive(n.path); setMenu({ path: n.path, x: r.left, y: r.bottom }); }}
+                    className="-my-2 -mr-2 hidden size-10 shrink-0 place-items-center self-center rounded-md text-dim any-pointer-coarse:grid"><EllipsisVertical className="size-4" /></button>
                 </CommandItem>
               ))}
             </CommandGroup>

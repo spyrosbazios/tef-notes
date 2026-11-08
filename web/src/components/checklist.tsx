@@ -27,13 +27,13 @@ export function Checklist({ task }: { task: TaskRec }) {
         <li key={i.id} className="group/item flex items-center gap-2.5">
           <button type="button" role="checkbox" aria-checked={i.done} aria-label={i.done ? `Untick "${i.text}"` : `Tick "${i.text}"`}
             onClick={() => report(changeTask(qc, task.id, (cur) => setItem(cur, i.id, { done: !i.done })))}
-            className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors", i.done ? "border-brand bg-brand text-bg" : "border-faint text-transparent hover:border-brand")}>
+            className={cn("hit relative flex size-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors", i.done ? "border-brand bg-brand text-bg" : "border-faint text-transparent hover:border-brand")}>
             <Check className="size-2.5" strokeWidth={3.5} />
           </button>
           <DraftInput value={i.text} aria-label="Checklist item" onSave={(t) => changeTask(qc, task.id, (cur) => (t.trim() ? setItem(cur, i.id, { text: t }) : removeItem(cur, i.id)))}
             className={cn(bare, "flex-1 text-sm md:text-sm", i.done && "text-faint line-through decoration-faint")} />
           <Button variant="ghost" size="icon-sm" aria-label={`Delete "${i.text}"`} onClick={() => report(changeTask(qc, task.id, (cur) => removeItem(cur, i.id)))}
-            className="size-6 shrink-0 text-faint opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 max-md:opacity-100"><X /></Button>
+            className="size-6 shrink-0 text-faint opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 any-pointer-coarse:opacity-100"><X /></Button>
         </li>
       ))}
       <li className="flex items-center gap-2.5">

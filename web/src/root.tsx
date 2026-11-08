@@ -1,16 +1,28 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { defaultShouldDehydrateQuery, QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { AssistantProvider } from "@/components/assistant/provider";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateToast } from "@/components/update-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useApplyAppearance, useAppearance } from "@/hooks/appearance";
+import { persister } from "@/lib/offline";
+import { buster, MAX_AGE, persistable } from "@/lib/persist";
 import App from "./App";
 
+// gcTime is the persisted cache's maxAge or more: a shorter one would discard the restored queries early. Mutations are never
+// paused for a connection: the ones left here (tags, lenses, push subscriptions, chat removal) have no local copy to wait in, so
+// one that can't reach the server fails at once and is reported. The notes, tasks and links are not mutations: they are written
+// to the local copy and sent by the sync (lib/sync.ts), which names the rev each was based on.
 const qc = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 10_000, retry: 2 },
+    queries: { staleTime: 10_000, retry: 2, gcTime: MAX_AGE },
+    mutations: { networkMode: "always" },
   },
 });
+
+// The tags, lenses, photo lists and link previews, kept in IndexedDB so the app opens offline on what
+// was last fetched (lib/persist.ts, lib/offline.ts). Written at most once a second, and at once when the page is hidden.
+addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") void persister.flush(); });
 
 /** Paints the chosen look (and an active lens's colour) on the page; inside the query client, which the lenses need. */
 function Look() {
@@ -22,7 +34,13 @@ function Look() {
 export function Root() {
   const { scheme } = useAppearance();
   return (
-    <QueryClientProvider client={qc}>
+    <PersistQueryClientProvider
+      client={qc}
+      persistOptions={{
+        persister, maxAge: MAX_AGE, buster: buster(),
+        dehydrateOptions: { shouldDehydrateQuery: (q) => defaultShouldDehydrateQuery(q) && persistable(q.queryKey) },
+      }}
+    >
       <Look />
       <TooltipProvider delayDuration={400}>
         <AssistantProvider>
@@ -31,6 +49,6 @@ export function Root() {
         <Toaster theme={scheme} position="bottom-right" />
         <UpdateToast />
       </TooltipProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

@@ -1,9 +1,10 @@
 // The open task, as Things' card: its title and notes, a checklist, and each thing it can say about itself in a row of
 // its own: When, deadline, repeat, reminder, tags, the notes it is about. Every change is one field
 // written at the task's rev (hooks/todo.ts), redone on the newer record when it moved; the notes are links (hooks/links.ts),
-// outside the rev.
+// outside the rev. Below `md` the card is a bottom sheet over its list (the shadcn drawer), as the phone opens a task, and
+// its pickers (components/pick.tsx) are sheets over it.
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Calendar, Check, ChevronLeft, Flag, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
+import { Bell, Calendar, Check, ChevronDown, Flag, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { dayLabel, whenLabel } from "@/core/dates";
 import { readsAsMarkdown, withLineBreaks } from "@/core/task-notes";
@@ -13,12 +14,14 @@ import { Checklist } from "@/components/checklist";
 import { DraftInput, DraftTextarea } from "@/components/draft-field";
 import { Markdown } from "@/components/markdown";
 import { TagEditor } from "@/components/tag-editor";
-import { WhenPopover } from "@/components/when-picker";
+import { InSheet, Pick } from "@/components/pick";
+import { WhenPick } from "@/components/when-picker";
 import { DeleteTask } from "@/components/task-delete";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { toggleTask, useLingering } from "@/hooks/linger";
+import { useNarrow } from "@/hooks/media";
 import { addLink, removeLink, useLinks } from "@/hooks/links";
 import { useLensSorted, useSorted } from "@/hooks/notes";
 import { changeTask, editTask, useToday } from "@/hooks/todo";
@@ -52,7 +55,7 @@ function LinkedNotes({ task }: { task: TaskRec }) {
   const [open, setOpen] = useState(false), [q, setQ] = useState("");
   const { linked, unseen } = useMemo(() => notesFor(links ?? [], task.id, sorted), [links, task.id, sorted]);
   const taken = useMemo(() => linkedNoteIds(links ?? [], task.id), [links, task.id]);
-  const hits = useMemo(() => scoped.filter((n) => !taken.has(n.rec)).filter(matches(q)).slice(0, 30), [scoped, taken, q]);
+  const hits = useMemo(() => scoped.filter((n) => n.rec && !taken.has(n.rec)).filter(matches(q)).slice(0, 30), [scoped, taken, q]);
   const add = (n: NoteRec) => { setOpen(false); setQ(""); report(addLink(qc, { type: "task", id: task.id }, { type: "note", id: n.rec }, "about")); };
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1 py-1">
@@ -61,22 +64,18 @@ function LinkedNotes({ task }: { task: TaskRec }) {
           onRemove={() => report(removeLink(qc, link.id))} />
       ))}
       {unseen ? <span className="text-sm text-faint">{unseen === 1 ? "A note you can't see yet" : `${unseen} notes you can't see yet`}</span> : null}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button type="button" className={cn(chip, "text-faint")} aria-label="Link a note"><Plus className="size-3.5" />{linked.length || unseen ? "Add" : "None"}</button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-72 p-0">
-          <Command shouldFilter={false}>
-            <CommandInput value={q} onValueChange={setQ} placeholder="Find a note…" />
-            <CommandList>
-              <CommandEmpty>Nothing matches.</CommandEmpty>
-              <CommandGroup>
-                {hits.map((n) => <CommandItem key={n.path} value={n.path} onSelect={() => add(n)}>{n.note.title}</CommandItem>)}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <Pick title="Link a note" width="w-72 p-0" open={open} onOpenChange={setOpen}
+        trigger={<button type="button" className={cn(chip, "text-faint")} aria-label="Link a note"><Plus className="size-3.5" />{linked.length || unseen ? "Add" : "None"}</button>}>
+        <Command shouldFilter={false}>
+          <CommandInput value={q} onValueChange={setQ} placeholder="Find a note…" />
+          <CommandList>
+            <CommandEmpty>Nothing matches.</CommandEmpty>
+            <CommandGroup>
+              {hits.map((n) => <CommandItem key={n.path} value={n.path} onSelect={() => add(n)}>{n.note.title}</CommandItem>)}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </Pick>
     </div>
   );
 }
@@ -115,20 +114,21 @@ function TaskNotes({ task, onSave }: { task: TaskRec; onSave: (notes: string) =>
 export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?: React.ReactNode; onGone: () => void }) {
   const qc = useQueryClient();
   const today = useToday();
+  const narrow = useNarrow(), { openTask } = useNav();
   const lingering = useLingering();
   const [confirm, setConfirm] = useState(false);
   const checked = lingering.get(task.id)?.checked ?? !!task.done;
   const when = whenLabel(task, today);
   const patch = (p: Parameters<typeof editTask>[2]) => report(editTask(qc, task.id, p));
 
-  return (
+  const card = (
     <article className="flex h-full min-h-0 flex-col" aria-label={task.title}>
       <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-2 md:px-4">
         {leading}
         <div className="flex-1" />
-        <WhenPopover value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
+        <WhenPick value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
           <Button variant="ghost" size="icon" aria-label="When" title="When"><Calendar className={when || task.due ? "text-brand" : "text-dim"} /></Button>
-        </WhenPopover>
+        </WhenPick>
         <Button variant="destructive" size="sm" aria-label="Delete the task" title="Delete" onClick={() => setConfirm(true)} className="ml-1"><Trash2 />Delete</Button>
       </header>
 
@@ -150,19 +150,19 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
 
           <div className="space-y-0.5 border-t border-line pt-3">
             <Row icon={task.evening ? Moon : Calendar} label="When">
-              <WhenPopover align="start" value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
+              <WhenPick align="start" value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
                 <button type="button" className={cn(chip, !when && "text-faint")}>{when ?? "No date"}</button>
-              </WhenPopover>
+              </WhenPick>
               {when ? <Clear label="Clear the date" onClick={() => patch(scheduleOf(null))} /> : null}
             </Row>
             <Row icon={Flag} label="Deadline">
-              <WhenPopover align="start" value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
+              <WhenPick align="start" value={whenState(task)} today={today} onSchedule={(s) => patch(scheduleOf(s))} onDue={(d) => patch({ due: d ?? "" })}>
                 <button type="button" className={cn(chip, task.due ? (task.due < today ? "font-semibold text-warn" : "text-warn") : "text-faint")}>{task.due ? dayLabel(task.due, today) : "None"}</button>
-              </WhenPopover>
+              </WhenPick>
               {task.due ? <Clear label="Clear the deadline" onClick={() => patch({ due: "" })} /> : null}
             </Row>
             <Row icon={Repeat} label="Repeat"><RepeatPicker value={task.every} onChange={(every) => patch({ every })} /></Row>
-            <Row icon={Bell} label="Reminder"><RemindPicker value={task.remind} dated={!!task.when} onChange={(remind) => patch({ remind })} /></Row>
+            <Row icon={Bell} label="Reminder"><RemindPicker value={task.remind} dated={!!task.when} today={today} onChange={patch} /></Row>
             <Row icon={Tag} label="Tags"><TaskTags task={task} /></Row>
             <Row icon={NotebookText} label="Notes"><LinkedNotes task={task} /></Row>
           </div>
@@ -172,13 +172,23 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
       <DeleteTask task={confirm ? task : null} onClose={() => setConfirm(false)} onGone={onGone} />
     </article>
   );
+  if (!narrow) return card;
+  return (
+    <Drawer open onOpenChange={(o) => { if (!o) openTask(null); }}>
+      <DrawerContent className="data-[vaul-drawer-direction=bottom]:h-[92dvh] data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
+        <DrawerTitle className="sr-only">{task.title}</DrawerTitle>
+        <InSheet value>{card}</InSheet>
+      </DrawerContent>
+    </Drawer>
+  );
 }
 
-/** The back and menu buttons a narrow window needs on the card: the list and the card take turns there. */
+/** The close and menu buttons a narrow window needs on the card: below `md` the card is a sheet over the list, closed by this
+ *  or by pulling it down; from `md` to `lg` the views menu has no rail to live in. */
 export function DetailLeading({ onBack, onMenu }: { onBack: () => void; onMenu: () => void }) {
   return (
     <>
-      <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Back" onClick={onBack}><ChevronLeft /></Button>
+      <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Close" onClick={onBack}><ChevronDown /></Button>
       <Button variant="ghost" size="icon-sm" className="max-md:hidden lg:hidden" aria-label="Views" onClick={onMenu}><Menu /></Button>
     </>
   );

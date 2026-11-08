@@ -5,6 +5,8 @@
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
+import { PDF } from "./src/photos";
+import { SHARE_PATH } from "./src/share-target";
 import { C, DEFAULT_THEME, THEMES, themeVars, type Theme } from "./src/theme";
 
 type Tag = { tag: string; attrs: Record<string, string>; injectTo: "head" };
@@ -42,8 +44,14 @@ export function identity({ manifest = false } = {}): Plugin {
   let base = "/";
   const icon = () => readFileSync(ICON);
   const webmanifest = () => JSON.stringify({
-    name: "TEF Notes", short_name: "TEF Notes", start_url: base, display: "standalone", theme_color: C.bg, background_color: C.bg,
+    name: "TEF Notes", short_name: "TEF Notes", start_url: base, scope: base, display: "standalone", theme_color: C.bg, background_color: C.bg,
     icons: [{ src: `${base}icon.png`, sizes: "1024x1024", type: "image/png" }],
+    // Android's Share sheet lists the installed app: a link, text, photos or a PDF POSTed to the service worker (web/sw/sw.ts),
+    // which hands them to the Share page (core/share-stash.ts). One `files` entry takes both kinds.
+    share_target: {
+      action: `${base}${SHARE_PATH}`, method: "POST", enctype: "multipart/form-data",
+      params: { title: "title", text: "text", url: "url", files: [{ name: "files", accept: ["image/*", PDF] }] },
+    },
   });
   const tags = (): Tag[] => [
     { tag: "link", attrs: { rel: "icon", type: "image/png", href: `${base}icon.png` }, injectTo: "head" },
