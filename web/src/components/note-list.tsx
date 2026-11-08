@@ -1,5 +1,5 @@
 // Home's notes: every note as a Keep tile in a masonry read by rows, pinned first then by the chosen sort, a page at a time. Search is the
-// palette's (⌘K); here a multiselect narrows to notes carrying every chosen tag, kept in the URL (`?tags=`, lib/nav.ts) so a
+// palette's (⌘K); here a multiselect narrows to notes carrying every chosen tag, kept in the URL (`?tags=`, lib/route-search.ts) so a
 // badge clicked anywhere lands here filtered. Ctrl/cmd-click or a tile's checkbox selects, shift-click selects a range, and
 // the header becomes the bulk bar until Esc. A toggle groups the notes under a header per tag (this browser's choice,
 // hooks/note-view.ts), as the phone's Notes tab does: a note with several tags shows under each, and a group folds away.
@@ -7,6 +7,7 @@
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
+import { useElementScrollRestoration } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
@@ -33,7 +34,8 @@ import { useNow } from "@/hooks/now";
 import { useTagNames } from "@/hooks/tag-names";
 import { useNotePictures } from "@/hooks/thumbs";
 import { Mosaic } from "./note-pictures";
-import { useNav } from "@/lib/nav";
+import { noteLink, useIntent, useNav, type AppLink } from "@/lib/nav";
+import { SCROLL_KEY } from "@/lib/scroll";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
@@ -62,8 +64,8 @@ type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean };
 /** A note as a Keep tile: its picture across the top, the title, the opening prose, tags, then pin and age. A note with a colour
  *  wears it as the tile's tint. On hover a checkbox selects it and a ⋮ opens its actions (a right-click does too); under a finger
  *  both are always there, and holding the tile opens the same menu. */
-function Tile({ id, n, now, selecting, selected, menuPaths, onPick, onCheck, onTag, onTags, onDelete }: {
-  id: string; n: NoteRec; now: number; selecting: boolean; selected: boolean; menuPaths: string[];
+function Tile({ id, n, link, now, selecting, selected, menuPaths, onPick, onCheck, onTag, onTags, onDelete }: {
+  id: string; n: NoteRec; link: AppLink; now: number; selecting: boolean; selected: boolean; menuPaths: string[];
   onPick: (e: Modifiers) => void; onCheck: () => void; onTag: (t: string) => void; onTags: () => void; onDelete: () => void;
 }) {
   const snippet = useMemo(() => snippetOf(n.note.body, 280), [n.note.body]);
@@ -75,13 +77,15 @@ function Tile({ id, n, now, selecting, selected, menuPaths, onPick, onCheck, onT
   const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), press = useTempoTransition(spring.press);
   const moved = useMoved(id, !phone, ref);
   const hold = useLongPress(() => (phone ? onCheck() : setMenu(true)), { menu: !phone });
+  // The note's page and its pictures' list fetched ahead on a hover or a touch, as a link's would be
+  const intent = useIntent(() => link);
   const tint = n.note.color;
   const chrome = cn("absolute top-2 z-10 flex size-6 items-center justify-center rounded-md border border-line bg-card/90 text-dim shadow-sm backdrop-blur hover:text-fg",
     "hit opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 any-pointer-coarse:md:opacity-100", menu && "opacity-100");
   return (
     <motion.div ref={ref} role="button" layout="position" layoutId={phone ? undefined : id} initial={moved ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
       whileTap={touch ? { scale: scale.choice } : undefined} exit={{ opacity: 0, scale: 0.96, transition: fade }} transition={{ ...move, opacity: fade, scale: press }} tabIndex={0} onClick={onPick} onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-      {...hold}
+      {...hold} {...intent}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPick(e); } }}
       aria-selected={selecting ? selected : undefined} data-color={tint}
       className={cn("group relative w-full cursor-pointer overflow-hidden rounded-2xl border text-left transition-colors any-pointer-coarse:select-none",
@@ -134,6 +138,10 @@ function SkeletonTile({ shape }: { shape: (typeof SHAPES)[number] }) {
 
 const PAGE = 30;
 
+/** The tiles to draw at first: a page, and more when the router is about to put the page back further down than one reaches
+ *  (a page of tiles is a screen or more, so a page per 1000px over-reaches rather than leaves the place past the end). */
+const startLimit = (y: number) => PAGE * (1 + Math.ceil(Math.max(0, y) / 1000));
+
 /** What Home's sort reads off a note record. */
 const recSortable = (n: NoteRec) => ({ pinned: n.note.pinned, updated: n.updated, created: n.note.created, path: n.path });
 
@@ -174,11 +182,13 @@ export function TagFilter({ counts, chosen, onChange, what = "Notes" }: { counts
   );
 }
 
-export function NoteList({ onNew }: { onNew: () => void }) {
+/** `scrollId`: Home's scroller, whose place the router is putting back (lib/scroll.ts). */
+export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: string }) {
   const { isPending } = useNotes();
   const { view, openNote, filterTag, setTags } = useNav();
   const chips = useMemo(() => (view.kind === "home" ? view.tags ?? [] : []), [view]);
-  const [limit, setLimit] = useState(PAGE);
+  const back = useElementScrollRestoration({ id: scrollId, getKey: () => SCROLL_KEY });
+  const [limit, setLimit] = useState(() => startLimit(back?.scrollY ?? 0));
   const end = useRef<HTMLDivElement>(null);
   const base = useLensSorted();
   const { grouped, collapsed, sort, setGrouped, fold: foldGroup, setSort } = useNoteView();
@@ -242,7 +252,7 @@ export function NoteList({ onNew }: { onNew: () => void }) {
   const tile = (t: NoteRec, key: string) => {
     const on = picked.includes(t.path), menuPaths = on ? picked : [t.path];
     return (
-      <Tile key={key} id={key} n={t} now={now} selecting={selecting} selected={on} menuPaths={menuPaths}
+      <Tile key={key} id={key} n={t} link={noteLink(t.note.id, { view })} now={now} selecting={selecting} selected={on} menuPaths={menuPaths}
         onPick={(e) => pick(t.path, e)} onCheck={() => check(t.path)} onTag={filterTag}
         onTags={() => ask("tags", menuPaths)} onDelete={() => ask("delete", menuPaths)} />
     );

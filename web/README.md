@@ -3,7 +3,7 @@
 <!-- reviewed: 2026-11-08 -->
 
 The laptop client for [TEF Notes](../README.md): browse and edit notes and tasks, view photos, PDFs and
-drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, wouter and axios.
+drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, TanStack Router and axios.
 
 There is no sign-in. The app talks to the server it was loaded from, so the server must only be reachable over a
 private network (see [`../server/README.md`](../server/README.md)). How the pieces fit, the note format and the write
@@ -49,7 +49,7 @@ and retries as the phone does.
 
 ## The assistant
 
-The agent is a dock on the right, not a page: `src/components/assistant/dock.tsx` is mounted once in the shell (`App.tsx`),
+The agent is a dock on the right, not a page: `src/components/assistant/dock.tsx` is mounted once in the shell (`components/shell.tsx`),
 beside the page from `xl` up (the page shrinks; its left edge drags to resize), over it below that. The rail's Assistant
 item, the header's sparkles button, `a` and Ctrl/Cmd+`/` toggle it; open, width and the current chat are kept per browser
 (`src/hooks/dock.ts`). The `Chat` itself lives in `src/components/assistant/provider.tsx`, above the routes, so navigating
@@ -57,7 +57,7 @@ or closing the dock never drops the thread or a reply still streaming; New chat 
 
 Every request carries `context` (the contract: [`packages/core/src/assistant.ts`](../packages/core/src/assistant.ts)), built
 as it goes out from the URL, the query cache and the selected text (`pageContext` in `src/lib/assistant.ts`). The agent's
-UI tools (`open_note`, `open_task`, `go_view`) are done through the nav and always answered; the turn resumes
+UI tools (`open_note`, `open_task`, `go_view`) are done through the router (`useNav`, `lib/nav.ts`) and always answered; the turn resumes
 by itself after a card's answer or a UI tool's (`resumes`). What the agent writes reaches the page through the realtime
 feed, as any client's writes do. A note's "Ask about this" opens the dock with a draft naming it; there is no `/ask` page.
 
@@ -69,8 +69,9 @@ as a week), then every note as the Notes view's tiles (`NoteList`: masonry read 
 multiselect, the sort from `@/core/note-sort`, 30 tiles at a time as the page scrolls). Every + opens the new-task dialog (`quick-add.tsx`) started from where it was pressed, with
 the card's When, deadline, repeat, reminder and tags (`task-fields.tsx`, shared with `task-detail.tsx`).
 
-A note is a page of its own, `/note/<id>` (`note-page.tsx` around the editor, `note-pane.tsx`): no rail, a Back that returns to
-where the note was opened from (Home when the page was opened by its address). Every way of opening a note goes there. "New note"
+A note is a page of its own laid over the screen it was opened from, `?note=<id>` (`note-page.tsx` around the editor,
+`note-pane.tsx`; see Routing): no rail, a Back that returns to where the note was opened from (the screen under it when the page was
+opened by its address). Every way of opening a note goes there. "New note"
 (`hooks/new-note.ts`) makes an "Untitled" note at once and opens it with the title selected.
 
 Ctrl/Cmd+K is the global palette: notes, tasks (done ones too), tags and views. While the dock is closed, a round
@@ -79,11 +80,11 @@ button at the corner opens it (`assistant/fab.tsx`).
 ## Phone layout
 
 Below `md` (768px) the app is the Android app's layout, so the installed PWA can stand in for it (the phone's own map:
-[`../mobile/AGENTS.md`](../mobile/AGENTS.md)). The shell (`App.tsx`) swaps the rail and the app bar for the phone's bottom tabs
+[`../mobile/AGENTS.md`](../mobile/AGENTS.md)). The shell (`components/shell.tsx`) swaps the rail and the app bar for the phone's bottom tabs
 (`components/tab-bar.tsx`: Home, Tasks, Ask, Settings, a floating pill with the front tab's label on a capsule; hidden on a note
 page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). A note's page is a layer over whatever screen it was opened
-from (`NoteLayer` in `App.tsx`; Home, a task list or Settings): that screen stays mounted under it, `invisible` and `inert`, reading its place
-from `useBehind` (`lib/nav.ts`: the last URL that was not a note's), so Back finds it as it was, with no tiles entering again, no
+from (`NoteLayer` in `components/shell.tsx`; Home, a task list or Settings): that screen stays matched and mounted under it, `invisible`
+and `inert` (Routing, below), so Back finds it as it was, with no tiles entering again, no
 pictures reloaded and the scroll where it was left; the focus goes into the note and back to the tile. Tasks goes back to the list last in front. Ask is the
 assistant's dock opened whole above the bar (`--dock-bottom`), so it is "in front" while the dock is open and any other tab closes it;
 the dock's X and the corner button are not there, and its history button is the phone's Chats. Home is the phone's Home: a header
@@ -95,12 +96,56 @@ drawer taking Home's place (`components/search-drawer.tsx`): `#tag` chips, notes
 assistant" when nothing matches; it and the palette (⌘K, laptop) share their data in `hooks/search.ts` and the note row in
 `components/note-hit.tsx`. Differences from the Android app: scroll-snap stands in for the strip's drag physics (a day does not
 spring as it nears the slot, it steps), the strip does not follow Upcoming scrolled by hand, and a search result's long press opens
-the laptop's note menu. A list comes back where it was left: `lib/scroll-memory.ts` keeps each list's scroll (per view URL and lens) and
-Home's task box (the list in front, its tag filter), and `hooks/scroll-memory.ts` puts the place back instantly when Home returns from another tab
-or a hidden list shows again, re-applying it while tiles and pictures lay out. Upcoming scrolled by hand moves the days strip to the
+the laptop's note menu. A list comes back where it was left: the router restores each list's scroll (Routing, below), and Home keeps its task box (the
+list in front, its tag filter) for as long as the app is open. Upcoming scrolled by hand moves the days strip to the
 section at its top (`TaskList`'s `onView`); the strip answers only a drag of its own, never its own sliding. The phone's header controls (tag
 filter, layout, sort, +) are one 40px outlined square each (`TOOL` in `note-list.tsx`, shared by the task box). Sending closes the assistant's keyboard
 (the Send tap still keeps the focus, so it lands first time). Where `md` and up draws the laptop's layout, nothing changes.
+
+## Routing
+
+[TanStack Router](https://tanstack.com/router/latest/docs/framework/react/overview) with file routes: `src/routes/` is the tree,
+`@tanstack/router-plugin`'s Vite plugin (`vite.config.ts`, before `react()`) generates `src/routeTree.gen.ts` on `dev` and `build`
+(generated, committed so `tsc -b` sees it; never edit it) and splits each route's component into its own chunk. The router, its
+options and the query client are `src/router.ts`; `src/root.tsx` puts it under the providers.
+
+| Route | File | Screen | Search |
+|---|---|---|---|
+| (root) | `__root.tsx` | `components/frame.tsx`: the assistant's chat, toasts, update toast, devtools in dev; 404 `components/not-found.tsx` | |
+| (layout) | `_app.tsx` | `components/shell.tsx`: rail, app bar, tabs, dock, palette, and the note over the screen | `note` |
+| `/` | `_app/index.tsx` | Home | `tags` (a comma list) |
+| `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list and the task beside it | `t` (task id) |
+| `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
+| `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |
+| `/note/$id` | `note.$id.tsx` | redirects to `/?note=<id>`, replacing itself | |
+
+- **Search params** are plain, `?t=abc&tags=a,b`, not the router's JSON default: `parseSearch`/`stringifySearch` and every route's
+  `validateSearch` are `src/lib/route-search.ts` (tested in `test/route-search.test.ts`), so the addresses handed out (Copy link's
+  `/note/<id>`, a reminder's `/today?t=<id>`, the share target's `/share?shared=1`) stay what they were. A validator drops what it
+  doesn't understand. Read a route's own search with `useSearch({ from })`; the loose `strict: false` one carries the raw query.
+- **The note layer.** A note is `?note=<id>` on whichever shell screen it was opened from, so that screen stays the matched route and
+  mounted under the note (no remount, no tiles entering again, scroll untouched); Back pops the param. `/note/<id>` is kept as the
+  public address and redirects. `usePlace`/`useNav` (`src/lib/nav.ts`) are the typed verbs (`openNote`, `showTask`, `goView`,
+  `filterTag`…) and `linkOf(view, { task, note })` the typed link for any place; `router` is exported for code outside React (the
+  service worker's `navigate` message in `update-toast.tsx`).
+- **Data and preload.** Loaders take `context.queryClient` (`createRootRouteWithContext`) and only touch the query cache
+  (`src/lib/loaders.ts`): the shell screens `ensureQueryData` the notes, tasks and links (the local copy, instant once open) and
+  prefetch tags and lenses without waiting; a note about to open prefetches its attachment list. `defaultPreload: "intent"` with
+  `defaultPreloadStaleTime: 0` (the router keeps no second cache; TanStack Query's staleTime decides). Task rows, the task tabs and
+  Settings' sections are `Link`s; a note tile keeps its own click, long press and selection, and gets the same intent preload from
+  `useIntent`. A cold load (first sync) shows `components/pending.tsx` after `defaultPendingMs` (400 ms), never a flash.
+- **Scroll restoration** is the router's (`scrollRestoration: true`). Each scroller carries a `data-scroll-restoration-id` from
+  `src/lib/scroll.ts` (Home per tag filter and lens, each list, each box list, each settings section), and `getScrollRestorationKey`
+  is one constant, so a place is kept per scroller, not per history entry: a tab, the rail or Back all find it. Home's scroller has
+  `overflow-anchor: none` (the browser's anchoring otherwise moved the restored place while the masonry measured), and Home draws
+  enough tiles for the restored depth up front (`useElementScrollRestoration` in `note-list.tsx`).
+- **View transitions:** `defaultViewTransition` is on unless the OS asks for reduced motion (read once in `router.ts`): the seam for a
+  page transition; nothing styles `::view-transition-*` yet.
+- **Adding a route:** a file under `src/routes/` (`_app/<name>.tsx` to sit in the shell) exporting `Route = createFileRoute(...)`, its
+  `validateSearch` in `lib/route-search.ts` with a test, a `loader` that only asks the query cache, a `data-scroll-restoration-id` on
+  its scroller; `bun run dev` or `build` regenerates the tree. A new view kind also goes in `View`, `viewOf` and `linkOf`.
+- **Deep links** need the server's SPA fallback (PocketBase serves `index.html` for unknown paths from `pb_public`) and the service
+  worker's (`NavigationRoute` in `sw/sw.ts`, which leaves `/api/`, `/agent/`, `/_/` and `/extension/` alone).
 
 ## Links
 

@@ -1,7 +1,7 @@
 // Lenses (core/lens.ts) as state: the definitions are TanStack Query state like the tag definitions, the active lens is this
 // browser's own (localStorage, hooks/store.ts), and none is the unfiltered app. The lists read the active lens through
 // `useActiveLens`; code outside a component (a new note, a new task) reads it with `activeLensOf`.
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { activeLens, type Lens, type LensFields } from "@/core/lens";
 import * as lenses from "@/services/lenses";
@@ -9,7 +9,9 @@ import { persisted } from "./store";
 
 export const LENSES = ["lenses"] as const;
 
-export const useLenses = () => useQuery({ queryKey: LENSES, queryFn: lenses.list, refetchOnWindowFocus: true });
+export const lensesQuery = queryOptions({ queryKey: LENSES, queryFn: lenses.list, refetchOnWindowFocus: true });
+
+export const useLenses = () => useQuery(lensesQuery);
 
 const chosen = persisted<{ lens?: string }>("tefnotes.lens", (p) => ({ lens: typeof p.lens === "string" && p.lens ? p.lens : undefined }));
 

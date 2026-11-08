@@ -10,9 +10,10 @@ import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
 import { ReducedMotionConfig, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AnimatePresence, motion, useIsPresent, type Transition } from "motion/react";
 import { Moon, Plus } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
-import type { Link } from "@/core/record-links";
+import type { Link as RecordLink } from "@/core/record-links";
 import { dateOf } from "@/core/things";
 import { landing, reorder } from "@/core/task-order";
 import { matchesTags } from "@/core/tags";
@@ -27,15 +28,14 @@ import { useRowDrag } from "@/hooks/drag";
 import { toggleTask, useLingering } from "@/hooks/linger";
 import { useActiveLens } from "@/hooks/lens";
 import { useLinks } from "@/hooks/links";
-import { calm, useNarrow } from "@/hooks/media";
+import { calm } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
-import { useScrollMemory } from "@/hooks/scroll-memory";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
-import { hrefOf, TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
+import { linkOf, TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
 import { report } from "@/lib/report";
 import { scheduleOf } from "@/lib/schedule";
-import { scrollKey } from "@/lib/scroll-memory";
+import { boxScroll, listScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 
 const EMPTY: Record<TaskView, string> = {
@@ -45,7 +45,7 @@ const EMPTY: Record<TaskView, string> = {
   logbook: "Nothing done yet.",
 };
 
-const NO_LINKS: Link[] = [];
+const NO_LINKS: RecordLink[] = [];
 const NO_TAGS: string[] = [];
 
 /** A day's heading counts as the list's top once it is this far (px) below the box's top edge: its own margin and a little more. */
@@ -92,7 +92,6 @@ function Section({ day, fade, children }: { day?: string; fade: Transition; chil
 }
 
 function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: number }) {
-  const { goView } = useNav();
   const count = { inbox, today, upcoming: 0, logbook: 0 };
   return (
     <nav aria-label="Lists" className="flex gap-1 overflow-x-auto border-b border-line px-3 md:hidden">
@@ -100,10 +99,10 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
       <Highlight controlledItems value={kind} className="inset-x-0 top-auto bottom-0 h-0.5 rounded-none bg-brand">
         {TASK_VIEWS.map((k) => (
           <HighlightItem key={k} value={k} className="-mb-px shrink-0">
-            <button type="button" aria-current={k === kind ? "page" : undefined} onClick={() => goView({ kind: k })}
+            <Link {...linkOf({ kind: k })} aria-current={k === kind ? "page" : undefined}
               className={cn("flex h-10 items-center gap-1.5 px-2.5 text-sm font-semibold transition-colors", k === kind ? "text-fg" : "text-dim")}>
               {titleOf({ kind: k })}{count[k] ? <span className="text-xs font-normal tabular-nums text-faint">{count[k]}</span> : null}
-            </button>
+            </Link>
           </HighlightItem>
         ))}
       </Highlight>
@@ -120,16 +119,16 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   const qc = useQueryClient();
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
-  const { openTask, showTask, task: open } = useNav();
+  const { openTask, task: open } = useNav(), navigate = useNavigate();
   const lingering = useLingering();
   const records = useTasks().data;
-  const narrow = useNarrow();
   const [deleting, setDeleting] = useState<string | null>(null);
   const doomed = (deleting && records?.find((r) => r.id === deleting)) || null;
   const kind = view.kind;
   const lens = useActiveLens(), fade = useTempoTransition(transition.fade);
-  // Kept where it was left: Home's box per list, a view's own list per view. On a phone a task open takes the list's place (it is hidden)
-  const scroller = useScrollMemory<HTMLDivElement>(scrollKey(embedded ? `box:${kind}` : hrefOf(view), lens?.rec), !(narrow && !embedded && open));
+  // Kept where it was left by the router (lib/scroll.ts): Home's box per list, a view's own list per view, each per lens
+  const scroller = useRef<HTMLDivElement>(null);
+  const scrollId = embedded ? boxScroll(kind, lens?.rec) : listScroll(kind, lens?.rec);
   // What the list is of: when it changes the rows are a new list, not rows coming and going
   const of = `${kind}|${lens?.rec ?? ""}|${tags.join(",")}`;
 
@@ -221,7 +220,7 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
         notes={noteSummary(links, t.id, noteTitles)}
         showWhen={kind === "today" && !!t.when && t.when < today}
         drag={reorderable && !l ? rowDrag(section, t.id) : undefined}
-        onTick={() => { void toggleTask(qc, t); }} onOpen={() => (embedded ? showTask(view, t.id) : openTask(t.id))}
+        onTick={() => { void toggleTask(qc, t); }} link={linkOf(view, { task: t.id })} onOpen={() => navigate(linkOf(view, { task: t.id }))}
         onSchedule={(s) => report(editTask(qc, t.id, scheduleOf(s)))} onDue={(d) => report(editTask(qc, t.id, { due: d ?? "" }))} onDelete={() => setDeleting(t.id)} />
     );
   };
@@ -242,7 +241,7 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
       {embedded ? null : <Tabs kind={kind} inbox={views.inbox.length} today={views.today.length + views.evening.length} />}
       {/* The list fades into the page where rows are scrolled out of view (top and bottom), rather than cutting one in half */}
       <ScrollFade asChild size={48} shrink={0} blur={0}>
-      <div ref={scroller} data-task-list tabIndex={-1} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
+      <div ref={scroller} data-scroll-restoration-id={scrollId} data-task-list tabIndex={-1} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
         // Focus is the hover of a finger and a keyboard: a tapped or tabbed row lights its day too, until focus leaves the list
         onFocus={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined}
         onBlur={onHoverDay ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) hover(null); } : undefined}

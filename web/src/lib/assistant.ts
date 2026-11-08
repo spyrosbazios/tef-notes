@@ -19,7 +19,7 @@ export function assistantView(v: View): AssistantView {
 export function webView(v: AssistantView): View | null {
   if (v.kind === "tag") return { kind: "home", tags: [v.tag] };
   const { kind } = v;
-  return kind === "ask" ? null : kind === "notes" || kind === "home" || kind === "pinned" ? { kind: "home" } : kind === "memory" ? { kind: "settings" } : { kind };
+  return kind === "ask" ? null : kind === "notes" || kind === "home" || kind === "pinned" ? { kind: "home" } : kind === "memory" ? { kind: "settings", section: "agent" } : { kind };
 }
 
 /** The URL's state: the open note's id and the open task's id (a task opens only in a task list). */

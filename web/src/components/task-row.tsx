@@ -6,6 +6,7 @@
 // the others close the gap (task-list.tsx's AnimatePresence); a row that is leaving can no longer be tabbed to and hands its focus on.
 import { Bell, Calendar, Check, EllipsisVertical, Flag, GripVertical, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { Link } from "@tanstack/react-router";
 import { motion, useIsPresent, useTransform } from "motion/react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { dayLabel, everyLabel, whenLabel, type Schedule } from "@/core/dates";
@@ -17,11 +18,12 @@ import { WhenPick } from "@/components/when-picker";
 import type { Task } from "@/core/todo";
 import type { RowDrag } from "@/hooks/drag";
 import { useSwipe } from "@/hooks/swipe";
+import type { linkOf } from "@/lib/nav";
 import { DELETE_WIDTH, WHEN_WIDTH } from "@/lib/swipe";
 import { whenState } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
-export function TaskRowView({ task, today, checked, leaving, selected, doomed, notes, showWhen, drag, onTick, onOpen, onSchedule, onDue, onDelete }: {
+export function TaskRowView({ task, today, checked, leaving, selected, doomed, notes, showWhen, drag, link, onTick, onOpen, onSchedule, onDue, onDelete }: {
   task: Task; today: string;
   /** The box as it shows: ticked rows stay in the list a moment before they go. */
   checked: boolean; leaving: boolean; selected: boolean;
@@ -33,6 +35,8 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
   showWhen: boolean;
   /** Set when the row can be dragged to another place in its list. */
   drag?: RowDrag;
+  /** Where the row's title leads: the task open beside its list. */
+  link: ReturnType<typeof linkOf>;
   onTick: () => void; onOpen: () => void; onSchedule: (s: Schedule | null) => void; onDue: (day: string | null) => void; onDelete: () => void;
 }) {
   const [menu, setMenu] = useState(false), [picking, setPicking] = useState(false);
@@ -83,10 +87,10 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
       ) : null}
       <TickBox checked={checked} aria-label={checked ? `Mark "${task.title}" not done` : `Mark "${task.title}" done`} onClick={onTick} className="mt-0.5" />
       <div className="min-w-0 flex-1">
-        <button type="button" onClick={onOpen} title="Open the task"
+        <Link {...link} draggable={false} title="Open the task"
           className={cn("block w-full text-left text-[15px] leading-snug transition-colors", checked ? "text-faint line-through decoration-faint" : "text-fg")}>
           {task.title}
-        </button>
+        </Link>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-faint">
           {notes ? <span className="inline-flex min-w-0 items-center gap-1"><NotebookText className="size-3 shrink-0" /><span className="truncate">{notes.title}</span>{notes.more ? <span className="shrink-0 tabular-nums">+{notes.more}</span> : null}</span> : null}
           {task.checklist.length ? <span className="inline-flex items-center gap-1 tabular-nums" title={`${ticked} of ${task.checklist.length} ticked`}><ListChecks className="size-3" />{ticked}/{task.checklist.length}</span> : null}
