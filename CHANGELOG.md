@@ -5,6 +5,37 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-08
+
+The web app, installed from Chrome on Android, is now the phone client. The Android app stays in the repository for this
+release but gets no new features.
+
+### Added
+
+- The web app is an Android share target: a link, text, photos or a PDF shared from any app land in a `/share` screen that
+  files them through the clip routes (a suggested note, an open task, a new note or task, or the assistant).
+- Offline: notes, tasks and links are kept in IndexedDB and edited offline with the phone's sync contract (pull, push with
+  the base `rev`, a 3-way merge for notes, a field merge for tasks, conflicts listed in Settings → Server & sync); viewed
+  attachments are cached. An offline bar shows what waits.
+- Task reminders as Web Push notifications to the installed app, sent by the agent every minute (`push_subscriptions`,
+  `push_sent`; a VAPID key, `TEF_NOTES_VAPID_SUBJECT`, and the server's `TZ`). Settings → Reminders turns them on per device.
+- A phone layout below the `md` breakpoint: bottom tabs (Home, Tasks, Ask, Settings), a days strip, the task box, a search
+  drawer, tasks and their pickers as bottom sheets, swipe rows (When / Delete), a 1.5 s tick with Undo, long-press menus,
+  a grip handle to reorder, safe areas, toasts at the top.
+- Animate UI as the UI library (`@animate-ui/react`): animated primitives behind the shadcn components, a tick box, task
+  rows that enter, leave and reflow, gliding highlights on every tab strip, scroll fades, status swaps, field shakes,
+  skeleton reveals, a theme wipe. Motion follows the OS's reduced-motion setting.
+
+### Changed
+
+- The service worker is a source worker (`web/sw/sw.ts`): the share target, attachment caching and push handling live
+  there, and a new deploy is still taken on the toast's Reload.
+- The status and navigation bars of the installed app follow the chosen theme.
+
+### Removed
+
+- `vaul` and `tw-animate-css` from the web app.
+
 ## 0.2.0 - 2026-11-08
 
 ### Added
