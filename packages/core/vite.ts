@@ -38,8 +38,9 @@ export function theme(extra?: (t: Theme) => Record<string, string>): Plugin {
 }
 
 /** The tab's identity from the phone's own: its app icon as the favicon (and, with `manifest`, the web manifest's icon,
- *  name and colours). Emitted at build, served from memory in dev; the page names no file. The tags and the manifest
- *  carry the build's `base` (Vite does not prefix a tag a plugin injects). */
+ *  name and colours, in the default theme, beside `manifest-colors.json`, every theme's ground, from which the server serves
+ *  the manifest in the owner's theme: server/pb_hooks/manifest.pb.js). Emitted at build, served from memory in dev; the page
+ *  names no file. The tags and the manifest carry the build's `base` (Vite does not prefix a tag a plugin injects). */
 export function identity({ manifest = false } = {}): Plugin {
   let base = "/";
   const icon = () => readFileSync(ICON);
@@ -53,6 +54,7 @@ export function identity({ manifest = false } = {}): Plugin {
       params: { title: "title", text: "text", url: "url", files: [{ name: "files", accept: ["image/*", PDF] }] },
     },
   });
+  const colors = () => JSON.stringify(Object.fromEntries(Object.values(THEMES).map((t) => [t.name, t.C.bg])));
   const tags = (): Tag[] => [
     { tag: "link", attrs: { rel: "icon", type: "image/png", href: `${base}icon.png` }, injectTo: "head" },
     ...(manifest ? [{ tag: "link", attrs: { rel: "manifest", href: `${base}manifest.webmanifest` }, injectTo: "head" as const }] : []),
@@ -65,12 +67,16 @@ export function identity({ manifest = false } = {}): Plugin {
       s.middlewares.use((req, res, next) => {
         if (req.url === "/icon.png") { res.setHeader("content-type", "image/png"); res.end(icon()); }
         else if (manifest && req.url === "/manifest.webmanifest") { res.setHeader("content-type", "application/manifest+json"); res.end(webmanifest()); }
+        else if (manifest && req.url === "/manifest-colors.json") { res.setHeader("content-type", "application/json"); res.end(colors()); }
         else next();
       });
     },
     generateBundle() {
       this.emitFile({ type: "asset", fileName: "icon.png", source: icon() });
-      if (manifest) this.emitFile({ type: "asset", fileName: "manifest.webmanifest", source: webmanifest() });
+      if (manifest) {
+        this.emitFile({ type: "asset", fileName: "manifest.webmanifest", source: webmanifest() });
+        this.emitFile({ type: "asset", fileName: "manifest-colors.json", source: colors() });
+      }
     },
     transformIndexHtml: tags,
   };
