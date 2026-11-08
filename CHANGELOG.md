@@ -5,7 +5,22 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-08
+
+### Added
+
+- Search by asking: when the search box finds nothing, the assistant searches notes and tasks by meaning and lists what fits and why (web palette and the phone's search drawer). No chat is saved and nothing is written.
+- A per-message effort for the assistant (quick, normal, deep), setting how many steps it takes and how hard it reasons.
+- The editor draws a link alone on its line as a card with a Copy button; a link's summary is the card's lower half.
+- The assistant can summarise a note's links (`summarise_links`), writing the same block as the Summary button.
 - The assistant and MCP tools can create and update tag definitions, including their colour and auto-tagger description.
+
+### Fixed
+
+- Work made on `main` after the launch branch point, missing from 0.1.0, is restored.
+- A link preview from a rate-limited or failing site is retried later, not cached as an empty card for an hour.
+- A link the assistant keeps goes alone on its line, so the editor draws its card.
+- The clipper's popup scrolls inside a fixed height, so it can no longer lock up past Chrome's size cap.
 
 ## 0.1.0 - 2026-11-07
 
