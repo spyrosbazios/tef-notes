@@ -1,31 +1,29 @@
-// Lenses (core/lens.ts) as state: the definitions are TanStack Query state like the tag definitions, the active lens is this
-// browser's own (localStorage, hooks/store.ts), and none is the unfiltered app. The lists read the active lens through
+// Lenses (core/lens.ts) as state: the definitions are TanStack Query state like the tag definitions, the active lens is one of
+// the owner's preferences (hooks/prefs.ts), so every device has the same on, and none is the unfiltered app. The lists read the active lens through
 // `useActiveLens`; code outside a component (a new note, a new task) reads it with `activeLensOf`.
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { activeLens, type Lens, type LensFields } from "@/core/lens";
 import * as lenses from "@/services/lenses";
-import { persisted } from "./store";
+import { prefsNow, setPrefs, usePrefs } from "./prefs";
 
 export const LENSES = ["lenses"] as const;
 
 export const useLenses = () => useQuery({ queryKey: LENSES, queryFn: lenses.list, refetchOnWindowFocus: true });
 
-const chosen = persisted<{ lens?: string }>("tefnotes.lens", (p) => ({ lens: typeof p.lens === "string" && p.lens ? p.lens : undefined }));
-
 /** Turn the lens `rec` on, or none with null. */
-export const setActiveLens = (rec: string | null) => chosen.set({ lens: rec ?? undefined });
+export const setActiveLens = (rec: string | null) => setPrefs({ lens: rec ?? undefined });
 
-/** The lens this browser has on: null when none is, and while the definitions load or when the chosen one is gone (deleted
+/** The lens on: null when none is, and while the definitions load or when the chosen one is gone (deleted
  *  from another device). */
 export function useActiveLens(): Lens | null {
-  const [{ lens }] = chosen.use();
+  const { lens } = usePrefs();
   const { data } = useLenses();
   return useMemo(() => activeLens(data ?? [], lens), [data, lens]);
 }
 
 /** The same, for code outside a component. */
-export const activeLensOf = (qc: QueryClient): Lens | null => activeLens(qc.getQueryData<Lens[]>(LENSES) ?? [], chosen.read().lens);
+export const activeLensOf = (qc: QueryClient): Lens | null => activeLens(qc.getQueryData<Lens[]>(LENSES) ?? [], prefsNow().lens);
 
 function useChange<V, R>(fn: (v: V) => Promise<R>) {
   const qc = useQueryClient();

@@ -1,6 +1,6 @@
-// The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens this browser has on (or none), make, edit and delete lenses.
+// The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens on, or none (every device follows), make, edit and delete lenses.
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
-// carries its first tag. The definitions are the server's, shared by every device; which one is on is this browser's.
+// carries its first tag. The definitions are the server's, shared by every device; which one is on is a preference too (hooks/prefs.ts).
 import { Check, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
@@ -81,7 +81,7 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
   );
 }
 
-/** The primary colour the app takes while the lens is on: none (this browser's own) or one of the accents. */
+/** The primary colour the app takes while the lens is on: none (the chosen accent) or one of the accents. */
 function LensAccent({ value, onChange }: { value: LensAccentName | null; onChange: (a: LensAccentName | null) => void }) {
   const { theme, accent: own } = useAppearance();
   const label = (a: LensAccentName | null) => (a ? ACCENTS[a].label : "This browser's own");

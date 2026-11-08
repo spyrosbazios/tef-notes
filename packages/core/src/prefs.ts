@@ -1,7 +1,7 @@
 // Preferences: how the owner likes the app, kept on the server so the laptop and the phone agree. One record of the
 // `prefs` collection (pb_migrations/1794400000_prefs.js), keyed `owner`, holding `data`: a Prefs, read back through `prefsOf`
-// whatever was stored (an unknown or missing field is its default). Edited whole: the last save wins. Which lens is on stays
-// each device's own (lens.ts): a laptop and a phone are often in different contexts.
+// whatever was stored (an unknown or missing field is its default). Edited whole: the last save wins. Which lens is on is one
+// of them, so every device shows the same filter.
 // Pure and platform-neutral.
 import { effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
@@ -29,6 +29,8 @@ export type Prefs = {
   tabs: Tab[];
   hidden: Tab[];
   start: Start;
+  /** The lens on (its record id; lens.ts), none for the unfiltered app. */
+  lens?: string;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -61,6 +63,7 @@ export function prefsOf(raw: unknown): Prefs {
     tabs: [...tabs, ...TABS.filter((t) => !tabs.includes(t))],
     hidden: tabsIn(p.hidden).filter((t) => HIDEABLE.includes(t)),
     start: STARTS.find((s) => s === p.start) ?? "home",
+    ...(typeof p.lens === "string" && p.lens ? { lens: p.lens } : {}),
   };
 }
 

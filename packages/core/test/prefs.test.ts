@@ -13,6 +13,8 @@ describe("prefsOf", () => {
     expect(p.tabs).toEqual(["ask", "home", "tasks", "settings"]);
     expect(p.hidden).toEqual(["tasks"]);
     expect(p.start).toBe("today");
+    expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
+    expect(prefsOf({ lens: "" }).lens).toBeUndefined();
     expect(p.notes).toEqual({ grouped: true, collapsed: ["a"], sort: "created" });
     expect(p.agent).toEqual({ effort: "deep", unasked: false });
   });

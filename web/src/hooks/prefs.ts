@@ -23,7 +23,17 @@ function adopt() {
   })));
   ["tefnotes.appearance", "tefnotes.note-view", "tefnotes.agent"].forEach((k) => localStorage.removeItem(k));
 }
-try { adopt(); } catch { /* storage unavailable: the defaults */ }
+// One-shot, likewise: the lens this browser had on, from before it was a preference. Delete with `adopt`.
+function adoptLens() {
+  const raw = localStorage.getItem("tefnotes.lens");
+  if (raw === null) return;
+  let lens: unknown;
+  try { lens = JSON.parse(raw)?.lens; } catch { /* none */ }
+  const now = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+  if (typeof lens === "string" && lens && !now.lens) localStorage.setItem(KEY, JSON.stringify({ ...now, lens, dirty: true }));
+  localStorage.removeItem("tefnotes.lens");
+}
+try { adopt(); adoptLens(); } catch { /* storage unavailable: the defaults */ }
 
 const local = persisted<Prefs & { rec?: string; dirty?: boolean }>(KEY, (p) => ({
   ...prefsOf(p), ...(typeof p.rec === "string" && p.rec ? { rec: p.rec } : {}), ...(p.dirty === true ? { dirty: true } : {}),
