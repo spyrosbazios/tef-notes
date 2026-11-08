@@ -1,47 +1,23 @@
-// This browser's look: the theme and the accent (localStorage, per browser, like the phone's pref), applied to the page
+// The look: the theme and the accent (the owner's preferences, hooks/prefs.ts, so every device has the same), applied to the page
 // the way the phone's WebView pages take theirs (page-theme.ts), so the same palette in theme.ts paints both.
-import { useCallback, useLayoutEffect, useSyncExternalStore } from "react";
+import { useCallback, useLayoutEffect } from "react";
 import { flushSync } from "react-dom";
-import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, pageTheme, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
+import { pageTheme, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { lensAccent } from "@/core/lens";
 import { applyPageTheme } from "@/page-theme";
 import { useActiveLens } from "./lens";
 import { calm, typedTransitions } from "./media";
+import { setPrefs, usePrefs } from "./prefs";
 
-const KEY = "tefnotes.appearance";
 type Look = { theme: ThemeName; accent: AccentName };
-const listeners = new Set<() => void>();
-let cached: { raw: string | null; look: Look } | undefined;
 
-function read(): Look {
-  const raw = localStorage.getItem(KEY);
-  if (cached?.raw === raw) return cached.look;
-  let look: Look = { theme: DEFAULT_THEME, accent: DEFAULT_ACCENT };
-  try {
-    const p = JSON.parse(raw ?? "{}");
-    look = {
-      theme: THEME_NAMES.find((n) => n === p.theme) ?? DEFAULT_THEME,
-      accent: ACCENT_NAMES.find((a) => a === p.accent) ?? DEFAULT_ACCENT,
-    };
-  } catch { /* an unreadable setting is no setting */ }
-  cached = { raw, look };
-  return look;
-}
-
-/** This browser's theme and accent, and the scheme of the theme; `set` merges a pick and tells every hook using them, wiping the
+/** The chosen theme and accent, and the scheme of the theme; `set` merges a pick and tells every hook using them, wiping the
  *  page from one look to the next (a View Transition, `::view-transition-new(root)` in index.css) unless the OS asks for less
  *  motion or the browser has no typed transitions. Only a pick made here wipes: a lens's accent (`useApplyAppearance`) switches all day, so it cuts. */
 export function useAppearance() {
-  const { theme, accent } = useSyncExternalStore((cb) => {
-    listeners.add(cb);
-    addEventListener("storage", cb);
-    return () => { listeners.delete(cb); removeEventListener("storage", cb); };
-  }, read);
+  const { theme, accent } = usePrefs();
   const set = useCallback((patch: Partial<Look>) => {
-    const apply = () => {
-      localStorage.setItem(KEY, JSON.stringify({ ...read(), ...patch }));
-      listeners.forEach((l) => l());
-    };
+    const apply = () => setPrefs(patch);
     // flushSync: the new look (and its layout effect, which writes the variables) is in the DOM when the browser takes the new snapshot.
     // The type `look` is what index.css's wipe is scoped to, so a route's transition (router.ts) never plays it.
     if (calm() || !typedTransitions()) apply();
@@ -51,7 +27,7 @@ export function useAppearance() {
 }
 
 /** Puts the look on the page: the `--tf-*` variables, `color-scheme`, the `dark` class tailwind's variant reads, and
- *  `data-scheme`. The primary colour is the active lens's when it has one (core/lens.ts `lensAccent`), else this browser's.
+ *  `data-scheme`. The primary colour is the active lens's when it has one (core/lens.ts `lensAccent`), else the chosen one.
  *  Mounted once, in root.tsx's `Look`. */
 export function useApplyAppearance() {
   const { theme, accent, scheme } = useAppearance();

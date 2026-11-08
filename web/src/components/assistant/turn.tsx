@@ -4,7 +4,7 @@
 import { CopyButton, CopyButtonIcon } from "@animate-ui/react/primitives/buttons/copy";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
-import { ArrowUpRight, Check, ChevronDown, Copy, ListChecks, Loader2, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Copy, FileText, ListChecks, Loader2, TriangleAlert } from "lucide-react";
 import { motion } from "motion/react";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import remend from "remend";
@@ -144,7 +144,21 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
   if (m.role === "user") {
     // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
     const text = plainShared(m.parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
-    return <Rise live={live}><div className="flex justify-end"><p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-raised px-3.5 py-2 text-sm">{text}</p></div></Rise>;
+    const files = m.parts.filter((p) => p.type === "file");
+    return (
+      <Rise live={live}>
+        <div className="flex flex-col items-end gap-1.5">
+          {files.length ? (
+            <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+              {files.map((f, i) => f.mediaType.startsWith("image/")
+                ? <img key={i} src={f.url} alt={f.filename ?? "Photo"} className="max-h-40 max-w-48 rounded-xl border border-line object-cover" />
+                : <span key={i} className="flex max-w-56 items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-xs"><FileText className="size-4 shrink-0 text-dim" /><span className="truncate">{f.filename ?? "PDF"}</span></span>)}
+            </div>
+          ) : null}
+          {text ? <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-raised px-3.5 py-2 text-sm">{text}</p> : null}
+        </div>
+      </Rise>
+    );
   }
   const { parts } = m;
   const answer = parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n").trim();

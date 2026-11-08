@@ -6,7 +6,7 @@
 // into a sheet and lay the dock over the page, and on a phone-width one the list and the task take turns. An open task brings its
 // own bar, so the narrow app bar steps aside and its back and menu buttons sit in that bar. Installed on a phone it is the whole
 // screen (`h-dvh`, which follows the keyboard: index.html's `interactive-widget`), padded by the safe-area insets.
-// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Ask, Settings) instead of the rail and the app bar, Home
+// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Ask, Settings, in the owner's order) instead of the rail and the app bar, Home
 // drawing its own header (lens, search), the Tasks tab the list with its own switcher (task-list.tsx), Ask the dock opened whole. From `md` to
 // `lg` the app bar's buttons are the touch way to everything the keys do: Views, Assistant (a), Search (/ and ⌘K), New note or task (n, q).
 import { Command as CommandIcon, Menu, Plus, Sparkles } from "lucide-react";

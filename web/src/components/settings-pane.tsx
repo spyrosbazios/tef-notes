@@ -1,18 +1,21 @@
-// Settings: the look (theme and accent: this browser's), the server and the offline copy this browser keeps, the agent (which model
-// Ask uses, how hard it thinks, whether it writes notes without asking: this browser's choices; what it remembers of the owner,
+// Settings: the look (theme and accent), the phone's tabs and where the app opens (all the owner's preferences, on the server,
+// hooks/prefs.ts), the server and the offline copy this browser keeps, the agent (which model
+// Ask uses, how hard it thinks, whether it writes notes without asking: preferences too; what it remembers of the owner,
 // agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
 // definition), and import and export. A window lists the sections beside the page; below `md` the list is the page and a
 // section opens over it (`?section=`), as the phone's Settings tab does.
+import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { Bell, Bot, Check, ChevronLeft, ChevronRight, Download, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
+import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Markdown } from "@/components/markdown";
@@ -30,6 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useModel } from "@/hooks/agent";
 import { useAppearance } from "@/hooks/appearance";
+import { setPrefs, usePrefs } from "@/hooks/prefs";
 import { useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
 import { useSyncStatus } from "@/hooks/sync";
@@ -51,6 +55,8 @@ import { cn } from "@/lib/utils";
 
 /** A tag is one word: it is written on the note's `tags:` line and typed as `#tag` in search. */
 const clean = (v: string) => v.trim().replace(/^#/, "");
+/** A section's title stays at the top of the scrolling page. */
+const HEAD = "sticky top-(--settings-top,0px) z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
 const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). */
@@ -75,8 +81,8 @@ function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: s
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
-        <form onSubmit={submit} className="space-y-4">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+        <form onSubmit={submit} className="min-w-0 space-y-4">
           <DialogHeader>
             <DialogTitle>{tag ? "Edit tag" : "New tag"}</DialogTitle>
             <DialogDescription>{tag ? "Notes already carrying the old name keep it." : "A tag is one word, written on a note and typed as #tag in search."}</DialogDescription>
@@ -88,7 +94,7 @@ function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: s
           </div>
           <div className="space-y-1.5">
             <Label>Colour</Label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {COLORS.map((c) => (
                 <button key={c} type="button" data-color={c} aria-label={c} aria-pressed={color === c} onClick={() => setColor(c)}
                   className={cn("grid size-7 place-items-center rounded-full border-2 bg-tile text-tile-fg", color === c ? "border-tile-fg" : "border-tile-line/50")}>
@@ -99,7 +105,7 @@ function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: s
             </div>
           </div>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <Label htmlFor="tag-desc">What it means</Label>
               <Button type="button" variant="ghost" size="sm" className="h-7 gap-1.5 rounded-full text-xs" disabled={!n || bad || describe.isPending} onClick={generate}>
                 <Sparkles className="size-3.5" />{describe.isPending ? "Writing…" : "Generate from notes"}
@@ -155,29 +161,9 @@ function Appearance() {
   const label = (a: AccentName) => (a === "theme" ? `${THEMES[theme].label}'s own` : ACCENTS[a].label);
   return (
     <section className="space-y-3" aria-labelledby="appearance-h">
-      <h2 id="appearance-h" className="font-bold text-lg tracking-tight">Appearance</h2>
-      <p className="text-sm text-dim">The theme and the primary colour are this browser's, as the phone keeps its own.</p>
+      <h2 id="appearance-h" className={HEAD}>Appearance</h2>
+      <p className="text-sm text-dim">Kept on the server: every device you open the app on has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
-        <div className="space-y-2.5 px-3 py-2.5">
-          <p id="theme-h" className="text-sm font-semibold">Theme</p>
-          <div role="radiogroup" aria-labelledby="theme-h" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {THEME_NAMES.map((n) => {
-              const on = n === theme;
-              return (
-                <button key={n} type="button" role="radio" aria-checked={on} onClick={() => set({ theme: n })}
-                  className={cn("flex flex-col items-start gap-2 rounded-xl border-2 p-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                    on ? "border-brand" : "border-line")}>
-                  <span className="flex w-full items-start justify-between">
-                    <Swatch name={n} accent={accent} />
-                    {on ? <Check className="size-4 text-brand" strokeWidth={2.6} /> : null}
-                  </span>
-                  <span className="block text-sm font-semibold">{THEMES[n].label}</span>
-                  <span className="block text-[13px] leading-snug text-dim">{ABOUT[n]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
         <div className="space-y-2.5 px-3 py-2.5">
           <div className="flex items-baseline justify-between gap-2">
             <p id="accent-h" className="text-sm font-semibold">Primary colour</p>
@@ -198,6 +184,69 @@ function Appearance() {
             })}
           </div>
         </div>
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p id="theme-h" className="text-sm font-semibold">Theme</p>
+          <div role="radiogroup" aria-labelledby="theme-h" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {THEME_NAMES.map((n) => {
+              const on = n === theme;
+              return (
+                <button key={n} type="button" role="radio" aria-checked={on} onClick={() => set({ theme: n })}
+                  className={cn("flex flex-col items-start gap-2 rounded-xl border-2 p-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                    on ? "border-brand" : "border-line")}>
+                  <span className="flex w-full items-start justify-between">
+                    <Swatch name={n} accent={accent} />
+                    {on ? <Check className="size-4 text-brand" strokeWidth={2.6} /> : null}
+                  </span>
+                  <span className="block text-sm font-semibold">{THEMES[n].label}</span>
+                  <span className="block text-[13px] leading-snug text-dim">{ABOUT[n]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The phone's bottom bar and where the app opens (core/prefs.ts). */
+function Layout() {
+  const { tabs, hidden, start } = usePrefs();
+  return (
+    <section className="space-y-3" aria-labelledby="layout-h">
+      <h2 id="layout-h" className={HEAD}>Layout</h2>
+      <p className="text-sm text-dim">The tabs at the bottom of the phone and the screen the app opens on. Kept on the server, like the look.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p id="start-h" className="text-sm font-semibold">Open on</p>
+          <div role="radiogroup" aria-labelledby="start-h" className="flex flex-wrap gap-2">
+            {STARTS.map((s) => (
+              <Button key={s} type="button" role="radio" aria-checked={s === start} size="sm" variant={s === start ? "default" : "outline"} onClick={() => setPrefs({ start: s })}>
+                {START_LABEL[s]}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="px-3 py-2.5">
+          <p className="text-sm font-semibold">Tabs</p>
+          <p className="text-[13px] leading-snug text-dim">Their order on the bar. Settings stays, so the bar can always be changed back.</p>
+        </div>
+        <ul aria-label="Tabs">
+          {tabs.map((t, i) => {
+            const shown = !hidden.includes(t);
+            return (
+              <li key={t} className="flex items-center gap-2 border-t border-line px-3 py-1.5">
+                <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{TAB_LABEL[t]}</span>
+                {HIDEABLE.includes(t) ? (
+                  <Switch checked={shown} aria-label={`Show ${TAB_LABEL[t]}`}
+                    onCheckedChange={(on) => setPrefs({ hidden: on ? hidden.filter((h) => h !== t) : [...hidden, t] })} />
+                ) : null}
+                <Button variant="ghost" size="icon" aria-label={`Move ${TAB_LABEL[t]} up`} disabled={i === 0} onClick={() => setPrefs({ tabs: movedTab(tabs, t, -1) })}><ArrowUp /></Button>
+                <Button variant="ghost" size="icon" aria-label={`Move ${TAB_LABEL[t]} down`} disabled={i === tabs.length - 1} onClick={() => setPrefs({ tabs: movedTab(tabs, t, 1) })}><ArrowDown /></Button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
@@ -211,12 +260,18 @@ function Tags() {
   const [editing, setEditing] = useState<TagDef | null | undefined>(undefined);     // undefined: closed, null: a new one
   const [defining, setDefining] = useState<string>();                                // a new one's name, from the tags in use
   const [deleting, setDeleting] = useState<TagDef>();
+  const [q, setQ] = useState("");
   const loose = useMemo(() => undefinedTags(data ?? [], [...notes.map((n) => n.note.tags), ...tasks.map((t) => t.tags)]), [data, notes, tasks]);
   const used = useMemo(() => {
     const m = new Map<string, number>();
     for (const n of notes) for (const t of n.note.tags) m.set(t.toLowerCase(), (m.get(t.toLowerCase()) ?? 0) + 1);
+    for (const t of tasks) for (const g of t.tags) m.set(g.toLowerCase(), (m.get(g.toLowerCase()) ?? 0) + 1);
     return m;
-  }, [notes]);
+  }, [notes, tasks]);
+  const find = clean(q).toLowerCase(), hit = (name: string) => !find || name.toLowerCase().includes(find);
+  const count = (name: string) => used.get(name.toLowerCase()) ?? 0;
+  const defs = (data ?? []).filter((t) => hit(t.name)).toSorted((a, b) => count(b.name) - count(a.name) || a.name.localeCompare(b.name));
+  const looseShown = loose.filter((t) => hit(t.name)).toSorted((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   const confirmDelete = async () => {
     if (!deleting) return;
@@ -226,33 +281,36 @@ function Tags() {
 
   return (
     <section className="space-y-3" aria-labelledby="tags-h">
-      <div className="flex items-center gap-2">
+      <div className={cn(HEAD, "flex items-center gap-2")}>
         <h2 id="tags-h" className="flex-1 font-bold text-lg tracking-tight">Tags</h2>
         <Button size="sm" className="rounded-full" onClick={() => setEditing(null)}><Plus /> Add tag</Button>
       </div>
       <p className="text-sm text-dim">A tag's colour paints its badge on every device. The description is what the AI reads to decide whether a note belongs.
         The server tags notes itself, about a minute after a save: every tag that likely fits goes on, and one you take off stays off.</p>
+      {data?.length || loose.length ? (
+        <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tags" aria-label="Search tags" />
+      ) : null}
       {isPending ? <Skeleton className="h-16 rounded-xl" /> : isError ? <p className="text-sm text-down">The tags can't be loaded.</p>
-        : data.length || loose.length ? (
+        : defs.length || looseShown.length ? (
           <ul className="divide-y divide-line rounded-xl border border-line">
-            {data.map((t) => (
+            {defs.map((t) => (
               <li key={t.rec} className="flex items-start gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-center gap-2"><TagBadge name={t.name} /><span className="text-xs tabular-nums text-faint">{used.get(t.name.toLowerCase()) ?? 0} notes</span></div>
+                  <div className="flex items-center gap-2"><TagBadge name={t.name} /><span className="text-xs tabular-nums text-faint">{count(t.name)} {count(t.name) === 1 ? "item" : "items"}</span></div>
                   {t.description ? <p className="text-[13px] leading-snug text-dim">{t.description}</p> : null}
                 </div>
                 <Button variant="ghost" size="icon" aria-label={`Edit ${t.name}`} onClick={() => setEditing(t)}><Pencil className="text-dim" /></Button>
                 <Button variant="ghost" size="icon" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}><Trash2 className="text-dim" /></Button>
               </li>
             ))}
-            {loose.map((t) => (
+            {looseShown.map((t) => (
               <li key={`loose:${t.name}`} className="flex items-start gap-3 px-3 py-2.5">
                 <div className="flex min-w-0 flex-1 items-center gap-2"><TagBadge name={t.name} /><span className="text-xs tabular-nums text-faint">{t.count} {t.count === 1 ? "item" : "items"}</span></div>
                 <Button variant="ghost" size="icon" aria-label={`Edit ${t.name}`} onClick={() => { setDefining(t.name); setEditing(null); }}><Pencil className="text-dim" /></Button>
               </li>
             ))}
           </ul>
-        ) : <p className="rounded-xl border border-dashed border-line px-3 py-8 text-center text-sm text-faint">No tags defined yet.</p>}
+        ) : <p className="rounded-xl border border-dashed border-line px-3 py-8 text-center text-sm text-faint">{find ? `No tag matches “${find}”.` : "No tags defined yet."}</p>}
 
 
       {editing !== undefined ? <TagDialog key={editing?.rec ?? `new:${defining ?? ""}`} tag={editing} name={defining} onClose={() => { setEditing(undefined); setDefining(undefined); }} /> : null}
@@ -277,12 +335,12 @@ function Agent() {
   return (
     <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
-      <h2 id="agent-h" className="font-bold text-lg tracking-tight">Agent</h2>
-      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys; the model and the switch below are this browser's.</p>
+      <h2 id="agent-h" className={HEAD}>Agent</h2>
+      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys, and the model and the switch below, so every device has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
-          <ModelMenu />
+          <ModelMenu align="end" />
         </div>
         <label className="flex items-center gap-3 px-3 py-2.5">
           <span className="min-w-0 flex-1">
@@ -309,7 +367,7 @@ function Memory() {
   const { data, isPending } = useQuery({ queryKey: ["memory"], queryFn: memory });
   return (
     <section className="space-y-3" aria-labelledby="memory-h">
-      <h2 id="memory-h" className="font-bold text-lg tracking-tight">Agent memory</h2>
+      <h2 id="memory-h" className={HEAD}>Agent memory</h2>
       <p className="text-sm text-dim">The agent (Ask, here and on the phone) keeps this file about you and how you keep notes, and rewrites it on its own.</p>
       <div className="rounded-xl border border-line px-4 py-3">
         {isPending ? <Skeleton className="h-24" /> : data?.text.trim() ? <Markdown body={data.text} /> : <p className="text-sm text-faint">Empty: the agent hasn't written anything yet.</p>}
@@ -329,7 +387,7 @@ function Export() {
   };
   return (
     <section className="space-y-3" aria-labelledby="export-h">
-      <h2 id="export-h" className="font-bold text-lg tracking-tight">Export</h2>
+      <h2 id="export-h" className={HEAD}>Export</h2>
       <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
         <p className="min-w-0 flex-1 text-[13px] leading-snug text-dim">Every note as a markdown file, with the photos and PDFs they link, in one zip. A single note downloads from its own menu.</p>
         <Button variant="outline" className="rounded-full" disabled={isPending || busy || !data?.length} onClick={() => { void run(); }}>
@@ -366,7 +424,7 @@ function Import() {
   const files = (e: { target: HTMLInputElement }) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; return f; };
   return (
     <section className="space-y-3" aria-labelledby="import-h">
-      <h2 id="import-h" className="font-bold text-lg tracking-tight">Import</h2>
+      <h2 id="import-h" className={HEAD}>Import</h2>
       <div className="space-y-3 rounded-xl border border-line px-3 py-2.5">
         <p className="text-[13px] leading-snug text-dim">Every markdown file in a folder, or in a zip such as Export makes, as a note; the photos and PDFs they link come along as attachments. Nothing is written until you confirm.</p>
         <div className="flex flex-wrap gap-2">
@@ -417,7 +475,7 @@ function ServerSync() {
   const sync = () => { void Promise.all([syncNow(), qc.invalidateQueries()]).then(() => toast("Up to date")); };
   return (
     <section className="space-y-3" aria-labelledby="server-h">
-      <h2 id="server-h" className="font-bold text-lg tracking-tight">Server &amp; sync</h2>
+      <h2 id="server-h" className={HEAD}>Server &amp; sync</h2>
       <p className="text-sm text-dim">Notes, photos and the agent live on the server this page was loaded from. There is no sign-in: it must only be reachable on a private network.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Server" detail={location.host} trailing={<span className={cn("text-[13px]", online ? "text-dim" : "text-warn")}>{online ? "Reachable" : "Not reachable"}</span>} />
@@ -471,7 +529,7 @@ function Reminders() {
     : "Rings at the time a task's reminder is set to, even when the app is closed.";
   return (
     <section className="space-y-3" aria-labelledby="reminders-h">
-      <h2 id="reminders-h" className="font-bold text-lg tracking-tight">Reminders</h2>
+      <h2 id="reminders-h" className={HEAD}>Reminders</h2>
       <p className="text-sm text-dim">A task with a day and a reminder time can notify you. Each device turns this on for itself; the server keeps the list of devices and sends the notifications.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <label className="flex items-center gap-3 px-3 py-2.5">
@@ -490,6 +548,7 @@ function Reminders() {
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
+  { id: "layout", label: "Layout", about: "Phone tabs, the screen it opens on", icon: LayoutGrid, body: Layout },
   { id: "server", label: "Server & sync", about: "Server, offline copy", icon: Server, body: ServerSync },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
@@ -510,12 +569,14 @@ export function SettingsPane() {
           <div className="px-4 pt-3 pb-28">
             {at ? (
               <>
-                <Link to="/settings" search={{}} className="-ml-2 mb-3 inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-dim hover:bg-muted"><ChevronLeft className="size-4" />Settings</Link>
-                <at.body />
+                <div className="sticky top-0 z-20 -mx-4 -mt-3 h-11 bg-bg/95 px-2 pt-0.5 backdrop-blur">
+                  <Link to="/settings" search={{}} className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-dim hover:bg-muted"><ChevronLeft className="size-4" />Settings</Link>
+                </div>
+                <div className="[--settings-top:2.75rem]"><at.body /></div>
               </>
             ) : (
               <>
-                <h1 className="mb-3 px-1 text-[22px] font-bold tracking-tight">Settings</h1>
+                <PageHeader title="Settings" className="-mx-4 -mt-3 mb-2" />
                 <ul className="divide-y divide-line rounded-xl border border-line">
                   {SECTIONS.map(({ id, label, about, icon: Icon }) => (
                     <li key={id}>

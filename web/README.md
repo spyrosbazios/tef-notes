@@ -113,7 +113,7 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 |---|---|---|---|
 | (root) | `__root.tsx` | `components/frame.tsx`: the assistant's chat, toasts, update toast, devtools in dev; 404 `components/not-found.tsx` | |
 | (layout) | `_app.tsx` | `components/shell.tsx`: rail, app bar, tabs, dock, palette, and the note over the screen | `note` |
-| `/` | `_app/index.tsx` | Home | `tags` (a comma list) |
+| `/` | `_app/index.tsx` | Home; a bare launch goes on to the chosen start screen (`lib/start.ts`, `beforeLoad`) | `tags` (a comma list) |
 | `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list and the task beside it | `t` (task id) |
 | `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
 | `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |

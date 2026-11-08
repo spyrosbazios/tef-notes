@@ -232,18 +232,28 @@ export const DEFAULT_THEME: ThemeName = "oled";
 
 /** The primary colour, picked over any theme in Settings > Appearance: `theme` keeps the theme's own brand. Each accent
  *  has a tone for dark grounds (pale, ~8:1 on black) and one for light grounds (deep, AA on white and on sepia paper). */
-export const ACCENT_NAMES = ["theme", "violet", "blue", "teal", "green", "amber", "orange", "rose", "pink"] as const;
+export const ACCENT_NAMES = ["theme", "violet", "indigo", "blue", "sky", "cyan", "teal", "mint", "green", "lime", "yellow", "amber", "orange", "coral", "red", "rose", "pink", "magenta", "slate"] as const;
 export type AccentName = (typeof ACCENT_NAMES)[number];
 
 export const ACCENTS: Record<Exclude<AccentName, "theme">, { label: string; dark: string; light: string }> = {
   violet: { label: "Violet", dark: "#b39bff", light: "#6750a4" },
+  indigo: { label: "Indigo", dark: "#a5b0ff", light: "#3949ab" },
   blue: { label: "Blue", dark: "#8ab4ff", light: "#1f5fbf" },
+  sky: { label: "Sky", dark: "#7dd3fc", light: "#0369a1" },
+  cyan: { label: "Cyan", dark: "#67e0ef", light: "#00727f" },
   teal: { label: "Teal", dark: "#5fd4c4", light: "#00796b" },
+  mint: { label: "Mint", dark: "#86efc0", light: "#047857" },
   green: { label: "Green", dark: "#7fdc8f", light: "#2e7d32" },
+  lime: { label: "Lime", dark: "#bef264", light: "#4d7c0f" },
+  yellow: { label: "Yellow", dark: "#fde047", light: "#806600" },
   amber: { label: "Amber", dark: "#f5c451", light: "#8a5a00" },
   orange: { label: "Orange", dark: "#ffa070", light: "#b8460b" },
+  coral: { label: "Coral", dark: "#ff9e8a", light: "#b23a24" },
+  red: { label: "Red", dark: "#ff8a80", light: "#c62828" },
   rose: { label: "Rose", dark: "#ff8fa3", light: "#b3264a" },
   pink: { label: "Pink", dark: "#f39ce0", light: "#9c2780" },
+  magenta: { label: "Magenta", dark: "#e8a0ff", light: "#8e24aa" },
+  slate: { label: "Slate", dark: "#b8c4d6", light: "#475569" },
 };
 
 export const DEFAULT_ACCENT: AccentName = "theme";

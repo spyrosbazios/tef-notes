@@ -1,7 +1,7 @@
 // The assistant as state, held above the routes (components/assistant/provider.tsx): the one `Chat` the owner is talking to,
 // which survives navigating and closing the dock, the message field, and what the rest of the app asks of it.
 import type { Chat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 import { createContext, useContext } from "react";
 
 export type Assistant = {
@@ -14,8 +14,8 @@ export type Assistant = {
   focusKey: number;
   /** Open the dock and focus the field; with `draft`, fill it for the owner to finish and send. */
   show: (draft?: string) => void;
-  /** Send `text` as the next message; false when it could not go (the chat's record could not be made). */
-  send: (text: string) => Promise<boolean>;
+  /** Send `text`, with any attached `files`, as the next message; false when it could not go (the chat's record could not be made). */
+  send: (text: string, files?: FileUIPart[]) => Promise<boolean>;
   /** Stop the reply, and close the tool calls it left unfinished. */
   stop: () => Promise<void>;
   /** A chat with nothing in it yet. */

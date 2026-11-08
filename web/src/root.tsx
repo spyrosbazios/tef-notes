@@ -5,6 +5,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { MotionConfig } from "motion/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useApplyAppearance } from "@/hooks/appearance";
+import { usePrefsSync } from "@/hooks/prefs";
 import { persister } from "@/lib/offline";
 import { buster, MAX_AGE, persistable } from "@/lib/persist";
 import { queryClient, router } from "./router";
@@ -13,8 +14,9 @@ import { queryClient, router } from "./router";
 // was last fetched (lib/persist.ts, lib/offline.ts). Written at most once a second, and at once when the page is hidden.
 addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") void persister.flush(); });
 
-/** Paints the chosen look (and an active lens's colour) on the page; inside the query client, which the lenses need. */
+/** Keeps the preferences in step with the server (hooks/prefs.ts) and paints the chosen look (and an active lens's colour) on the page; inside the query client, which the lenses need. */
 function Look() {
+  usePrefsSync();
   useApplyAppearance();
   return null;
 }

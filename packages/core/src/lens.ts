@@ -2,7 +2,7 @@
 // a task) is shown only if it carries any of its tags (or the lens has none) and none of its excluded ones, and what is made
 // under it carries the lens's first tag. The definitions are records of
 // the server's `lenses` collection (pb_migrations/1793600000_lenses.js), so every device has the same ones; *which* lens
-// is on is each device's own (the web app's localStorage, the phone's prefs), and none is the unfiltered app.
+// is on is one of the owner's preferences (prefs.ts), shared by every device, and none is the unfiltered app.
 // Pure and platform-neutral: the clients, the CLI and the agent's context all read it from here.
 import { fold } from "./notes";
 import { ACCENT_NAMES, type AccentName } from "./theme";
