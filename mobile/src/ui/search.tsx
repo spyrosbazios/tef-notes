@@ -4,15 +4,21 @@
 // a chip in the field and narrows notes and tasks alike; a tag still being typed is a prefix, and the Tags rows offer the names
 // (tap: a chip). Everything respects the lens that is on, as the lists do. Tapping a result opens it, a long press on a note its
 // actions (as a right-click does in the web's palette); the palette also previews the highlighted note, which has no room on a phone.
+// When words find no note or task, "Search with the assistant" asks the agent for what was meant (core/find.ts); its hits fill
+// the list with why each fits. No chat opens.
 import { FlashList } from "@shopify/flash-list";
 import { router } from "expo-router";
 import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, MessageSquare, Settings, Sparkles, Star, type LucideIcon } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { BackHandler, View } from "react-native";
+import { ActivityIndicator, BackHandler, View } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { fold, snippetOf } from "@/core/notes";
 import { absorbTags, allTagNames, dropTyping, matchesTags, matchesTask, parseTagQuery, suggestTags, typingTag } from "@/core/tags";
 import { search } from "@/store/db";
+import type { Found } from "@/core/find";
+import { findByAsking, findError } from "@/store/find";
+import { useKeys } from "@/store/keys";
+import { useTheme } from "@/ui/use-theme";
 import { useActiveLens } from "@/store/lenses";
 import { useNoteList, useNotes, type NoteMeta } from "@/store/notes";
 import { useTags } from "@/store/tags";
@@ -53,6 +59,12 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
   const [query, setQuery] = useState("");                          // q once typing pauses
   const [chips, setChips] = useState<string[]>([]);              // finished `#tag`s, matched as typed ones are
   const [menu, setMenu] = useState<string | null>(null);          // the note whose actions are open
+  const server = useKeys((s) => s.keys.server);
+  const { C } = useTheme();
+  // The assistant's search for `wanted`: running, its hits, or why it failed. A new query drops it (and stops one running).
+  const [asked, setAsked] = useState<{ q: string; found?: Found; error?: string } | null>(null);
+  const [abort, setAbort] = useState<AbortController | null>(null);
+  useEffect(() => () => abort?.abort(), [abort]);
 
   // The chips and the words typed, as one query: `#tag`s narrow notes and tasks, the rest is searched for
   const typedQuery = q.trim() ? query.trim() : "";
@@ -87,8 +99,34 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
     setQ(rest); setQuery(rest);
   }, [q]);
 
+  const current = asked?.q === wanted ? asked : null;
+  const askAgent = useCallback(() => {
+    if (!server) return;
+    const c = new AbortController(), q = wanted;
+    setAbort(c); setAsked({ q });
+    findByAsking(server, q, c.signal).then((found) => { if (!c.signal.aborted) setAsked({ q, found }); },
+      (e) => { if (!c.signal.aborted) setAsked({ q, error: findError(e) }); });
+  }, [server, wanted]);
+  const byPath = useMemo(() => new Map(all.map((n) => [n.path, n])), [all]);
+
   const rows = useMemo((): Row[] => {
     const out: Row[] = [];
+    if (text && !notes.length && !taskHits.length && server) {
+      const foundNotes = current?.found?.notes.flatMap((h) => { const n = byPath.get(h.path); return n ? [{ n, why: h.why }] : []; }) ?? [];
+      const foundTasks = current?.found?.tasks.flatMap((h) => { const t = tasks.find((x) => x.id === h.id); return t ? [{ t, why: h.why }] : []; }) ?? [];
+      out.push({ key: "h:asked", kind: "head", title: "Assistant" });
+      const status = !current ? <ListRow title="Search with the assistant" subtitle="Finds what you meant" icon={Sparkles} onPress={askAgent} />
+        : !current.found && !current.error ? <ListRow title="Looking through your notes and tasks…" icon={Sparkles} trailing={<ActivityIndicator size="small" color={C.brand} />} disabled />
+        : current.error ? <ListRow title="Couldn't search. Try again" subtitle={current.error} icon={Sparkles} onPress={askAgent} />
+        : !foundNotes.length && !foundTasks.length ? <ListRow title="The assistant found nothing either" icon={Sparkles} disabled /> : null;
+      if (status) out.push({ key: "asked", kind: "block", node: <ListSection>{status}</ListSection> });
+      for (const { n, why } of foundNotes) out.push({ key: `asked:${n.path}`, kind: "note", n, hit: why });
+      if (foundTasks.length) out.push({
+        key: "asked:tasks", kind: "block", node: (
+          <ListSection>{foundTasks.map(({ t, why }) => <ListRow key={t.id} title={t.title || "Untitled"} subtitle={why} icon={t.done ? Check : ListTodo} onPress={() => openTask(t.id)} />)}</ListSection>
+        ),
+      });
+    }
     if (notes.length) {
       out.push({ key: "h:notes", kind: "head", title: "Notes" });
       for (const n of notes) out.push({ key: n.path, kind: "note", n, hit: snips.get(n.path) });
@@ -115,7 +153,7 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
       out.push({ key: "go", kind: "block", node: <ListSection>{views.map((v) => <ListRow key={v.label} title={v.label} icon={v.icon} chevron onPress={v.go} />)}</ListSection> });
     }
     return out;
-  }, [notes, snips, taskHits, tagHits, views, pick]);
+  }, [notes, snips, taskHits, tagHits, views, pick, text, server, current, byPath, tasks, askAgent, C.brand]);
 
   const found = notes.length + taskHits.length + tagHits.length + views.length > 0;
   return (
