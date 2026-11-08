@@ -1,9 +1,9 @@
 // Home's notes: every note as a Keep tile in a masonry read by rows, pinned first then by the chosen sort, a page at a time. Search is the
-// palette's (⌘K); here a multiselect narrows to notes carrying every chosen tag, kept in the URL (`?tags=`, lib/route-search.ts) so a
-// badge clicked anywhere lands here filtered. Ctrl/cmd-click or a tile's checkbox selects, shift-click selects a range, and
+// palette's (⌘K) and the lens is the filter; a badge clicked anywhere lands here narrowed to its tag (`?tags=`, lib/route-search.ts),
+// shown as a chip that clears it. Ctrl/cmd-click or a tile's checkbox selects, shift-click selects a range, and
 // the header becomes the bulk bar until Esc. A toggle groups the notes under a header per tag (this browser's choice,
 // hooks/note-view.ts), as the phone's Notes tab does: a note with several tags shows under each, and a group folds away.
-// Below `md` it is the phone's: two columns, a header of icons (tag filter, tiles or grouped, sort, +), a tile shows two tags, and
+// Below `md` it is the phone's: two columns, a header of icons (tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
@@ -21,7 +21,6 @@ import { Loaded } from "@/components/loaded";
 import { Masonry } from "@/components/masonry";
 import { TagBadge } from "@/components/tag-badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -144,44 +143,11 @@ const startLimit = (y: number) => PAGE * (1 + Math.ceil(Math.max(0, y) / 1000));
 /** What Home's sort reads off a note record. */
 const recSortable = (n: NoteRec) => ({ pinned: n.note.pinned, updated: n.updated, created: n.note.created, path: n.path });
 
-/** The phone's header controls (Home's task box and its notes): one 40px outlined rounded square each, an icon of 20px, `gap-2` between. Where a
- *  control is wider (the tag filter naming what it has chosen) it keeps the height and the corners. */
+/** The phone's header controls (Home's task box and its notes): one 40px outlined rounded square each, an icon of 20px, `gap-2` between. A
+ *  wider control keeps the height and the corners. */
 export const TOOL = "max-md:h-10 max-md:min-w-10 max-md:rounded-xl";
 
-/** The tag filter: a button naming what is chosen, opening every tag in the list (with its count) to tick on or off. Home's tasks use it
- *  too (`what`). The "Tags" word folds into the icon when none is chosen: on a phone, and under 20rem when a `@container` holds it (Home's
- *  task box, where the three list names and this would collide). */
-export function TagFilter({ counts, chosen, onChange, what = "Notes" }: { counts: [string, number][]; chosen: string[]; onChange: (tags: string[]) => void; what?: string }) {
-  const on = (t: string) => chosen.some((c) => fold(c) === fold(t));
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Filter by tag"
-          className={cn("max-w-64 max-sm:max-w-28", TOOL, chosen.length ? "text-fg max-md:px-3" : "text-dim max-sm:px-0 max-md:px-3")}>
-          <Hash className="max-md:size-5" /><span className={cn("truncate", !chosen.length && "max-sm:hidden @max-xs:hidden")}>{chosen.length ? chosen.join(", ") : "Tags"}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
-        <DropdownMenuLabel>{what} with every tag ticked</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {counts.length ? counts.map(([t, c]) => (
-          <DropdownMenuCheckboxItem key={t} checked={on(t)} onSelect={(e) => e.preventDefault()}
-            onCheckedChange={(v) => onChange(v ? [...chosen, t] : chosen.filter((x) => fold(x) !== fold(t)))}>
-            <span className="flex-1 truncate">{t}</span><span className="text-xs tabular-nums text-faint">{c}</span>
-          </DropdownMenuCheckboxItem>
-        )) : <p className="px-2 py-1.5 text-sm text-faint">No tags yet.</p>}
-        {chosen.length ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onChange([])}><X /> Clear</DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-/** `scrollId`: Home's scroller, whose place is put back: by the router for a tag filter, by `useScrollSwitch` for a lens (lib/scroll.ts). */
+/** `scrollId`: Home's scroller, whose place is put back: by the router for a badge's tag, by `useScrollSwitch` for a lens (lib/scroll.ts). */
 export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: string }) {
   const { isPending } = useNotes();
   const { view, openNote, filterTag, setTags } = useNav();
@@ -201,11 +167,6 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
   const anchor = useRef<string | undefined>(undefined);
   const shown = useMemo(() => sorted.filter((n) => matchesTags(n.note.tags, chips, true)), [sorted, chips]);
   const order = useMemo(() => shown.map((n) => n.path), [shown]);
-  const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const n of base) for (const t of n.note.tags) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [base]);
   const groups = useMemo(     // the core groups anything with `tags`: a record's are its note's
     () => (grouped ? groupNotes(shown.map((rec) => ({ tags: rec.note.tags, rec })), names).map((g) => ({ tag: g.tag, notes: g.notes.map((x) => x.rec) })) : []),
     [grouped, shown, names]);
@@ -271,7 +232,11 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
               <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
               <span className="text-xs tabular-nums text-faint md:mr-auto md:self-baseline md:pt-1">{shown.length}</span>
             </div>
-            <TagFilter counts={counts} chosen={chips} onChange={setTags} />
+            {chips.length ? (
+              <Button variant="outline" size="sm" aria-label="Clear tag filter" onClick={() => setTags([])} className={cn("max-w-64 text-fg max-sm:max-w-28 max-md:px-3", TOOL)}>
+                <Hash className="max-md:size-5" /><span className="truncate">{chips.join(", ")}</span><X className="max-md:size-5" />
+              </Button>
+            ) : null}
             {narrow ? (
               // The phone's toggle: one button showing the other layout (the animated group's gliding highlight has
               // nothing to sit on when the selected item is hidden, and paints a stray surface)

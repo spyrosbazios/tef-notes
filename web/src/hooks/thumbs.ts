@@ -10,16 +10,19 @@ import * as photos from "@/services/photos";
 import { ALL_PHOTOS } from "./photos";
 import { useLinkPreview } from "./previews";
 
-/** Whether the element has come near the screen yet; once true, stays true. */
-function useSeen<T extends Element>() {
-  const ref = useRef<T>(null), [seen, setSeen] = useState(false);
+/** The rows already near the screen once in this page's life: a remounted one draws its pictures at once. */
+const near = new Set<string>();
+
+/** Whether the element has come near the screen yet (or did before, under `id`); once true, stays true. */
+function useSeen<T extends Element>(id: string) {
+  const ref = useRef<T>(null), [seen, setSeen] = useState(() => near.has(id));
   useEffect(() => {
     const el = ref.current;
     if (!el || seen) return;
-    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) setSeen(true); }, { rootMargin: "200px" });
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { near.add(id); setSeen(true); } }, { rootMargin: "200px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [seen]);
+  }, [seen, id]);
   return [ref, seen] as const;
 }
 
@@ -39,7 +42,7 @@ const here = () => ({ url: location.origin });
 
 /** `[ref for the row, its pictures (none until near the screen), how many more it has than those]`. */
 export function useNotePictures<T extends Element>(noteId: string, body: string) {
-  const [ref, seen] = useSeen<T>();
+  const [ref, seen] = useSeen<T>(noteId);
   const found = useMemo(() => picturesOf(noteId, body), [noteId, body]);
   const link = found && "link" in found ? found.link : null;
   const anyPhoto = !!found && "pictures" in found && found.pictures.some((p) => "image" in p);

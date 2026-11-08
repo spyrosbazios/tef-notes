@@ -64,7 +64,7 @@ feed, as any client's writes do. A note's "Ask about this" opens the dock with a
 ## Home and search
 
 Home (`src/components/home.tsx`) is the date, the task box (Today, Inbox and Upcoming as their views draw them, `TaskList
-embedded`, with its own tag filter) beside the month's planner (`planned.tsx` over `@/core/planner`, which the phone draws
+embedded`) beside the month's planner (`planned.tsx` over `@/core/planner`, which the phone draws
 as a week), then every note as the Notes view's tiles (`NoteList`: masonry read by rows, thumbnails, filter and `#tag`,
 multiselect, the sort from `@/core/note-sort`, 30 tiles at a time as the page scrolls). Every + opens the new-task dialog (`quick-add.tsx`) started from where it was pressed, with
 the card's When, deadline, repeat, reminder and tags (`task-fields.tsx`, shared with `task-detail.tsx`).
@@ -90,14 +90,14 @@ assistant's dock opened whole above the bar (`--dock-bottom`), so it is "in fron
 the dock's X and the corner button are not there, and its history button is the phone's Chats. Home is the phone's Home: a header
 with the lens (the app's mark, `LensSwitcher header`) and a search button, then the days strip (`components/days.tsx` over
 `@/core/planner`, where the laptop has the month: tap a day to show it in the task box, hold one to add a task that day), the
-same task box at a fixed height, then the notes in two columns (`columnCount` in `lib/masonry.ts`), a header of icons (tag filter,
+same task box at a fixed height, then the notes in two columns (`columnCount` in `lib/masonry.ts`), a header of icons (
 tiles or grouped, sort, +) and tiles showing two tags, held to select (a wider screen's hold opens the tile's menu). Search is a
 drawer taking Home's place (`components/search-drawer.tsx`): `#tag` chips, notes, tasks, tags, the views, and "Search with the
 assistant" when nothing matches; it and the palette (⌘K, laptop) share their data in `hooks/search.ts` and the note row in
 `components/note-hit.tsx`. Differences from the Android app: scroll-snap stands in for the strip's drag physics (a day does not
 spring as it nears the slot, it steps), the strip does not follow Upcoming scrolled by hand, and a search result's long press opens
 the laptop's note menu. A list comes back where it was left: the router restores each list's scroll (Routing, below), and Home keeps its task box (the
-list in front, its tag filter) for as long as the app is open. Upcoming scrolled by hand moves the days strip to the
+list in front) for as long as the app is open. Upcoming scrolled by hand moves the days strip to the
 section at its top (`TaskList`'s `onView`); the strip answers only a drag of its own, never its own sliding. The phone's header controls (tag
 filter, layout, sort, +) are one 40px outlined square each (`TOOL` in `note-list.tsx`, shared by the task box). Sending closes the assistant's keyboard
 (the Send tap still keeps the focus, so it lands first time). Where `md` and up draws the laptop's layout, nothing changes.
@@ -136,7 +136,7 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
   Settings' sections are `Link`s; a note tile keeps its own click, long press and selection, and gets the same intent preload from
   `useIntent`. A cold load (first sync) shows `components/pending.tsx` after `defaultPendingMs` (400 ms), never a flash.
 - **Scroll restoration** is the router's (`scrollRestoration: true`). Each scroller carries a `data-scroll-restoration-id` from
-  `src/lib/scroll.ts` (Home per tag filter and lens, each list, each box list, each settings section, and one per open note, task and
+  `src/lib/scroll.ts` (Home per badge tag and lens, each list, each box list, each settings section, and one per open note, task and
   chat), and `getScrollRestorationKey` is one constant, so a place is kept per scroller, not per history entry: a tab, the rail or
   Back all find it, and an id never seen (another note) starts at the top (`scrollToTopSelectors`). Home's scroller has
   `overflow-anchor: none` (the browser's anchoring otherwise moved the restored place while the masonry measured), and Home draws
