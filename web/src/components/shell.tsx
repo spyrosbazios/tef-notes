@@ -30,12 +30,14 @@ import { useNewNote } from "@/hooks/new-note";
 import { INSETS, ShellContext, startOf, type ShellActions } from "@/hooks/shell";
 import { typing } from "@/lib/keys";
 import { TAB_BAR } from "@/lib/tabs";
+import { landed, leaving } from "@/lib/morph";
 import { isTaskView, titleOf, usePlace } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 /** A note's page laid over the screen it was opened from. On a phone it reaches down over the tab bar (`reach`: kept, hidden, under it);
  *  from `md` it covers the rail and the page and leaves the assistant's dock beside it. The focus moves in on opening and goes back to
- *  what had it (the tile) on closing. */
+ *  what had it (the tile) on closing. Its coming and going is the route's view transition (`data-vt="note"`, router.ts, index.css),
+ *  grown out of and shrunk back into the tile it was opened from (lib/morph.ts). */
 function NoteLayer({ id, reach }: { id: string; reach: boolean }) {
   const ref = useRef<HTMLElement>(null);
   const [from] = useState(() => document.activeElement);   // read before the effect moves the focus: Strict Mode runs the effect twice
@@ -48,8 +50,10 @@ function NoteLayer({ id, reach }: { id: string; reach: boolean }) {
       });
     };
   }, [from]);
+  // Laid out before the new page is captured: the tile hands the card's name to this layer, and takes it back on the way out
+  useLayoutEffect(() => { landed(); return () => leaving(id); }, [id]);
   return (
-    <div className={cn("absolute inset-0 z-20 flex flex-col bg-bg", reach && "max-md:-bottom-(--tab-bar)")}>
+    <div data-vt="note" className={cn("absolute inset-0 z-20 flex flex-col bg-bg", reach && "max-md:-bottom-(--tab-bar)")}>
       <OfflineBar />
       <div className="flex min-h-0 flex-1">
         <main ref={ref} tabIndex={-1} className="min-w-0 flex-1 outline-none"><NotePage id={id} /></main>
@@ -102,7 +106,7 @@ export function Shell() {
         <div className="flex min-h-0 flex-1">
           <div className="relative flex min-w-0 flex-1">
             {/* The screen behind a note's page: hidden and inert, but laid out and mounted, so it keeps its scroll and its pictures */}
-            <div className={cn("flex min-w-0 flex-1", onNote && "invisible")} inert={onNote}>
+            <div className={cn("flex min-w-0 flex-1", onNote && "invisible")} inert={onNote} data-under-note={onNote || undefined}>
               <aside className="hidden w-60 shrink-0 border-r border-line bg-bg lg:block">{rail}</aside>
               <Sheet open={menu} onOpenChange={setMenu}>
                 <SheetContent side="left" className="w-64 p-0"><SheetTitle className="sr-only">Views</SheetTitle>{rail}</SheetContent>
@@ -119,7 +123,8 @@ export function Shell() {
                   <Button variant="ghost" size="icon" aria-label={tasks ? "New task" : "New note"} onClick={() => (tasks ? setAdding(startOf(kind)) : newNote())}><Plus /></Button>
                 </div>
 
-                <div className="flex min-h-0 flex-1"><Outlet /></div>
+                {/* What a route change crossfades (`data-vt="page"`, index.css): the rail, the app bar, the tabs and the dock stay put */}
+                <div data-vt="page" className="flex min-h-0 flex-1"><Outlet /></div>
               </div>
             </div>
             {note ? <NoteLayer id={note} reach={bar} /> : null}

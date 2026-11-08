@@ -5,7 +5,7 @@
 // hooks/note-view.ts), as the phone's Notes tab does: a note with several tags shows under each, and a group folds away.
 // Below `md` it is the phone's: two columns, a header of icons (tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
-import { scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { ReducedMotionConfig, scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Sparkles, Tags, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -33,6 +33,7 @@ import { useSavedScroll } from "@/hooks/scroll";
 import { useTagNames } from "@/hooks/tag-names";
 import { useNotePictures } from "@/hooks/thumbs";
 import { Mosaic } from "./note-pictures";
+import { arm } from "@/lib/morph";
 import { isNotesView, noteLink, useIntent, useNav, type AppLink } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
@@ -84,13 +85,19 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
   // The note's page and its pictures' list fetched ahead on a hover or a touch, as a link's would be
   const intent = useIntent(() => link);
   const tint = n.note.color;
+  // A plain click or Enter opens the note (note-list's `pick`): the tile is what the note's page grows out of (lib/morph.ts)
+  const open = (e: Modifiers) => {
+    if (!selecting && !e.shiftKey && !e.ctrlKey && !e.metaKey && ref.current) arm(n.note.id, ref.current);
+    onPick(e);
+  };
   const chrome = cn("absolute top-2 z-10 flex size-6 items-center justify-center rounded-md border border-line bg-card/90 text-dim shadow-sm backdrop-blur hover:text-fg",
     "hit opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 any-pointer-coarse:md:opacity-100", menu && "opacity-100");
   return (
+    <ReducedMotionConfig>
     <motion.div ref={ref} role="button" layout="position" layoutId={phone ? undefined : id} initial={moved ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-      whileTap={touch ? { scale: scale.choice } : undefined} exit={{ opacity: 0, scale: 0.96, transition: fade }} transition={{ ...move, opacity: fade, scale: press }} tabIndex={0} onClick={onPick} onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+      whileTap={touch ? { scale: scale.choice } : undefined} exit={{ opacity: 0, scale: 0.96, transition: fade }} transition={{ ...move, opacity: fade, scale: press }} tabIndex={0} onClick={open} onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
       {...hold} {...intent}
-      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPick(e); } }}
+      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(e); } }}
       aria-selected={selecting ? selected : undefined} data-color={tint}
       className={cn("group relative w-full cursor-pointer overflow-hidden rounded-2xl border text-left transition-colors any-pointer-coarse:select-none",
         tint ? "bg-tile text-tile-fg" : "bg-card hover:bg-raised",
@@ -116,6 +123,7 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
         </span>
       </div>
     </motion.div>
+    </ReducedMotionConfig>
   );
 }
 

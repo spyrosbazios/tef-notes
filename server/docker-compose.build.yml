@@ -20,5 +20,8 @@ services:
   agent:
     image: tefnotes-agent:local
     build: { context: .., dockerfile: server/agent/Dockerfile }
+  stt:
+    image: tefnotes-stt:local
+    build: { context: .., dockerfile: server/stt/Dockerfile }
 secrets:
   crx_key: { file: *crxkey }

@@ -5,6 +5,7 @@
 // Pure and platform-neutral.
 import { effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
+import { keepOf, type Keep } from "./voice";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 
 /** The phone's bottom bar: its tabs, in the order the owner put them. Settings is always shown (it is where the bar is set). */
@@ -19,6 +20,11 @@ const OFF: readonly Tab[] = ["notes"];
 export const TASK_LISTS = ["today", "inbox", "upcoming"] as const;
 export type TaskList = (typeof TASK_LISTS)[number];
 export const TASK_LIST_LABEL: Record<TaskList, string> = { today: "Today", inbox: "Inbox", upcoming: "Upcoming" };
+
+/** Which tabs in the bar show their name. */
+export const TAB_LABELS = ["active", "always", "never"] as const;
+export type TabLabels = (typeof TAB_LABELS)[number];
+export const TAB_LABELS_LABEL: Record<TabLabels, string> = { active: "Active tab", always: "Every tab", never: "None" };
 
 /** Where the app opens. */
 export const STARTS = ["home", "inbox", "today", "upcoming", "notes"] as const;
@@ -35,12 +41,14 @@ export type Prefs = {
   /** Every tab in order, hidden ones included, so one shown again comes back where it was. */
   tabs: Tab[];
   hidden: Tab[];
-  /** The bar's labels: the tab in front shows its name, or every tab is an icon alone. */
-  tabLabels: boolean;
+  /** The bar's labels: the tab in front shows its name, every tab does, or none (icons alone). */
+  tabLabels: TabLabels;
   start: Start;
   /** The list Home's task box shows first, and the one the Tasks tab opens on. */
   homeList: TaskList;
   tasksList: TaskList;
+  /** Voice input: how long the server keeps its speech model loaded once idle, in seconds (voice.ts). */
+  voice: { keep: Keep };
   /** The lens on (its record id; lens.ts), none for the unfiltered app. */
   lens?: string;
 };
@@ -49,7 +57,8 @@ export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), unasked: false },
-  tabs: [...TABS], hidden: [...OFF], tabLabels: true, start: "home", homeList: "today", tasksList: "today",
+  tabs: [...TABS], hidden: [...OFF], tabLabels: "active", start: "home", homeList: "today", tasksList: "today",
+  voice: { keep: keepOf(undefined) },
 };
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {});
@@ -58,7 +67,7 @@ const tabsIn = (v: unknown): Tab[] => [...new Set(strings(v).filter((t): t is Ta
 
 /** Whatever was stored as Prefs: the one defensive reader. Tabs keep their stored order, any missing ones appended. */
 export function prefsOf(raw: unknown): Prefs {
-  const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent);
+  const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent), voice = obj(p.voice);
   const tabs = tabsIn(p.tabs);
   return {
     theme: THEME_NAMES.find((n) => n === p.theme) ?? DEFAULT_THEME,
@@ -75,10 +84,11 @@ export function prefsOf(raw: unknown): Prefs {
     tabs: [...tabs, ...TABS.filter((t) => !tabs.includes(t))],
     // A tab the stored order doesn't know yet is new to this record: it starts as a new record's would
     hidden: [...new Set([...tabsIn(p.hidden).filter((t) => HIDEABLE.includes(t)), ...OFF.filter((t) => !tabs.includes(t))])],
-    tabLabels: p.tabLabels !== false,
+    tabLabels: TAB_LABELS.find((l) => l === p.tabLabels) ?? "active",
     start: STARTS.find((s) => s === p.start) ?? "home",
     homeList: TASK_LISTS.find((l) => l === p.homeList) ?? "today",
     tasksList: TASK_LISTS.find((l) => l === p.tasksList) ?? "today",
+    voice: { keep: keepOf(voice.keep) },
     ...(typeof p.lens === "string" && p.lens ? { lens: p.lens } : {}),
   };
 }

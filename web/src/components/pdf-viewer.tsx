@@ -1,11 +1,14 @@
 // A note's PDF read in the app: pdf.js (src/pdf/pages.ts, the same the phone's viewer page runs) in a dialog, the pages one
 // under another, a counter that jumps to a page, zoom buttons. In a window and not the browser's own viewer because the
 // server serves attachments under a CSP sandbox, which Chrome's viewer can't open. pdf.js is a chunk of its own,
-// loaded when the first PDF opens.
+// loaded when the first PDF opens. A page-shaped skeleton stands in until the first pages are drawn, then fades out as they fade in.
+import { transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Minus, Plus } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useNarrow } from "@/hooks/media";
 import { message } from "@/services/api";
 import type { PdfPages } from "@/pdf/pages";
@@ -30,6 +33,7 @@ function Pages({ url }: { url: string }) {
   const host = useRef<HTMLDivElement>(null), pdf = useRef<PdfPages | null>(null);
   const [zoom, setZoom] = useState(2), [state, setState] = useState<"loading" | "shown" | "failed">("loading");
   const [err, setErr] = useState("");
+  const fade = useTempoTransition(transition.fade), reveal = useTempoTransition(transition.reveal);
 
   useEffect(() => {
     let live = true;
@@ -53,9 +57,16 @@ function Pages({ url }: { url: string }) {
   return (
     <>
       <div className="relative min-h-0 flex-1 overflow-auto p-3">
-        {state === "loading" ? <p className="p-6 text-center text-faint text-sm">Opening…</p> : null}
+        <p role="status" className="sr-only">{state === "loading" ? "Opening…" : ""}</p>
+        <AnimatePresence initial={false}>
+          {state === "loading" ? (
+            <motion.div key="page" aria-hidden className="absolute inset-x-3 top-3" exit={{ opacity: 0, transition: fade }}>
+              <Skeleton className="mx-auto aspect-[3/4] w-full max-w-xl rounded-sm" />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
         {state === "failed" ? <p className="p-6 text-center text-down text-sm">Couldn’t open it: {err}</p> : null}
-        <div ref={host} />
+        <motion.div ref={host} initial={false} animate={{ opacity: state === "shown" ? 1 : 0, transition: reveal }} />
       </div>
       <footer className="flex h-12 shrink-0 items-center justify-center gap-2 border-t border-line text-dim text-sm">
         <Button variant="ghost" size="icon" aria-label="Zoom out" disabled={zoom === 0} onClick={() => step(-1)}><Minus /></Button>

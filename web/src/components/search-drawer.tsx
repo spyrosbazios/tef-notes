@@ -4,10 +4,13 @@
 // a tag still being typed is a prefix, and the Tags rows offer the names (tap: a chip). Everything is inside the lens that is on.
 // Notes are Home's tiles in its masonry, gliding as results change; a long press on one opens its actions. When words find no note or task, "Search with the assistant" asks the agent for what
 // was meant (core/find.ts; the palette's too, hooks/search.ts), its hits filling the list with why each fits. The palette (⌘K)
-// is the laptop's; this is the phone's, for the same data.
-import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
-import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+// is the laptop's; this is the phone's, for the same data. It comes down from under the header as a sheet from the top edge
+// (Animate UI's sheet recipe: in on transition.sheet, away on transition.dismiss, a fade in place under reduced motion), over the
+// page, which stays laid out under it; the results inside are never staggered (they change on every key): they glide and fade as they change, notes as Home's tiles.
+import { ReducedMotionConfig, spring, transition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
+import { MicButton } from "@/components/mic-button";
 import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { absorbTags, dropTyping } from "@/core/tags";
@@ -19,6 +22,7 @@ import { TagBadge } from "@/components/tag-badge";
 import { useAssistant } from "@/hooks/assistant";
 import { useActiveLens } from "@/hooks/lens";
 import { useNow } from "@/hooks/now";
+import { useLeaving } from "@/hooks/presence";
 import { useFinder } from "@/hooks/search";
 import { homeOfTask, noteLink, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -74,8 +78,13 @@ function Tiles({ notes, now, onOpen, onMenu, onTag, onTags, onDelete }: {
   );
 }
 
-/** `header`: Home's top row, kept above the field; `onClose` puts the page back. */
-export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: () => void }) {
+/** `header`: Home's top row, kept above the field; `onClose` puts the page back. Rendered under an `AnimatePresence` (home.tsx,
+ *  notes-page.tsx), which lets it slide away, inert (`useLeaving`) while it does. */
+export function SearchDrawer(props: { header: ReactNode; onClose: () => void }) {
+  return <ReducedMotionConfig><Drawer {...props} /></ReducedMotionConfig>;
+}
+
+function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void }) {
   const { openNote, showTask, goView } = useNav();
   const assistant = useAssistant();
   const lens = useActiveLens();
@@ -121,10 +130,21 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
     </button></Row>
   );
   const found = f.hits.length + f.taskHits.length + f.tags.length + views.length > 0;
+  const reduce = useShouldReduceMotion();
+  const enter = useTempoTransition(transition.sheet), leave = useTempoTransition(transition.dismiss);
+  // The same transform function at both ends: Motion can't interpolate `none` with a translate
+  const hidden = { opacity: 0, transform: reduce ? "translateY(0%)" : "translateY(-100%)" };
+
+  // The page behind is live again the moment the drawer starts to leave (home.tsx, notes-page.tsx): the drawer must not stay tabbable over it
+  const root = useLeaving<HTMLDivElement>(undefined, { sibling: false });
 
   return (
-    <div className="flex h-full min-h-0 flex-col" role="search">
-      {header}
+    <div ref={root} className="flex h-full min-h-0 flex-col" role="search">
+      <div className="relative z-10 bg-bg">{header}</div>
+      {/* Clipped under the header, so the sheet comes out from behind it */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <motion.div initial={hidden} animate={{ opacity: 1, transform: "translateY(0%)", transition: enter }} exit={{ ...hidden, transition: leave }}
+        className="flex h-full min-h-0 flex-col bg-bg">
       <div className="px-4 pt-1 pb-2">
         <label className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-card px-3 py-1.5 focus-within:border-ring">
           <Search className="size-4 shrink-0 text-dim" />
@@ -132,6 +152,7 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
           <input autoFocus value={q} onChange={(e) => change(e.target.value)} onKeyDown={backspace} placeholder={chips.length ? "" : "Search notes, tasks, or #tag"}
             aria-label="Search notes, tasks, or #tag" enterKeyHint="search" autoCapitalize="none" autoCorrect="off"
             className="min-w-24 flex-1 bg-transparent py-1 text-base outline-none placeholder:text-faint" />
+          <MicButton className="-mr-2" onText={(t) => change(q.trim() ? `${q.trimEnd()} ${t}` : t)} />
         </label>
         {lens ? <p className="px-1 pt-2 text-xs text-faint">Searching inside {lens.name}</p> : null}
       </div>
@@ -166,6 +187,8 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
           </motion.div>
         ) : null}
         </AnimatePresence></LayoutGroup>
+      </div>
+      </motion.div>
       </div>
 
       <MenuAt paths={menu ? [menu.path] : []} at={menu} onClose={() => setMenu(null)} onTags={() => ask("tags")} onDelete={() => ask("delete")} />

@@ -119,6 +119,14 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 | `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
 | `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |
 | `/note/$id` | `note.$id.tsx` | redirects to `/?note=<id>`, replacing itself | |
+- **Route transitions** are the router's View Transitions, typed by what changes (`router.ts` `transitionOf`, drawn in
+  `src/index.css`): `view` crossfades only the page (`data-vt="page"` around the `Outlet`, `shell.tsx`; 150 ms on a phone, 200 ms
+  wider) while rail, bars and dock hold still; `note-open`/`note-close` slide the note's layer (`data-vt="note"`) up and back down on
+  a phone and fade it from `md`, the direction read from `?note=` coming or going (Back, the note's Back and links alike);
+  `note-grow`/`note-shrink` grow it out of the tile it was opened from and back (`lib/morph.ts`); `note-swap` crossfades one note
+  for another; `whole` for the share page; a tag-filter change or a task opened or closed (`?t=`: the phone's sheet has its own motion) has none. Animate UI's Page Transition for TanStack Router is a
+  registry file (shadcn CLI), which this app doesn't take (package only), so the CSS uses its tokens' timings instead. The screen
+  under a note stays mounted and keeps its scroll.
 
 - **Search params** are plain, `?t=abc&tags=a,b`, not the router's JSON default: `parseSearch`/`stringifySearch` and every route's
   `validateSearch` are `src/lib/route-search.ts` (tested in `test/route-search.test.ts`), so the addresses handed out (Copy link's
@@ -149,7 +157,7 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 - **View transitions:** every navigation is one of type `route` (`defaultViewTransition: { types: ["route"] }`, off when the OS asks
   for reduced motion, read once in `router.ts`); nothing styles it yet, so the browser's crossfade plays: the seam for a page
   transition. The theme and accent change is its own, type `look` (`hooks/appearance.ts`), and the wipe in `index.css` is scoped to
-  `:active-view-transition-type(look)`. A browser without typed transitions gets the plain route one and a cut for the look.
+  `:active-view-transition-type(look)`. A browser without typed transitions gets a cut for both: the router passes `false` there, so the user agent's own crossfade never plays and no tile is named (`lib/morph.ts` `arm`).
 - **Adding a route:** a file under `src/routes/` (`_app/<name>.tsx` to sit in the shell) exporting `Route = createFileRoute(...)`, its
   `validateSearch` in `lib/route-search.ts` with a test, a `loader` that only asks the query cache, a `data-scroll-restoration-id` on
   its scroller; `bun run dev` or `build` regenerates the tree. A new view kind also goes in `View`, `viewOf` and `linkOf`.
@@ -304,14 +312,23 @@ The rest, one line each:
 - `ui/checkbox.tsx` is the animated checkbox and `components/tick-box.tsx` its round task/checklist tick (`sm`, `md`, `lg`): controlled by `checked`, a tick's write waits its linger (`hooks/linger.ts`).
 - The task list (`task-list.tsx`, `task-row.tsx`): rows enter, leave and reflow with `layout="position"` presence; a leaving row or section is inert and hands its focus on, a returning one is live again.
 - A swipe is a Motion value (`hooks/swipe.ts`'s `x`): the row follows the finger, and the When star and Delete button read it through `useTransform`.
-- Bottom Navigation (`tab-bar.tsx`): the phone's tab bar with its sliding highlight; the label is on `spring.slide`, as the spring's default overshoots under a blur.
+- Bottom Navigation (`tab-bar.tsx`): the phone's tab bar with its sliding highlight; the label is on `spring.slide`, as the spring's default overshoots under a blur. It does not fold on scroll (`scrollBehavior` stays `none`): the bar is already one row of icons, so folding would reclaim no height, and `--tab-bar`/`--dock-bottom` stay fixed.
+- Tile → note (`lib/morph.ts`): the clicked tile and the note's layer share the view-transition name `note-card` for that one navigation, so the box grows on `spring.morph`'s timing and its face crossfades (`transition.swap` out, `transition.reveal` in); closing shrinks it back into the tile if still on the page. Container only: the note's pictures are the editor's, drawn after the capture. The tile's own `layoutId` stays its masonry glide, with `useMoved` against doubling.
+- Search drawer (`search-drawer.tsx`, phone): a sheet down from under the header (`transition.sheet` in, `transition.dismiss` out, a fade under reduced motion), results at once.
 - Highlight: the one background that glides between Home's task tabs (`home.tsx`) and the underline under the task list's tabs (`task-list.tsx`).
 - Scroll Fade: the task list's top and bottom edges and the days strip's sides; Copy Button: the assistant's "Copy answer" (`assistant/turn.tsx`); Shimmering Text: its "Thinking…" (`assistant/panel.tsx`).
 - AutoHeight: a box that follows its content's height (the assistant's thinking line), so it opens and closes its space.
 - Touch press: on a finger every `[data-slot="button"]` scales to .97 on `spring.press` from one CSS rule in `index.css`, so buttons carry no `active:scale` of their own.
+- Lightbox (`lightbox.tsx`): a note's pictures in a Carousel (Animate UI's, Embla's drop-in, so `embla-carousel` and `embla-carousel-react` are peer packages): a finger swipes between them, buttons and arrow keys do too (a mouse does not drag: it would fight the zoom). On a laptop a click zooms the picture in where the pointer is (Image Zoom, the pointer pans it); on a phone a tap shows it at its own size, scrolled by hand. The counter is a Sliding Number. The viewer grows out of the place tapped (the dialog's tilt, with `transform-origin` at the last press). Embla's options never change while it is open (it deep-compares them each render and a changed one re-initialises it, which snaps a glide in flight): the start index is frozen and `watchDrag` is one function (touch only: any touch screen swipes, a mouse never drags).
+- Reader view: a Scroll Progress bar in the brand colour under the header, shown only once the article is long enough to scroll. The PDF viewer and the drawing dialog fade their pages and canvas in over a skeleton (`Loaded`, whose `frame` sizes the box around both).
+- Planned: Animate UI's own Tooltip (`@floating-ui/react` is its peer): one popup that glides and resizes from day to day under a mouse (`hooks/hover.ts`), none under a finger. The month's total is a Sliding Number, so a task scheduled elsewhere rolls it.
+- Assistant: a block that appears while the reply is live rises in (`assistant/rise.tsx`, the list recipe), cards included; a chat row leaves on a fade and the rows below close the gap; an `ask_choice` option is pressed to `scale.choice` with Animate UI's Button under a mouse (a finger already scales every button from `index.css`). The skill has no recipe for streamed text, so it only appears as it arrives: nothing animates per token.
+- Empty states (`components/empty.tsx`): the icon and its line fade in and rise once on `spring.slide`, no loop. A list inside a `Loaded` or an `AnimatePresence initial={false}` that is empty on first paint sits still: that flag reaches every motion element mounted later inside it.
+- Counts: the task tabs' counts and the heatmap's total are Sliding Numbers (a tick lingers, the row goes, the digit rolls; it starts at its value, no count-up on mount). The checklist's items and a chat's rows are a list that keeps its shape (`hooks/presence.ts` takes a leaving item out of the tab order and hands its focus on).
+- When picker: one background glides between its quick options under a mouse (Highlight, hover-capable pointers only) and the line that says what the typed words mean opens in height (Auto Height, which starts from a height of 0: only used where the box starts empty). The update toast's Reload is a status button: it says "Reloading…" in place.
 
 Picking a theme or accent in Settings wipes the page from one look to the next (a View Transition in `hooks/appearance.ts` `set`, its timing in `index.css`: `transition.overlay`'s curve from the skill's `css-timing.mjs`); a lens's accent cuts, and reduced motion skips the wipe.
-Reduced motion follows the OS setting only, no switch in the app: `root.tsx` wraps the app in `AnimateUIProvider` and
+Reduced motion follows the OS setting only, no switch in the app (route transitions keep their fades, the note's slide and the tile's growth drop): `root.tsx` wraps the app in `AnimateUIProvider` and
 `MotionConfig reducedMotion="user"`, `index.css` quiets the CSS loops (spinners pulse instead of turning), and scrolls that would glide
 (`calm()` in `hooks/media.ts`) jump.
 

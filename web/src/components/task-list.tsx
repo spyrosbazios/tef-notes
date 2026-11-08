@@ -7,11 +7,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
+import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
 import { ReducedMotionConfig, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { AnimatePresence, motion, useIsPresent, type Transition } from "motion/react";
+import { AnimatePresence, motion, type Transition } from "motion/react";
 import { Moon, Plus } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link as RecordLink } from "@/core/record-links";
 import { dateOf } from "@/core/things";
@@ -20,6 +21,7 @@ import { views as viewsOf, type Task, type Views } from "@/core/todo";
 import { TASK_ICON } from "@/components/task-icons";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { DeleteTask } from "@/components/task-delete";
+import { Empty } from "@/components/empty";
 import { TaskRowView } from "@/components/task-row";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -30,6 +32,7 @@ import { useActiveLens } from "@/hooks/lens";
 import { useLinks } from "@/hooks/links";
 import { calm, useNarrow } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
+import { useLeaving } from "@/hooks/presence";
 import { useScrollSwitch } from "@/hooks/scroll";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
@@ -74,16 +77,9 @@ function Heading({ kind, section, today, lit }: { kind: TaskView; section: strin
   return null;
 }
 
-/** The lists as tabs, below `md` where the rail is a drawer: Inbox and Today with their counts, as the phone's Tasks tab. */
 /** A section of rows. When the last of its rows goes the whole section fades out: it is inert from then on and hands the focus to the list. */
 function Section({ day, fade, children }: { day?: string; fade: Transition; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null), present = useIsPresent();
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (!present && el.contains(document.activeElement)) el.closest<HTMLElement>("[data-task-list]")?.focus({ preventScroll: true });
-    el.inert = !present;
-  }, [present]);
+  const ref = useLeaving<HTMLDivElement>("[data-task-list]", { sibling: false });
   return (
     <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
       {children}
@@ -91,6 +87,8 @@ function Section({ day, fade, children }: { day?: string; fade: Transition; chil
   );
 }
 
+/** The lists as tabs, below `md` where the rail is a drawer: Inbox and Today with their counts, as the phone's Tasks tab. A count changes
+ *  once a tick has lingered: its digit rolls (Animate UI's Sliding Number), tying the row that leaves to the number that follows. */
 function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: number }) {
   const count = { inbox, today, upcoming: 0, logbook: 0 };
   return (
@@ -101,7 +99,7 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
           <HighlightItem key={k} value={k} className="-mb-px shrink-0">
             <Link {...linkOf({ kind: k })} aria-current={k === kind ? "page" : undefined}
               className={cn("flex h-10 items-center gap-1.5 px-2.5 text-sm font-semibold transition-colors", k === kind ? "text-fg" : "text-dim")}>
-              {titleOf({ kind: k })}{count[k] ? <span className="text-xs font-normal tabular-nums text-faint">{count[k]}</span> : null}
+              {titleOf({ kind: k })}{count[k] ? <span className="text-xs font-normal text-faint"><SlidingNumber number={count[k]} initiallyStable /></span> : null}
             </Link>
           </HighlightItem>
         ))}
@@ -262,12 +260,10 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
                     <ul className="relative"><AnimatePresence mode="popLayout" initial={false}>{rows.map((t) => row(t, key))}</AnimatePresence></ul>
                   </Section>
                 )) : (
-                  <motion.div key="empty" className={cn("grid place-items-center gap-3 px-6 text-center", embedded ? "py-10" : "py-16")}
-                    initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
-                    <Icon className="size-8 text-line" />
+                  <Empty key="empty" icon={Icon} className={cn("px-6", embedded ? "py-10" : "py-16")}>
                     <p className="text-sm text-faint">{EMPTY[kind]}</p>
                     {kind === "inbox" ? <p className="flex items-center gap-1.5 text-xs text-faint any-pointer-coarse:hidden">Press <Kbd>Q</Kbd> to add one</p> : null}
-                  </motion.div>
+                  </Empty>
                 )}
               </AnimatePresence>
             </div>

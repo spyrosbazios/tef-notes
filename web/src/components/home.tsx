@@ -29,6 +29,7 @@ import { homeScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { Plus, Search, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const TABS = [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]] as const satisfies readonly [TaskView, string][];
@@ -81,14 +82,14 @@ export function Home() {
         {searching ? <X /> : <Search />}
       </Button>} />
   );
-  // The phone's search lies over the page, which stays laid out under it and keeps its scroll
+  // The phone's search comes down over the page (search-drawer.tsx), which stays laid out under it, inert, and keeps its scroll
   return (
-    <main className="relative min-w-0 flex-1">
-      {phone && searching ? <div className="absolute inset-0 z-10 bg-bg"><SearchDrawer header={top} onClose={closeSearch} /></div> : null}
+    <main className="relative flex h-full min-w-0 flex-1 flex-col">
+      <AnimatePresence>{phone && searching ? <motion.div key="search" className="absolute inset-0 z-10"><SearchDrawer header={top} onClose={closeSearch} /></motion.div> : null}</AnimatePresence>
+      {phone ? top : null}
       {/* The router puts the place back (lib/scroll.ts) before the masonry has settled; the browser's scroll anchoring would then
           chase the tiles as they measure and leave the page off the place. The settled layout is the one that was left, so no anchoring */}
-      <div ref={page} data-scroll-restoration-id={scrollId} className={cn("h-full overflow-y-auto [overflow-anchor:none]", phone && searching && "invisible")} inert={phone && searching}>
-        {phone ? top : null}
+      <div ref={page} data-scroll-restoration-id={scrollId} className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]" inert={phone && searching}>
         <div className="mx-auto max-w-6xl space-y-12 px-4 pt-8 pb-28 max-md:space-y-4 max-md:px-0 max-md:pt-2 max-md:pb-6 md:px-8">
           {phone ? null : <h1 className="text-3xl font-bold tracking-tight">{d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h1>}
 

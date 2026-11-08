@@ -3,8 +3,10 @@
 // drawing and hands its body line up). Excalidraw loads on first use, a chunk of its own.
 import { Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Loaded } from "@/components/loaded";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useNarrow } from "@/hooks/media";
 import { useDrawings } from "@/hooks/photos";
 import { message } from "@/services/api";
@@ -34,6 +36,10 @@ export function DrawingDialog({ noteId, name, open, onClose, onCreated }: Props)
       </DialogContent>
     </Dialog>
   );
+}
+
+function Waiting() {
+  return <Skeleton role="status" aria-label="Opening the drawing" className="size-full rounded-none" />;
 }
 
 function Editing({ noteId, name, onClose, onCreated }: Omit<Props, "open">) {
@@ -69,11 +75,13 @@ function Editing({ noteId, name, onClose, onCreated }: Omit<Props, "open">) {
         </Button>
       </header>
       <div className="min-h-0 flex-1">
-        {initial === undefined ? <p className="p-6 text-center text-faint text-sm">{err ?? "Opening…"}</p> : (
-          <Suspense fallback={<p className="p-6 text-center text-faint text-sm">Loading the editor…</p>}>
-            <Canvas ref={canvas} initial={initial} />
+        {/* The canvas fades in over a skeleton as large as itself: the drawing's file, then the editor's chunk, are waited for */}
+        <Loaded loading={initial === undefined} blurred={false} frame="h-full" className="h-full"
+          skeleton={err && initial === undefined ? <p className="p-6 text-center text-faint text-sm">{err}</p> : <Waiting />}>
+          <Suspense fallback={<Waiting />}>
+            <Canvas ref={canvas} initial={initial ?? null} />
           </Suspense>
-        )}
+        </Loaded>
       </div>
     </>
   );

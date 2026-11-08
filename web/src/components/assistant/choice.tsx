@@ -1,8 +1,11 @@
 // The assistant's question (`ask_choice`, core/assistant.ts): buttons drawn from the call's input, answered by the owner, which
 // resumes the turn. Only the newest turn can still be answered; an older one was passed over. Answered, it is a line saying what was chosen.
+import { Button as Press } from "@animate-ui/react/primitives/buttons/button";
+import { scale } from "@animate-ui/react/utils/motion";
 import { Check, MessageCircleQuestion, Send } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useTouch } from "@/hooks/media";
 import { choiceFrom, choiceOutput, chosenOf, type ChoiceOutput, type UiToolInput } from "@/core/assistant";
 import type { ToolPart } from "@/lib/ask";
 import { cn } from "@/lib/utils";
@@ -21,6 +24,9 @@ function Line({ question, end }: { question: string; end: string }) {
 
 function Ask({ q, disabled, onAnswer }: { q: Question; disabled: boolean; onAnswer: (o: ChoiceOutput) => void }) {
   const [picked, setPicked] = useState<readonly string[]>([]);
+  // An option is a whole row: a mouse presses it to `scale.choice` on `spring.press` (Animate UI's Button); under a finger every button
+  // already scales to .97 from one CSS rule (index.css), so the press is left to it rather than doubled
+  const tap = useTouch() ? 1 : scale.choice;
   const toggle = (id: string) => setPicked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   return (
     <div role="group" aria-label={q.question} className="space-y-2.5 rounded-2xl border border-line bg-card p-3">
@@ -32,15 +38,17 @@ function Ask({ q, disabled, onAnswer }: { q: Question; disabled: boolean; onAnsw
         {q.options.map((o) => {
           const on = picked.includes(o.id);
           return (
-            <Button key={o.id} type="button" variant={on ? "secondary" : "outline"} disabled={disabled} aria-pressed={q.multi ? on : undefined}
-              onClick={() => (q.multi ? toggle(o.id) : onAnswer(choiceOutput([o.id])))}
-              className={cn("h-auto justify-start gap-2 whitespace-normal rounded-xl px-3 py-2 text-left", on && "border-brand")}>
-              {q.multi ? <Check className={cn("size-4 shrink-0", on ? "text-brand" : "text-transparent")} /> : null}
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">{o.label}</span>
-                {o.hint ? <span className="block text-xs font-normal text-dim">{o.hint}</span> : null}
-              </span>
-            </Button>
+            <Press key={o.id} asChild tapScale={tap}>
+              <Button type="button" variant={on ? "secondary" : "outline"} disabled={disabled} aria-pressed={q.multi ? on : undefined}
+                onClick={() => (q.multi ? toggle(o.id) : onAnswer(choiceOutput([o.id])))}
+                className={cn("h-auto justify-start gap-2 whitespace-normal rounded-xl px-3 py-2 text-left", on && "border-brand")}>
+                {q.multi ? <Check className={cn("size-4 shrink-0", on ? "text-brand" : "text-transparent")} /> : null}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{o.label}</span>
+                  {o.hint ? <span className="block text-xs font-normal text-dim">{o.hint}</span> : null}
+                </span>
+              </Button>
+            </Press>
           );
         })}
       </div>
