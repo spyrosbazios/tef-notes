@@ -292,7 +292,7 @@ function Agent() {
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
-          <ModelMenu />
+          <ModelMenu align="end" />
         </div>
         <label className="flex items-center gap-3 px-3 py-2.5">
           <span className="min-w-0 flex-1">

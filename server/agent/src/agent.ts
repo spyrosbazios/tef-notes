@@ -12,7 +12,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
-import { uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
+import { hasAttachment, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
 import { MEMORY, parseNote } from "@/core/notes";
 import type { Server } from "@/core/pocketbase";
 import { exists, saver } from "./chats";
@@ -23,7 +23,7 @@ import { stepTools, trim } from "./loop";
 import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, Unavailable } from "./models";
-import { preview } from "./pdfs";
+import { inlinePdfs, preview } from "./pdfs";
 import { SYSTEM, today, WEB } from "./systemPrompt";
 import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
 import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type AddManyInput, type UpdateInput } from "./todoTools";
@@ -87,7 +87,7 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
   };
 }
 
-/** `pdfs`: a PDF's text is in this turn's context: its writes are tainted and ask, like after reading the web. */
+/** `pdfs`: a PDF's text is in this turn's context, or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
 async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, pdfs: boolean) {
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
@@ -124,7 +124,7 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
 
   const notes = new Notes(server), todo = new Todo(server), ctx = await context(notes, page);
   let agent: ToolLoopAgent<never, Tools>;
-  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.pdfs); } catch (e) {
+  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.pdfs || hasAttachment(parsed.data.messages as AgentMessage[])); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }
@@ -141,7 +141,7 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   try {
     stream = await createAgentUIStream({
       agent,
-      uiMessages: withContext(messages, ctx.text),
+      uiMessages: withContext(await inlinePdfs(messages), ctx.text),
       originalMessages: messages,
       generateMessageId: generateId,
       abortSignal: req.signal,              // the client's Stop (or a dropped connection) ends the turn

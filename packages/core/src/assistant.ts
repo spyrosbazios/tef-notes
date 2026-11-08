@@ -155,3 +155,18 @@ export function chosenOf(output: unknown): string[] | null {
   const c = obj(output)?.chosen;
   return Array.isArray(c) && c.every((x) => typeof x === "string") ? c : null;
 }
+
+// ---- Attachments: photos and PDFs the owner adds to a message ----
+// They ride in the user message as the AI SDK's file parts (data URLs) and are saved with the chat. A photo goes as the
+// picture the model looks at (photos.ts `lookSize`, JPEG); a PDF as it is, which the server turns into its text before the
+// model sees it (server/agent/src/pdfs.ts `inlinePdfs`). Either is someone else's content: a turn that carries one is
+// tainted like one that read the web (its writes ask).
+
+/** What the field's file picker takes. */
+export const ATTACH_ACCEPT = "image/*,application/pdf";
+/** At most this many files on one message, and a PDF no bigger than this (it is resent with every later message). */
+export const ATTACH_MAX = 6, ATTACH_PDF_MAX = 8 * 1024 * 1024;
+
+/** Whether a message history holds a file the owner attached (the server's taint check). */
+export const hasAttachment = (messages: readonly { role?: unknown; parts?: readonly { type?: unknown }[] }[]) =>
+  messages.some((m) => m.role === "user" && m.parts?.some((p) => p.type === "file"));
