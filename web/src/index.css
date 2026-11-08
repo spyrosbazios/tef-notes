@@ -310,25 +310,28 @@
 :root:active-view-transition-type(view)::view-transition-group(page),
 :root:active-view-transition-type(view)::view-transition-old(page),
 :root:active-view-transition-type(view)::view-transition-new(page) { animation-duration: 150ms; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
-/* One task list for another (router.ts `list`): the list moves as Home's task box does (components/home.tsx), as a tab panel. The one
-   left slides shift.tabs (12px) away from the list picked into blur.panel on transition.panelOut (150ms, ease.leave), then the picked
-   one comes in from that side on transition.panelIn (300ms, ease.enter); `list-back` mirrors it. The phone's tab underline glides to
-   the list picked on spring.selection (500ms as its linear()); its tabs remount with the route, so its own glide never plays */
+/* One task list for another (router.ts `list`): the lists slide as Home's task box does (components/home.tsx), as Animate UI's Tabs'
+   panels: the one picked pushes the one left out of the list's box (clipped to it), both moving together on spring.slide, the one
+   going blurring to 4px and the one coming clearing. spring.slide is 750ms as its linear() but 99.8% there at 500ms: cut there, since a
+   view transition holds every click until it ends. `list-back` comes from the left. The phone's tab underline glides to the list
+   picked on spring.selection (500ms); its tabs remount with the route, so its own glide never plays. Reduced motion: a crossfade */
 :root:active-view-transition-type(list) [data-vt="list"] { view-transition-name: list; }
 :root:active-view-transition-type(list) [data-vt="lists"] [data-slot="motion-highlight"] { view-transition-name: list-tab; }
-:root:active-view-transition-type(list)::view-transition-group(list) { animation: none; }
-:root:active-view-transition-type(list)::view-transition-old(list) { animation: list-out 150ms cubic-bezier(0, 0, 0.58, 1) both; }
-:root:active-view-transition-type(list)::view-transition-new(list) { animation: list-in 300ms cubic-bezier(0.25, 0.1, 0.35, 1) 150ms both; }
+:root:active-view-transition-type(list)::view-transition-group(list) { animation: none; overflow: clip; }
+:root:active-view-transition-type(list)::view-transition-image-pair(list) { isolation: auto; }
+:root:active-view-transition-type(list)::view-transition-old(list), :root:active-view-transition-type(list)::view-transition-new(list) { mix-blend-mode: normal; animation-duration: 500ms; animation-timing-function: linear(0, 0.0137, 0.0488, 0.0981, 0.156, 0.2184, 0.2824, 0.3459, 0.4073, 0.4658, 0.5206, 0.5714, 0.6182, 0.6608, 0.6995, 0.7345, 0.7658, 0.7939, 0.8189, 0.8411, 0.8608, 0.8782, 0.8936, 0.9071, 0.919, 0.9295, 0.9386, 0.9466, 0.9536, 0.9597, 0.965, 0.9697, 0.9737, 0.9772, 0.9803, 0.9829, 0.9852, 0.9872, 0.989, 0.9905, 0.9918, 0.9929, 0.9939, 0.9947, 0.9954, 0.9961, 0.9966, 0.9971, 0.9975, 0.9978, 1); animation-fill-mode: both; }
+:root:active-view-transition-type(list)::view-transition-old(list) { animation-name: list-out; }
+:root:active-view-transition-type(list)::view-transition-new(list) { animation-name: list-in; }
 :root:active-view-transition-type(list)::view-transition-group(list-tab) {
   animation-duration: 500ms;
   animation-timing-function: linear(0, 0.0141, 0.0509, 0.1035, 0.1663, 0.2349, 0.306, 0.3769, 0.4459, 0.5115, 0.573, 0.6297, 0.6814, 0.728, 0.7696, 0.8064, 0.8387, 0.8668, 0.8911, 0.9119, 0.9296, 0.9445, 0.957, 0.9673, 0.9758, 0.9827, 0.9882, 0.9926, 0.9961, 0.9987, 1.0007, 1.0021, 1.0031, 1.0038, 1.0041, 1, 1, 1, 1.004, 1.0038, 1.0035, 1.0032, 1.0029, 1.0026, 1.0023, 1.002, 1.0017, 1.0015, 1, 1);
 }
 :root:active-view-transition-type(list)::view-transition-old(list-tab), :root:active-view-transition-type(list)::view-transition-new(list-tab) { animation: none; }
 :root:active-view-transition-type(list)::view-transition-old(list-tab) { opacity: 0; }
-:root { --list-shift: 12px; }
-:root:active-view-transition-type(list-back) { --list-shift: -12px; }
-@keyframes list-out { to { opacity: 0; transform: translateX(calc(-1 * var(--list-shift))); filter: blur(5px); } }
-@keyframes list-in { from { opacity: 0; transform: translateX(var(--list-shift)); filter: blur(5px); } }
+:root { --list-from: 100%; }
+:root:active-view-transition-type(list-back) { --list-from: -100%; }
+@keyframes list-out { to { transform: translateX(calc(-1 * var(--list-from))); filter: blur(4px); } }
+@keyframes list-in { from { transform: translateX(var(--list-from)); filter: blur(4px); } }
 
 /* One note for another, and the share page, outside the shell, for the whole window */
 :root:active-view-transition-type(note-swap)::view-transition-old(note), :root:active-view-transition-type(note-swap)::view-transition-new(note),
@@ -359,7 +362,9 @@
   :root:active-view-transition-type(note-open)::view-transition-new(note) { animation: vt-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   :root:active-view-transition-type(note-close)::view-transition-old(note) { animation: vt-out 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   :root:active-view-transition-type(note-grow, note-shrink)::view-transition-group(note-card) { animation: none; }
-  :root, :root:active-view-transition-type(list-back) { --list-shift: 0px; }
+  :root:active-view-transition-type(list)::view-transition-old(list) { animation: vt-out 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  :root:active-view-transition-type(list)::view-transition-new(list) { animation: vt-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  :root:active-view-transition-type(list)::view-transition-old(list), :root:active-view-transition-type(list)::view-transition-new(list) { mix-blend-mode: plus-lighter; }
   :root:active-view-transition-type(list)::view-transition-group(list-tab) { animation: none; }
 }
 @keyframes vt-in { from { opacity: 0; } }

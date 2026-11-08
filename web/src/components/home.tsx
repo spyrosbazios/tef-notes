@@ -1,5 +1,5 @@
 // Home, the first view: the day at a glance and every note. The date; then the task box (Today, the Inbox and Upcoming as
-// quiet words, opening on the owner's pick (core/prefs.ts `homeList`), the one chosen in full and the others faint, the list picked sliding in as a tab panel; its + beside it) next to the
+// quiet words, opening on the owner's pick (core/prefs.ts `homeList`), the one chosen in full and the others faint, the list picked pushing the other out of the box sideways; its + beside it) next to the
 // month of planned tasks as a heatmap; Hovering either lights or scrolls to the same day in the other; then every note as the Notes view's tiles, in a masonry a page at a time. A task opens beside its own
 // list, a note over Home (which stays mounted under it). The route is routes/_app/index.tsx; a badge's tag is `?tags=`, and the task
 // box's list is kept here for as long as the app is open (not in the URL: the rail's and the tabs' Home finds the
@@ -29,19 +29,29 @@ import { homeScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { Plus, Search, X } from "lucide-react";
-import { blur, ReducedMotionConfig, shift, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { AnimatePresence, motion, type Transition, type Variants } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ReducedMotionConfig, spring, transition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { AnimatePresence, motion, useIsPresent, type Transition, type Variants } from "motion/react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 
 const TABS = [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]] as const satisfies readonly [TaskView, string][];
 
-/** A list taking the box's place as a tab panel does (Animate UI's `shift.tabs`, `blur.panel`): the one leaving slides away from the
- *  side of the tab picked as it fades out, then the picked one comes in from that side. `custom` is +1 for a tab to the right, -1 left. */
-const panel = (panelIn: Transition, panelOut: Transition): Variants => ({
-  enter: (dir: number) => ({ opacity: 0, x: dir * shift.tabs, filter: blur.panel }),
-  shown: { opacity: 1, x: 0, filter: "blur(0px)", transition: panelIn },
-  leave: (dir: number) => ({ opacity: 0, x: -dir * shift.tabs, filter: blur.panel, transition: panelOut }),
-});
+/** The lists side by side, as Animate UI's Tabs' panels (`TabsContents`): the one picked pushes the one in front out of the box, both
+ *  moving together on `spring.slide`, the one going blurring as an inactive panel does and the one coming clearing (`spring.selection`).
+ *  `custom` is +1 for a tab to the right, -1 left. Under reduced motion nothing slides: the lists crossfade in place. */
+const panel = (slide: Transition, selection: Transition, fade: Transition, still: boolean): Variants => {
+  const at = (dir: number) => (still ? { x: 0, opacity: 0 } : { x: `${dir * 100}%` });
+  const moving = { x: slide, opacity: fade, filter: selection };
+  return {
+    enter: (dir: number) => ({ ...at(dir), filter: "blur(4px)" }),
+    shown: { x: 0, opacity: 1, filter: "blur(0px)", transition: moving },
+    leave: (dir: number) => ({ ...at(-dir), filter: "blur(4px)", transition: moving }),
+  };
+};
+
+/** A list in the box; the one on its way out can't be clicked or tabbed into. */
+function Panel({ children, ...props }: ComponentProps<typeof motion.div>) {
+  return <motion.div {...props} inert={!useIsPresent()}>{children}</motion.div>;
+}
 const order = (k: TaskView) => TABS.findIndex(([t]) => t === k);
 
 /** Home's task box: the list in front, kept while another screen takes Home's place. */
@@ -65,7 +75,7 @@ export function Home() {
   // Which way the list moves: toward the tab picked, from the one in front before it (set as the tab is, so the leaving list reads it too)
   const [dir, setDir] = useState(1);
   const show = (k: Box["tab"]) => { if (k !== tab) setDir(order(k) > order(tab) ? 1 : -1); setTab(k); };
-  const panels = panel(useTempoTransition(transition.panelIn), useTempoTransition(transition.panelOut));
+  const panels = panel(useTempoTransition(spring.slide), useTempoTransition(spring.selection), useTempoTransition(transition.fade), useShouldReduceMotion());
   // Home's own scroll is the router's, per tag filter and lens: another one is another list (the lens switched on the page is `useScrollSwitch`'s)
   const { view } = usePlace(), lens = useActiveLens();
   const scrollId = homeScroll(view.kind === "home" ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec);
@@ -128,13 +138,13 @@ export function Home() {
                 </nav>
                 <Button variant={phone ? "outline" : "ghost"} size="icon-sm" aria-label="New task" title="New task (Q)" onClick={add} className={cn("shrink-0 text-brand hover:text-brand", TOOL)}><Plus className="max-md:size-5" /></Button>
               </header>
-              {/* The list picked takes the box as a tab panel: the old one out first, then the new one in (no two lists scrolling at once) */}
-              <div className="min-h-0 flex-1 max-md:h-72 max-md:flex-none">
+              {/* The list picked pushes the one in front out of the box, both on screen while they slide */}
+              <div className="relative min-h-0 flex-1 overflow-hidden max-md:h-72 max-md:flex-none">
                 <ReducedMotionConfig>
-                  <AnimatePresence mode="wait" initial={false} custom={dir}>
-                    <motion.div key={tab} className="h-full" custom={dir} variants={panels} initial="enter" animate="shown" exit="leave">
+                  <AnimatePresence initial={false} custom={dir}>
+                    <Panel key={tab} className="absolute inset-0" custom={dir} variants={panels} initial="enter" animate="shown" exit="leave">
                       <TaskList embedded view={{ kind: tab }} focus={tab === "upcoming" ? focus : null} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} />
-                    </motion.div>
+                    </Panel>
                   </AnimatePresence>
                 </ReducedMotionConfig>
               </div>
