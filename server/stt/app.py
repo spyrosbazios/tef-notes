@@ -1,7 +1,7 @@
-"""Speech to text: NVIDIA Parakeet TDT 0.6B v2 (English), int8, on the CPU, through onnx-asr.
+"""Speech to text: NVIDIA Parakeet TDT_CTC 110M (English) on the CPU, through onnx-asr.
 
 Reached only by the agent (server/agent/src/transcribe.ts) on the compose network; never published. Holds nothing: a
-clip is transcribed in memory and dropped. The model (~700 MB on disk, ~1.5 GB resident) is loaded on the first request
+clip is transcribed in memory and dropped. The model (~460 MB on disk, ~560 MB resident) is loaded on the first request
 in a worker process, and unloaded (the process ended) once it has sat idle for the `keep` seconds the last request asked for (the owner's setting, prefs.ts
 `voice.keep`): 0 unloads it as soon as the clip is done.
 
@@ -20,8 +20,18 @@ from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 import onnx_asr
+import onnxruntime as ort
+from huggingface_hub import snapshot_download
 
-MODEL = "nemo-parakeet-tdt-0.6b-v2"
+#: Parakeet TDT_CTC 110M as onnx-asr loads it, pinned to a commit. Chosen over TDT 0.6B v2 for speed: on the N100 it is
+#: ~2.5x faster (10 s of speech in ~1 s) at ~a third of the memory, for slightly more misheard words. fp32: its int8
+#: export is no faster here.
+MODEL = "OpenVoiceOS/nvidia-parakeet-tdt_ctc-110m-onnx"
+REVISION = "40cd0e28e787fc8a2635abf5258e0f886b5304a9"
+FILES = ["config.json", "vocab.txt", "encoder-model.onnx", "encoder-model.onnx_data", "decoder_joint-model.onnx", "decoder_joint-model.onnx_data"]
+#: Threads per clip: measured on the 4-core N100, 2 beat 4 (and 1, and 3), since the other cores are busy with the rest of
+#: the host.
+THREADS = 2
 DATA = os.environ.get("TEF_NOTES_DATA", "/data")
 RATE = 16_000
 #: The longest clip taken: ten minutes of float32 at 16 kHz.
@@ -47,7 +57,10 @@ def serve(conn):
     """The worker: loads the model (downloaded once into the data volume), then transcribes what it is sent. A process of
     its own because freeing a model inside one leaves its memory with the allocator: killing the process gives it back."""
     t = time.monotonic()
-    asr = onnx_asr.load_model(MODEL, os.path.join(DATA, "parakeet-v2"), quantization="int8")
+    path = snapshot_download(MODEL, revision=REVISION, allow_patterns=FILES, local_dir=os.path.join(DATA, "parakeet-110m"))
+    opts = ort.SessionOptions()
+    opts.intra_op_num_threads = THREADS
+    asr = onnx_asr.load_model("nemo-conformer-tdt", path, sess_options=opts)
     vad = onnx_asr.load_vad("silero", os.path.join(DATA, "silero"))
     long = asr.with_vad(vad)
     print(f"stt: loaded {MODEL} in {time.monotonic() - t:.1f}s", flush=True)
@@ -71,7 +84,12 @@ def load():
         parent, child = mp.Pipe()
         proc = mp.Process(target=serve, args=(child,), daemon=True)
         proc.start()
-        parent.recv()  # loaded
+        child.close()  # only the worker holds that end now: if it dies, recv() raises instead of waiting forever
+        try:
+            parent.recv()  # loaded
+        except EOFError:
+            proc.join()
+            raise RuntimeError(f"the model failed to load (worker exit code {proc.exitcode})") from None
         worker = (proc, parent)
     return worker[1]
 
@@ -106,7 +124,11 @@ def transcribe(pcm: np.ndarray) -> str:
         return ""
     pipe = load()
     pipe.send(pcm)
-    out = pipe.recv()
+    try:
+        out = pipe.recv()
+    except EOFError:  # the worker died mid-clip (out of memory): start a fresh one next time
+        unload()
+        raise RuntimeError("the worker died transcribing") from None
     if isinstance(out, Exception):
         raise out
     return out
@@ -131,7 +153,11 @@ class Handler(BaseHTTPRequestHandler):
         keep = keep_of(parse_qs(url.query))
         if url.path == "/warm":
             with lock:
-                load()
+                try:
+                    load()
+                except Exception as e:  # noqa: BLE001
+                    print(f"stt: failed: {e}", flush=True)
+                    return self.reply(500, {"error": "the model failed to load"})
                 touch(keep)
             return self.reply(200, {"loaded": True})
         if url.path != "/transcribe":

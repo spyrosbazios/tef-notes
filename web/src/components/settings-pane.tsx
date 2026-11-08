@@ -624,7 +624,7 @@ function Voice() {
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
             <p className="text-sm font-semibold">Keep the model loaded</p>
-            <p className="text-[13px] leading-snug text-dim">The model takes about 1.5 GB of the server's memory while loaded. Loading it takes a few seconds, and starts the moment you tap the mic. Longer keeps the next dictation instant; shorter frees the memory sooner.</p>
+            <p className="text-[13px] leading-snug text-dim">The model takes about 560 MB of the server's memory while loaded. Loading it takes a few seconds, and starts the moment you tap the mic. Longer keeps the next dictation instant; shorter frees the memory sooner.</p>
           </div>
           <div role="radiogroup" aria-label="Keep the model loaded" className="flex flex-wrap gap-2">
             {KEEPS.map((k) => (

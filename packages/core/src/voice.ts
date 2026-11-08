@@ -1,6 +1,6 @@
 // Voice input's contract: speech in, text out, on the owner's own server. The client records a clip, turns it into mono
 // 16 kHz float32 samples (RATE) and posts them raw to the agent's `POST /agent/transcribe?keep=S`, which hands them to the
-// stt service (server/stt/app.py: Parakeet TDT 0.6B v2, English, on the CPU) and answers a Transcript. Nothing is kept: no
+// stt service (server/stt/app.py: Parakeet TDT_CTC 110M, English, on the CPU) and answers a Transcript. Nothing is kept: no
 // recording, no text, only what the client puts in the field it was dictated into. `POST /agent/transcribe/warm?keep=S`
 // loads the model as recording starts, so the clip that follows waits for no load. `keep` is how long the model stays
 // loaded once idle, the owner's setting (prefs.ts `voice.keep`). Pure and platform-neutral.

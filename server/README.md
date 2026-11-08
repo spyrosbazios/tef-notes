@@ -5,7 +5,7 @@
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
 (`agent/`, see [agent/README.md](agent/README.md)), and a Python one for voice input (`stt/`: Parakeet speech to text
-on the CPU, ~1.5 GB of memory while its model is loaded, unloaded after the idle time set in the app's Settings, Voice).
+on the CPU, ~560 MB of memory while its model is loaded, unloaded after the idle time set in the app's Settings, Voice).
 `docker compose up -d` pulls them as multi-arch (amd64, arm64)
 images from GHCR, the web app already in PocketBase's `pb_public`. The signed Chrome extension is not in them: it needs
 your origin and your key, so you build it yourself ("The browser extension's CRX").
