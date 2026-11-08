@@ -1,4 +1,4 @@
-// A note as a search result: the palette's row and the phone's drawer share it. Its picture as a small mosaic, the title, two
+// A note as a search result: the palette's row (the phone's drawer shows Home's tiles instead). Its picture as a small mosaic, the title, two
 // lines of prose (or, for a hit of the assistant's, why it fits), tags and age.
 import { Pin, Sparkles } from "lucide-react";
 import { useMemo } from "react";

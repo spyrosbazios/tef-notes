@@ -2,23 +2,25 @@
 // in place of the page. One field; under it the notes it finds, the tasks, tags and the screens to jump to. A finished `#tag`
 // becomes a chip in the field (absorbed as it is typed, taken off with its x or Backspace) and narrows notes and tasks alike;
 // a tag still being typed is a prefix, and the Tags rows offer the names (tap: a chip). Everything is inside the lens that is on.
-// A long press on a note opens its actions. When words find no note or task, "Search with the assistant" asks the agent for what
+// Notes are Home's tiles in its masonry, gliding as results change; a long press on one opens its actions. When words find no note or task, "Search with the assistant" asks the agent for what
 // was meant (core/find.ts; the palette's too, hooks/search.ts), its hits filling the list with why each fits. The palette (⌘K)
 // is the laptop's; this is the phone's, for the same data.
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
+import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { absorbTags, dropTyping } from "@/core/tags";
 import { fold } from "@/core/notes";
 import { MenuAt, TagsDialog, DeleteDialog } from "@/components/note-actions";
-import { NoteHit } from "@/components/note-hit";
+import { Masonry } from "@/components/masonry";
+import { Tile } from "@/components/note-list";
 import { TagBadge } from "@/components/tag-badge";
 import { useAssistant } from "@/hooks/assistant";
 import { useActiveLens } from "@/hooks/lens";
-import { useLongPress } from "@/hooks/long-press";
 import { useNow } from "@/hooks/now";
 import { useFinder } from "@/hooks/search";
-import { homeOfTask, useNav, type View } from "@/lib/nav";
+import { homeOfTask, noteLink, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
@@ -31,19 +33,44 @@ const VIEWS: { label: string; icon: LucideIcon; view: View | "ask" }[] = [
 
 const row = "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] transition-colors active:bg-muted disabled:opacity-60";
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="pt-3"><h3 className="px-3 pb-1 text-xs font-semibold tracking-wide text-faint uppercase">{title}</h3>{children}</section>;
+/** A group of results: it slides into place as the groups above it grow or go, and fades in and out as it comes and goes. */
+function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade);
+  return (
+    <motion.section layout="position" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: fade }}
+      transition={{ ...move, opacity: fade }} className="pt-4">
+      <h3 className="flex items-baseline gap-2 px-3 pb-1.5 text-xs font-semibold tracking-wide text-faint uppercase">
+        {title}{count ? <span className="tabular-nums font-medium normal-case">{count}</span> : null}
+      </h3>
+      {children}
+    </motion.section>
+  );
 }
 
-/** A note result: a card in the note's own colour; holding it opens its actions. */
-function Result({ n, now, why, onOpen, onMenu }: { n: NoteRec; now: number; why?: string; onOpen: () => void; onMenu: (at: { x: number; y: number }) => void }) {
-  const press = useLongPress(onMenu, { menu: true });
-  const tint = n.note.color;
+/** A row in a group, gliding and fading as the results change like the tiles do. */
+function Row({ children }: { children: ReactNode }) {
+  const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade);
   return (
-    <button type="button" onClick={onOpen} {...press} data-color={tint}
-      className={cn("my-1 block w-full rounded-2xl border p-3 text-left select-none", tint ? "border-tile-line/50 bg-tile text-tile-fg" : "border-line bg-card")}>
-      <NoteHit n={n} now={now} why={why} />
-    </button>
+    <motion.div layout="position" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, transition: fade }}
+      transition={{ ...move, opacity: fade, scale: fade }}>
+      {children}
+    </motion.div>
+  );
+}
+
+/** Notes as Home's tiles, in its masonry: a tile glides as the results reflow and fades in or out as they change. Keys are
+ *  prefixed so a tile here never shares a layout id with the Notes page's own. */
+function Tiles({ notes, now, onOpen, onMenu, onTag, onTags, onDelete }: {
+  notes: { n: NoteRec; why?: string }[]; now: number; onOpen: (n: NoteRec) => void;
+  onMenu: (path: string) => (at: { x: number; y: number }) => void; onTag: (t: string) => void; onTags: (path: string) => void; onDelete: (path: string) => void;
+}) {
+  return (
+    <Masonry animate className="px-1 pt-1">
+      {notes.map(({ n, why }) => (
+        <Tile key={`search:${n.path}`} id={`search:${n.path}`} n={n} why={why} link={noteLink(n.note.id, null)} now={now} menuPaths={[n.path]}
+          onPick={() => onOpen(n)} onHold={onMenu(n.path)} onTag={onTag} onTags={() => onTags(n.path)} onDelete={() => onDelete(n.path)} />
+      ))}
+    </Masonry>
   );
 }
 
@@ -80,14 +107,18 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
   const go = (v: View | "ask") => { onClose(); if (v === "ask") assistant.show(); else goView(v); };
   const open = (id: string) => openNote(id);
   const task = (t: TaskRec) => showTask(homeOfTask(t), t.id);
-  const ask = (kind: "tags" | "delete") => { if (menu) setTarget([menu.path]); setDialog(kind); };
+  const ask = (kind: "tags" | "delete", path = menu?.path) => { if (path) setTarget([path]); setDialog(kind); };
+  const tiles = (notes: { n: NoteRec; why?: string }[]) => (
+    <Tiles notes={notes} now={now} onOpen={(n) => open(n.note.id)} onMenu={menuOf} onTag={choose}
+      onTags={(p) => ask("tags", p)} onDelete={(p) => ask("delete", p)} />
+  );
   const menuOf = (path: string) => (at: { x: number; y: number }) => setMenu({ path, ...at });
 
   const taskRow = (t: TaskRec, sub: string) => (
-    <button key={t.id} type="button" onClick={() => task(t)} className={row}>
+    <Row key={t.id}><button type="button" onClick={() => task(t)} className={row}>
       {t.done ? <Check className="size-5 shrink-0 text-dim" /> : <ListTodo className="size-5 shrink-0 text-dim" />}
       <span className="min-w-0 flex-1"><span className="block truncate">{t.title || "Untitled"}</span>{sub ? <span className="block truncate text-xs text-dim">{sub}</span> : null}</span>
-    </button>
+    </button></Row>
   );
   const found = f.hits.length + f.taskHits.length + f.tags.length + views.length > 0;
 
@@ -106,33 +137,35 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6">
+        <LayoutGroup><AnimatePresence initial={false} mode="popLayout">
         {f.empty && q.trim() ? (
-          <Section title="Assistant">
+          <Section key="assistant" title="Assistant">
             {!f.asked ? <button type="button" onClick={f.ask} className={row}><Sparkles className="size-5 shrink-0 text-brand" /><span className="min-w-0"><span className="block">Search with the assistant</span><span className="block text-xs text-dim">Finds what you meant</span></span></button>
               : !f.asked.found && !f.asked.error ? <p className={cn(row, "text-dim")}><Loader2 className="size-5 shrink-0 animate-spin" /><ShimmeringText text="Looking through your notes and tasks…" color="var(--tf-dim)" shimmeringColor="var(--tf-fg)" /></p>
               : f.asked.error ? <button type="button" onClick={f.ask} className={row}><Sparkles className="size-5 shrink-0 text-brand" /><span className="min-w-0"><span className="block">Couldn't search. Try again</span><span className="block text-xs text-dim">{f.asked.error}</span></span></button>
               : !f.foundNotes.length && !f.foundTasks.length ? <p className={cn(row, "text-dim")}><Sparkles className="size-5 shrink-0" />The assistant found nothing either</p> : null}
-            {f.foundNotes.map(({ n, why }) => <Result key={n.path} n={n} now={now} why={why} onOpen={() => open(n.note.id)} onMenu={menuOf(n.path)} />)}
-            {f.foundTasks.map(({ t, why }) => taskRow(t, why))}
+            {f.foundNotes.length ? tiles(f.foundNotes) : null}
+            <AnimatePresence initial={false}>{f.foundTasks.map(({ t, why }) => taskRow(t, why))}</AnimatePresence>
           </Section>
         ) : null}
-        {f.hits.length ? <Section title="Notes">{f.hits.map((n) => <Result key={n.path} n={n} now={now} onOpen={() => open(n.note.id)} onMenu={menuOf(n.path)} />)}</Section> : null}
-        {f.taskHits.length ? <Section title="Tasks">{f.taskHits.map((t) => taskRow(t, [t.done ? "Completed" : "", t.notes].filter(Boolean).join(" · ")))}</Section> : null}
+        {f.hits.length ? <Section key="notes" title="Notes" count={f.hits.length}>{tiles(f.hits.map((n) => ({ n })))}</Section> : null}
+        {f.taskHits.length ? <Section key="tasks" title="Tasks" count={f.taskHits.length}><AnimatePresence initial={false}>{f.taskHits.map((t) => taskRow(t, [t.done ? "Completed" : "", t.notes].filter(Boolean).join(" · ")))}</AnimatePresence></Section> : null}
         {q.trim() && f.tags.length ? (
-          <Section title="Tags">
-            {f.tags.map((t) => <button key={t} type="button" onClick={() => choose(t)} className={row}><Hash className="size-5 shrink-0 text-dim" />{t}</button>)}
+          <Section key="tags" title="Tags">
+            <AnimatePresence initial={false}>{f.tags.map((t) => <Row key={t}><button type="button" onClick={() => choose(t)} className={row}><Hash className="size-5 shrink-0 text-dim" />{t}</button></Row>)}</AnimatePresence>
           </Section>
         ) : null}
         {views.length ? (
-          <Section title="Go">
-            {views.map((v) => { const Icon = v.icon; return <button key={v.label} type="button" onClick={() => go(v.view)} className={row}><Icon className="size-5 shrink-0 text-dim" />{v.label}</button>; })}
+          <Section key="go" title="Go">
+            <AnimatePresence initial={false}>{views.map((v) => { const Icon = v.icon; return <Row key={v.label}><button type="button" onClick={() => go(v.view)} className={row}><Icon className="size-5 shrink-0 text-dim" />{v.label}</button></Row>; })}</AnimatePresence>
           </Section>
         ) : null}
         {!found ? (
-          <div className="grid place-items-center gap-2 px-6 py-16 text-center">
+          <motion.div key="none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid place-items-center gap-2 px-6 py-16 text-center">
             <SearchX className="size-8 text-line" /><p className="text-sm text-faint">Nothing matches</p>
-          </div>
+          </motion.div>
         ) : null}
+        </AnimatePresence></LayoutGroup>
       </div>
 
       <MenuAt paths={menu ? [menu.path] : []} at={menu} onClose={() => setMenu(null)} onTags={() => ask("tags")} onDelete={() => ask("delete")} />

@@ -6,7 +6,7 @@
 // Below `md` it is the phone's: two columns, a header of icons (tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
+import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Sparkles, Tags, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
@@ -62,11 +62,17 @@ type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean };
 /** A note as a Keep tile: its picture across the top, the title, the opening prose, tags, then pin and age. A note with a colour
  *  wears it as the tile's tint. On hover a checkbox selects it and a ⋮ opens its actions (a right-click does too); under a finger
  *  both are always there, and holding the tile opens the same menu. */
-function Tile({ id, n, link, now, selecting, selected, menuPaths, onPick, onCheck, onTag, onTags, onDelete }: {
-  id: string; n: NoteRec; link: AppLink; now: number; selecting: boolean; selected: boolean; menuPaths: string[];
-  onPick: (e: Modifiers) => void; onCheck: () => void; onTag: (t: string) => void; onTags: () => void; onDelete: () => void;
+export function Tile({ id, n, link, now, selecting = false, selected = false, menuPaths, why, onPick, onCheck, onHold, onTag, onTags, onDelete }: {
+  id: string; n: NoteRec; link: AppLink; now: number; selecting?: boolean; selected?: boolean; menuPaths: string[];
+  /** The assistant's reason this note fits (search), shown for its prose. */
+  why?: string;
+  onPick: (e: Modifiers) => void; onTag: (t: string) => void; onTags: () => void; onDelete: () => void;
+  /** Selects it: without one the tile has no checkbox, and a hold opens its actions everywhere. */
+  onCheck?: () => void;
+  /** A hold or right-click, given where, in place of the tile's own menu (search's menu sits at the finger). */
+  onHold?: (at: { x: number; y: number }) => void;
 }) {
-  const snippet = useMemo(() => snippetOf(n.note.body, 280), [n.note.body]);
+  const snippet = useMemo(() => why || snippetOf(n.note.body, 280), [why, n.note.body]);
   const [ref, pictures, more] = useNotePictures<HTMLDivElement>(n.note.id, n.note.body);
   const [menu, setMenu] = useState(false);
   const phone = useNarrow(), touch = useTouch();
@@ -74,7 +80,7 @@ function Tile({ id, n, link, now, selecting, selected, menuPaths, onPick, onChec
   // while held, answering the press before the hold fires
   const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), press = useTempoTransition(spring.press);
   const moved = useMoved(id, !phone, ref);
-  const hold = useLongPress(() => (phone ? onCheck() : setMenu(true)), { menu: !phone });
+  const hold = useLongPress((at) => (onHold ? onHold(at) : phone && onCheck ? onCheck() : setMenu(true)), { menu: !!onHold || !phone || !onCheck });
   // The note's page and its pictures' list fetched ahead on a hover or a touch, as a link's would be
   const intent = useIntent(() => link);
   const tint = n.note.color;
@@ -90,15 +96,15 @@ function Tile({ id, n, link, now, selecting, selected, menuPaths, onPick, onChec
         tint ? "bg-tile text-tile-fg" : "bg-card hover:bg-raised",
         selected ? "border-brand ring-2 ring-brand" : tint ? "border-tile-line/50" : "border-line")}>
       {/* Not ui/checkbox or TickBox: this is a chip on the tile's corner (shown on hover, over a picture), not a form control or a task's tick */}
-      <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select ${n.note.title}`} onClick={(e) => { e.stopPropagation(); onCheck(); }}
+      {onCheck ? <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select ${n.note.title}`} onClick={(e) => { e.stopPropagation(); onCheck(); }}
         className={cn(chrome, "left-2", selecting && "opacity-100", selected && "border-brand bg-brand text-bg hover:text-bg")}>
         {selected ? <Check className="size-3.5" strokeWidth={3} /> : null}
-      </button>
-      <TileMenu paths={menuPaths} open={menu} onOpenChange={setMenu} onTags={onTags} onDelete={onDelete} className={cn(chrome, "right-2 max-md:hidden")} />
+      </button> : null}
+      {onHold ? null : <TileMenu paths={menuPaths} open={menu} onOpenChange={setMenu} onTags={onTags} onDelete={onDelete} className={cn(chrome, "right-2 max-md:hidden")} />}
       <Mosaic sources={pictures} more={more} className={pictures.length > 2 ? "h-44" : "h-32"} />
       <div className="flex flex-col gap-1.5 p-3">
         <h3 className="line-clamp-2 font-semibold text-[15px] leading-snug">{n.note.title}</h3>
-        {snippet ? <p className={cn("line-clamp-6 text-[13px] leading-snug", tint ? "opacity-85" : "text-dim")}>{snippet}</p> : null}
+        {snippet ? <p className={cn("line-clamp-6 text-[13px] leading-snug", why ? "" : tint ? "opacity-85" : "text-dim")}>{why ? <Sparkles className="mr-1 inline size-3 opacity-70" /> : null}{snippet}</p> : null}
         {n.note.tags.length ? (
           <span className="flex flex-wrap gap-1 max-md:[&>*:nth-child(n+3)]:hidden">
             {n.note.tags.map((t) => <TagBadge key={t} name={t} onClick={() => onTag(t)} />)}
