@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode, type SyntheticEvent } from "react";
 import { toast } from "sonner";
 import { ChatList } from "@/components/assistant/chat-list";
+import { Loaded } from "@/components/loaded";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Turn } from "@/components/assistant/turn";
 import { Button } from "@/components/ui/button";
@@ -226,8 +227,10 @@ export function Panel() {
   const listing = listedAt === focusKey;
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {chat ? <Thread key={chat.id} chat={chat} listing={listing} onHistory={() => setListedAt(listing ? undefined : focusKey)} />
-        : <><Header /><div className="space-y-3 p-4"><Skeleton className="h-10 w-2/3" /><Skeleton className="h-24" /></div></>}
+      <Loaded loading={!chat} blurred={false} frame="h-full min-h-0" className="h-full"
+        skeleton={<><Header /><div className="space-y-3 p-4"><Skeleton className="h-10 w-2/3" /><Skeleton className="h-24" /></div></>}>
+        {chat ? <Thread key={chat.id} chat={chat} listing={listing} onHistory={() => setListedAt(listing ? undefined : focusKey)} /> : null}
+      </Loaded>
     </div>
   );
 }

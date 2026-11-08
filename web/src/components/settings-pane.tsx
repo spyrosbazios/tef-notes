@@ -18,6 +18,8 @@ import { Conflict } from "@/core/pocketbase";
 import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { ModelMenu } from "@/components/assistant/model-menu";
+import { Empty } from "@/components/empty";
+import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
 import { Conflicts } from "@/components/sync-conflicts";
 import { TagBadge } from "@/components/tag-badge";
@@ -324,7 +326,8 @@ function Tags() {
       {data?.length || loose.length ? (
         <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tags" aria-label="Search tags" />
       ) : null}
-      {isPending ? <Skeleton className="h-16 rounded-xl" /> : isError ? <p className="text-sm text-down">The tags can't be loaded.</p>
+      <Loaded loading={isPending} blurred={false} skeleton={<Skeleton className="h-16 rounded-xl" />}>
+      {isError ? <p className="text-sm text-down">The tags can't be loaded.</p>
         : defs.length || looseShown.length ? (
           <ul className="divide-y divide-line rounded-xl border border-line">
             {defs.map((t) => (
@@ -344,7 +347,8 @@ function Tags() {
               </li>
             ))}
           </ul>
-        ) : <p className="rounded-xl border border-dashed border-line px-3 py-8 text-center text-sm text-faint">{find ? `No tag matches “${find}”.` : "No tags defined yet."}</p>}
+        ) : <Empty icon={TagIcon} className="rounded-xl border border-dashed border-line px-3 py-8"><p className="text-sm text-faint">{find ? `No tag matches “${find}”.` : "No tags defined yet."}</p></Empty>}
+      </Loaded>
 
 
       {editing !== undefined ? <TagDialog key={editing?.rec ?? `new:${defining ?? ""}`} tag={editing} name={defining} onClose={() => { setEditing(undefined); setDefining(undefined); }} /> : null}
@@ -404,7 +408,9 @@ function Memory() {
       <h2 id="memory-h" className={HEAD}>Agent memory</h2>
       <p className="text-sm text-dim">The agent (Ask, here and on the phone) keeps this file about you and how you keep notes, and rewrites it on its own.</p>
       <div className="rounded-xl border border-line px-4 py-3">
-        {isPending ? <Skeleton className="h-24" /> : data?.text.trim() ? <Markdown body={data.text} /> : <p className="text-sm text-faint">Empty: the agent hasn't written anything yet.</p>}
+        <Loaded loading={isPending} blurred={false} skeleton={<Skeleton className="h-24" />}>
+          {data?.text.trim() ? <Markdown body={data.text} /> : <Empty icon={Bot} className="py-2"><p className="text-sm text-faint">Empty: the agent hasn't written anything yet.</p></Empty>}
+        </Loaded>
       </div>
     </section>
   );

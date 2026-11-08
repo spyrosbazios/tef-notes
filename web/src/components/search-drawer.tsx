@@ -4,7 +4,11 @@
 // a tag still being typed is a prefix, and the Tags rows offer the names (tap: a chip). Everything is inside the lens that is on.
 // A long press on a note opens its actions. When words find no note or task, "Search with the assistant" asks the agent for what
 // was meant (core/find.ts; the palette's too, hooks/search.ts), its hits filling the list with why each fits. The palette (⌘K)
-// is the laptop's; this is the phone's, for the same data.
+// is the laptop's; this is the phone's, for the same data. It comes down from under the header as a sheet from the top edge
+// (Animate UI's sheet recipe: in on transition.sheet, away on transition.dismiss, a fade in place under reduced motion), over the
+// page, which stays laid out under it; the results inside appear at once, never staggered (they change on every key).
+import { ReducedMotionConfig, transition as motionTransition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { motion } from "motion/react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -47,8 +51,13 @@ function Result({ n, now, why, onOpen, onMenu }: { n: NoteRec; now: number; why?
   );
 }
 
-/** `header`: Home's top row, kept above the field; `onClose` puts the page back. */
-export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: () => void }) {
+/** `header`: Home's top row, kept above the field; `onClose` puts the page back. Rendered under an `AnimatePresence` (home.tsx,
+ *  notes-page.tsx), which lets it slide away. */
+export function SearchDrawer(props: { header: ReactNode; onClose: () => void }) {
+  return <ReducedMotionConfig><Drawer {...props} /></ReducedMotionConfig>;
+}
+
+function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void }) {
   const { openNote, showTask, goView } = useNav();
   const assistant = useAssistant();
   const lens = useActiveLens();
@@ -90,10 +99,18 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
     </button>
   );
   const found = f.hits.length + f.taskHits.length + f.tags.length + views.length > 0;
+  const reduce = useShouldReduceMotion();
+  const enter = useTempoTransition(motionTransition.sheet), leave = useTempoTransition(motionTransition.dismiss);
+  // The same transform function at both ends: Motion can't interpolate `none` with a translate
+  const hidden = { opacity: 0, transform: reduce ? "translateY(0%)" : "translateY(-100%)" };
 
   return (
     <div className="flex h-full min-h-0 flex-col" role="search">
-      {header}
+      <div className="relative z-10 bg-bg">{header}</div>
+      {/* Clipped under the header, so the sheet comes out from behind it */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <motion.div initial={hidden} animate={{ opacity: 1, transform: "translateY(0%)", transition: enter }} exit={{ ...hidden, transition: leave }}
+        className="flex h-full min-h-0 flex-col bg-bg">
       <div className="px-4 pt-1 pb-2">
         <label className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-card px-3 py-1.5 focus-within:border-ring">
           <Search className="size-4 shrink-0 text-dim" />
@@ -133,6 +150,8 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
             <SearchX className="size-8 text-line" /><p className="text-sm text-faint">Nothing matches</p>
           </div>
         ) : null}
+      </div>
+      </motion.div>
       </div>
 
       <MenuAt paths={menu ? [menu.path] : []} at={menu} onClose={() => setMenu(null)} onTags={() => ask("tags")} onDelete={() => ask("delete")} />

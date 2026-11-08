@@ -2,10 +2,8 @@
 // came. A tool call is a row, a note write a confirm card, the answer streaming markdown. Consecutive finished
 // thoughts and read-only calls fold into one summary line; what is still moving, failed, or left a card to open stays a row.
 import { CopyButton, CopyButtonIcon } from "@animate-ui/react/primitives/buttons/copy";
-import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { ArrowUpRight, Check, ChevronDown, Copy, FileText, ListChecks, Loader2, TriangleAlert } from "lucide-react";
-import { motion } from "motion/react";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import remend from "remend";
 import { Markdown } from "@/components/markdown";
@@ -23,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Cards } from "./cards";
 import { Choice } from "./choice";
 import { Confirm } from "./confirm";
+import { Rise } from "./rise";
 import { WidgetView } from "./widgets";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -58,19 +57,6 @@ function CopyAnswer({ text }: { text: string }) {
       className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), "-ml-1.5 text-dim any-pointer-coarse:min-h-10 any-pointer-coarse:min-w-10")}>
       <CopyButtonIcon icon={<Copy className="size-4" />} copiedIcon={<Check className="size-4 text-brand" />} />
     </CopyButton>
-  );
-}
-
-/** What a streamed reply's new block (a row, the answer, a card) and a message just sent come in as: a short rise and
- *  fade, only if the reply is live when the block appears — one that is there when the chat opens sits still. Decided once,
- *  at mount: a block going live later (a confirm card answered, the turn resumed) doesn't replay it. */
-function Rise({ live, children }: { live: boolean; children: ReactNode }) {
-  const [enter] = useState(live);
-  const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade);
-  return (
-    <motion.div initial={enter ? { opacity: 0, y: 4 } : false} animate={{ opacity: 1, y: 0, transition: { ...move, opacity: fade } }}>
-      {children}
-    </motion.div>
   );
 }
 
@@ -192,14 +178,14 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
       return (
         <div key={i} className="space-y-2">
           <Confirm name={name} input={(p.input ?? {}) as WriteInput} id={approval?.id ?? ""} respond={respond} answer={decided} />
-          {shown ? <Cards cards={shown} /> : null}
+          {shown ? <Cards cards={shown} live={live} /> : null}
         </div>
       );
     // A widget (day, week, review, quote, link, lens) is drawn by its type; one that came back as an error, or doesn't hold together, keeps its row
     const widget = isWidgetTool(name) && p.state === "output-available" ? widgetOf(p.output) : null;
     if (widget) return <WidgetView key={i} widget={widget} />;
     // What it chose to show is the cards alone (a failed call keeps its row)
-    if (name === "show_items" && p.state === "output-available") return shown ? <Cards key={i} cards={shown} /> : null;
+    if (name === "show_items" && p.state === "output-available") return shown ? <Cards key={i} cards={shown} live={live} /> : null;
     const detail = p.input && typeof p.input === "object" ? detailOf(name, p.input as Record<string, unknown>, titleOf) : "";
     const failed = p.state === "output-error" || p.state === "output-denied" || passed;
     const running = !failed && !settledState(p);
@@ -210,7 +196,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
           title={detail ? `${label(name)} · ${detail.slice(0, 80)}` : label(name)} busy={running} defaultOpen={failed && !unconfirmed}>
           {why ? <p className="text-[13px] text-dim">{why}</p> : null}
         </Fold>
-        {shown ? <Cards cards={shown} /> : null}
+        {shown ? <Cards cards={shown} live={live} /> : null}
       </div>
     );
   };

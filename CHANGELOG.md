@@ -5,6 +5,13 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- Web: route transitions. Switching tabs or screens crossfades the page (quick on a phone), a note slides up over the screen on a phone and back down on Back, and a note opened from its tile grows out of it and shrinks back into it.
+- Web (phone): the tab bar folds to icons while a screen scrolls down and unfolds on scroll up; the search drawer slides down from the header.
+- Web: pictures and viewers. The lightbox is a carousel (swipe on a phone, arrow keys and buttons on a laptop) that grows out of the picture tapped, with zoom where the pointer is on a laptop and a rolling counter; the reader view shows how far down the article you are; the PDF viewer and the drawing editor fade in over a skeleton.
+- Web: the Planned heatmap shows one tooltip that glides from day to day. Empty lists enter calmly; the task tabs' counts and the heatmap's total roll when they change; the checklist, the saved chats and the tags animate as they come and go; the When picker's options share one gliding highlight and the update toast's Reload says "Reloading…".
+
 ### Changed
 
 - The web app's navigation runs on TanStack Router in place of wouter: typed routes and search params, loaders over the query cache with links and note tiles fetching ahead on hover or touch, and the router's scroll restoration in place of the app's own. A note opens as `?note=<id>` over the screen it came from; `/note/<id>` links still work.

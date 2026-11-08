@@ -7,8 +7,8 @@
 import { Bell, Calendar, Check, EllipsisVertical, Flag, GripVertical, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Link } from "@tanstack/react-router";
-import { motion, useIsPresent, useTransform } from "motion/react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { motion, useTransform } from "motion/react";
+import { useState } from "react";
 import { dayLabel, everyLabel, whenLabel, type Schedule } from "@/core/dates";
 import { TagBadge } from "@/components/tag-badge";
 import { TickBox } from "@/components/tick-box";
@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { WhenPick } from "@/components/when-picker";
 import type { Task } from "@/core/todo";
 import type { RowDrag } from "@/hooks/drag";
+import { useLeaving } from "@/hooks/presence";
 import { useSwipe } from "@/hooks/swipe";
 import type { linkOf } from "@/lib/nav";
 import { DELETE_WIDTH, WHEN_WIDTH } from "@/lib/swipe";
@@ -43,17 +44,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
   const sw = useSwipe({ when: !checked, onWhen: () => setPicking(true) });
   const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), away = useTempoTransition(transition.dismiss);
   const starOpacity = useTransform(sw.x, [0, 0.6 * WHEN_WIDTH], [0, 1]), starScale = useTransform(sw.x, [0, WHEN_WIDTH], [0.6, 1]);
-  const li = useRef<HTMLLIElement>(null), present = useIsPresent();
-  // A row on its way out can't be tabbed to, and hands the focus to the row beside it; one that comes back (a take-back) is live again
-  useLayoutEffect(() => {
-    const el = li.current;
-    if (!el) return;
-    if (!present && el.contains(document.activeElement)) {
-      const near = (el.nextElementSibling ?? el.previousElementSibling)?.querySelector<HTMLElement>("button, a, input");
-      (near ?? el.closest<HTMLElement>("[data-task-list]"))?.focus({ preventScroll: true });
-    }
-    el.inert = !present;
-  }, [present]);
+  const li = useLeaving<HTMLLIElement>("[data-task-list]");   // a row on its way out can't be tabbed to, and hands the focus on
   const when = showWhen ? whenLabel(task, today) : null;
   const overdue = !!task.due && task.due < today;
   const ticked = task.checklist.filter((i) => i.done).length;

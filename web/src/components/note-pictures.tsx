@@ -1,7 +1,9 @@
 // A note's pictures as a tile draws them: one fills, two split, three are one tall and two stacked, four are quarters
 // (`mosaicCells`), a "+N" on the last when it has more. Each blurs in: the server's tiny copy, scaled up and blurred, at
 // once, then the sharp one fading and un-blurring over it. A picture that fails drops out and the rest close up.
-import { useState } from "react";
+import { toCssTiming, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import type { Transition } from "motion/react";
+import { useState, type CSSProperties } from "react";
 import { mosaicCells } from "@/core/notes";
 import type { Source } from "@/hooks/thumbs";
 import { cn } from "@/lib/utils";
@@ -10,17 +12,25 @@ import { cn } from "@/lib/utils";
  *  in the browser's and the service worker's caches, so they draw at once, not blurred in again. */
 const drawn = new Set<string>();
 
+/** A tween token as the CSS transition's timing, paced by the tempo (`toCssTiming`). */
+function useTiming(t: Transition): CSSProperties {
+  const { duration, easing } = toCssTiming(useTempoTransition(t));
+  return { transitionDuration: `${duration}ms`, transitionTimingFunction: easing };
+}
+
 /** One picture filling its box, blurred in the first time. `onBroken`: the sharp one couldn't be loaded. */
 export function BlurImage({ src, className, onBroken }: { src: Source; className?: string; onBroken?: () => void }) {
   const before = drawn.has(src.key);
   const [tiny, setTiny] = useState(false), [sharp, setSharp] = useState(before);
   const fit = cn("absolute inset-0 size-full object-cover", src.page && "object-top");
+  const fade = useTiming(transition.fade), reveal = useTiming(transition.reveal);
   return (
     <div className={cn("relative overflow-hidden bg-raised", !tiny && !sharp && "animate-pulse", className)}>
       {before ? null : <img src={src.at("blur")} alt="" aria-hidden decoding="async" onLoad={() => setTiny(true)}
-        className={cn(fit, "scale-110 blur-lg transition-opacity duration-200", tiny && !sharp ? "opacity-100" : "opacity-0")} />}
+        style={fade} className={cn(fit, "scale-110 blur-lg transition-opacity motion-reduce:scale-100", tiny && !sharp ? "opacity-100" : "opacity-0")} />}
       <img src={src.at("sharp")} alt="" loading="lazy" decoding="async" onLoad={() => { drawn.add(src.key); setSharp(true); }} onError={onBroken}
-        className={cn(fit, !before && "transition-[opacity,filter,scale] duration-500 ease-out", sharp ? "scale-100 opacity-100 blur-none" : "scale-105 opacity-0 blur-md")} />
+        style={before ? undefined : reveal}
+        className={cn(fit, !before && "transition-[opacity,filter,scale]", sharp ? "scale-100 opacity-100 blur-none" : "scale-105 opacity-0 blur-md motion-reduce:scale-100")} />
     </div>
   );
 }

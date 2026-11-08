@@ -18,6 +18,7 @@ import { Mosaic } from "../note-pictures";
 import { useTasks, useToday } from "@/hooks/todo";
 import { homeOfTask, useNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { Rise } from "./rise";
 
 /** A card's surface: a button to the record, or a plain dimmed one when the record is gone. */
 export function Shell({ onOpen, gone, label, children }: { onOpen: () => void; gone: boolean; label: string; children: ReactNode }) {
@@ -110,12 +111,14 @@ export function LiveTask({ card }: { card: TaskCard }) {
   return <TaskView card={live} today={today} gone={!local && !tasks.isPending} onTick={local ? () => { void toggleTask(qc, local); } : undefined} />;
 }
 
-/** The cards one after another; each is drawn live where the app has the record. */
-export function Cards({ cards }: { cards: Card[] }) {
+/** The cards one after another; each is drawn live where the app has the record. `live`: the reply is coming, so a card that appears
+ *  rises in (the list's entrance, `Rise`); cards that are there when a chat opens sit still. */
+export function Cards({ cards, live = false }: { cards: Card[]; live?: boolean }) {
   return (
     <div className="space-y-2">
-      {cards.map((c) => c.kind === "note" ? <LiveNote key={cardKey(c)} card={c} />
-        : <LiveTask key={cardKey(c)} card={c} />)}
+      {cards.map((c) => (
+        <Rise key={cardKey(c)} live={live}>{c.kind === "note" ? <LiveNote card={c} /> : <LiveTask card={c} />}</Rise>
+      ))}
     </div>
   );
 }

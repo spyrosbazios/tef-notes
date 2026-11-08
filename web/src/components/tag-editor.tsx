@@ -5,11 +5,12 @@
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Check, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { fold } from "@/core/notes";
 import { Pick } from "@/components/pick";
 import { TagBadge } from "@/components/tag-badge";
 import { useNarrow } from "@/hooks/media";
+import { useLeaving } from "@/hooks/presence";
 import { useTagNames } from "@/hooks/tag-names";
 import { cn } from "@/lib/utils";
 
@@ -40,29 +41,40 @@ function TagSheet({ names, tags, onAdd, onRemove }: { names: string[]; tags: str
   );
 }
 
+/** A tag popping in from half its size with a fade, shrinking out when taken off (and then out of the tab order, its focus handed on). */
+function Chip({ children }: { children: ReactNode }) {
+  const ref = useLeaving<HTMLSpanElement>();
+  const pop = useTempoTransition(spring.pop), reflow = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), out = useTempoTransition(transition.popOut);
+  const half = { opacity: 0, scale: 0.5 };
+  return (
+    <motion.span ref={ref} layout="position" className="inline-flex" initial={half} animate={{ opacity: 1, scale: 1, transition: { ...pop, opacity: fade } }}
+      exit={{ ...half, transition: out }} transition={{ layout: reflow }}>
+      {children}
+    </motion.span>
+  );
+}
+
 export function TagEditor({ tags, dim = [], onAdd, onRemove, onTag }: {
   tags: string[]; dim?: string[]; onAdd: (name: string) => void; onRemove: (name: string) => void; onTag?: (name: string) => void;
 }) {
   const names = useTagNames(), list = useId();
   const [adding, setAdding] = useState(false), [v, setV] = useState("");
   const narrow = useNarrow();
-  const pop = useTempoTransition(spring.pop), reflow = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), out = useTempoTransition(transition.popOut);
+  const reflow = useTempoTransition(spring.reflow);
   const add = () => {
     const t = v.trim().replace(/^#/, "");
     if (t) onAdd(names.find((d) => fold(d) === fold(t)) ?? t);
     setV(""); setAdding(false);
   };
-  // A tag added pops in from half its size with a fade, one taken off shrinks out, and the others (and the add button) close the gap
-  const half = { opacity: 0, scale: 0.5 };
+  // A tag added pops in, one taken off shrinks out, and the others (and the add button) close the gap
   return (
     <>
       <AnimatePresence mode="popLayout" initial={false}>
         {tags.map((t) => (
-          <motion.span key={t} layout="position" className="inline-flex" initial={half} animate={{ opacity: 1, scale: 1, transition: { ...pop, opacity: fade } }}
-            exit={{ ...half, transition: out }} transition={{ layout: reflow }}>
+          <Chip key={t}>
             <TagBadge name={t} onClick={onTag && (() => onTag(t))} onRemove={() => onRemove(t)}
               className={cn("h-6 text-xs", dim.some((d) => fold(d) === fold(t)) && "border-dashed opacity-60")} />
-          </motion.span>
+          </Chip>
         ))}
       </AnimatePresence>
       <motion.span layout="position" className="inline-flex items-center" transition={{ layout: reflow }}>
