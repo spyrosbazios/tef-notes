@@ -116,7 +116,7 @@ function TaskNotes({ task, onSave }: { task: TaskRec; onSave: (notes: string) =>
 export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?: React.ReactNode; onGone: () => void }) {
   const qc = useQueryClient();
   const today = useToday();
-  const narrow = useNarrow(), { openTask } = useNav();
+  const narrow = useNarrow(), { closeTask } = useNav();
   const lingering = useLingering();
   const [confirm, setConfirm] = useState(false);
   const checked = lingering.get(task.id)?.checked ?? !!task.done;
@@ -171,7 +171,7 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
   );
   if (!narrow) return card;
   return (
-    <Drawer open repositionInputs={false} onOpenChange={(o) => { if (!o) openTask(null); }}>
+    <Drawer open repositionInputs={false} onOpenChange={(o) => { if (!o) closeTask(); }}>
       <DrawerContent className="data-[vaul-drawer-direction=bottom]:h-[92dvh] data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
         <DrawerTitle className="sr-only">{task.title}</DrawerTitle>
         <InSheet value>{card}</InSheet>

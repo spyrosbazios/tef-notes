@@ -9,6 +9,13 @@ import type { SettingsSection } from "@/lib/route-search";
 import { linkOptions, useCanGoBack, useLocation, useMatch, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    /** Set on the entry `showTask` pushes: the task was opened from another screen, so closing it goes back there. */
+    taskFrom?: boolean;
+  }
+}
+
 export const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
 export type TaskView = (typeof TASK_VIEWS)[number];
 
@@ -85,6 +92,7 @@ export function usePlace(): { view: View; note: string | undefined; task: string
 export function useNav() {
   const { view, note, task } = usePlace();
   const navigate = useNavigate(), canGoBack = useCanGoBack(), router = useRouter();
+  const taskFrom = useLocation({ select: (l) => !!l.state.taskFrom });
   const inShell = !!useMatch({ from: "/_app", shouldThrow: false });
   const here = inShell ? { view, task } : null;
   return {
@@ -98,8 +106,13 @@ export function useNav() {
     },
     /** A task opened beside its list (null closes it). */
     openTask: (id: string | null) => navigate(linkOf(view, { task: id ?? undefined })),
-    /** A task opened in a task list of `v`, from a view that has none (a card in the assistant). */
-    showTask: (v: View, id: string) => navigate(linkOf(v, { task: id })),
+    /** A task opened in a task list of `v`, from a view that has none (a note's linked tasks, a card in the assistant). */
+    showTask: (v: View, id: string) => navigate({ ...linkOf(v, { task: id }), state: { taskFrom: true } }),
+    /** Closing the open task: back where it was opened from when `showTask` brought it, else its list. */
+    closeTask: () => {
+      if (taskFrom && canGoBack) router.history.back();
+      else void navigate(linkOf(view));
+    },
     goView: (v: View) => navigate(linkOf(v)),
     /** The notes (the Notes page's when on it, else Home's) under exactly these tags. */
     setTags: (tags: string[]) => navigate(linkOf({ kind: view.kind === "notes" ? "notes" : "home", tags })),

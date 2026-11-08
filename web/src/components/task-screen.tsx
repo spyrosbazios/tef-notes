@@ -26,12 +26,12 @@ function Nothing() {
 }
 
 function Pane({ task }: { task: string | undefined }) {
-  const { openTask } = useNav(), { openMenu } = useShell();
+  const { openTask, closeTask } = useNav(), { openMenu } = useShell();
   const tasks = useTasks();
   if (!task) return <Nothing />;
   const t = tasks.data?.find((x) => x.id === task);
   if (!t) return tasks.isPending ? null : <div className="grid h-full place-items-center text-sm text-faint">This task is gone: deleted on another device.</div>;
-  return <TaskDetail key={t.id} task={t} leading={<DetailLeading onBack={() => openTask(null)} onMenu={openMenu} />} onGone={() => openTask(null)} />;
+  return <TaskDetail key={t.id} task={t} leading={<DetailLeading onBack={closeTask} onMenu={openMenu} />} onGone={() => openTask(null)} />;
 }
 
 /** The task lists' route component: which list, and which task, are the router's. */
