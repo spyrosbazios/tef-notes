@@ -1,12 +1,12 @@
 // The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens on, or none (every device follows), make, edit and delete lenses.
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
 // carries its first tag. The definitions are the server's, shared by every device; which one is on is a preference too (hooks/prefs.ts).
-import { Check, ChevronUp, ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
 import { fold } from "@/core/notes";
-import { ACCENT_NAMES, ACCENTS, accentColor, THEMES, type AccentName } from "@/core/theme";
+import { ACCENT_NAMES, ACCENTS, accentColor, THEMES } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
 import { Mark } from "@/components/brand";
 import { Turns } from "@/components/swap";
@@ -15,7 +15,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { FormSheet, SheetForm, useInDrawer } from "@/components/form-sheet";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -29,14 +30,16 @@ import { cn } from "@/lib/utils";
 const NONE = "";
 const add = (c: string[], t: string) => (c.some((x) => fold(x) === fold(t)) ? c : [...c, t]);
 
-/** The name and tags of a lens, made or edited. `lens` undefined: a new one, which is turned on once it is made. */
+/** The name and tags of a lens, made or edited. `lens` undefined: a new one, which is turned on once it is made. In the phone's
+ *  sheet the keyboard is not raised unasked. */
 function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
+  const sheet = useInDrawer();
   const create = useCreateLens(), update = useUpdateLens(), { data: all = [] } = useLenses();
   const [name, setName] = useState(lens?.name ?? ""), [tags, setTags] = useState<string[]>(lens?.tags ?? []);
   const [exclude, setExclude] = useState<string[]>(lens?.exclude ?? []);
   const [accent, setAccent] = useState<LensAccentName | null>(lens?.accent ?? null);
   const problem = lensProblem({ name, tags, exclude }), taken = all.some((l) => l.rec !== lens?.rec && fold(l.name) === fold(name.trim()));
-  const [field, shake] = useShake<HTMLInputElement>(), takenId = useId();
+  const [field, shake] = useShake<HTMLInputElement>(), takenId = useId(), nameId = useId();
   useEffect(() => { if (taken) shake(); }, [taken, shake]);   // once, as the name becomes one that exists
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,72 +55,66 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
   };
   const busy = create.isPending || update.isPending;
   return (
-    <form onSubmit={save} className="space-y-4">
-      <DialogHeader>
-        <DialogTitle>{lens ? "Edit lens" : "New lens"}</DialogTitle>
-        <DialogDescription>While a lens is on, every list shows only what carries any of its tags and none it hides, and what you make gets the first tag.</DialogDescription>
-      </DialogHeader>
-      <Input ref={field} autoFocus value={name} maxLength={LENS_NAME_MAX} aria-invalid={taken || undefined} aria-describedby={taken ? takenId : undefined} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Work" aria-label="Lens name" />
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-dim">Tags (the first is given to what you make)</p>
+    <SheetForm title={lens ? "Edit lens" : "New lens"} description="Every list shows only what matches, until you turn it off." onSubmit={save} className="space-y-5" actions={<>
+      <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
+      <Button type="submit" className="rounded-full" disabled={busy || !!problem || taken}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: "Save", busy: "Saving…" }} /></Button>
+    </>}>
+      <Field label="Name" htmlFor={nameId}>
+        <Input id={nameId} ref={field} autoFocus={!sheet} value={name} maxLength={LENS_NAME_MAX} aria-invalid={taken || undefined} aria-describedby={taken ? takenId : undefined} onChange={(e) => setName(e.target.value)} placeholder="e.g. Work" />
+        {taken ? <p id={takenId} role="alert" className="text-xs text-down">A lens by that name exists.</p> : null}
+      </Field>
+      <Field label="Show" hint="Items with any of these. New items get the first.">
         <div className="flex flex-wrap items-center gap-1.5">
           <TagEditor tags={tags} onAdd={(t) => setTags((c) => add(c, t))} onRemove={(t) => setTags((c) => c.filter((x) => x !== t))} />
         </div>
-      </div>
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-dim">Hide (anything with one of these is left out)</p>
+      </Field>
+      <Field label="Hide" hint="Items with any of these are left out.">
         <div className="flex flex-wrap items-center gap-1.5">
           <TagEditor tags={exclude} onAdd={(t) => setExclude((c) => add(c, t))} onRemove={(t) => setExclude((c) => c.filter((x) => x !== t))} />
         </div>
-      </div>
+      </Field>
       <LensAccent value={accent} onChange={setAccent} />
       {problem && (tags.length || exclude.length) ? <p className="text-xs text-down">{problem}</p> : null}
-      {taken ? <p id={takenId} role="alert" className="text-xs text-down">A lens by that name exists.</p> : null}
-      <DialogFooter>
-        <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
-        <Button type="submit" className="rounded-full" disabled={busy || !!problem || taken}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: "Save", busy: "Saving…" }} /></Button>
-      </DialogFooter>
-    </form>
+    </SheetForm>
   );
 }
 
-/** How many swatches the folded picker shows: with its toggle, one row in the dialog on a 360 px phone. */
-const FOLDED = 6;
-
-/** The primary colour the app takes while the lens is on: none (the chosen accent) or one of the accents.
- *  Folded to one row, with a toggle at its end for them all; a pick beyond the row takes the row's last place, so it stays in view. */
-function LensAccent({ value, onChange }: { value: LensAccentName | null; onChange: (a: LensAccentName | null) => void }) {
-  const { theme, accent: own } = useAppearance();
-  const [all, setAll] = useState(false), listId = useId();
-  const label = (a: LensAccentName | null) => (a ? ACCENTS[a].label : "This browser's own");
-  const row: readonly AccentName[] = ACCENT_NAMES.slice(0, FOLDED), picked: AccentName = value ?? "theme";
-  const shown = all ? ACCENT_NAMES : row.includes(picked) ? row : [...row.slice(0, -1), picked];
-  const toggle = all ? "Fewer colours" : "All colours";
+/** A labelled part of the lens form: its name, an optional one-line hint, then its control. */
+function Field({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
+      <div>
+        <Label htmlFor={htmlFor} className="text-sm font-semibold">{label}</Label>
+        {hint ? <p className="text-xs text-dim">{hint}</p> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** The primary colour the app takes while the lens is on: none (this browser's own accent) or one of the accents, in one row that scrolls sideways. */
+function LensAccent({ value, onChange }: { value: LensAccentName | null; onChange: (a: LensAccentName | null) => void }) {
+  const { theme, accent: own } = useAppearance(), headId = useId();
+  const label = (a: LensAccentName | null) => (a ? ACCENTS[a].label : "This browser's own");
+  return (
+    <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2">
-        <p id="lens-accent-h" className="text-xs font-medium text-dim">Colour while on</p>
+        <p id={headId} className="text-sm font-semibold">Colour</p>
         <span className="text-xs text-dim">{label(value)}</span>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        <div id={listId} role="radiogroup" aria-labelledby="lens-accent-h" className="contents">
-          {shown.map((a) => {
-            const pick = a === "theme" ? null : a, on = pick === value, colour = accentColor(THEMES[theme], a === "theme" ? own : a);
-            return (
-              <button key={a} type="button" role="radio" aria-checked={on} aria-label={label(pick)} title={label(pick)} onClick={() => onChange(pick)}
-                className="grid size-9 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                style={{ borderColor: on ? colour : "transparent" }}>
-                <span className={cn("grid size-6 place-items-center rounded-full", a === "theme" && "border-2 border-dashed border-bg")} style={{ backgroundColor: colour }}>
-                  {on ? <Check className="size-3.5 text-bg" strokeWidth={3} /> : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <button type="button" aria-expanded={all} aria-controls={listId} aria-label={toggle} title={toggle} onClick={() => setAll((x) => !x)}
-          className="grid size-9 place-items-center rounded-full text-dim outline-none transition-colors hover:bg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring">
-          {all ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-        </button>
+      <div role="radiogroup" aria-labelledby={headId} className="-mx-1 flex gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none]">
+        {ACCENT_NAMES.map((a) => {
+          const pick = a === "theme" ? null : a, on = pick === value, colour = accentColor(THEMES[theme], a === "theme" ? own : a);
+          return (
+            <button key={a} type="button" role="radio" aria-checked={on} aria-label={label(pick)} title={label(pick)} onClick={() => onChange(pick)}
+              className="grid size-9 shrink-0 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+              style={{ borderColor: on ? colour : "transparent" }}>
+              <span className={cn("grid size-6 place-items-center rounded-full", a === "theme" && "border-2 border-dashed border-bg")} style={{ backgroundColor: colour }}>
+                {on ? <Check className="size-3.5 text-bg" strokeWidth={3} /> : null}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -174,9 +171,7 @@ export function LensSwitcher({ header = false }: { header?: boolean }) {
       ) : null}
       </div>
 
-      <Dialog open={form != null} onOpenChange={(o) => { if (!o) setForm(null); }}>
-        <DialogContent className="sm:max-w-md">{form ? <LensForm key={form.lens?.rec ?? "new"} lens={form.lens} onDone={() => setForm(null)} /> : null}</DialogContent>
-      </Dialog>
+      <FormSheet open={form != null} onClose={() => setForm(null)}>{form ? <LensForm key={form.lens?.rec ?? "new"} lens={form.lens} onDone={() => setForm(null)} /> : null}</FormSheet>
       <AlertDialog open={asking != null} onOpenChange={(o) => { if (!o) setAsking(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

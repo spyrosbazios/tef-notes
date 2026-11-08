@@ -7,18 +7,15 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { dayLabel, whenLabel, type Schedule } from "@/core/dates";
 import { MicButton } from "@/components/mic-button";
-import { InSheet } from "@/components/pick";
+import { FormSheet, SheetForm } from "@/components/form-sheet";
 import { TagEditor } from "@/components/tag-editor";
 import { chip, Clear, RemindPicker, RepeatPicker, Row } from "@/components/task-fields";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Turns } from "@/components/swap";
 import { WhenPick, type WhenState } from "@/components/when-picker";
 import { dictateInto } from "@/hooks/dictation";
-import { useNarrow } from "@/hooks/media";
 import { useShake } from "@/hooks/shake";
 import { useGuessedTags } from "@/hooks/tags";
 import { addTask, useToday } from "@/hooks/todo";
@@ -31,7 +28,7 @@ export type Start = { schedule: Schedule | null };
 
 const stateOf = (s: Schedule | null, due: string | null): WhenState => ({ when: s?.when ?? null, evening: !!s?.evening, due });
 
-function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; onDone: () => void }) {
+function Form({ initial, onDone }: { initial: Start; onDone: () => void }) {
   const qc = useQueryClient(), today = useToday();
   const [title, setTitle] = useState(""), [notes, setNotes] = useState("");
   const [schedule, setSchedule] = useState<Schedule | null>(initial.schedule), [due, setDue] = useState<string | null>(null);
@@ -52,8 +49,10 @@ function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; on
   };
   const target = !schedule ? "Inbox" : schedule.when === today ? (schedule.evening ? "This Evening" : "Today") : when ?? "Upcoming";
   return (
-    <form onSubmit={add} className="space-y-4">
-      {narrow ? <DrawerTitle className="text-center text-[15px] font-semibold">New task</DrawerTitle> : <DialogHeader><DialogTitle>New task</DialogTitle></DialogHeader>}
+    <SheetForm title="New task" onSubmit={add} className="space-y-4" actions={<>
+      <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
+      <Button type="submit" className="rounded-full" disabled={busy || !title.trim()}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: `Add to ${target}`, busy: "Adding…" }} /></Button>
+    </>}>
       <div className="relative">
         <Input ref={field} autoFocus value={title} aria-invalid={failed || undefined} onChange={(e) => { setTitle(e.target.value); setFailed(false); }} placeholder="What needs doing? Type or tap the mic" aria-label="Task" className="h-11 pr-12 text-base" />
         <MicButton className="absolute top-1/2 right-1.5 -translate-y-1/2" onText={(t) => { setFailed(false); dictateInto(field.current, field.current?.value ?? title, t, setTitle); }} />
@@ -83,33 +82,12 @@ function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; on
           </div>
         </Row>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
-        <Button type="submit" className="rounded-full" disabled={busy || !title.trim()}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: `Add to ${target}`, busy: "Adding…" }} /></Button>
-      </DialogFooter>
-    </form>
+    </SheetForm>
   );
 }
 
 /** `initial`: what a new task starts with (null: closed). The form is mounted per opening, so it starts clean. A dialog in a
  *  window, a bottom sheet below `md`, as the phone's add sheet is. */
 export function QuickAdd({ initial, onClose }: { initial: Start | null; onClose: () => void }) {
-  const narrow = useNarrow();
-  const change = (o: boolean) => { if (!o) onClose(); };
-  if (narrow) {
-    return (
-      <Drawer open={!!initial} onOpenChange={change}>
-        <DrawerContent className="data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <InSheet value>{initial ? <Form initial={initial} narrow onDone={onClose} /> : null}</InSheet>
-          </div>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-  return (
-    <Dialog open={!!initial} onOpenChange={change}>
-      <DialogContent className="sm:max-w-lg">{initial ? <Form initial={initial} narrow={false} onDone={onClose} /> : null}</DialogContent>
-    </Dialog>
-  );
+  return <FormSheet open={!!initial} onClose={onClose} width="sm:max-w-lg">{initial ? <Form initial={initial} onDone={onClose} /> : null}</FormSheet>;
 }
