@@ -35,7 +35,7 @@ export async function find(req: Request, server: Server, pick: typeof model = mo
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }
-  const result = await generateText({
+  const run = () => generateText({
     model: m.model,
     providerOptions: m.providerOptions,
     instructions: `${INSTRUCTIONS}\n${today()}`,
@@ -43,10 +43,12 @@ export async function find(req: Request, server: Server, pick: typeof model = mo
     tools: { search_notes: all.search_notes, read_note: all.read_note, list_tasks: all.list_tasks, answer },
     reasoning: "minimal",
     stopWhen: [hasToolCall("answer"), isStepCount(STEPS)],
-    // the last step must answer, or the loop ends with nothing to show
-    prepareStep: ({ stepNumber }) => (stepNumber === STEPS - 1 ? { toolChoice: { type: "tool" as const, toolName: "answer" as const } } : {}),
+    // the last step has only `answer` to call (a forced tool_choice is refused by thinking models, DeepSeek's among them)
+    prepareStep: ({ stepNumber }) => (stepNumber === STEPS - 1 ? { activeTools: ["answer" as const] } : {}),
     abortSignal: req.signal,
   });
+  let result: Awaited<ReturnType<typeof run>>;
+  try { result = await run(); } catch (e) { return fail(502, `The model failed: ${(e as Error).message}`); }
   const call = result.steps.flatMap((s) => s.toolCalls).find((c) => c.toolName === "answer");
   const said = Hits.safeParse(call?.input).data ?? { notes: [], tasks: [] };
   const known = new Set((await notes.list()).map((n) => n.path)), ids = new Set((await todo.tasks()).map((t) => t.id));
