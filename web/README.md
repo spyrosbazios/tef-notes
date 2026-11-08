@@ -222,6 +222,22 @@ bunx --bun shadcn@latest add <name>
 and never edit those files by hand; change how something looks in the app's own components or in `src/index.css`.
 Icons come from lucide, the library `components.json` configures.
 
+## Motion
+
+Overlays, menus, switches, toggles and collapsibles move through [Animate UI](https://animate-ui.com)'s
+`@animate-ui/react` package (a Motion-based drop-in for Radix, and for vaul's drawer: `ui/drawer.tsx` and `Pick`'s nested sheet). Only the
+npm package is used: none of its registry files (icons, backgrounds) are copied into the repo. `src/components/ui/` reaches it through
+`bunx @animate-ui/cli@latest animate <component>` after a `shadcn add`, never by hand. Motion we write ourselves takes its values from
+`@animate-ui/react/utils/motion` (`spring`, `transition`, `scale`, `useTempoTransition`), as the palette (`palette-dialog.tsx`, a quick
+fade and slight scale: it opens all day from the keyboard, so not the dialog's tilt) and `assistant/turn.tsx`'s `Rise` do.
+The full-screen viewers pass `data-side="bottom"` to `DialogContent` on a phone so they slide up like a sheet. The overlays' colour is
+the theme's scrim (`[data-slot$="-overlay"]` in `src/index.css`). `bun x @animate-ui/cli@latest audit src` lists what moves and what
+it costs.
+
+Reduced motion follows the OS setting only, no switch in the app: `root.tsx` wraps the app in `AnimateUIProvider` and
+`MotionConfig reducedMotion="user"`, `index.css` quiets the CSS loops (spinners pulse instead of turning), and scrolls that would glide
+(`calm()` in `hooks/media.ts`) jump.
+
 ## Colours
 
 The app has no colours of its own. The palettes live in `@/core/theme` ([`packages/core`](../packages/core/README.md)).

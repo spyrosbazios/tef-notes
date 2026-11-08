@@ -79,7 +79,7 @@ cd mobile && npx pnpm@11 install && pnpm typecheck && pnpm test
 | `packages/core/` | The pure, dependency-free code every client imports: note format, merge, PocketBase client, task logic, agent card shapes, theme | Dependencies, I/O of its own, anything platform-specific |
 | `mobile/` | Offline cache, merge, conflict UI, the assistant over the server's agent (the Ask tab) | Talking to anything but the server; holding a model key |
 | `cli/` | Terminal access for the user and coding agents: notes and tasks | A second copy of client logic: it imports `@/core/*` |
-| `web/` | The laptop's UI: shadcn, TanStack Query, axios services, the assistant dock over the server's agent; served by PocketBase from `pb_public` | Talking to anything but the server. Note format, merge, ids, the Ask wording, colours of its own: all from `@/core/*`; a model key |
+| `web/` | The laptop's UI: shadcn animated by Animate UI's npm package (`web/README.md` "Motion"), TanStack Query, axios services, the assistant dock over the server's agent; served by PocketBase from `pb_public` | Talking to anything but the server. Note format, merge, ids, the Ask wording, colours of its own: all from `@/core/*`; a model key |
 | `extension/` | The browser's "Save to TEF Notes": reads the page, or fetches the picture and downscales it as the phone does, shows the server's suggestions, takes an optional note, saves where the user picks | Filing logic (the server's), any key or sign-in, colours of its own: all from `@/core/theme` |
 | `site/` | The public page: copy, device frames, the app screens it draws | Talking to any server; a palette, font or icon set of its own: all from `@/core/theme`, `mobile/assets/` and lucide |
 
@@ -99,7 +99,7 @@ cd mobile && npx pnpm@11 install && pnpm typecheck && pnpm test
 - The phone's editor and PDF viewer pages are built by `web/` into `mobile/src/ui/editor-html.ts` and `pdf-html.ts`
   (generated, gitignored: ~930 KB and ~2 MB). A fresh checkout has none: `mobile`'s `start`, `android` and `typecheck`
   build them first; EAS cloud builds would need the same step. Bridges: `packages/core/src/editor-bridge.ts`, `pdf-bridge.ts`.
-- `components/ui/` in `web/` is shadcn's output: add with `bunx --bun shadcn@latest add <name>`, never hand-edit. Its
+- `components/ui/` in `web/` is shadcn's output: add with `bunx --bun shadcn@latest add <name>` (then `bunx @animate-ui/cli@latest animate <name>` for the animated primitive), never hand-edit. Its
   three `only-export-components` lint warnings are shadcn's, not ours.
 - Tailwind's CSS `@import` can't see Vite virtual modules: the generated palette is imported from `web/src/main.tsx`.
 - `pnpm` 10 rewrites `mobile/pnpm-lock.yaml` into the old patch format and then refuses `--frozen-lockfile`.

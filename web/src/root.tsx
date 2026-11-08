@@ -1,5 +1,7 @@
+import { AnimateUIProvider } from "@animate-ui/react/provider";
 import { defaultShouldDehydrateQuery, QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { MotionConfig } from "motion/react";
 import { AssistantProvider } from "@/components/assistant/provider";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateToast } from "@/components/update-toast";
@@ -42,13 +44,17 @@ export function Root() {
       }}
     >
       <Look />
-      <TooltipProvider delayDuration={400}>
-        <AssistantProvider>
-          <App />
-        </AssistantProvider>
-        <Toaster theme={scheme} position="bottom-right" />
-        <UpdateToast />
-      </TooltipProvider>
+      <AnimateUIProvider>
+        <MotionConfig reducedMotion="user">
+          <TooltipProvider delayDuration={400}>
+            <AssistantProvider>
+              <App />
+            </AssistantProvider>
+            <Toaster theme={scheme} position="bottom-right" />
+            <UpdateToast />
+          </TooltipProvider>
+        </MotionConfig>
+      </AnimateUIProvider>
     </PersistQueryClientProvider>
   );
 }

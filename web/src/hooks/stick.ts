@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { calm } from "@/hooks/media";
 
 const NEAR = 80;                 // px from the end within which the reader counts as still following
 const BLOCK = 48;                // px of growth at once that is a new block (a row, a card, a message), not a streamed line
@@ -18,8 +19,7 @@ export function useStick<T extends HTMLElement>(lines: unknown, state: unknown) 
     const first = height.current === 0;
     height.current = e.scrollHeight;
     if (!stuck.current) return;
-    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (first || calm || grew <= BLOCK) { e.scrollTo({ top: e.scrollHeight }); return; }
+    if (first || calm() || grew <= BLOCK) { e.scrollTo({ top: e.scrollHeight }); return; }
     gliding.current = true;
     clearTimeout(settle.current);
     settle.current = setTimeout(() => { gliding.current = false; }, GLIDE);

@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useNarrow } from "@/hooks/media";
 import { Skeleton } from "@/components/ui/skeleton";
 import { readingMinutes } from "@/core/reader";
 import { message } from "@/services/api";
@@ -14,9 +15,10 @@ const HOUR = 3_600_000;
 
 /** `url`: the page; null is closed. `onNote`: a link to a note in the article (rare, but the same as a note's). */
 export function Reader({ url, onClose, onNote }: { url: string | null; onClose: () => void; onNote?: (id: string) => void }) {
+  const narrow = useNarrow();
   return (
     <Dialog open={url !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent aria-describedby={undefined} className="flex h-[92dvh] w-[min(46rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
+      <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined} className="flex h-[92dvh] w-[min(46rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
         {url ? <Body url={url} onNote={onNote} /> : null}
       </DialogContent>
     </Dialog>

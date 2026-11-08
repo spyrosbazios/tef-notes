@@ -6,6 +6,7 @@ import { Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useNarrow } from "@/hooks/media";
 import { message } from "@/services/api";
 import type { PdfPages } from "@/pdf/pages";
 
@@ -13,9 +14,10 @@ const STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
 /** `url`: the file on the server; `name`: what the header says. Null `url` is closed. */
 export function PdfViewer({ url, name, onClose }: { url: string | null; name: string; onClose: () => void }) {
+  const narrow = useNarrow();
   return (
     <Dialog open={url !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent aria-describedby={undefined} className="flex h-[92dvh] w-[min(56rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
+      <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined} className="flex h-[92dvh] w-[min(56rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
         <DialogTitle className="truncate border-b border-line py-3 pr-12 pl-4 text-sm font-semibold">{name}</DialogTitle>
         <DialogDescription className="sr-only">The PDF, page by page</DialogDescription>
         {url ? <Pages url={url} /> : null}

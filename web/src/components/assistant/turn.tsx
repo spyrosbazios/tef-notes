@@ -1,8 +1,10 @@
 // One message of the assistant's chat. The user's: a bubble. The agent's: its thoughts, tool calls and answer in the order they
 // came. A tool call is a row, a note write a confirm card, the answer streaming markdown. Consecutive finished
 // thoughts and read-only calls fold into one summary line; what is still moving, failed, or left a card to open stays a row.
+import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { ArrowUpRight, Check, ChevronDown, Copy, ListChecks, Loader2, TriangleAlert } from "lucide-react";
+import { motion } from "motion/react";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import remend from "remend";
 import { Markdown } from "@/components/markdown";
@@ -62,7 +64,12 @@ function CopyAnswer({ text }: { text: string }) {
  *  at mount: a block going live later (a confirm card answered, the turn resumed) doesn't replay it. */
 function Rise({ live, children }: { live: boolean; children: ReactNode }) {
   const [enter] = useState(live);
-  return <div className={cn(enter && "animate-in fade-in slide-in-from-bottom-1 duration-200")}>{children}</div>;
+  const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade);
+  return (
+    <motion.div initial={enter ? { opacity: 0, y: 4 } : false} animate={{ opacity: 1, y: 0, transition: { ...move, opacity: fade } }}>
+      {children}
+    </motion.div>
+  );
 }
 
 /** A thought or a summary: a line that opens to show what is in it. */
@@ -76,7 +83,7 @@ function Fold({ icon, title, busy, defaultOpen, children }: { icon: ReactNode; t
         {children ? <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} /> : null}
       </CollapsibleTrigger>
       {children ? (
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <CollapsibleContent className="overflow-hidden">
           <div className="ml-2 mt-1.5 space-y-2 border-l border-line pl-4">{children}</div>
         </CollapsibleContent>
       ) : null}

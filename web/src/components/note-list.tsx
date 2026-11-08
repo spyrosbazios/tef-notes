@@ -6,7 +6,7 @@
 // Below `md` it is the phone's: two columns, a header of icons (tag filter, tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
-import { motion, MotionConfig } from "motion/react";
+import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { between, toggled } from "@/core/bulk";
 import { groupNotes } from "@/core/note-groups";
@@ -245,7 +245,6 @@ export function NoteList({ onNew }: { onNew: () => void }) {
           </div>
         )}
       </header>
-      <MotionConfig reducedMotion="user">
       <div className={cn(grouped && !isPending && shown.length && "space-y-4", selecting && "select-none")} aria-busy={isPending || undefined}>
         {isPending ? <Masonry>{SHAPES.map((s, i) => <SkeletonTile key={i} shape={s} />)}</Masonry>
           : shown.length ? (grouped
@@ -257,7 +256,6 @@ export function NoteList({ onNew }: { onNew: () => void }) {
             : <Masonry animate>{shown.slice(0, limit).map((t) => tile(t, t.path))}</Masonry>)
           : <p className="px-3 py-10 text-center text-sm text-faint">{chips.length ? "No note has every tag ticked." : "No notes here yet."}</p>}
       </div>
-      </MotionConfig>
       {more ? <div ref={end} className="h-px" aria-hidden /> : null}
       <TagsDialog paths={target} open={dialog === "tags"} onOpenChange={(o) => { if (!o) setDialog(null); }} />
       <DeleteDialog paths={target} open={dialog === "delete"} onOpenChange={(o) => { if (!o) setDialog(null); }} onDone={() => { setDialog(null); setSel([]); }} />

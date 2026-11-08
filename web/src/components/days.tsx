@@ -9,6 +9,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { addDays, daysBetween } from "@/core/dates";
 import { dayDate, dayRange, plannedByDay, shadeOf, WEEKDAYS } from "@/core/planner";
 import { useLongPress } from "@/hooks/long-press";
+import { calm } from "@/hooks/media";
 import { useLensTasks } from "@/hooks/todo";
 import { SHADE } from "@/lib/shade";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,7 @@ export function Days({ today, day: picked, onPick, onAdd }: { today: string; day
   const strip = useRef<HTMLDivElement>(null);
   const [slot, setSlot] = useState(BEHIND);     // the day in the slot, followed live for the month's name and each day's size
   const slide = useCallback((day: string, smooth = true) => {
-    strip.current?.scrollTo({ left: Math.min(days.length - 1, Math.max(0, daysBetween(days[0], day))) * STEP, behavior: smooth ? "smooth" : "instant" });
+    strip.current?.scrollTo({ left: Math.min(days.length - 1, Math.max(0, daysBetween(days[0], day))) * STEP, behavior: smooth && !calm() ? "smooth" : "instant" });
   }, [days]);
 
   // The callbacks as the days see them never change, so a Home render leaves every mounted day alone; the box's day, as the settling sees it

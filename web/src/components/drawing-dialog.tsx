@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useNarrow } from "@/hooks/media";
 import { useDrawings } from "@/hooks/photos";
 import { message } from "@/services/api";
 import type { DrawingHandle } from "./drawing-canvas";
@@ -22,9 +23,10 @@ type Props = {
 };
 
 export function DrawingDialog({ noteId, name, open, onClose, onCreated }: Props) {
+  const narrow = useNarrow();
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent aria-describedby={undefined} showCloseButton={false} onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}
+      <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined} showCloseButton={false} onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}
         className="top-0 left-0 flex h-dvh w-dvw max-w-none -translate-x-0 -translate-y-0 flex-col gap-0 rounded-none p-0 sm:max-w-none">
         <DialogTitle className="sr-only">Drawing</DialogTitle>
         <DialogDescription className="sr-only">Draw with Excalidraw, then save.</DialogDescription>

@@ -13,7 +13,7 @@ export function NoteGroup({ tag, count, folded, onToggle, children }: {
   const color = useTagColor()(tag);
   const name = tag === NO_TAG ? "No tag" : tag, Chevron = folded ? ChevronRight : ChevronDown;
   return (
-    <Collapsible open={!folded} onOpenChange={() => onToggle(tag)} className="space-y-2.5">
+    <Collapsible open={!folded} onOpenChange={() => onToggle(tag)} className="flex flex-col gap-2.5">
       <CollapsibleTrigger aria-label={`${name}, ${count} note${count === 1 ? "" : "s"}`}
         className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-muted">
         <span data-color={tag === NO_TAG ? "gray" : color} className="size-3 shrink-0 rounded-full border border-tile-fg bg-tile" />

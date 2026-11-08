@@ -1,8 +1,8 @@
-// Where a picker opens: a popover beside its trigger in a window, a bottom sheet (the shadcn drawer, vaul) at phone width, as
+// Where a picker opens: a popover beside its trigger in a window, a bottom sheet (the shadcn drawer, Animate UI's) at phone width, as
 // the phone's pickers are. One component for the When, repeat, reminder, tags and note pickers, so a field has one picker whatever
 // the width. A sheet opened from inside another (the task's own) is a nested one, so the two stack.
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { Drawer as Vaul } from "vaul";
+import { NestedRoot } from "@animate-ui/react/primitives/radix-ui/drawer";
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNarrow } from "@/hooks/media";
@@ -42,7 +42,7 @@ export function Pick({ trigger, title, open, onOpenChange, align = "start", widt
       </Popover>
     );
   }
-  const Root = nested ? Vaul.NestedRoot : Drawer;
+  const Root = nested ? NestedRoot : Drawer;
   return (
     <Root open={shown} onOpenChange={set}>
       <DrawerTrigger asChild>{trigger}</DrawerTrigger>

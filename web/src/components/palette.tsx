@@ -10,8 +10,9 @@ import { ago } from "@/core/time";
 import { fold, snippetOf } from "@/core/notes";
 import { DeleteDialog, MenuAt, TagsDialog } from "@/components/note-actions";
 import { NoteHit, Thumb } from "@/components/note-hit";
+import { PaletteDialog } from "@/components/palette-dialog";
 import { TagBadge } from "@/components/tag-badge";
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useAssistant } from "@/hooks/assistant";
 import { useNow } from "@/hooks/now";
 import { useFinder } from "@/hooks/search";
@@ -53,7 +54,7 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const run = (f: () => void) => { onOpenChange(false); setQ(""); f(); };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags and views. #tag narrows to a tag." className="max-sm:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:max-w-[calc(100%-1rem)] sm:max-w-2xl md:max-w-4xl">
+    <PaletteDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags and views. #tag narrows to a tag.">
       <Command shouldFilter={false} value={active} onValueChange={setActive}>
         <CommandInput value={q} onValueChange={setQ} placeholder="Search notes, tasks, or #tag…" />
         <div className="flex min-h-0">
@@ -114,6 +115,6 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
       <MenuAt paths={menu ? [menu.path] : []} at={menu} onClose={() => setMenu(null)} onTags={() => ask("tags")} onDelete={() => ask("delete")} />
       <TagsDialog paths={target} open={dialog === "tags"} onOpenChange={(o) => { if (!o) setDialog(null); }} />
       <DeleteDialog paths={target} open={dialog === "delete"} onOpenChange={(o) => { if (!o) setDialog(null); }} onDone={() => setDialog(null)} />
-    </CommandDialog>
+    </PaletteDialog>
   );
 }

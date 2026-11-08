@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRowDrag } from "@/hooks/drag";
 import { toggleTask, useLingering } from "@/hooks/linger";
 import { useLinks } from "@/hooks/links";
+import { calm } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
@@ -126,7 +127,7 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
     // Only the list's own box scrolls, never the page around it
     const id = requestAnimationFrame(() => {
       const box = scroller.current, el = box?.querySelector(`[data-day="${lit}"]`);
-      if (box && el) box.scrollTo({ top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top, behavior: "smooth" });
+      if (box && el) box.scrollTo({ top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top, behavior: calm() ? "instant" : "smooth" });
     });
     return () => cancelAnimationFrame(id);
   }, [focus, lit]);

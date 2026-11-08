@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useNarrow } from "@/hooks/media";
 import { cn } from "@/lib/utils";
 
 export type LightboxItem = { url: string; alt: string };
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export function Lightbox({ items, index, onIndex }: Props) {
+  const narrow = useNarrow();
   const [seen, setSeen] = useState<{ at: number; full: boolean }>({ at: 0, full: false });
   const open = index !== null && index < items.length;
   const at = open ? index : 0, item = items[at];
@@ -34,7 +36,7 @@ export function Lightbox({ items, index, onIndex }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { setSeen({ at: 0, full: false }); onIndex(null); } }}>
-      <DialogContent aria-describedby={undefined}
+      <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined}
         className="top-0 left-0 flex h-dvh w-dvw max-w-none -translate-x-0 -translate-y-0 flex-col gap-0 rounded-none bg-bg/95 p-0 ring-0 sm:max-w-none">
         <DialogTitle className="sr-only">Picture {at + 1} of {items.length}</DialogTitle>
         <DialogDescription className="sr-only">{item?.alt || "Picture"}</DialogDescription>

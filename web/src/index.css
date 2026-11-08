@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -87,6 +86,10 @@
   --input: var(--tf-line);
   --ring: var(--tf-brand);
 }
+
+/* The modals' backdrops (ui/* overlays, which shadcn paints bg-black/10 and ui/ is generated): the theme's scrim. Animate UI
+   fades an overlay in from its computed colour, so this is what it fades to. Unlayered, so it beats the utility. */
+[data-slot$="-overlay"] { background-color: var(--tf-scrim); }
 
 [data-color="yellow"] { --tile-bg: var(--tf-note-yellow-bg); --tile-fg: var(--tf-note-yellow-fg); --tile-line: var(--tf-note-yellow-line); }
 [data-color="pink"] { --tile-bg: var(--tf-note-pink-bg); --tile-fg: var(--tf-note-pink-fg); --tile-line: var(--tf-note-pink-line); }
@@ -252,4 +255,14 @@
   .ProseMirror-focused .ProseMirror-gapcursor { @apply block; }
   @keyframes pm-blink { to { visibility: hidden; } }
 
+}
+
+/* Reduced motion (the OS setting, no in-app switch): Animate UI's primitives and Motion follow it themselves (root.tsx); this is the
+   CSS animation left in our own code, and in the generated ui/ files that can't carry a `motion-reduce:` class. A spinner keeps saying
+   it is loading as a slow fade instead of a turn, a skeleton stops pulsing, the busy chip and the gap cursor hold still. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin { animation: pm-pulse 1.2s ease-in-out infinite alternate; }
+  .animate-pulse { animation: none; }
+  .pm-editor .pm-link-tool[data-busy]::before { animation: none; opacity: 0.5; }
+  .ProseMirror-gapcursor::after { animation: none; }
 }
