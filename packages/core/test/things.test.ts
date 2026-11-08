@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
-  dueFields, dueLabel, everyOf, progress, reminderPlan, weekdaysOf, whenFields, REPEATS,
+  dueFields, dueLabel, everyOf, progress, reminderPlan, remindAt, weekdaysOf, whenFields, REPEATS,
 } from "../src/things";
 import { EVERY, newTask, patchTask, type Task } from "../src/todo";
 
@@ -60,5 +60,13 @@ describe("reminders", () => {
     expect(plan.map((r) => [r.task, r.title])).toEqual([[b.id, "b"], [c.id, "c"]]);
     expect(plan[0]).toMatchObject({ id: `task:${b.id}`, at: new Date(2026, 9, 31, 18, 0).getTime() });
     expect(reminderPlan([c, b], now, 30, 1)).toHaveLength(1);
+  });
+});
+
+describe("remindAt", () => {
+  it("is the when day at the remind time, local; null without both", () => {
+    expect(remindAt({ when: "2026-11-01", remind: "09:30" })).toBe(new Date(2026, 10, 1, 9, 30).getTime());
+    expect(remindAt({ when: "2026-11-01", remind: "" })).toBeNull();
+    expect(remindAt({ when: "", remind: "09:30" })).toBeNull();
   });
 });

@@ -81,7 +81,7 @@ agent) for amd64 and arm64; building from source, which is also how the signed c
 git clone https://github.com/spyrosbazios/tef-notes.git
 cd tef-notes/server
 cp .env.example .env
-mkdir -p keys/typesafe keys/deepseek keys/exa
+mkdir -p keys/typesafe keys/deepseek keys/exa keys/push
 # Edit .env: set TEF_NOTES_URL to your private origin and choose TZ.
 docker compose up -d
 ```

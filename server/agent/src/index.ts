@@ -7,6 +7,8 @@ import { mcp } from "./mcp";
 import { catalog } from "./models";
 import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
 import { Notes } from "./notes";
+import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
+import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { semantic } from "./semantic";
 
@@ -25,6 +27,8 @@ Bun.serve({
     "/agent/reader": { GET: (req) => reader(req, server) },
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
+    "/agent/push/key": { GET: () => keyRoute() },
+    "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/mcp": (req) => (withMcp ? mcp(req, server) : new Response("Not found", { status: 404 })),
   },
@@ -42,5 +46,7 @@ const warm = () => new Notes(server).list().then(async (n) => semantic().sync(n,
   .catch((e) => console.error(`agent: indexing notes by meaning failed: ${(e as Error).message}`));
 void warm();
 setInterval(warm, WARM);
+
+startReminders(server);
 
 console.error(`agent: listening on ${port}, notes at ${server.url}${withMcp ? ", MCP at /agent/mcp" : ""}`);

@@ -27,7 +27,8 @@ on every device would add friction without keeping out anyone the network does n
   leave a provider's key out to keep that traffic off. Provider keys are files under `server/keys/` or the paths in
   `server/.env`, mounted read-only; keep them out of git and out of backups you share.
 - The link-preview and clip-image routes fetch URLs from your server. They refuse private and loopback addresses at every
-  redirect hop; report any bypass.
+  redirect hop; report any bypass. The push route posts to a subscribed browser's push-service URL (https, and its name
+  resolved and checked as public before every send); it stores at most 20 devices.
 - TEF Notes has no backups of its own. See the README's "Backups".
 
 ## Reporting a vulnerability

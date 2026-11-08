@@ -67,6 +67,13 @@ export const progress = (t: Pick<Task, "checklist">): [number, number] | null =>
 
 export type Reminder = { id: string; at: number; title: string; task: string };
 
+/** When a task's reminder rings, in the clock's own zone (the phone's, or the server's TZ): its `when` day at its `remind`
+ *  time; null for a task without both. */
+export const remindAt = (t: Pick<Task, "when" | "remind">): number | null =>
+  t.when && t.remind
+    ? new Date(+t.when.slice(0, 4), +t.when.slice(5, 7) - 1, +t.when.slice(8, 10), +t.remind.slice(0, 2), +t.remind.slice(3, 5)).getTime()
+    : null;
+
 /** The notifications to have scheduled: open tasks with a day and a time, that time still ahead and within `days`; the
  *  soonest `cap` of them (the OS keeps only so many). A task with a day but no time needs none. */
 export function reminderPlan(tasks: Task[], now: Date, days = 30, cap = 200): Reminder[] {
@@ -74,8 +81,8 @@ export function reminderPlan(tasks: Task[], now: Date, days = 30, cap = 200): Re
   const out: Reminder[] = [];
   for (const t of tasks) {
     if (t.done || !t.when || !t.remind) continue;
-    const at = new Date(+t.when.slice(0, 4), +t.when.slice(5, 7) - 1, +t.when.slice(8, 10), +t.remind.slice(0, 2), +t.remind.slice(3, 5)).getTime();
-    if (at <= from || at > to) continue;
+    const at = remindAt(t);
+    if (at === null || at <= from || at > to) continue;
     out.push({ id: `task:${t.id}`, at, title: t.title, task: t.id });
   }
   return out.sort((a, b) => a.at - b.at).slice(0, cap);

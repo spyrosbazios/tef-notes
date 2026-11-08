@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-07 -->
+<!-- reviewed: 2026-11-08 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -36,7 +36,7 @@ of it is the only gate.
 ```sh
 cd server
 cp .env.example .env              # then edit it: at least TZ
-mkdir -p keys/typesafe keys/deepseek keys/exa   # keys/<TEF_NOTES_PROVIDER> for another model provider
+mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<TEF_NOTES_PROVIDER> for another model provider
 # put each provider's key, alone, in keys/<provider>/api-key (see AI providers); all optional
 docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes and tef-notes-agent
 docker compose exec pocketbase ./pocketbase superuser create you@example.com 'a-long-password'
@@ -63,10 +63,12 @@ result.
 | `TEF_NOTES_URL` | `http://localhost:8097` | The public origin clients reach. Read by the extension build only: its `update_url` is built from it, and Chrome installs and updates an extension only from https, so use your proxy's address. |
 | `PB_PORT` | `8097` | Host port for PocketBase, loopback only. |
 | `AGENT_PORT` | `8098` | Host port for the agent, loopback only. |
-| `TZ` | `UTC` | The server's time zone (an IANA name). A note the server writes is dated and named by this zone's day; the agent uses it for the prompt's date. |
+| `TZ` | `UTC` | The server's time zone (an IANA name). A note the server writes is dated and named by this zone's day; the agent uses it for the prompt's date and for push reminders' wall-clock times, so it must be yours. |
 | `TEF_NOTES_KEY_TYPESAFE` | `./keys/typesafe` | Directory holding `api-key`, mounted read-only at `/run/typesafe`. |
 | `TEF_NOTES_KEY_LLM` | `./keys/<TEF_NOTES_PROVIDER>` | Same, for the model provider, mounted into both containers at `/run/llm`. |
 | `TEF_NOTES_KEY_EXA` | `./keys/exa` | Same, for Exa, mounted into the agent at `/run/exa`. |
+| `TEF_NOTES_KEY_PUSH` | `./keys/push` | Same, for the VAPID private key of push reminders, mounted into the agent at `/run/push`. |
+| `TEF_NOTES_VAPID_SUBJECT` | | A `mailto:` or https URL the push services may reach you at. Empty: push reminders are off. |
 | `TEF_NOTES_CRX_KEY` | `./no-crx-key` | Path to the extension's signing key, inside `server/`. Extension build only, see the extension section. |
 | `TEF_NOTES_PROVIDER` | `deepseek` | The model provider for the chat agent and the server's clip and tag-description writing: `deepseek`, `anthropic`, `openai`, `xai`, `qwen`, `zai`, `ollama`. Defaults and keys: [AI providers](../docs/ai-providers.md). |
 | `TEF_NOTES_MODEL` | the provider's | The model; Ollama has no default. |
@@ -93,6 +95,21 @@ root-owned. Every provider is optional.
 A failure is logged with its status, never the key. Auto-tagger and clip failures show as `autotag:` and `clip:` lines
 in PocketBase's logs (admin UI, Logs).
 
+## Push reminders
+
+The installed web app gets a task's reminder (its `when` day and `remind` time) as a Web Push notification, sent by the
+agent every minute; the phone app rings its own local ones. Set up once: generate a VAPID key pair with
+`bunx web-push generate-vapid-keys --json`, put its `privateKey` alone in `keys/push/api-key` (the public key is derived
+from it; keep it unreadable to others, `chmod 600`, owned by uid 1000), and set `TEF_NOTES_VAPID_SUBJECT` to
+`mailto:you@example.com` in `.env`. Then `docker compose up -d`; `docker compose logs agent` says "web push is off" once
+when either is missing. A reminder rings within an hour of its time and not after, and never for a time set after it. A
+browser the push service no longer knows (404, 410) or that fails five sends in a row is forgotten; a reminder every
+delivery of which failed is tried again on the next minute's scan, until an hour past its time. A reminder's time has no
+zone: the agent reads it in its own `TZ`, so `TZ` in `.env` must be your own zone (default `UTC`, which rings hours off
+anywhere else); the agent logs a warning at start when push is on and `TZ` is unset. At most 20 devices are kept (a
+further one is refused with 409), and before every send the push service's name is resolved and must point only at public
+addresses, or the subscription is deleted.
+
 ## The write contract
 
 Every write to a note or task carries the `rev` it was based on, and `pb_hooks/rev.pb.js` refuses it if the
@@ -113,6 +130,8 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `POST` | `/api/tefnotes/tags/describe` | Drafts a tag's description (`{tag}`) or all tags' (`{all: true}`) from notes carrying it; returned, never saved. |
 | `POST` | `/agent/chat` | Streams a chat turn (the agent sidecar, not PocketBase). |
 | `GET` | `/agent/models` | Lists the provider's models and whether its key is present (the agent sidecar). |
+| `GET` | `/agent/push/key` | `{ publicKey }` a browser subscribes to push with; 404 while push is off (the agent sidecar). |
+| `POST`, `DELETE` | `/agent/push/subscribe` | Stores a browser's `PushSubscription` (and a `label`), the same endpoint again replacing it, a new one beyond 20 devices a 409; `DELETE` takes `{ endpoint }`. Shapes: `packages/core/src/push.ts`. |
 
 Cron jobs: `autotag` every minute (evaluates up to 50 notes per run) and `link_previews_prune` daily.
 

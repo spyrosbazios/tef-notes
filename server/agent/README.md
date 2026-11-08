@@ -14,6 +14,8 @@ to it. See the security model in [../README.md](../README.md).
 |---|---|---|
 | `POST` | `/agent/chat` | Streams a chat turn. Body: `id`, `messages`, `model`, `writesWithoutAsking`, and optional `context` (below) |
 | `GET` | `/agent/models` | The models; `provider` names the server's; `available` is true when its key is read |
+| `GET` | `/agent/push/key` | The VAPID public key for `pushManager.subscribe`; 404 while push is off (`src/push.ts`, [../README.md](../README.md) "Push reminders") |
+| `POST`, `DELETE` | `/agent/push/subscribe` | Store or forget a browser's push subscription (`packages/core/src/push.ts` is the contract) |
 | `POST`, `GET`, `DELETE` | `/agent/mcp` | The MCP endpoint, when `TEF_NOTES_MCP=1` (below); a 404 otherwise |
 
 ## Always-on assistant
@@ -74,6 +76,7 @@ Other clients take the same URL as a "Streamable HTTP" server.
 | `HOST` | `127.0.0.1` | Listen address (the image sets `0.0.0.0`; compose publishes it on loopback only) |
 | `PORT` | `8098` | Listen port |
 | `TEF_NOTES_KEYS_DIR` | `/run` | Keys are read from `<dir>/llm/api-key` and `<dir>/exa/api-key` on every use |
+| `TEF_NOTES_VAPID_SUBJECT` | | `mailto:` or https URL for push reminders; with the key at `<dir>/push/api-key` they switch `src/reminders.ts` on |
 | `TEF_NOTES_PROVIDER` | `deepseek` | The model provider (`src/models.ts` `PROVIDERS`) |
 | `TEF_NOTES_MODEL` | the provider's | The default model |
 | `TEF_NOTES_MCP` | `0` | `1` serves the MCP endpoint |
