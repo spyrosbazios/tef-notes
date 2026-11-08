@@ -42,7 +42,7 @@ export function NotesPage() {
       {phone ? top : null}
       {/* No scroll anchoring, as Home's: the router's restore lands before the masonry settles */}
       <div ref={page} data-scroll-restoration-id={scrollId} className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]" inert={phone && searching}>
-        <div className="mx-auto max-w-6xl px-4 pt-8 pb-28 max-md:px-0 max-md:pt-2 max-md:pb-6 md:px-8">
+        <div className="mx-auto max-w-6xl px-4 pt-8 pb-28 max-md:px-0 max-md:pt-2 max-md:pb-[calc(var(--under-tabs)+1.5rem)] md:px-8">
           {phone ? null : <h1 className="mb-8 text-3xl font-bold tracking-tight">Notes</h1>}
           <NoteList onNew={newNote} scrollId={scrollId} />
         </div>

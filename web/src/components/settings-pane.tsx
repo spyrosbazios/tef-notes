@@ -674,7 +674,7 @@ export function SettingsPane() {
             <Link to="/settings" search={{}} aria-label="Back to Settings" className="grid size-9 shrink-0 place-items-center rounded-lg text-dim hover:bg-muted"><ChevronLeft className="size-[22px]" /></Link>} />
         ) : <PageHeader title="Settings" />}
         <div data-scroll-restoration-id={settingsScroll(at?.id ?? "")} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="px-4 pt-1 pb-28">
+          <div className="px-4 pt-1 pb-28 max-md:pb-[calc(var(--under-tabs)+1.5rem)]">
             {at ? <at.body /> : (
               <ul className="divide-y divide-line rounded-xl border border-line">
                 {SECTIONS.map(({ id, label, about, icon: Icon }) => (

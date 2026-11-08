@@ -90,7 +90,7 @@ export function Home() {
       {/* The router puts the place back (lib/scroll.ts) before the masonry has settled; the browser's scroll anchoring would then
           chase the tiles as they measure and leave the page off the place. The settled layout is the one that was left, so no anchoring */}
       <div ref={page} data-scroll-restoration-id={scrollId} className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]" inert={phone && searching}>
-        <div className="mx-auto max-w-6xl space-y-12 px-4 pt-8 pb-28 max-md:space-y-4 max-md:px-0 max-md:pt-2 max-md:pb-6 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-12 px-4 pt-8 pb-28 max-md:space-y-4 max-md:px-0 max-md:pt-2 max-md:pb-[calc(var(--under-tabs)+1.5rem)] md:px-8">
           {phone ? null : <h1 className="text-3xl font-bold tracking-tight">{d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h1>}
 
           <div className="grid items-start gap-x-14 gap-y-12 max-md:grid-cols-[minmax(0,1fr)] max-md:gap-y-2 md:grid-cols-2">

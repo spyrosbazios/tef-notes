@@ -157,7 +157,7 @@ function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void })
         {lens ? <p className="px-1 pt-2 text-xs text-faint">Searching inside {lens.name}</p> : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 max-md:pb-[calc(var(--under-tabs)+1.5rem)]">
         <LayoutGroup><AnimatePresence initial={false} mode="popLayout">
         {f.empty && q.trim() ? (
           <Section key="assistant" title="Assistant">

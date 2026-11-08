@@ -34,7 +34,8 @@ import { landed, leaving } from "@/lib/morph";
 import { isTaskView, titleOf, usePlace } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
-/** A note's page laid over the screen it was opened from. On a phone it reaches down over the tab bar (`reach`: kept, hidden, under it);
+/** A note's page laid over the screen it was opened from. On a phone it covers the tab bar (kept, hidden, under it) and keeps clear of
+ *  the bottom inset the shell leaves to the bar (`reach`);
  *  from `md` it covers the rail and the page and leaves the assistant's dock beside it. The focus moves in on opening and goes back to
  *  what had it (the tile) on closing. Its coming and going is the route's view transition (`data-vt="note"`, router.ts, index.css),
  *  grown out of and shrunk back into the tile it was opened from (lib/morph.ts). */
@@ -53,7 +54,7 @@ function NoteLayer({ id, reach }: { id: string; reach: boolean }) {
   // Laid out before the new page is captured: the tile hands the card's name to this layer, and takes it back on the way out
   useLayoutEffect(() => { landed(); return () => leaving(id); }, [id]);
   return (
-    <div data-vt="note" className={cn("absolute inset-0 z-20 flex flex-col bg-bg", reach && "max-md:-bottom-(--tab-bar)")}>
+    <div data-vt="note" className={cn("absolute inset-0 z-20 flex flex-col bg-bg", reach && "max-md:pb-[env(safe-area-inset-bottom)]")}>
       <OfflineBar />
       <div className="flex min-h-0 flex-1">
         <main ref={ref} tabIndex={-1} className="min-w-0 flex-1 outline-none"><NotePage id={id} /></main>
@@ -95,14 +96,17 @@ export function Shell() {
   const rail = <Rail onSearch={() => { setMenu(false); setPalette(true); }} onPick={() => setMenu(false)} />;
   const tasks = isTaskView(view), focus = tasks && !!task;
   // The phone's bottom tabs: on every screen but an open task (a screen of its own, with a Back), and under the keyboard. A note's page
-  // is another: its layer reaches over the tabs, which stay mounted (hidden) under it so the screen behind keeps its size
+  // is another: its layer covers the tabs, which stay mounted (hidden) under it. The bar floats over the page, which runs on under it
+  // and the bottom inset (the bar takes the inset as its own padding); every phone page's scroller ends `--under-tabs` lower, so its
+  // last row can scroll up clear of the pill
   const bar = !focus && (onNote || !keyboard);
 
   return (
     <ShellContext.Provider value={actions}>
-      <div className={cn("flex h-dvh flex-col overflow-hidden", INSETS)}
+      <div className={cn("relative flex h-dvh flex-col overflow-hidden", INSETS, bar && "max-md:pb-0")}
         // What the assistant's dock leaves free under it below `md`: the bar and the inset it sits above
-        style={{ "--dock-bottom": bar && !onNote ? `calc(${TAB_BAR} + env(safe-area-inset-bottom))` : "0px", "--tab-bar": TAB_BAR } as CSSProperties}>
+        style={{ "--dock-bottom": bar && !onNote ? `calc(${TAB_BAR} + env(safe-area-inset-bottom))` : "0px", "--tab-bar": TAB_BAR,
+          "--under-tabs": bar ? `calc(${TAB_BAR} + env(safe-area-inset-bottom))` : "0px" } as CSSProperties}>
         <div className="flex min-h-0 flex-1">
           <div className="relative flex min-w-0 flex-1">
             {/* The screen behind a note's page: hidden and inert, but laid out and mounted, so it keeps its scroll and its pictures */}
@@ -136,7 +140,7 @@ export function Shell() {
           <Palette open={palette} onOpenChange={setPalette} onNew={newNote} />
           <QuickAdd initial={adding} onClose={() => setAdding(null)} />
         </div>
-        {bar ? <div className={cn("shrink-0", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}
+        {bar ? <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}
       </div>
     </ShellContext.Provider>
   );

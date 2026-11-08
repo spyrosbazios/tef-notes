@@ -249,7 +249,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
         // Focus is the hover of a finger and a keyboard: a tapped or tabbed row lights its day too, until focus leaves the list
         onFocus={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined}
         onBlur={onHoverDay ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) hover(null); } : undefined}
-        className={cn("min-h-0 flex-1 overflow-y-auto outline-none", embedded ? "pb-2" : "px-2 pb-24")}>
+        className={cn("min-h-0 flex-1 overflow-y-auto outline-none", embedded ? "pb-2" : "px-2 pb-24 max-md:pb-[calc(var(--under-tabs)+1.5rem)]")}>
         {isPending ? <div className="space-y-2 px-2 pt-2">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}</div> : (
           <ReducedMotionConfig>
             <div key={of} className="relative">
