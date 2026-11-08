@@ -29,10 +29,11 @@ export function readButton(cls: string, href: string, read: (url: string) => voi
   return btn;
 }
 
-/** Whether the block after the one holding `pos` is a summary: a blockquote that opens on "Summary". */
+/** Whether the block after the one holding `pos` is a summary: a blockquote whose first line is "Summary". (Its first
+ *  child's text, not the quote's: `textContent` runs the blocks together, "SummaryKokonut…", and `\b` never matches.) */
 export function summarised(doc: Node, pos: number): boolean {
   const next = doc.resolve(blockEnd(doc, pos)).nodeAfter;
-  return next?.type === schema.nodes.blockquote && /^\s*summary\b/i.test(next.textContent);
+  return next?.type === schema.nodes.blockquote && /^\s*summary\b/i.test(next.firstChild?.textContent ?? "");
 }
 
 /** A sparkles icon and "Summary": a click asks `summarize` and puts the block under the link at `getPos`. */
