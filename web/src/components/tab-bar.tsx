@@ -44,7 +44,7 @@ export function TabBar() {
                   <button type="button" aria-label={dot ? `${label}, new answer` : label}
                     className="group/tab relative flex h-full items-center justify-center rounded-full px-3 text-dim transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:text-brand">
                     <Icon className="size-[22px] group-data-[state=active]/tab:[stroke-width:2.4]" />
-                    {prefs.tabLabels ? <BottomNavigationLabel show="active" transition={spring.slide} className="pr-1 pl-2 text-sm font-semibold">{label}</BottomNavigationLabel> : null}
+                    {prefs.tabLabels !== "never" ? <BottomNavigationLabel show={prefs.tabLabels} transition={spring.slide} className="pr-1 pl-2 text-sm font-semibold">{label}</BottomNavigationLabel> : null}
                     {dot ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-warn" /> : null}
                   </button>
                 </BottomNavigationItem>

@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
+import { HIDEABLE, movedTab, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Markdown } from "@/components/markdown";
@@ -253,12 +253,9 @@ function Layout() {
           <p className="text-sm font-semibold">Open the app on</p>
           <Choice label="Open the app on" value={start} options={STARTS} names={START_LABEL} onPick={(v) => setPrefs({ start: v })} />
         </div>
-        <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Tab labels</p>
-            <p className="text-[13px] leading-snug text-dim">The tab in front shows its name. Off, the bar is icons only.</p>
-          </div>
-          <Switch checked={tabLabels} aria-label="Show tab labels" onCheckedChange={(on) => setPrefs({ tabLabels: on })} />
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p className="text-sm font-semibold">Tab labels</p>
+          <Choice label="Tab labels" value={tabLabels} options={TAB_LABELS} names={TAB_LABELS_LABEL} onPick={(v) => setPrefs({ tabLabels: v })} />
         </div>
         <div className="px-3 py-2.5">
           <p className="text-sm font-semibold">Tabs</p>
