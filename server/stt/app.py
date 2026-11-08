@@ -63,6 +63,7 @@ def serve(conn):
     asr = onnx_asr.load_model("nemo-conformer-tdt", path, sess_options=opts)
     vad = onnx_asr.load_vad("silero", os.path.join(DATA, "silero"))
     long = asr.with_vad(vad)
+    asr.recognize(np.zeros(RATE, dtype=np.float32), sample_rate=RATE)  # the first run sets up onnxruntime (~4 s): do it now, not on the first clip
     print(f"stt: loaded {MODEL} in {time.monotonic() - t:.1f}s", flush=True)
     conn.send(None)
     while True:
