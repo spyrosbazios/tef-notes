@@ -159,6 +159,16 @@ describe("writes", () => {
     expect(await run(T.rewrite_note, { path: "notes/a.md", text: "1\ntwo\nthree\nfour", why: "x" })).toEqual({ error: expect.stringMatching(/changed meanwhile/) });
   });
 
+  it("summarise_links: the route's block under each card without one, tainted; a failure listed", async () => {
+    pb.put("notes/a.md", file("a", "[a](https://a.com)\nwhat it is\n\n- [b](https://b.com) inline\n\n[e](https://empty.com)\n"));
+    const r = await run(T.summarise_links, { path: "notes/a.md" });
+    expect(r).toMatchObject({ saved: "notes/a.md", summarised: 1, failed: ["https://empty.com"] });
+    const n = pb.notes.get("notes/a.md")!;
+    expect(parseNote("notes/a.md", n.text).body).toBe("[a](https://a.com)\n\n> **Summary**\n> About https://a.com.\n\nwhat it is\n\n- [b](https://b.com) inline\n\n[e](https://empty.com)\n");
+    expect(n.tainted).toBe(true);
+    expect(await run(T.summarise_links, { path: "notes/a.md", urls: ["https://a.com"] })).toMatchObject({ error: expect.stringContaining("No link card") });
+  });
+
   it("set_note_flags: only existing tags, spelled as they exist", async () => {
     pb.put("notes/a.md", file("a"));
     expect(await run(T.set_note_flags, { path: "notes/a.md", tags: ["newtag", "work"] })).toEqual({ error: "Not an existing tag: newtag. Use only: Σπίτι, work." });

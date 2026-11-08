@@ -7,6 +7,7 @@ import { z } from "zod";
 import { cardKey, noteCardOf, type Card } from "@/core/agent";
 import { appendToNote, COLORS, MEMORY, NOTES, parseNote, serializeNote, snippetOf, withBody, withFlags } from "@/core/notes";
 import { createTag, listTags, updateTag } from "@/core/tags";
+import { cardLines, withSummaries } from "@/core/link-summary";
 import { localDay } from "@/core/time";
 import { uiTools } from "./assistant";
 import { capList, clip, fromWeb } from "./guard";
@@ -21,6 +22,7 @@ import * as web from "./web";
 import { widgetTools } from "./widgetTools";
 
 export const CAP = 6000;                    // agent/memory.md rides in every prompt; keep it small
+const SUMMARIES = 10;                       // summarise_links: pages read in one call
 const NOTE = 20_000, PAGE = 20_000, LIST = 60, SHOWN = 8;            // read_note: chars; list_notes: the most it hands back; show_items: cards at most
 export const RECENT = 60;                   // the prompt's index: every pinned note, then this many newest
 
@@ -275,6 +277,33 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
         if (bad) return { error: bad };
         return notes.change(path, (file) => withBody(file, parseNote(path, file), text.trimEnd() + "\n", title?.trim()),
           { taint: await fromPage(messages), merge: true });
+      },
+    }),
+
+    summarise_links: tool({
+      description: "Put a summary under a note's link cards: each line that is only a link (the app draws it as the page's card) and has none yet gets the block the card's Summary button writes, the server's own read of the page. Use this, never your own text, when asked to summarise a note's links. The user confirms. Lists what it couldn't summarise.",
+      inputSchema: z.object({
+        path: z.string().describe("notes/<file>.md"),
+        urls: z.array(z.string()).max(SUMMARIES).optional().describe("Only these links; omit for every card without a summary"),
+      }),
+      execute: async ({ path, urls }) => {
+        const bad = await checkWrite(notes, path);
+        if (bad) return { error: bad };
+        const cur = await notes.read(path);
+        if (!cur) return { error: `No note ${path}.` };
+        const want = [...new Set(cardLines(parseNote(path, cur.text).body).filter((c) => !c.summarised).map((c) => c.url))]
+          .filter((u) => !urls || urls.includes(u)).slice(0, SUMMARIES);
+        if (!want.length) return { error: "No link card without a summary in that note: a card is a line that is only a link." };
+        const got = await Promise.allSettled(want.map((u) => pb.pageSummary(notes.server, u)));
+        const blocks = new Map<string, string>(), failed: string[] = [];
+        got.forEach((r, i) => (r.status === "fulfilled" && r.value ? blocks.set(want[i], r.value) : failed.push(want[i])));
+        if (!blocks.size) return { error: "None of those pages could be summarised.", failed };
+        // the summaries are the server model's read of web pages: the note is marked like any write from the web
+        const saved = await notes.change(path, (file) => {
+          const n = parseNote(path, file);
+          return withBody(file, n, withSummaries(n.body, blocks));
+        }, { taint: true });
+        return failed.length ? { ...saved, summarised: blocks.size, failed } : { ...saved, summarised: blocks.size };
       },
     }),
 

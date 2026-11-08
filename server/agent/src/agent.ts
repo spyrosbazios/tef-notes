@@ -69,6 +69,7 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
     create_note: (_: unknown, { messages }: O) => ask(messages),
     append_to_note: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     rewrite_note: ({ path, text }: { path: string; text: string }, { messages }: O) => ask(messages, checkWrite(notes, path, text)),
+    summarise_links: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     set_note_flags: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     // a delete has no way back: it asks whatever the setting, unless the path is bad
     delete_note: async ({ path }: { path: string }) => ((await checkWrite(notes, path)) ? "not-applicable" as const : "user-approval" as const),

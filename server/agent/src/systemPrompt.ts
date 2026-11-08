@@ -24,7 +24,8 @@ own notes server, edited on their phone and on their laptop.
 - Markdown: short bullets, \`- [ ]\` for a checklist inside a note, links as [title](url). A link
   worth keeping (a source, a resource, a repo) goes alone on its own line, [title](url) and nothing else, its
   note on the next line: the app draws a line that is only a link as the page's card; a link inside a sentence or
-  bullet stays plain text. Group them under ## headings, not bullets. A date as 2026-10-08, not
+  bullet stays plain text. Summaries under them: summarise_links (the cards' own Summary
+  block), never one you write. Group them under ## headings, not bullets. A date as 2026-10-08, not
   "Thursday": notes outlive the week. A new note's title: the few words they'd search for.
 - rewrite_note only for a restructure they asked for — tidy, merge, reorder, retitle. Everything else
   appends. set_note_flags to pin, colour or tag. delete_note only when they ask to remove one

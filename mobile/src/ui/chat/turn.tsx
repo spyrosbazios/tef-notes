@@ -41,7 +41,7 @@ const DETAIL: Record<ToolName, (i: Record<string, unknown>) => string> = {
   create_tag: (i) => str(i.name), update_tag: (i) => str(i.name) || str(i.id),
   list_tags: () => "", show_items: () => "",
   read_note: (i) => titleOf(i.path), create_note: (i) => str(i.title), append_to_note: (i) => titleOf(i.path),
-  rewrite_note: (i) => str(i.why) || titleOf(i.path), set_note_flags: (i) => `${titleOf(i.path)} · ${flagLine(i as WriteInput, true)}`, delete_note: (i) => titleOf(i.path),
+  rewrite_note: (i) => str(i.why) || titleOf(i.path), set_note_flags: (i) => `${titleOf(i.path)} · ${flagLine(i as WriteInput, true)}`, delete_note: (i) => titleOf(i.path), summarise_links: (i) => titleOf(i.path),
   list_tasks: (i) => [str(i.view), str(i.query), str(i.tag)].filter(Boolean).join(" · "), add_task: (i) => str(i.title), add_tasks: () => "", update_task: (i) => str(i.about), complete_task: (i) => str(i.about),
   delete_task: (i) => str(i.about),
   update_memory: (i) => str(i.why), web_search: (i) => str(i.query), read_url: (i) => (Array.isArray(i.urls) ? i.urls.join(", ") : ""),

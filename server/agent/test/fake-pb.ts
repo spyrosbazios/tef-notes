@@ -34,6 +34,10 @@ export function fakePb() {
         if (/\/\/(localhost|10\.)/.test(page)) return err(400, { message: "blocked" });
         return Response.json({ url: page, title: page.includes("empty") ? "" : "Example page", description: "About it", site: "example.com", image: "", icon: "", picture: "" });
       }
+      if (u.pathname === "/api/tefnotes/summary" && req.method === "POST") {   // the Summary button's route: "empty" has nothing to summarise
+        const page = String(((await req.json()) as { url?: string }).url ?? "");
+        return page.includes("empty") ? err(422, { error: "There is nothing on that page to summarise." }) : Response.json({ summary: `> **Summary**\n> About ${page}.` });
+      }
       if (u.pathname === "/api/tefnotes/page") {                // the reader's fetch: a private address is refused, "bare" has no article
         const page = u.searchParams.get("url") ?? "";
         if (/\/\/(localhost|10\.)/.test(page)) return err(400, { message: "blocked" });

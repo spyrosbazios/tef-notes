@@ -107,7 +107,7 @@ function MemoryDiff({ text }: { text: string }) {
 /** What an answered card says: what was done, or what was left undone. */
 const VERB: Record<string, [done: string, skipped: string]> = {
   create_tag: ["Created", "create"], update_tag: ["Updated", "update"],
-  create_note: ["Created", "create"], append_to_note: ["Added to", "add to"], rewrite_note: ["Rewrote", "rewrite"],
+  create_note: ["Created", "create"], append_to_note: ["Added to", "add to"], rewrite_note: ["Rewrote", "rewrite"], summarise_links: ["Summarised links in", "summarise links in"],
   set_note_flags: ["Changed flags of", "change flags of"], delete_note: ["Deleted", "delete"], update_memory: ["Updated", "update"],
 };
 
@@ -122,7 +122,7 @@ export function Confirm({ name, input, id, respond, answer }: {
   const own = todoWords(name, input);
   const head = own?.head ?? {
     create_tag: `Create tag “${input.name ?? ""}”?`, update_tag: `Update tag “${input.name ?? input.id ?? ""}”?`,
-    create_note: `Create note “${input.title ?? ""}”?`, append_to_note: `Add to ${title}?`, rewrite_note: `Rewrite ${title}?`,
+    create_note: `Create note “${input.title ?? ""}”?`, append_to_note: `Add to ${title}?`, rewrite_note: `Rewrite ${title}?`, summarise_links: `Summarise the links in ${title}?`,
     set_note_flags: `Change flags of ${title}?`, delete_note: `Delete ${title}?`, update_memory: "Update the agent's memory?",
   }[name] ?? "Go ahead?";
   const yes = own?.yes ?? (name === "create_note" ? "Create it" : name === "append_to_note" ? "Add it" : name === "delete_note" ? "Delete it" : "Save it");
@@ -157,6 +157,7 @@ export function Confirm({ name, input, id, respond, answer }: {
                 : name === "rewrite_note" && input.path ? <RewriteDiff path={input.path} title={title} input={input} />
                 : (name === "create_tag" || name === "update_tag") ? <T size={14}>{tagLine(name, input)}</T>
                 : name === "set_note_flags" ? <T size={14}>{flagLine(input, true) || "No change"}</T>
+                : name === "summarise_links" ? <T size={14}>A summary under each link card without one, as its Summary button writes it</T>
                 : name === "delete_note" ? <T size={14}>Delete it for good, with its photos and PDFs</T>
                 : own ? <TodoPreview name={name} input={input} />
                 : name === "update_memory" ? <MemoryDiff text={input.text ?? ""} />
