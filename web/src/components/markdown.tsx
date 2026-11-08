@@ -12,6 +12,7 @@ import { noteIdOf } from "@/core/notes";
 import { Lightbox, type LightboxItem } from "@/components/lightbox";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { attachmentLink, drawingPreview, isDrawing, isPdf } from "@/core/photos";
+import { noteHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 /** Task checkboxes drawn in full colour: remark-gfm draws them disabled, greyed. They stay read-only. */
@@ -68,7 +69,7 @@ export const Markdown = memo(function Markdown({ body, className, onNote }: Prop
             }
             const note = noteLinkPath(href);
             return note ? (
-              <a href={`/note/${encodeURIComponent(noteIdOf(note))}`} title={title} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onNote?.(noteIdOf(note)); }}>{children}</a>
+              <a href={noteHref(noteIdOf(note))} title={title} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onNote?.(noteIdOf(note)); }}>{children}</a>
             ) : <a href={href} title={title} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{children}</a>;
           },
           img: ({ src, alt }) =>

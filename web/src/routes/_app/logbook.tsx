@@ -6,6 +6,6 @@ import { listSearch } from "@/lib/route-search";
 
 export const Route = createFileRoute("/_app/logbook")({
   validateSearch: listSearch,
-  loader: ({ context }) => loadLists(context.queryClient),
+  loader: ({ context, preload }) => loadLists(context.queryClient, preload),
   component: TaskScreen,
 });

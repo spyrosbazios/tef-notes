@@ -19,5 +19,8 @@ const TOUCH = "(any-pointer: coarse)";
  *  guards in index.css do for the rest). */
 export const calm = (): boolean => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** The browser can start a View Transition with types (`:active-view-transition-type()`), which the wipe in index.css is scoped to. */
+export const typedTransitions = (): boolean => typeof document.startViewTransition === "function" && CSS.supports("selector(:active-view-transition-type(a))");
+
 export const touching = (): boolean => matchMedia(TOUCH).matches;
 export const useTouch = () => useMedia(TOUCH);

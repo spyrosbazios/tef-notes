@@ -5,6 +5,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { MAX_AGE } from "@/lib/persist";
 import { parseSearch, stringifySearch } from "@/lib/route-search";
+import { calm } from "@/hooks/media";
 import { SCROLL_KEY, SCROLL_TOP } from "@/lib/scroll";
 import { Pending } from "@/components/pending";
 import { routeTree } from "./routeTree.gen";
@@ -20,9 +21,8 @@ export const queryClient = new QueryClient({
   },
 });
 
-/** The screens slide into place through the View Transition API unless the OS asks for less motion (the seam a page transition
- *  hooks into: `::view-transition-*` in index.css). Read once: the setting rarely changes under an open app. */
-const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** The OS asks for less motion: no View Transition. Read once, as the setting rarely changes under an open app. */
+const still = calm();
 
 export const router = createRouter({
   routeTree,
@@ -37,7 +37,9 @@ export const router = createRouter({
   defaultPendingComponent: Pending,
   defaultPendingMs: 400,
   defaultPendingMinMs: 300,
-  defaultViewTransition: !calm,
+  // Every navigation is a View Transition of the type `route` (index.css styles the theme wipe, type `look`, and no route yet: the
+  // seam a page transition hooks into) unless the OS asks for less motion. A browser without typed transitions gets the plain one.
+  defaultViewTransition: still ? false : { types: ["route"] },
   // Each scroller with a `data-scroll-restoration-id` keeps its place under that id, whatever history entry it was left in: a
   // list comes back where it was from a tab, the rail or Back alike, and one it has no place for starts at the top (lib/scroll.ts)
   scrollRestoration: true,

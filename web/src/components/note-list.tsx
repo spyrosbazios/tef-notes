@@ -7,7 +7,6 @@
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
-import { useElementScrollRestoration } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
@@ -31,11 +30,11 @@ import { useNarrow, useTouch } from "@/hooks/media";
 import { useLensSorted, useNotes } from "@/hooks/notes";
 import { useNoteView } from "@/hooks/note-view";
 import { useNow } from "@/hooks/now";
+import { useSavedScroll } from "@/hooks/scroll";
 import { useTagNames } from "@/hooks/tag-names";
 import { useNotePictures } from "@/hooks/thumbs";
 import { Mosaic } from "./note-pictures";
 import { noteLink, useIntent, useNav, type AppLink } from "@/lib/nav";
-import { SCROLL_KEY } from "@/lib/scroll";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
@@ -182,13 +181,13 @@ export function TagFilter({ counts, chosen, onChange, what = "Notes" }: { counts
   );
 }
 
-/** `scrollId`: Home's scroller, whose place the router is putting back (lib/scroll.ts). */
+/** `scrollId`: Home's scroller, whose place is put back: by the router for a tag filter, by `useScrollSwitch` for a lens (lib/scroll.ts). */
 export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: string }) {
   const { isPending } = useNotes();
   const { view, openNote, filterTag, setTags } = useNav();
   const chips = useMemo(() => (view.kind === "home" ? view.tags ?? [] : []), [view]);
-  const back = useElementScrollRestoration({ id: scrollId, getKey: () => SCROLL_KEY });
-  const [limit, setLimit] = useState(() => startLimit(back?.scrollY ?? 0));
+  const place = useSavedScroll(scrollId);
+  const [limit, setLimit] = useState(() => startLimit(place));
   const end = useRef<HTMLDivElement>(null);
   const base = useLensSorted();
   const { grouped, collapsed, sort, setGrouped, fold: foldGroup, setSort } = useNoteView();
@@ -214,10 +213,11 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
   // What a shift-click's range runs over: the notes as they stand on screen, a folded group's left out, a note under two tags once.
   const sights = () => (grouped ? [...new Set(groups.filter((g) => !folded(g.tag)).flatMap((g) => g.notes.map((n) => n.path)))] : order);
 
-  // A selection belongs to the list it was made in: another view or filter starts over.
-  const scope = `${chips.join(",")} ${sort}`;
+  // A selection belongs to the list it was made in: another view, filter or lens starts over, with the tiles to reach the place that
+  // list was left at drawn (the page is put back to it as the list changes)
+  const scope = `${scrollId} ${sort}`;
   const [seen, setSeen] = useState(scope);
-  if (seen !== scope) { setSeen(scope); setSel([]); setLimit(PAGE); }
+  if (seen !== scope) { setSeen(scope); setSel([]); setLimit(startLimit(place)); }
   const picked = useMemo(() => sel.filter((p) => order.includes(p)), [sel, order]);
   const selecting = picked.length > 0;
 

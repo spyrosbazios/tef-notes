@@ -12,10 +12,14 @@ import { tagsQuery } from "@/hooks/tags";
 import { tasksQuery } from "@/hooks/todo";
 import type { NoteRec } from "@/services/notes";
 
-/** The lists every screen of the shell reads: the notes, the tasks and their links (the copy's), the tags and lenses (the server's). */
-export async function loadLists(qc: QueryClient): Promise<void> {
-  void qc.prefetchQuery(tagsQuery);
-  void qc.prefetchQuery(lensesQuery);
+/** The lists every screen of the shell reads: the notes, the tasks and their links (the copy's), the tags and lenses (the server's).
+ *  A `preload` (a hover or a touch, asked again every few seconds under a pointer) reads only the copy: the server's lists would
+ *  go over the network each time, for a screen that may never open, and the screen asks for them itself. */
+export async function loadLists(qc: QueryClient, preload: boolean): Promise<void> {
+  if (!preload) {
+    void qc.prefetchQuery(tagsQuery);
+    void qc.prefetchQuery(lensesQuery);
+  }
   await Promise.all([qc.ensureQueryData(notesQuery), qc.ensureQueryData(tasksQuery), qc.ensureQueryData(linksQuery)]);
 }
 

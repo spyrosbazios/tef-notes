@@ -30,6 +30,7 @@ import { useActiveLens } from "@/hooks/lens";
 import { useLinks } from "@/hooks/links";
 import { calm } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
+import { useScrollSwitch } from "@/hooks/scroll";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
 import { linkOf, TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
@@ -129,6 +130,7 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   // Kept where it was left by the router (lib/scroll.ts): Home's box per list, a view's own list per view, each per lens
   const scroller = useRef<HTMLDivElement>(null);
   const scrollId = embedded ? boxScroll(kind, lens?.rec) : listScroll(kind, lens?.rec);
+  useScrollSwitch(scroller, scrollId);   // a lens, or the box's list, switched on the page is no navigation (hooks/scroll.ts)
   // What the list is of: when it changes the rows are a new list, not rows coming and going
   const of = `${kind}|${lens?.rec ?? ""}|${tags.join(",")}`;
 

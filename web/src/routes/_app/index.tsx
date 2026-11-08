@@ -6,6 +6,6 @@ import { homeSearch } from "@/lib/route-search";
 
 export const Route = createFileRoute("/_app/")({
   validateSearch: homeSearch,
-  loader: ({ context }) => loadLists(context.queryClient),
+  loader: ({ context, preload }) => loadLists(context.queryClient, preload),
   component: Home,
 });

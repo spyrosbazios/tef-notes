@@ -30,6 +30,7 @@ import { linkedNoteIds, notesFor } from "@/lib/links";
 import { useNav } from "@/lib/nav";
 import { report } from "@/lib/report";
 import { whenState, scheduleOf } from "@/lib/schedule";
+import { taskScroll } from "@/lib/scroll";
 import { matches } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
@@ -133,7 +134,7 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
         <Button variant="destructive" size="sm" aria-label="Delete the task" title="Delete" onClick={() => setConfirm(true)} className="ml-1"><Trash2 />Delete</Button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div data-scroll-restoration-id={taskScroll(task.id)} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-xl space-y-5 px-6 pt-8 pb-24 md:px-10">
           <div className="flex items-start gap-3">
             <TickBox size="lg" checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(qc, task); }} className="mt-2" />

@@ -130,17 +130,25 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
   service worker's `navigate` message in `update-toast.tsx`).
 - **Data and preload.** Loaders take `context.queryClient` (`createRootRouteWithContext`) and only touch the query cache
   (`src/lib/loaders.ts`): the shell screens `ensureQueryData` the notes, tasks and links (the local copy, instant once open) and
-  prefetch tags and lenses without waiting; a note about to open prefetches its attachment list. `defaultPreload: "intent"` with
+  prefetch tags and lenses without waiting (not on a hover's preload, which asks every few seconds: the screen asks for them itself);
+  a note about to open prefetches its attachment list. `defaultPreload: "intent"` with
   `defaultPreloadStaleTime: 0` (the router keeps no second cache; TanStack Query's staleTime decides). Task rows, the task tabs and
   Settings' sections are `Link`s; a note tile keeps its own click, long press and selection, and gets the same intent preload from
   `useIntent`. A cold load (first sync) shows `components/pending.tsx` after `defaultPendingMs` (400 ms), never a flash.
 - **Scroll restoration** is the router's (`scrollRestoration: true`). Each scroller carries a `data-scroll-restoration-id` from
-  `src/lib/scroll.ts` (Home per tag filter and lens, each list, each box list, each settings section), and `getScrollRestorationKey`
-  is one constant, so a place is kept per scroller, not per history entry: a tab, the rail or Back all find it. Home's scroller has
+  `src/lib/scroll.ts` (Home per tag filter and lens, each list, each box list, each settings section, and one per open note, task and
+  chat), and `getScrollRestorationKey` is one constant, so a place is kept per scroller, not per history entry: a tab, the rail or
+  Back all find it, and an id never seen (another note) starts at the top (`scrollToTopSelectors`). Home's scroller has
   `overflow-anchor: none` (the browser's anchoring otherwise moved the restored place while the masonry measured), and Home draws
-  enough tiles for the restored depth up front (`useElementScrollRestoration` in `note-list.tsx`).
-- **View transitions:** `defaultViewTransition` is on unless the OS asks for reduced motion (read once in `router.ts`): the seam for a
-  page transition; nothing styles `::view-transition-*` yet.
+  enough tiles for the restored depth up front, on mount and on each new filter or lens (`useSavedScroll`, `note-list.tsx`).
+  A lens (or the task box's list) is switched on the page, not navigated to, and the router saves a place only as a navigation
+  starts: `useScrollSwitch` (`src/hooks/scroll.ts`) keeps each id's place as it scrolls and puts it back when the id changes. The lens
+  stays each device's own state (`hooks/lens.ts`), not a search param: it filters every screen and the code that makes a note or
+  task reads it outside React, so a URL copy would be a second source.
+- **View transitions:** every navigation is one of type `route` (`defaultViewTransition: { types: ["route"] }`, off when the OS asks
+  for reduced motion, read once in `router.ts`); nothing styles it yet, so the browser's crossfade plays: the seam for a page
+  transition. The theme and accent change is its own, type `look` (`hooks/appearance.ts`), and the wipe in `index.css` is scoped to
+  `:active-view-transition-type(look)`. A browser without typed transitions gets the plain route one and a cut for the look.
 - **Adding a route:** a file under `src/routes/` (`_app/<name>.tsx` to sit in the shell) exporting `Route = createFileRoute(...)`, its
   `validateSearch` in `lib/route-search.ts` with a test, a `loader` that only asks the query cache, a `data-scroll-restoration-id` on
   its scroller; `bun run dev` or `build` regenerates the tree. A new view kind also goes in `View`, `viewOf` and `linkOf`.

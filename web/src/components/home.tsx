@@ -20,6 +20,7 @@ import { addDays } from "@/core/dates";
 import { useActiveLens } from "@/hooks/lens";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
+import { useScrollSwitch } from "@/hooks/scroll";
 import { useViews } from "@/hooks/todo";
 import { useShell } from "@/hooks/shell";
 import { usePlace, type TaskView } from "@/lib/nav";
@@ -47,9 +48,12 @@ export function Home() {
   // takes Home's place, so coming back finds the box as it was left
   const [tab, setTab] = useState<Box["tab"]>(() => box.tab), [tags, setTags] = useState(() => box.tags);
   useEffect(() => { box = { tab, tags }; }, [tab, tags]);
-  // Home's own scroll is the router's, per tag filter and lens: another one is another list
+  // Home's own scroll is the router's, per tag filter and lens: another one is another list (the lens switched on the page is `useScrollSwitch`'s)
   const { view } = usePlace(), lens = useActiveLens();
   const scrollId = homeScroll(view.kind === "home" ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec);
+  // A lens is switched on the page, not navigated to: Home's own scroller puts its place back (hooks/scroll.ts)
+  const page = useRef<HTMLDivElement>(null);
+  useScrollSwitch(page, scrollId);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const t of [...views.today, ...views.evening, ...views.inbox, ...views.upcoming.flatMap((g) => g.tasks)]) for (const g of t.tags) m.set(g, (m.get(g) ?? 0) + 1);
@@ -87,7 +91,7 @@ export function Home() {
       {phone && searching ? <div className="absolute inset-0 z-10 bg-bg"><SearchDrawer header={top} onClose={closeSearch} /></div> : null}
       {/* The router puts the place back (lib/scroll.ts) before the masonry has settled; the browser's scroll anchoring would then
           chase the tiles as they measure and leave the page off the place. The settled layout is the one that was left, so no anchoring */}
-      <div data-scroll-restoration-id={scrollId} className={cn("h-full overflow-y-auto [overflow-anchor:none]", phone && searching && "invisible")} inert={phone && searching}>
+      <div ref={page} data-scroll-restoration-id={scrollId} className={cn("h-full overflow-y-auto [overflow-anchor:none]", phone && searching && "invisible")} inert={phone && searching}>
         {phone ? top : null}
         <div className="mx-auto max-w-6xl space-y-12 px-4 pt-8 pb-28 max-md:space-y-4 max-md:px-0 max-md:pt-2 max-md:pb-6 md:px-8">
           {phone ? null : <h1 className="text-3xl font-bold tracking-tight">{d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h1>}

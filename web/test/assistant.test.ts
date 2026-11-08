@@ -19,6 +19,9 @@ describe("the page context", () => {
     expect(assistantView({ kind: "home" })).toEqual({ kind: "home" });
     expect(assistantView({ kind: "home", tags: ["x"] })).toEqual({ kind: "tag", tag: "x" });
     expect(assistantView({ kind: "home", tags: ["x", "y"] })).toEqual({ kind: "home" });
+    expect(assistantView({ kind: "settings", section: "agent" })).toEqual({ kind: "memory" });
+    expect(assistantView({ kind: "settings", section: "tags" })).toEqual({ kind: "settings" });
+    expect(assistantView({ kind: "settings" })).toEqual({ kind: "settings" });
     expect(webView({ kind: "notes" })).toEqual({ kind: "home" });
     expect(webView({ kind: "pinned" })).toEqual({ kind: "home" });
     expect(webView({ kind: "tag", tag: "x" })).toEqual({ kind: "home", tags: ["x"] });
