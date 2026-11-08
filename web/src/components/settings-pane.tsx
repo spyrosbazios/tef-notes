@@ -65,6 +65,8 @@ import { appVersion, forceUpdate } from "@/lib/update";
 const clean = (v: string) => v.trim().replace(/^#/, "");
 /** A section's title stays at the top of the scrolling page. */
 const HEAD = "sticky top-0 z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
+/** A section page's own title. On the phone the page header already names the section, so it is only read out there. */
+const TITLE = cn(HEAD, "max-md:sr-only");
 const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). */
@@ -169,7 +171,7 @@ function Appearance() {
   const label = (a: AccentName) => (a === "theme" ? `${THEMES[theme].label}'s own` : ACCENTS[a].label);
   return (
     <section className="space-y-3" aria-labelledby="appearance-h">
-      <h2 id="appearance-h" className={HEAD}>Appearance</h2>
+      <h2 id="appearance-h" className={TITLE}>Appearance</h2>
       <p className="text-sm text-dim">Kept on the server: every device you open the app on has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
@@ -250,7 +252,7 @@ function Layout() {
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ tabs: movedTab(prefsNow().tabs, id as Tab, over as Tab, after) }));
   return (
     <section className="space-y-3" aria-labelledby="layout-h">
-      <h2 id="layout-h" className={HEAD}>Layout</h2>
+      <h2 id="layout-h" className={TITLE}>Layout</h2>
       <p className="text-sm text-dim">The tabs at the bottom of the phone, what each opens on, and the screen the app starts on. Kept on the server, like the look.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
@@ -324,7 +326,8 @@ function Tags() {
   return (
     <section className="space-y-3" aria-labelledby="tags-h">
       <div className={cn(HEAD, "flex items-center gap-2")}>
-        <h2 id="tags-h" className="flex-1 font-bold text-lg tracking-tight">Tags</h2>
+        <h2 id="tags-h" className="flex-1 font-bold text-lg tracking-tight max-md:sr-only">Tags</h2>
+        <span className="flex-1 md:hidden" />
         <Button size="sm" className="rounded-full" onClick={() => setEditing(null)}><Plus /> Add tag</Button>
       </div>
       <p className="text-sm text-dim">A tag's colour paints its badge on every device. The description is what the AI reads to decide whether a note belongs.
@@ -379,7 +382,7 @@ function Agent() {
   return (
     <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
-      <h2 id="agent-h" className={HEAD}>Agent</h2>
+      <h2 id="agent-h" className={TITLE}>Agent</h2>
       <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys, and the model and the switch below, so every device has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
@@ -458,7 +461,7 @@ function ImportExport() {
   const count = src ? (update ? src.seen.found : src.seen.found - src.seen.taken) : 0;
   return (
     <section className="space-y-3" aria-labelledby="transfer-h">
-      <h2 id="transfer-h" className={HEAD}>Import & export</h2>
+      <h2 id="transfer-h" className={TITLE}>Import & export</h2>
       <p className="text-sm text-dim">Notes travel as plain markdown files, with the photos and PDFs they link. An export's zip imports back as it is.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
@@ -533,7 +536,7 @@ function ServerSync() {
   const sync = () => { void Promise.all([syncNow(), qc.invalidateQueries()]).then(() => toast("Up to date")); };
   return (
     <section className="space-y-3" aria-labelledby="server-h">
-      <h2 id="server-h" className={HEAD}>Server &amp; sync</h2>
+      <h2 id="server-h" className={TITLE}>Server &amp; sync</h2>
       <p className="text-sm text-dim">Notes, photos and the agent live on the server this page was loaded from. There is no sign-in: it must only be reachable on a private network.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Server" detail={location.host} trailing={<span className={cn("text-[13px]", online ? "text-dim" : "text-warn")}>{online ? "Reachable" : "Not reachable"}</span>} />
@@ -587,7 +590,7 @@ function Reminders() {
     : "Rings at the time a task's reminder is set to, even when the app is closed.";
   return (
     <section className="space-y-3" aria-labelledby="reminders-h">
-      <h2 id="reminders-h" className={HEAD}>Reminders</h2>
+      <h2 id="reminders-h" className={TITLE}>Reminders</h2>
       <p className="text-sm text-dim">A task with a day and a reminder time can notify you. Each device turns this on for itself; the server keeps the list of devices and sends the notifications.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <label className="flex items-center gap-3 px-3 py-2.5">
@@ -609,7 +612,7 @@ function Voice() {
   const [heard, setHeard] = useState("");
   return (
     <section className="space-y-3" aria-labelledby="voice-h">
-      <h2 id="voice-h" className={HEAD}>Voice</h2>
+      <h2 id="voice-h" className={TITLE}>Voice</h2>
       <p className="text-sm text-dim">Tap the mic in the assistant, a new task, a task's notes, a note or search, and speak English. Your server turns the speech into text with Parakeet, on its own CPU: the recording never leaves it and is not kept.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
@@ -638,7 +641,7 @@ function Maintenance() {
   const reload = () => { setBusy(true); forceUpdate().catch((e) => { setBusy(false); toast.error(message(e)); }); };
   return (
     <section className="space-y-3" aria-labelledby="maintenance-h">
-      <h2 id="maintenance-h" className={HEAD}>Maintenance</h2>
+      <h2 id="maintenance-h" className={TITLE}>Maintenance</h2>
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Version" detail={`Built ${builtAt().toLocaleString()}`} trailing={<span className="text-[13px] text-dim tabular-nums">{appVersion()}</span>} />
         <Line title="Get the latest version" detail="Checks the server for a newer build and reloads into it now, instead of waiting for the update notice. Changes not sent yet stay on this device."
