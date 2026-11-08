@@ -241,7 +241,7 @@ function TabOptions({ tab }: { tab: Tab }) {
 /** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger by the grip), shown or
  *  hidden, and Home and Tasks tapped open for the list each starts on. */
 function Layout() {
-  const { tabs, hidden, start } = usePrefs();
+  const { tabs, hidden, start, tabLabels } = usePrefs();
   const [open, setOpen] = useState<Tab | null>(null);
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ tabs: movedTab(prefsNow().tabs, id as Tab, over as Tab, after) }));
   return (
@@ -252,6 +252,13 @@ function Layout() {
         <div className="space-y-2.5 px-3 py-2.5">
           <p className="text-sm font-semibold">Open the app on</p>
           <Choice label="Open the app on" value={start} options={STARTS} names={START_LABEL} onPick={(v) => setPrefs({ start: v })} />
+        </div>
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Tab labels</p>
+            <p className="text-[13px] leading-snug text-dim">The tab in front shows its name. Off, the bar is icons only.</p>
+          </div>
+          <Switch checked={tabLabels} aria-label="Show tab labels" onCheckedChange={(on) => setPrefs({ tabLabels: on })} />
         </div>
         <div className="px-3 py-2.5">
           <p className="text-sm font-semibold">Tabs</p>
