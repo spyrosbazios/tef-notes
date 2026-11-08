@@ -171,6 +171,8 @@ describe("previewOf", () => {
   test("an error page or a non-page has nothing to preview", () => {
     const empty = { title: "", description: "", site: "", image: "", icon: "" };
     expect(previewOf("https://example.com/", net({ "https://example.com/": reply(404, { "content-type": "text/html" }, PAGE) }))).toEqual(empty);
+    expect(() => previewOf("https://example.com/", net({ "https://example.com/": reply(429, { "content-type": "text/html" }, PAGE) }))).toThrow("429");
+    expect(() => previewOf("https://example.com/", net({ "https://example.com/": reply(503, { "content-type": "text/html" }, PAGE) }))).toThrow("503");
     expect(previewOf("https://example.com/", net({ "https://example.com/": reply(200, { "content-type": "application/pdf" }, "%PDF") }))).toEqual(empty);
   });
   const VIDEO = "https://youtu.be/abc?t=5";

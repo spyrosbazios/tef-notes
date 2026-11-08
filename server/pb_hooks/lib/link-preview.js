@@ -333,6 +333,7 @@ function previewOf(raw, io) {
   }
   const page = fetchPage(raw, io);
   const empty = { title: "", description: "", site: "", image: "", icon: "" };
+  if (page.status === 429 || page.status >= 500) throw new Error(`the site answered ${page.status}`);   // busy or rate-limited: ask again later, never cache it as a page with nothing
   if (page.status >= 400) return empty;
   if (/^image\//.test(page.type)) {
     let name = page.url.replace(/[?#].*$/, "").replace(/^.*\//, "");

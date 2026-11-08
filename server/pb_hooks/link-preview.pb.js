@@ -8,7 +8,8 @@
 // The page's picture is fetched once more through the same guard and kept on the record (`picture`), so clients draw
 // it at the server's thumb sizes (pb_migrations/1794200000_thumbs.js) and never load it from the other site.
 //
-// 200 always carries all six fields, empty when the page says nothing; 400 is a URL this server won't fetch.
+// 200 always carries all six fields, empty when the page says nothing; 400 is a URL this server won't fetch; 502 the site
+// didn't answer and nothing is cached (not saved: asked again next time).
 // Nothing is signed in, like the rest: the tailnet is the gate, and it is why the guard in the lib exists.
 
 routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
@@ -46,7 +47,11 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
   if (!fresh) {
     const run = (name, ...args) => toString($os.exec(name, ...args).output());
     let page = null;
-    try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) { /* blocked on the way, or the site didn't answer */ }
+    let blocked = false;
+    try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) { blocked = err instanceof lib.Blocked; }
+    // the site didn't answer (down, slow, rate-limited) and there is nothing to fall back on: a 502, not cached, so the
+    // editor asks again later instead of drawing an empty card for an hour
+    if (!page && !out && !blocked) return e.json(502, { error: "The site didn't answer." });
     if (page || !out) {                                  // a failed refresh keeps the stale preview there is
       out = page || Object.fromEntries(FIELDS.map((f) => [f, ""]));
       const r = rec || new Record(e.app.findCollectionByNameOrId("link_previews"));
