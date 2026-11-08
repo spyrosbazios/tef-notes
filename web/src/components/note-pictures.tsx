@@ -6,16 +6,21 @@ import { mosaicCells } from "@/core/notes";
 import type { Source } from "@/hooks/thumbs";
 import { cn } from "@/lib/utils";
 
-/** One picture filling its box, blurred in. `onBroken`: the sharp one couldn't be loaded. */
+/** The pictures already drawn sharp in this page's life: on a return (a row remounted, Home left and come back to) they are
+ *  in the browser's and the service worker's caches, so they draw at once, not blurred in again. */
+const drawn = new Set<string>();
+
+/** One picture filling its box, blurred in the first time. `onBroken`: the sharp one couldn't be loaded. */
 export function BlurImage({ src, className, onBroken }: { src: Source; className?: string; onBroken?: () => void }) {
-  const [tiny, setTiny] = useState(false), [sharp, setSharp] = useState(false);
+  const before = drawn.has(src.key);
+  const [tiny, setTiny] = useState(false), [sharp, setSharp] = useState(before);
   const fit = cn("absolute inset-0 size-full object-cover", src.page && "object-top");
   return (
     <div className={cn("relative overflow-hidden bg-raised", !tiny && !sharp && "animate-pulse", className)}>
-      <img src={src.at("blur")} alt="" aria-hidden decoding="async" onLoad={() => setTiny(true)}
-        className={cn(fit, "scale-110 blur-lg transition-opacity duration-200", tiny && !sharp ? "opacity-100" : "opacity-0")} />
-      <img src={src.at("sharp")} alt="" loading="lazy" decoding="async" onLoad={() => setSharp(true)} onError={onBroken}
-        className={cn(fit, "transition-[opacity,filter,scale] duration-500 ease-out", sharp ? "scale-100 opacity-100 blur-none" : "scale-105 opacity-0 blur-md")} />
+      {before ? null : <img src={src.at("blur")} alt="" aria-hidden decoding="async" onLoad={() => setTiny(true)}
+        className={cn(fit, "scale-110 blur-lg transition-opacity duration-200", tiny && !sharp ? "opacity-100" : "opacity-0")} />}
+      <img src={src.at("sharp")} alt="" loading="lazy" decoding="async" onLoad={() => { drawn.add(src.key); setSharp(true); }} onError={onBroken}
+        className={cn(fit, !before && "transition-[opacity,filter,scale] duration-500 ease-out", sharp ? "scale-100 opacity-100 blur-none" : "scale-105 opacity-0 blur-md")} />
     </div>
   );
 }
