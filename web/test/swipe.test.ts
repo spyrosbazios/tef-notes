@@ -14,14 +14,14 @@ describe("offsetOf", () => {
     expect(offsetOf(200, 0, false)).toBe(0);
     expect(offsetOf(-200, 0, false)).toBe(-DELETE_WIDTH);
   });
-  it("carries on from Delete being out", () => {
-    expect(offsetOf(0, -DELETE_WIDTH, true)).toBe(-DELETE_WIDTH);
-    expect(offsetOf(DELETE_WIDTH * FRICTION, -DELETE_WIDTH, true)).toBe(0);
+  it("carries on from mid-glide", () => {
+    expect(offsetOf(0, -20, true)).toBe(-20);
+    expect(offsetOf(20 * FRICTION, -20, true)).toBe(0);
   });
 });
 
 describe("outcomeOf", () => {
-  it("asks When past its threshold, and leaves Delete out past its own", () => {
+  it("asks When past its threshold, and deletes past its own", () => {
     expect(outcomeOf(WHEN_AT)).toBe("when");
     expect(outcomeOf(WHEN_AT - 1)).toBe("closed");
     expect(outcomeOf(-DELETE_AT)).toBe("delete");

@@ -2,7 +2,7 @@
 // the deadline in the warn colour. The When button and a ⋮ show on hover (always, under a finger); the title opens the task,
 // a right-click or a long press its menu. A row that can be reordered is dragged by a mouse anywhere, by a finger at its handle.
 // At phone width under a finger the buttons give way to the phone's swipes (hooks/swipe.ts): right asks When (a sheet), left
-// brings out Delete. The row is the list's item: it rises in, and leaves on a fade (a row being deleted slides away instead) while
+// deletes (the take-back banner confirms). The row is the list's item: it rises in, and leaves on a fade (a row being deleted slides away instead) while
 // the others close the gap (task-list.tsx's AnimatePresence); a row that is leaving can no longer be tabbed to and hands its focus on.
 import { Bell, Calendar, Check, EllipsisVertical, Flag, GripVertical, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
@@ -40,7 +40,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
   onTick: () => void; onOpen: () => void; onSchedule: (s: Schedule | null) => void; onDue: (day: string | null) => void; onDelete: () => void;
 }) {
   const [menu, setMenu] = useState(false), [picking, setPicking] = useState(false);
-  const sw = useSwipe({ when: !checked, onWhen: () => setPicking(true) });
+  const sw = useSwipe({ when: !checked, onWhen: () => setPicking(true), onDelete });
   const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), away = useTempoTransition(transition.dismiss);
   const starOpacity = useTransform(sw.x, [0, 0.6 * WHEN_WIDTH], [0, 1]), starScale = useTransform(sw.x, [0, WHEN_WIDTH], [0.6, 1]);
   const li = useRef<HTMLLIElement>(null), present = useIsPresent();
@@ -70,11 +70,10 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
         </div>
       ) : null}
       {sw.side === "delete" ? (
-        <button type="button" data-swipe-skip aria-label="Delete" onClick={() => { sw.close(); onDelete(); }}
-          className="absolute inset-y-0 right-0 flex flex-col items-center justify-center gap-1 bg-down text-bg" style={{ width: DELETE_WIDTH }}>
+        <div aria-hidden className="absolute inset-y-0 right-0 flex flex-col items-center justify-center gap-1 bg-down text-bg" style={{ width: DELETE_WIDTH }}>
           <Trash2 className="size-5" />
           <span className="text-[11px] font-semibold">Delete</span>
-        </button>
+        </div>
       ) : null}
       <motion.div className={cn("group relative flex items-start gap-3 rounded-xl px-3 py-2 transition-[background-color,opacity] duration-500 hover:bg-muted/60", sw.side && "bg-bg", selected && "bg-muted", leaving && checked && "opacity-35", drag?.dragging && "opacity-40")}
         style={{ x: sw.x }} variants={{ gone: doomed ? { x: "-100%", transition: away } : {} }}>
