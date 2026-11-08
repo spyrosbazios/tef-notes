@@ -1,6 +1,7 @@
 // Device prefs that aren't secret and never sync: the prefs MMKV file (src/store/storage.ts).
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { DEFAULT_EFFORT, type Effort } from "@/core/agent";
 import type { NoteSort } from "@/core/note-sort";
 import { DEFAULT_ACCENT, DEFAULT_THEME, type AccentName, type ThemeName } from "@/core/theme";
 import { zustandPrefs } from "./storage";
@@ -8,6 +9,7 @@ import { zustandPrefs } from "./storage";
 export type Prefs = {
   photosWifiOnly: boolean;            // attachments wait for Wi-Fi; notes still sync on mobile data
   agentWritesWithoutAsking: boolean;  // sent with each message: note writes skip the confirm card (the server still asks after web reads)
+  agentEffort: Effort;               // sent with each message: the agent's step limit and reasoning (@/core/agent EFFORT)
   agentModelId: string | null;        // the model this phone's messages go to; null: the server's default (pickModel)
   theme: ThemeName;                   // the palette (packages/core/src/theme.ts), applied by src/ui/use-theme.ts
   accent: AccentName;                 // the primary colour over it; "theme": the theme's own
@@ -21,11 +23,11 @@ export type Prefs = {
 
 export const usePrefs = create<Prefs & { set: (p: Partial<Prefs>) => void }>()(
   persist(
-    (set) => ({ photosWifiOnly: false, agentWritesWithoutAsking: false, agentModelId: null, theme: DEFAULT_THEME, accent: DEFAULT_ACCENT, clipSummary: false, notesView: "list", notesTags: [], collapsedTags: [], notesSort: "updated", lensRec: null, set: (p) => set(p) }),
+    (set) => ({ photosWifiOnly: false, agentWritesWithoutAsking: false, agentEffort: DEFAULT_EFFORT, agentModelId: null, theme: DEFAULT_THEME, accent: DEFAULT_ACCENT, clipSummary: false, notesView: "list", notesTags: [], collapsedTags: [], notesSort: "updated", lensRec: null, set: (p) => set(p) }),
     {
       name: "prefs", storage: createJSONStorage(() => zustandPrefs),
-      partialize: ({ photosWifiOnly, agentWritesWithoutAsking, agentModelId, theme, accent, clipSummary, notesView, notesTags, collapsedTags, notesSort, lensRec }) =>
-        ({ photosWifiOnly, agentWritesWithoutAsking, agentModelId, theme, accent, clipSummary, notesView, notesTags, collapsedTags, notesSort, lensRec }),
+      partialize: ({ photosWifiOnly, agentWritesWithoutAsking, agentEffort, agentModelId, theme, accent, clipSummary, notesView, notesTags, collapsedTags, notesSort, lensRec }) =>
+        ({ photosWifiOnly, agentWritesWithoutAsking, agentEffort, agentModelId, theme, accent, clipSummary, notesView, notesTags, collapsedTags, notesSort, lensRec }),
     },
   ),
 );

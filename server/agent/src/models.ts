@@ -28,11 +28,12 @@ type Provider = {
   listHeaders?: (apiKey: string) => Record<string, string>;
 };
 
-/** Exported for server/test/llm.test.js, which holds the hooks' copy to it. */
+/** Exported for server/test/llm.test.js, which holds the hooks' copy to it. No reasoning option here: a provider option
+ *  overrides the request's portable `reasoning` (the effort pick, agent.ts), so it would pin every message. */
 export const PROVIDERS = {
   deepseek: {
     label: "DeepSeek", model: "deepseek-flash", base: "https://api.deepseek.com",
-    make: (apiKey) => createDeepSeek({ apiKey }), options: { deepseek: { reasoningEffort: "low" } },   // its prompt cache is automatic
+    make: (apiKey) => createDeepSeek({ apiKey }), options: {},   // its prompt cache is automatic
   },
   anthropic: {
     label: "Anthropic", model: "claude-sonnet-5-5", base: "https://api.anthropic.com/v1",
@@ -42,11 +43,11 @@ export const PROVIDERS = {
   },
   openai: {
     label: "OpenAI", model: "gpt-6-luna", base: "https://api.openai.com/v1",
-    make: (apiKey) => createOpenAI({ apiKey }), options: { openai: { reasoningEffort: "low" } },   // the Responses API: its models call tools only there
+    make: (apiKey) => createOpenAI({ apiKey }), options: {},   // the Responses API: its models call tools only there
   },
   xai: {
     label: "Grok", model: "grok-4.7", base: "https://api.x.ai/v1",
-    make: (apiKey) => createXai({ apiKey }), options: { xai: { reasoningEffort: "low" } },
+    make: (apiKey) => createXai({ apiKey }), options: {},
   },
   qwen: {
     label: "Qwen", model: "qwen-plus", base: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",

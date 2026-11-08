@@ -1,12 +1,12 @@
 // The agent is the server's (the sidecar under /agent, beside PocketBase): the model keys, the prompt, the tools, the
-// web guard. The phone sends the chat with this phone's two choices — which model, and whether note writes skip the
-// confirm card — plus what is on screen (the assistant's page context, src/agent/ui-tools.ts), and draws the
+// web guard. The phone sends the chat with this phone's choices — which model, its effort, and whether note writes skip
+// the confirm card — plus what is on screen (the assistant's page context, src/agent/ui-tools.ts), and draws the
 // stream that comes back. expo/fetch, not RN's fetch: RN's can't stream a response body.
 import { useQuery } from "@tanstack/react-query";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
 import { screenContext } from "@/agent/ui-tools";
-import { pickModel, type AgentModels } from "@/core/agent";
+import { effortOf, pickModel, type AgentModels } from "@/core/agent";
 import { agentModels, agentUrl } from "@/core/pocketbase";
 import { ensureChat } from "./chats";
 import { serverOf, useKeys } from "./keys";
@@ -36,11 +36,11 @@ export const transport = new DefaultChatTransport<UIMessage>({
   prepareSendMessagesRequest: async ({ id, messages }) => {
     const s = serverOf();
     if (!s) throw new Error("Set the notes server in Settings.");
-    const { agentModelId, agentWritesWithoutAsking } = usePrefs.getState();
+    const { agentModelId, agentWritesWithoutAsking, agentEffort } = usePrefs.getState();
     const offered = await queryClient.ensureQueryData<AgentModels>({ queryKey: modelsKey(s.url), queryFn: () => agentModels(s) });
     const model = pickModel(offered, agentModelId);
     if (!model) throw new Error(`The server holds no ${offered.provider} key: add it there.`);
     await ensureChat(s, id, messages);
-    return { api: agentUrl(s, "chat"), body: { id, messages, model, writesWithoutAsking: agentWritesWithoutAsking, context: screenContext() } };
+    return { api: agentUrl(s, "chat"), body: { id, messages, model, writesWithoutAsking: agentWritesWithoutAsking, effort: effortOf(agentEffort), context: screenContext() } };
   },
 });

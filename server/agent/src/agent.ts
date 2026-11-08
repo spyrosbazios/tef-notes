@@ -1,4 +1,4 @@
-// POST /agent/chat: one turn of the agent loop (model call → tool → model, up to 12 steps; what changes between steps: loop.ts), streamed back as the AI
+// POST /agent/chat: one turn of the agent loop (model call → tool → model, up to the effort's steps, @/core/agent EFFORT; what changes between steps: loop.ts), streamed back as the AI
 // SDK's UI message stream, so a client is useChat + DefaultChatTransport({ api: "/agent/chat" }). Note writes ask
 // through the SDK's tool approval: the confirm card comes back as an approval-requested part, the client's answer
 // as an approval-responded one on the next request, which runs it. The chat is saved to `chats` every few seconds
@@ -11,6 +11,7 @@ import {
   type InferUITools, type ModelMessage, type UIMessage,
 } from "ai";
 import { z } from "zod";
+import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
 import { uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
 import { MEMORY, parseNote } from "@/core/notes";
 import type { Server } from "@/core/pocketbase";
@@ -30,7 +31,6 @@ import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type Add
 /** A message as useChat holds it, tool parts typed: what `chats.messages` holds. */
 export type AgentMessage = UIMessage<unknown, never, InferUITools<Tools>>;
 
-const STEPS = 12;
 const SAVE_EVERY = 3000;
 
 const Body = z.object({
@@ -38,6 +38,7 @@ const Body = z.object({
   messages: z.array(z.unknown()),
   model: z.string().min(1).max(200),
   writesWithoutAsking: z.boolean(),
+  effort: z.enum(EFFORTS),
   context: Context,                     // the page the assistant is on; absent or unreadable: a plain chat
 });
 
@@ -87,8 +88,9 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
 }
 
 /** `pdfs`: a PDF's text is in this turn's context: its writes are tainted and ask, like after reading the web. */
-async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, page: AssistantContext | undefined, pdfs: boolean) {
+async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, pdfs: boolean) {
   const { model: m, providerOptions } = await pick(id);
+  const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = pdfs ? async () => true : read;
   const web = !!(await key("exa")), all = tools(notes, todo, untrusted);
   // Out of the prompt: the web tools without an Exa key, and the tools the client does itself unless this page can do them
@@ -98,12 +100,13 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
     model: m,
     instructions: `${SYSTEM}${web ? `\n${WEB}` : ""}`,
     tools: all,
-    stopWhen: isStepCount(STEPS),
+    stopWhen: isStepCount(steps),
+    reasoning,
     // Per step: the first trims earlier turns' bulky results (loop.ts), every one picks its tools, and the last has to
     // answer, or a tool call there ends the turn with no reply
     prepareStep: async ({ stepNumber, messages }) => ({
       ...(stepNumber === 0 && { messages: trim(messages) }),
-      ...(stepNumber < STEPS - 1 ? { activeTools: stepTools(base, await untrusted(messages)) } : { toolChoice: "none" as const }),
+      ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages)) } : { toolChoice: "none" as const }),
     }),
     toolApproval: approvals(notes, todo, writesWithoutAsking, untrusted),
     providerOptions,
@@ -116,12 +119,12 @@ const fail = (status: number, message: string) => new Response(message, { status
 export async function chat(req: Request, server: Server, pick: typeof model = model): Promise<Response> {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail(400, `Bad request: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
-  const { id, model: picked, writesWithoutAsking, context: page } = parsed.data;
+  const { id, model: picked, writesWithoutAsking, effort, context: page } = parsed.data;
   if (!(await exists(server, id))) return fail(404, `No chat ${id}: create it in chats first.`);
 
   const notes = new Notes(server), todo = new Todo(server), ctx = await context(notes, page);
   let agent: ToolLoopAgent<never, Tools>;
-  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, page, ctx.pdfs); } catch (e) {
+  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.pdfs); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }

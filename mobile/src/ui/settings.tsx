@@ -182,7 +182,7 @@ function AgentPage() {
   return (
     <>
       <ListSection title="Agent" footer={agent}>
-        <ListRow title="Model" subtitle={model ?? "None"} icon={Sparkles} chevron onPress={() => setChoosing(true)} />
+        <ListRow title="Model and effort" subtitle={`${model ?? "None"} · ${prefs.agentEffort}`} icon={Sparkles} chevron onPress={() => setChoosing(true)} />
         <ToggleRow title="Write notes without asking" subtitle="Off: each change waits for your OK. Always asked after it read the web." icon={PenLine}
           value={prefs.agentWritesWithoutAsking} onChange={(v) => prefs.set({ agentWritesWithoutAsking: v })} />
       </ListSection>
@@ -199,6 +199,6 @@ export const SECTIONS: Record<SectionId, { title: string; about: string; icon: L
   appearance: { title: "Appearance", about: "Theme and primary colour", icon: Palette, Page: () => <><Appearance /><Accent /></> },
   server: { title: "Server & sync", about: "Address, sync, conflicts", icon: Server, Page: ServerPage },
   photos: { title: "Photos", about: "Uploads on Wi-Fi", icon: Camera, Page: PhotosPage },
-  agent: { title: "Agent", about: "Model, write confirmations, memory", icon: Sparkles, Page: AgentPage },
+  agent: { title: "Agent", about: "Model, effort, write confirmations, memory", icon: Sparkles, Page: AgentPage },
   tags: { title: "Tags", about: "Colours and descriptions", icon: TagIcon, Page: TagList },
 };

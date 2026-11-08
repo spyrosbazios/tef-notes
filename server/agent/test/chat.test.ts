@@ -37,7 +37,7 @@ const pick = (async () => ({ model: mock, providerOptions: {} })) as unknown as 
 /** The reply as useChat would build it from the stream. */
 async function send(messages: UIMessage[], writesWithoutAsking = false, context?: unknown) {
   const res = await chat(new Request("http://x/agent/chat", {
-    method: "POST", body: JSON.stringify({ id: "chat1", messages, model: "m", writesWithoutAsking, context }),
+    method: "POST", body: JSON.stringify({ id: "chat1", messages, model: "m", writesWithoutAsking, effort: "normal", context }),
   }), { url: pb.url }, pick);
   expect(res.status).toBe(200);
   const chunks = (await res.text()).split("\n").filter((l) => l.startsWith("data: ") && l !== "data: [DONE]").map((l) => JSON.parse(l.slice(6)) as UIMessageChunk);
@@ -90,7 +90,7 @@ describe("POST /agent/chat", () => {
     expect(parseNote("notes/20261001-shopping.md", pb.notes.get("notes/20261001-shopping.md")!.text).body).toBe("- eggs\n- bread\n");
 
     const res = await chat(new Request("http://x/agent/chat", {
-      method: "POST", body: JSON.stringify({ id: "nope", messages: [], model: "m", writesWithoutAsking: false }),
+      method: "POST", body: JSON.stringify({ id: "nope", messages: [], model: "m", writesWithoutAsking: false, effort: "normal" }),
     }), { url: pb.url }, pick);
     expect(res.status).toBe(404);
   });

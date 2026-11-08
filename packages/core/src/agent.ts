@@ -18,6 +18,22 @@ export function pickModel(models: AgentModels | undefined, chosen: string | null
   return chosen && models.models.includes(chosen) ? chosen : models.default;
 }
 
+/** How hard the agent works on a message, each client's own pick sent with every request: how many model calls a turn
+ *  may take, and the reasoning asked of the model (the AI SDK's portable `reasoning`; a model without it ignores it,
+ *  the step limit still holds). */
+export const EFFORTS = ["quick", "normal", "deep"] as const;
+export type Effort = (typeof EFFORTS)[number];
+export const DEFAULT_EFFORT: Effort = "normal";
+
+export const EFFORT: Record<Effort, { steps: number; reasoning: "minimal" | "low" | "high"; about: string }> = {
+  quick: { steps: 6, reasoning: "minimal", about: "Short answers, a few lookups" },
+  normal: { steps: 12, reasoning: "low", about: "Most questions and edits" },
+  deep: { steps: 30, reasoning: "high", about: "Long tasks across many notes; slower, costs more" },
+};
+
+/** A stored pick read defensively: anything else is the default. */
+export const effortOf = (v: unknown): Effort => (EFFORTS as readonly unknown[]).includes(v) ? v as Effort : DEFAULT_EFFORT;
+
 /** What a confirm card left unanswered (the user typed on instead) says, to the model and on the folded card. */
 export const UNCONFIRMED = "Not confirmed.";
 

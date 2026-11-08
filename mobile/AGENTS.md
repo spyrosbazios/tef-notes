@@ -167,9 +167,9 @@ server, and so must it be here.
 
 The agent runs on the server (a sidecar under `/agent`, same origin as the notes server). The phone is a window on it.
 
-- `POST /agent/chat` `{ id, messages, model, writesWithoutAsking, context }` streams an AI SDK UI message stream: `useChat` over
-  `DefaultChatTransport` with expo/fetch (`src/store/agent.ts`). Every request carries the model pick and "write notes
-  without asking", both this phone's prefs; the server still asks after the chat read the web.
+- `POST /agent/chat` `{ id, messages, model, writesWithoutAsking, effort, context }` streams an AI SDK UI message stream: `useChat` over
+  `DefaultChatTransport` with expo/fetch (`src/store/agent.ts`). Every request carries the model pick, the effort (`@/core/agent`
+  `EFFORT`: step limit and reasoning) and "write notes without asking", all this phone's prefs; the server still asks after the chat read the web.
 - `GET /agent/models` → `{ provider, available, default, models, web }` feeds the picker (`src/ui/models.tsx`). `pickModel`
   (`@/core/agent`) falls back to `default`, also for a pick the server no longer offers.
 - Chats are `chats` records on the server. The phone names a new chat (a PocketBase-style id) and makes its record empty just
