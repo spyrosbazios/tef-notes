@@ -16,6 +16,9 @@ COPY packages/core/vite.ts /src/packages/core/vite.ts
 COPY mobile/assets/fonts /src/mobile/assets/fonts
 COPY mobile/assets/images/icon.png /src/mobile/assets/images/icon.png
 COPY web ./
+# Settings → Maintenance shows the version; scripts/version.sh reads TEF_NOTES_VERSION (no .git in the image).
+COPY scripts/version.sh /src/scripts/version.sh
+ARG TEF_NOTES_VERSION
 RUN bun run build
 
 # The Chrome extension, signed and served for self-hosted install and update (extension/scripts/crx.ts). Reached by the
@@ -28,9 +31,8 @@ WORKDIR /src/extension
 COPY extension/package.json extension/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY extension ./
-# The manifest's version comes from scripts/version.sh, which reads TEF_NOTES_VERSION (no .git in the image): Chrome
+# The manifest's version comes from scripts/version.sh (copied in the web stage): Chrome
 # installs an update only when this is higher than the installed one, so a build names it.
-COPY scripts/version.sh /src/scripts/version.sh
 ARG TEF_NOTES_URL CRX_KEY_FILE TEF_NOTES_VERSION
 RUN --mount=type=secret,id=crx_key \
     bun run build && bun run pack /run/secrets/crx_key /src/extension/out

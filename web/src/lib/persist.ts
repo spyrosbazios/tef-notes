@@ -18,6 +18,8 @@ export const MAX_AGE = 7 * 24 * 60 * 60 * 1000;
  *  holds needs no migration code; the cost is one refetch after each deploy, which an online visit does anyway. */
 declare const __BUILD_ID__: string;
 export const buster = (): string => __BUILD_ID__;
+/** When this build was made: the build id is its timestamp in base 36. */
+export const builtAt = (): Date => new Date(parseInt(__BUILD_ID__, 36));
 
 /** Where a persisted client is kept: idb-keyval's `get`/`set`/`del` (each takes the store last), or a stand-in. */
 export type Keyed<S> = {
