@@ -100,7 +100,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
       {!checked ? (
         <WhenPick value={whenState(task)} today={today} onSchedule={onSchedule} onDue={onDue} open={picking} onOpenChange={setPicking}>
           <Button variant="ghost" size="icon-sm" aria-label="When" title="When"
-            className="-my-0.5 shrink-0 text-faint opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 any-pointer-coarse:opacity-100 any-pointer-coarse:-my-2 any-pointer-coarse:max-md:hidden">
+            className="-my-0.5 shrink-0 text-faint opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 any-pointer-coarse:opacity-100 any-pointer-coarse:-my-2 any-pointer-coarse:max-md:invisible any-pointer-coarse:max-md:absolute any-pointer-coarse:max-md:right-2 any-pointer-coarse:max-md:top-1/2 any-pointer-coarse:max-md:my-0 any-pointer-coarse:max-md:-translate-y-1/2">
             <Calendar />
           </Button>
         </WhenPick>
@@ -108,7 +108,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
       <DropdownMenu open={menu} onOpenChange={setMenu}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon-sm" aria-label="Task actions" title="More"
-            className="-my-0.5 shrink-0 text-faint opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 any-pointer-coarse:opacity-100 any-pointer-coarse:-my-2 any-pointer-coarse:max-md:hidden">
+            className="-my-0.5 shrink-0 text-faint opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 any-pointer-coarse:opacity-100 any-pointer-coarse:-my-2 any-pointer-coarse:max-md:invisible any-pointer-coarse:max-md:absolute any-pointer-coarse:max-md:right-2 any-pointer-coarse:max-md:top-1/2 any-pointer-coarse:max-md:my-0 any-pointer-coarse:max-md:-translate-y-1/2">
             <EllipsisVertical />
           </Button>
         </DropdownMenuTrigger>
