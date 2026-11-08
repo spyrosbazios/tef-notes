@@ -296,10 +296,14 @@
    ease.out; spring.morph 400ms as its linear(). Reduced motion keeps the fades and drops every slide and morph. */
 :root:active-view-transition-type(view) [data-vt="page"] { view-transition-name: page; }
 /* The phone's tab bar floats over the page: without a name of its own it would be in the root, painted under the page's snapshot, and
-   wink out for the crossfade. Named, it is a group stacked above the page (it comes later in the tree) and holds still */
+   wink out for the crossfade. Named (the glass pill itself, tab-bar.tsx), it is a group stacked above the page (it comes later in
+   the tree) and holds still: only the new image, which is live, so the capsule's glide shows; the old one is dropped, not kept at
+   full opacity beside it, because the UA adds the two (`plus-lighter`) and a translucent pill doubled is a white haze. The pill's
+   blur is a child's backdrop-filter, which an image can't carry, so the group blurs the page in its place for those frames */
 :root:active-view-transition-type(view, note-close, note-shrink) [data-vt="tabs"] { view-transition-name: tabs; }
-:root:active-view-transition-type(view, note-close, note-shrink)::view-transition-old(tabs),
+:root:active-view-transition-type(view, note-close, note-shrink)::view-transition-old(tabs) { display: none; }
 :root:active-view-transition-type(view, note-close, note-shrink)::view-transition-new(tabs) { animation: none; }
+:root:active-view-transition-type(view, note-close, note-shrink)::view-transition-group(tabs) { animation: none; border-radius: 9999px; backdrop-filter: saturate(1.7) blur(14px); }
 /* A note going: the bar comes back in the new page, live. Left in the root it is painted from the live DOM, and on Android its glass
    (a backdrop-filter) was composited over the note's snapshot, so the bar showed through the note sinking or shrinking away. Named,
    it is a snapshot like the rest, stacked below the note's group here (the pseudo tree's order is the old page's paint order, the

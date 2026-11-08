@@ -15,10 +15,15 @@ export type Palette = {
 
 export type NoteColors = Record<Color, { bg: string; fg: string; line: string }>;
 
+/** The red, green and blue of `hex` (#rrggbb), 0..255 each. */
+export function channels(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+}
+
 /** `hex` (#rrggbb) at opacity `a` (0..1), as rgba(): a tint of a palette colour, never a hex with digits glued on. */
 export function alpha(hex: string, a: number) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  return `rgba(${channels(hex).join(", ")}, ${a})`;
 }
 
 /** Translucent fills, named once for both CSS outputs: `muted` a pressed or tonal fill, `accent` a selected one (brand

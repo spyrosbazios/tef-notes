@@ -140,7 +140,8 @@ export function Shell() {
           <Palette open={palette} onOpenChange={setPalette} onNew={newNote} />
           <QuickAdd initial={adding} onClose={() => setAdding(null)} />
         </div>
-        {bar ? <div data-vt="tabs" className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}
+        {/* The pill inside is what a route change names (`data-vt="tabs"`, tab-bar.tsx), not this strip */}
+        {bar ? <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}
       </div>
     </ShellContext.Provider>
   );
