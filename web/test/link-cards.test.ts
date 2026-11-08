@@ -1,6 +1,7 @@
 // Which paragraphs get a link card: only a paragraph that is nothing but one URL.
 import { describe, expect, test } from "bun:test";
 import { cardUrl } from "../src/editor/link-cards";
+import { summarised } from "../src/editor/link-tools";
 import { parse } from "../src/editor/markdown";
 
 const urls = (md: string) => {
@@ -35,5 +36,16 @@ describe("cardUrl", () => {
   });
   test("a PDF attached to the note is a chip, not a card", () => {
     expect(urls("https://example.com/attachments/20261005-a/doc.pdf\n\n<https://example.com/attachments/20261005-a/doc.pdf>\n\n[https://example.com/a](../attachments/20261005-a/doc.pdf)")).toEqual([null, null, null]);
+  });
+});
+
+describe("summarised", () => {
+  const after = (md: string) => { const d = parse(md); return summarised(d, d.firstChild!.nodeSize); };
+  test("a summary quote under the link, its first line Summary and a list after it", () => {
+    expect(after("[a page](https://example.com/a)\n\n> **Summary**\n>\n> - one\n> - two")).toBe(true);
+  });
+  test("any other quote, or none, is not", () => {
+    expect(after("[a page](https://example.com/a)\n\n> Summaryish words")).toBe(false);
+    expect(after("[a page](https://example.com/a)\n\nSummary")).toBe(false);
   });
 });
