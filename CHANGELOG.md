@@ -5,6 +5,23 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-08
+
+### Changed
+
+- The public site and its phone screens now present the installed web app as the phone client (install from Chrome, share target,
+  offline, task reminders, a polished animated UI) in place of the Android app, with no APK download button; the README, the
+  self-host skill and the Push reminders section say the same, and the Android app is noted as frozen.
+- A release no longer builds an APK: `release.yml` attaches the extension zip only.
+
+### Fixed
+
+- Closing a note on the phone returns to Home where it was left: the scroll, the task box's list and its tag filter are
+  kept; the other lists and Tasks keep their scroll the same way.
+- The assistant's on-screen keyboard closes after Send on the phone (the first tap still sends).
+- The phone's Notes header controls (tag filter, layout, sort, +) are one size and style, matching the task box's header.
+- Scrolling Upcoming in Home's task box moves the days strip to the day at its top.
+
 ## 0.3.0 - 2026-11-08
 
 The web app, installed from Chrome on Android, is now the phone client. The Android app stays in the repository for this
