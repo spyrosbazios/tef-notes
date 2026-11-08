@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowDownUp, ArrowUp, Bell, Bot, Check, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
@@ -378,40 +378,27 @@ function Memory() {
   );
 }
 
-/** Every note and the photos and PDFs they link, as one zip: `notes/<file>.md` and `attachments/<note-id>/<name>`. */
-function Export() {
+/** Notes in and out, on one card. Export: every note and the photos and PDFs they link, as one zip (`notes/<file>.md` and
+ * `attachments/<note-id>/<name>`). Import: a folder of Markdown, or such a zip, in as notes: picked, checked without writing,
+ * then imported. */
+function ImportExport() {
   const { data, isPending } = useNotes();
-  const [busy, setBusy] = useState(false);
-  const run = async () => {
-    if (!data) return;
-    setBusy(true);
-    try { toast(`Downloaded ${await downloadZip(data, `tefnotes-notes-${localDay()}.zip`)} notes`); } catch (e) { toast.error(message(e)); } finally { setBusy(false); }
-  };
-  return (
-    <section className="space-y-3" aria-labelledby="export-h">
-      <h2 id="export-h" className={HEAD}>Export</h2>
-      <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
-        <p className="min-w-0 flex-1 text-[13px] leading-snug text-dim">Every note as a markdown file, with the photos and PDFs they link, in one zip. A single note downloads from its own menu.</p>
-        <Button variant="outline" className="rounded-full" disabled={isPending || busy || !data?.length} onClick={() => { void run(); }}>
-          {busy ? <Loader2 className="animate-spin" /> : <Download />} Download all notes
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-/** A folder of Markdown, or an export's zip, in as notes: picked, checked without writing, then imported. */
-function Import() {
+  const [exporting, setExporting] = useState(false);
   const [src, setSrc] = useState<{ name: string; source: Source; seen: ImportTally } | null>(null);
   const [update, setUpdate] = useState(false);
   const [busy, setBusy] = useState(false);
   const here = { url: location.origin };
+  const download = async () => {
+    if (!data) return;
+    setExporting(true);
+    try { toast(`Downloaded ${await downloadZip(data, `tefnotes-notes-${localDay()}.zip`)} notes`); } catch (e) { toast.error(message(e)); } finally { setExporting(false); }
+  };
   const pick = async (name: string, make: () => Promise<Source> | Source) => {
     setBusy(true);
     try {
       const source = await make();
       const seen = await importNotes(here, source, { dry: true, update: false, today: localDay() });
-      if (!seen.found) { toast.error(`No markdown files in ${name}`); setSrc(null); } else setSrc({ name, source, seen });
+      if (!seen.found) { toast.error(`No markdown files in ${name}`); setSrc(null); } else { setUpdate(false); setSrc({ name, source, seen }); }
     } catch (e) { toast.error(message(e)); } finally { setBusy(false); }
   };
   const run = async () => {
@@ -424,31 +411,54 @@ function Import() {
     } catch (e) { toast.error(message(e)); } finally { setBusy(false); }
   };
   const files = (e: { target: HTMLInputElement }) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; return f; };
+  const count = src ? (update ? src.seen.found : src.seen.found - src.seen.taken) : 0;
   return (
-    <section className="space-y-3" aria-labelledby="import-h">
-      <h2 id="import-h" className={HEAD}>Import</h2>
-      <div className="space-y-3 rounded-xl border border-line px-3 py-2.5">
-        <p className="text-[13px] leading-snug text-dim">Every markdown file in a folder, or in a zip such as Export makes, as a note; the photos and PDFs they link come along as attachments. Nothing is written until you confirm.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" className="rounded-full" disabled={busy}>
-            <label>
-              <Upload /> Choose folder
-              <input type="file" className="sr-only" disabled={busy} {...{ webkitdirectory: "" }}
-                onChange={(e) => { const f = files(e); if (f.length) void pick(f[0].webkitRelativePath.split("/")[0] || "the folder", () => folderSource(f)); }} />
-            </label>
+    <section className="space-y-3" aria-labelledby="transfer-h">
+      <h2 id="transfer-h" className={HEAD}>Import & export</h2>
+      <p className="text-sm text-dim">Notes travel as plain markdown files, with the photos and PDFs they link. An export's zip imports back as it is.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+          <Download className="mt-0.5 size-4 shrink-0 self-start text-brand" />
+          <div className="min-w-0 flex-1 basis-48">
+            <p className="text-sm font-semibold">Export</p>
+            <p className="text-[13px] leading-snug text-dim">
+              {isPending ? "Counting notes…" : `All ${data?.length ?? 0} notes in one zip.`} A single note downloads from its own menu.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" className="rounded-full" disabled={isPending || exporting || !data?.length} onClick={() => { void download(); }}>
+            {exporting ? <Loader2 className="animate-spin" /> : <Download />} Download zip
           </Button>
-          <Button asChild variant="outline" className="rounded-full" disabled={busy}>
-            <label>
-              <Upload /> Choose zip
-              <input type="file" accept=".zip,application/zip" className="sr-only" disabled={busy}
-                onChange={(e) => { const [f] = files(e); if (f) void pick(f.name, () => zipSource(f)); }} />
-            </label>
-          </Button>
-          {busy && <Loader2 className="size-4 animate-spin self-center text-dim" />}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+          <Upload className="mt-0.5 size-4 shrink-0 self-start text-brand" />
+          <div className="min-w-0 flex-1 basis-48">
+            <p className="text-sm font-semibold">Import</p>
+            <p className="text-[13px] leading-snug text-dim">Every markdown file in a folder or zip becomes a note. You see what it finds before anything is written.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {busy && !src && <Loader2 className="size-4 animate-spin text-dim" />}
+            <Button asChild variant="outline" size="sm" className="rounded-full" disabled={busy}>
+              <label>
+                Folder
+                <input type="file" className="sr-only" disabled={busy} {...{ webkitdirectory: "" }}
+                  onChange={(e) => { const f = files(e); if (f.length) void pick(f[0].webkitRelativePath.split("/")[0] || "the folder", () => folderSource(f)); }} />
+              </label>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="rounded-full" disabled={busy}>
+              <label>
+                Zip
+                <input type="file" accept=".zip,application/zip" className="sr-only" disabled={busy}
+                  onChange={(e) => { const [f] = files(e); if (f) void pick(f.name, () => zipSource(f)); }} />
+              </label>
+            </Button>
+          </div>
         </div>
         {src && (
-          <div className="space-y-3 border-t border-line pt-3">
-            <p className="text-sm"><span className="font-semibold">{src.name}</span>: {src.seen.found} notes, {src.seen.taken} already here.</p>
+          <div className="space-y-3 rounded-b-xl bg-muted/40 px-3 py-3" aria-live="polite">
+            <p className="text-sm">
+              <span className="font-semibold">{src.name}</span>
+              <span className="text-dim"> · {src.seen.found} notes found{src.seen.taken > 0 ? `, ${src.seen.taken} already here` : ""}</span>
+            </p>
             {src.seen.taken > 0 && (
               <div className="flex items-center gap-2">
                 <Switch id="import-update" checked={update} onCheckedChange={setUpdate} />
@@ -456,8 +466,10 @@ function Import() {
               </div>
             )}
             <div className="flex gap-2">
-              <Button className="rounded-full" disabled={busy} onClick={() => { void run(); }}>Import {update ? src.seen.found : src.seen.found - src.seen.taken} notes</Button>
-              <Button variant="ghost" className="rounded-full" disabled={busy} onClick={() => setSrc(null)}>Cancel</Button>
+              <Button size="sm" className="rounded-full" disabled={busy || count === 0} onClick={() => { void run(); }}>
+                {busy ? <Loader2 className="animate-spin" /> : <Check />} {count === 0 ? "Nothing new to import" : `Import ${count} ${count === 1 ? "note" : "notes"}`}
+              </Button>
+              <Button variant="ghost" size="sm" className="rounded-full" disabled={busy} onClick={() => setSrc(null)}>Cancel</Button>
             </div>
           </div>
         )}
@@ -572,8 +584,7 @@ const SECTIONS = [
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
-  { id: "import", label: "Import", about: "Markdown folders and zips", icon: Upload, body: Import },
-  { id: "export", label: "Export", about: "Every note as a zip", icon: Download, body: Export },
+  { id: "transfer", label: "Import & export", about: "Markdown folders and zips, in and out", icon: ArrowDownUp, body: ImportExport },
   { id: "maintenance", label: "Maintenance", about: "Version, get the latest", icon: Wrench, body: Maintenance },
 ] as const satisfies readonly { id: SettingsSection; label: string; about: string; icon: LucideIcon; body: () => ReactNode }[];
 
