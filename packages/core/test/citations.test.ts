@@ -1,7 +1,7 @@
 // The sources a turn read and the citations in an answer (packages/core/src/citations.ts): what the web app's chips and
 // the phone's source list are built from.
 import { describe, expect, it } from "bun:test";
-import { citeLink, citedIn, findCite, hostOf, matchesSource, sourcesOf } from "../src/citations";
+import { annotate, citeLink, citedIn, findCite, hostOf, matchesSource, sourcesOf } from "../src/citations";
 
 const NOTE = "---\ntitle: Garage codes\ncreated: 2026-10-05\n---\nThe side door is 4821.\n";
 const part = (type: string, input: unknown, output: unknown) => ({ type: `tool-${type}`, state: "output-available", input, output });
@@ -70,6 +70,23 @@ describe("citedIn", () => {
 
   it("nothing to cite when the answer names no source", () => {
     expect(citedIn("Just a line.", sources)).toEqual([]);
+  });
+});
+
+describe("annotate", () => {
+  const sources = sourcesOf([
+    part("read_note", { path: "notes/garage.md" }, { path: "notes/garage.md", text: NOTE }),
+    part("web_search", { query: "x" }, { results: [{ title: "Specs", url: "https://www.example.com/specs/", excerpts: ["Rated 20 W."] }] }),
+  ]);
+
+  it("puts the number after each source link, in first-citation order, and leaves other links", () => {
+    const answer = "From [Garage codes](notes/garage.md), see [a page](https://elsewhere.test/) and [the specs](https://example.com/specs).";
+    expect(annotate(answer, citedIn(answer, sources))).toBe("From [Garage codes](notes/garage.md)¹, see [a page](https://elsewhere.test/) and [the specs](https://example.com/specs)².");
+  });
+
+  it("doesn't number an image, and does nothing without citations", () => {
+    expect(annotate("![shot](notes/garage.md)", citedIn("[x](notes/garage.md)", sources))).toBe("![shot](notes/garage.md)");
+    expect(annotate("plain", [])).toBe("plain");
   });
 });
 

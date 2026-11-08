@@ -177,8 +177,8 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - Citations: the prompt has the agent link the note or page in the sentence it backs (a markdown link, as it already
   names notes). `packages/core/src/citations.ts` reads a turn's tool results — the notes, pages and PDFs it read — and
   matches the answer's links to them, numbering each source the first time the answer cites it. The clients draw them:
-  the web a chip with a hover preview and a sources list (`web/src/components/citations.tsx`), the phone a sources list
-  under the answer (`mobile/src/ui/chat/sources.tsx`).
+  the web a chip with a hover preview and a sources list (`web/src/components/citations.tsx`), the phone the number inline
+  (`annotate`, its native markdown has no chips) and a sources list under the answer (`mobile/src/ui/chat/sources.tsx`).
 - Always-on assistant: a client that stays with you (the web's docked panel, the phone's Ask tab) sends the page it is on as
   `context` with each message (`packages/core/src/assistant.ts`). The agent reads it as the last part of the newest message's
   `<context>` (never the instructions), resolves "this note" from it, and gets UI tools (`open_note`, `open_task`,

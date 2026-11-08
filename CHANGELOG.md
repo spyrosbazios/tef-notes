@@ -7,7 +7,7 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Agent
 
-- Answers cite what they read: a note, page or PDF the agent read is linked in the sentence it backs, and the clients turn those links into numbered sources — the web a chip with a hover preview and a list at the end, the phone a list under the answer.
+- Answers cite what they read: a note, page or PDF the agent read is linked in the sentence it backs, and the clients turn those links into numbered sources — the web a chip with a hover preview and a list at the end, the phone the number inline and a list under the answer.
 
 ## 0.1.0 - 2026-11-07
 

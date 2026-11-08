@@ -12,7 +12,7 @@ import { KeyboardEvents } from "react-native-keyboard-controller";
 import remend from "remend";
 import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type ToolName, type WriteInput } from "@/core/agent";
 import { choiceFrom, chosenOf, isAskTool } from "@/core/assistant";
-import { citedIn, sourcesOf } from "@/core/citations";
+import { annotate, citedIn, type Citation, sourcesOf } from "@/core/citations";
 import { plainShared } from "@/core/share";
 import { isWidgetTool, widgetOf } from "@/core/widgets";
 import { useNotes } from "@/store/notes";
@@ -66,11 +66,12 @@ function CopyAnswer({ text }: { text: string }) {
 
 /** Answer text as it arrives: remend closes half-written markdown (`**bo` reads as bold, not asterisks),
  *  and the native view fades each new tail in instead of popping it. A link to a note opens it in the app.
- *  A box in an answer is the agent's text, not a note's: it doesn't tick. */
-function Answer({ text, streaming }: { text: string; streaming: boolean }) {
+ *  A cited source link carries its number as a superscript (the native view can't draw a chip). A box in an answer is
+ *  the agent's text, not a note's: it doesn't tick. */
+function Answer({ text, streaming, cites }: { text: string; streaming: boolean; cites: readonly Citation[] }) {
   const md = useMarkdownStyle();
   return (
-    <EnrichedMarkdownText flavor="github" markdown={streaming ? remend(text) : text} markdownStyle={md} selectable
+    <EnrichedMarkdownText flavor="github" markdown={annotate(streaming ? remend(text) : text, cites)} markdownStyle={md} selectable
       streamingAnimation={streaming} md4cFlags={{ latexMath: false }}     // `$50` is money, not math
       enableTaskListItemToggle={false} onLinkPress={({ url }) => openLink(url)} />
   );
@@ -114,7 +115,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
         <Reasoning key={i} text={text} streaming={streaming && end === parts.length - 1} />
       );
     }
-    if (p.type === "text") return <Answer key={i} text={p.text} streaming={streaming && i === parts.length - 1} />;
+    if (p.type === "text") return <Answer key={i} text={p.text} streaming={streaming && i === parts.length - 1} cites={cited} />;
     if (!isToolUIPart(p)) return null;
     const name = toolName(p) ?? "";
     const here = cards.get(i);

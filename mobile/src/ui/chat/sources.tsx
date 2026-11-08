@@ -1,6 +1,7 @@
 // The sources an agent answer cited, under it on the phone: the number, the note or site, and the passage that backs the
-// claim. The answer's own links are the citations (packages/core/src/citations.ts matches them); the native markdown
-// renderer has no inline chips, so the list is where the phone shows what a page or note said.
+// claim. The answer's own links are the citations (packages/core/src/citations.ts matches them) and carry their number
+// inline (`annotate`); the native markdown renderer has no inline chips, so this list is where the phone shows what a
+// page or note said.
 import { ChevronDown } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, View } from "react-native";

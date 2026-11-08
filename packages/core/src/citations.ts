@@ -158,6 +158,21 @@ export function citedIn(answer: string, sources: readonly CiteSource[]): Citatio
   return out;
 }
 
+const LINK_FULL = /(!?)\[[^\]]*\]\(\s*<?([^)\s>]+)([^)]*)\)/g;
+const SUPER = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
+const sup = (n: number) => String(n).split("").map((d) => SUPER[Number(d)] ?? "").join("");
+
+/** The answer with each source link followed by its citation number as a superscript, for a client whose markdown
+ *  renderer can't draw inline chips (the phone): `[Semtech](https://…)` reads `Semtech¹`, matching `citedIn`. */
+export function annotate(answer: string, cited: readonly Citation[]): string {
+  if (!cited.length) return answer;
+  return answer.replace(LINK_FULL, (whole, bang: string, href: string) => {
+    if (bang) return whole;
+    const c = cited.find((x) => matchesSource(href, x));
+    return c ? `${whole}${sup(c.n)}` : whole;
+  });
+}
+
 /** The citation an answer link points at, for the renderer: the numbered source whose target is `href`, if any. */
 export function findCite(href: string, cited: readonly Citation[]): Citation | undefined {
   return cited.find((c) => matchesSource(href, c));
