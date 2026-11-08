@@ -4,6 +4,7 @@
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
 // definition), and import and export. A window lists the sections beside the page; below `md` the list is the page and a
 // section opens over it (`?section=`), as the phone's Settings tab does.
+import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Bot, Check, ChevronLeft, ChevronRight, Download, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
@@ -527,7 +528,7 @@ export function SettingsPane() {
             </>
           ) : (
             <>
-              <h1 className="mb-3 px-1 text-[22px] font-bold tracking-tight">Settings</h1>
+              <PageHeader title="Settings" className="-mx-4 -mt-3 mb-2" />
               <ul className="divide-y divide-line rounded-xl border border-line">
                 {SECTIONS.map(({ id, label, about, icon: Icon }) => (
                   <li key={id}>

@@ -15,6 +15,7 @@ import { ChatList } from "@/components/assistant/chat-list";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Turn } from "@/components/assistant/turn";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { SUGGEST } from "@/core/agent";
@@ -25,6 +26,7 @@ import { setDock } from "@/hooks/dock";
 import { useActiveLens } from "@/hooks/lens";
 import { useNotes } from "@/hooks/notes";
 import { useStick } from "@/hooks/stick";
+import { useNarrow } from "@/hooks/media";
 import { useTasks } from "@/hooks/todo";
 import { isTool, type Part } from "@/lib/ask";
 import { pageContext } from "@/lib/assistant";
@@ -54,6 +56,11 @@ function Seeing() {
 }
 
 function Header({ children }: { children?: ReactNode }) {
+  // The phone's dock is a full screen over the app, so it wears the tabs' header (and clears the status bar itself)
+  if (useNarrow()) return (
+    <PageHeader title="Assistant" icon={<Sparkles className="size-5 shrink-0 text-brand" />} actions={children}
+      className="h-[calc(2.75rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] [&_button]:text-dim [&_button_svg:not([class*='size-'])]:size-[22px]" />
+  );
   return (
     <header className="flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line px-3 pt-[env(safe-area-inset-top)]">
       <Sparkles className="size-4 shrink-0 text-brand" />

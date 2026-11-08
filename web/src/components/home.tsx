@@ -24,6 +24,7 @@ import { useViews } from "@/hooks/todo";
 import { hrefOf, useNav, type TaskView } from "@/lib/nav";
 import { boxOf, keepBox, scrollKey } from "@/lib/scroll-memory";
 import { cn } from "@/lib/utils";
+import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -66,12 +67,10 @@ export function Home({ onNew, onAdd }: { onNew: () => void; onAdd: (s: Start) =>
 
   // The phone's header: the mark is the lens (picked here only: a filter on the whole app), the corner opens and closes Search
   const top = (
-    <div className="flex h-11 items-center gap-1 pr-2 pl-4">
-      <div className="flex min-w-0 flex-1"><LensSwitcher header /></div>
-      <Button variant="ghost" size="icon" aria-label={searching ? "Close search" : "Search"} onClick={() => setSearching((o) => !o)} className={searching ? "text-brand hover:text-brand" : "text-dim"}>
-        {searching ? <X className="size-[22px]" /> : <Search className="size-[22px]" />}
-      </Button>
-    </div>
+    <PageHeader title={<LensSwitcher header />} actions={
+      <Button variant="ghost" size="icon" aria-label={searching ? "Close search" : "Search"} onClick={() => setSearching((o) => !o)} className={cn(HEADER_ICON, searching && "text-brand hover:text-brand")}>
+        {searching ? <X /> : <Search />}
+      </Button>} />
   );
   if (phone && searching) return <SearchDrawer header={top} onClose={closeSearch} />;
 

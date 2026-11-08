@@ -18,6 +18,7 @@ import { landing, reorder } from "@/core/task-order";
 import { matchesTags } from "@/core/tags";
 import { views as viewsOf, type Task, type Views } from "@/core/todo";
 import { TASK_ICON } from "@/components/task-icons";
+import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { DeleteTask } from "@/components/task-delete";
 import { TaskRowView } from "@/components/task-row";
 import { Button } from "@/components/ui/button";
@@ -231,13 +232,18 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   return (
     <section className="flex h-full min-h-0 flex-col" aria-label={title}>
       {embedded ? null : (
-        <header className="flex items-start justify-between px-4 pt-4 pb-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Icon className="size-5 text-brand" />{title}</h2>
-            {kind === "today" ? <p className="pl-7 text-sm text-dim">{dateOf(today).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p> : null}
-          </div>
-          <Button variant="ghost" size="icon-sm" aria-label="New task" title="New task (Q)" onClick={onAdd} className="mt-0.5 shrink-0 text-dim"><Plus /></Button>
-        </header>
+        narrow ? (
+          <PageHeader title={title} icon={<Icon className="size-5 shrink-0 text-brand" />}
+            actions={<Button variant="ghost" size="icon" aria-label="New task" title="New task (Q)" onClick={onAdd} className={cn(HEADER_ICON, "text-brand hover:text-brand")}><Plus /></Button>} />
+        ) : (
+          <header className="flex items-start justify-between px-4 pt-4 pb-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Icon className="size-5 text-brand" />{title}</h2>
+              {kind === "today" ? <p className="pl-7 text-sm text-dim">{dateOf(today).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p> : null}
+            </div>
+            <Button variant="ghost" size="icon-sm" aria-label="New task" title="New task (Q)" onClick={onAdd} className="mt-0.5 shrink-0 text-dim"><Plus /></Button>
+          </header>
+        )
       )}
       {embedded ? null : <Tabs kind={kind} inbox={views.inbox.length} today={views.today.length + views.evening.length} />}
       {/* The list fades into the page where rows are scrolled out of view (top and bottom), rather than cutting one in half */}
