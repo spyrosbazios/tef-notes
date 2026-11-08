@@ -235,7 +235,8 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
 
   return (
     <section className="flex flex-col max-md:px-4" aria-label="Notes">
-      <header className="pb-3">
+      {/* Stays at the top of the scroller, so the bulk bar it turns into is in view when a tile far down is selected */}
+      <header className="sticky top-0 z-20 -mt-2 bg-bg pt-2 pb-3 max-md:-mx-4 max-md:px-4">
         {selecting ? (
           <BulkBar paths={picked} onClear={() => setSel([])} onAll={() => setSel(order)}
             onTags={() => ask("tags", picked)} onDelete={() => ask("delete", picked)} />
