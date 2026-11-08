@@ -5,6 +5,7 @@
 // for it or due on it, inside the lens that is on (core/planner.ts, shared with the month): the brand at 1, 2, 3, 4 or more.
 // Holding a day adds a task planned for it. Past days stay faint and take neither: a drag that leaves one in the slot settles
 // back on today. The strip snaps (CSS scroll-snap), and a day grows as it nears the slot and fades as it leaves.
+import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { addDays, daysBetween } from "@/core/dates";
 import { dayDate, dayRange, plannedByDay, shadeOf, WEEKDAYS } from "@/core/planner";
@@ -28,7 +29,7 @@ const Day = memo(function Day({ day, n, near, today, picked, onPick, onAdd }: {
   const press = useLongPress(() => { if (!past) onAdd(day); });
   const scale = near === 0 ? "scale-110" : near === 1 ? "scale-95" : near >= 3 ? "scale-[0.86]" : "scale-90";
   return (
-    <div className={cn("snap-center shrink-0 rounded-xl border-2 transition-[transform,opacity,border-color] duration-150", scale,
+    <div className={cn("snap-center shrink-0 rounded-xl border-2 transition-[transform,opacity,border-color] duration-150 motion-reduce:transition-none", scale,
       past ? "opacity-35" : near === 0 ? "opacity-100" : near === 1 ? "opacity-85" : near >= 4 ? "opacity-55" : "opacity-70",
       picked ? "border-brand" : near === 0 ? "border-fg/30" : "border-transparent")} style={{ width: CELL, height: 56 }}>
       <button type="button" {...press} disabled={past} onClick={() => onPick(day)} aria-current={picked ? "date" : undefined}
@@ -80,15 +81,13 @@ export function Days({ today, day: picked, onPick, onAdd }: { today: string; day
   return (
     <div className="mx-3 min-w-0" role="group" aria-label="The days' plan">
       <p className="h-[18px] text-center text-[11px] font-medium text-faint">{monthOf(days[slot], today)}</p>
-      <div className="relative">
+      {/* The strip's edges fade into the page where more days are scrolled away, rather than cutting a day in half */}
+      <ScrollFade asChild orientation="horizontal" size={28} shrink={0} blur={0}>
         <div ref={strip} onScroll={scrolled} style={{ gap: GAP, paddingInline: `calc(50% - ${CELL / 2}px)` }}
-          className="flex snap-x snap-mandatory items-center overflow-x-auto overscroll-x-contain py-[5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          className="flex snap-x snap-mandatory items-center overscroll-x-contain py-[5px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {days.map((d, i) => <Day key={d} day={d} n={byDay.get(d)?.length ?? 0} near={Math.min(4, Math.abs(i - slot))} today={today} picked={d === picked} onPick={pickDay} onAdd={addDay} />)}
         </div>
-        {/* The strip's edges fade into the page rather than cutting a day in half */}
-        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-7 bg-linear-to-r from-bg to-transparent" />
-        <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-7 bg-linear-to-l from-bg to-transparent" />
-      </div>
+      </ScrollFade>
     </div>
   );
 }

@@ -2,10 +2,11 @@
 // from the web app's own copy of the record when it has one (so a tick or an edit shows at once), else from the
 // snapshot the tool returned; one whose record is gone is dimmed and opens nothing.
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Calendar, Check, Flag, ListChecks, Moon, Repeat } from "lucide-react";
+import { Bell, Calendar, Flag, ListChecks, Moon, Repeat } from "lucide-react";
 import { useMemo, type KeyboardEvent, type ReactNode } from "react";
 import { Markdown } from "@/components/markdown";
 import { TagBadge } from "@/components/tag-badge";
+import { TickBox } from "@/components/tick-box";
 import { cardKey, noteCardOf, taskCardOf, type Card, type NoteCard, type TaskCard } from "@/core/agent";
 import { dayLabel, everyLabel, whenLabel } from "@/core/dates";
 import { noteIdOf } from "@/core/notes";
@@ -78,13 +79,8 @@ function TaskView({ card, today, onTick, gone }: { card: TaskCard; today: string
   return (
     <Shell onOpen={() => showTask(homeOfTask(card), card.id)} gone={gone} label={card.title}>
       <div className="flex items-start gap-3 px-3 py-2.5">
-        <button type="button" role="checkbox" aria-checked={checked} disabled={!onTick}
-          aria-label={checked ? `Mark "${card.title}" not done` : `Mark "${card.title}" done`}
-          onClick={(e) => { e.stopPropagation(); onTick?.(); }} onKeyDown={(e) => e.stopPropagation()}
-          className={cn("mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors disabled:cursor-default",
-            checked ? "border-brand bg-brand text-bg" : "border-faint text-transparent enabled:hover:border-brand enabled:hover:text-brand/50")}>
-          <Check className="size-3" strokeWidth={3.5} />
-        </button>
+        <TickBox checked={checked} disabled={!onTick} aria-label={checked ? `Mark "${card.title}" not done` : `Mark "${card.title}" done`}
+          onClick={(e) => { e.stopPropagation(); onTick?.(); }} onKeyDown={(e) => e.stopPropagation()} className="mt-0.5" />
         <div className="min-w-0 flex-1">
           <p className={cn("text-[15px] leading-snug", checked ? "text-faint line-through decoration-faint" : "text-fg")}>{card.title}</p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">

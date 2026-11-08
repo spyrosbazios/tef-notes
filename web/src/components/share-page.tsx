@@ -12,6 +12,7 @@ import { useLocation, useSearchParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Turns } from "@/components/swap";
 import { Textarea } from "@/components/ui/textarea";
 import { choices, sendsFile, summaryNotice, type ClipResult, type Suggestions, type Target } from "@/core/clip";
 import { noteIdOf } from "@/core/notes";
@@ -247,7 +248,8 @@ export function SharePage() {
                 <Textarea placeholder="Add a note (optional)" value={note} disabled={!!busy} aria-label="A note to save with it" className="min-h-20" onChange={(e) => setNote(e.target.value)} />
                 <p className="px-2 text-sm text-dim">PDFs and several photos go in a note of their own.</p>
                 <Button size="lg" className="w-full" disabled={!!busy} onClick={() => void asNote()}>
-                  {busy === "note" ? <Loader2 className="animate-spin" /> : <FilePlus2 />} Save as a new note
+                  <Turns aria-live="polite" state={busy === "note" ? "busy" : "idle"}
+                    states={{ idle: <><FilePlus2 /> Save as a new note</>, busy: <><Loader2 className="animate-spin" /> Saving…</> }} />
                 </Button>
               </>
             )}
@@ -260,7 +262,8 @@ export function SharePage() {
             {err ? <p className="text-sm text-warn" role="alert">{err}</p> : null}
             {!done && (
               <Button size="lg" variant="secondary" className="w-full" disabled={!!busy} onClick={() => void asAgent()}>
-                {busy === "agent" ? <Loader2 className="animate-spin" /> : <Bot />} Ask the assistant to file it
+                <Turns aria-live="polite" state={busy === "agent" ? "busy" : "idle"}
+                  states={{ idle: <><Bot /> Ask the assistant to file it</>, busy: <><Loader2 className="animate-spin" /> Handing it over…</> }} />
               </Button>
             )}
           </>

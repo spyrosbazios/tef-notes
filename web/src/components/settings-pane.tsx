@@ -4,6 +4,7 @@
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
 // definition), and import and export. A window lists the sections beside the page; below `md` the list is the page and a
 // section opens over it (`?section=`), as the phone's Settings tab does.
+import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Bot, Check, ChevronLeft, ChevronRight, Download, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -534,15 +535,21 @@ export function SettingsPane() {
   const Body = (at ?? SECTIONS[0]).body;
   return (
     <div className="flex h-full min-h-0">
-      <nav aria-label="Settings sections" className="w-52 shrink-0 space-y-1 border-r border-line px-3 pt-8">
+      <nav aria-label="Settings sections" className="w-52 shrink-0 border-r border-line px-3 pt-8">
         <div className="mb-3 flex items-center gap-2 px-2 text-brand"><Settings className="size-5" /><span className="text-xs font-semibold uppercase tracking-wider">Settings</span></div>
-        {SECTIONS.map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" aria-current={id === (at ?? SECTIONS[0]).id ? "page" : undefined} onClick={() => open(id)}
-            className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-              id === (at ?? SECTIONS[0]).id ? "bg-muted font-semibold text-fg" : "text-dim")}>
-            <Icon className="size-4" />{label}
-          </button>
-        ))}
+        <Highlight controlledItems value={(at ?? SECTIONS[0]).id} className="inset-0 rounded-lg bg-muted">
+          <div className="space-y-1">
+            {SECTIONS.map(({ id, label, icon: Icon }) => (
+              <HighlightItem key={id} value={id}>
+                <button type="button" aria-current={id === (at ?? SECTIONS[0]).id ? "page" : undefined} onClick={() => open(id)}
+                  className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                    id === (at ?? SECTIONS[0]).id ? "font-semibold text-fg" : "text-dim")}>
+                  <Icon className="size-4" />{label}
+                </button>
+              </HighlightItem>
+            ))}
+          </div>
+        </Highlight>
       </nav>
       <article className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10"><Body /></div>

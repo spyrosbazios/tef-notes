@@ -29,6 +29,7 @@ export function UpdateToast() {
       id: ID,
       duration: Infinity,
       action: { label: "Reload", onClick: () => { void updateServiceWorker(true); } },
+      cancel: { label: "Later", onClick: () => {} },
       onDismiss: () => setNeedRefresh(false),
     });
   }, [needRefresh, setNeedRefresh, updateServiceWorker]);

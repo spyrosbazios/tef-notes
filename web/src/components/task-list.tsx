@@ -1,9 +1,16 @@
 // The list column of a task view: a Things list (Inbox, Today, Upcoming, Logbook, as core/todo.ts views
 // sorts them). A task just ticked stays a moment, faded, and then leaves
 // (hooks/linger.ts), at the place it had.
+// The list stays the same list as it changes (interactions/list.md of the animate-ui skill): a row added rises in, one removed
+// (ticked and lingered, deleted, moved elsewhere) fades out of the flow at once and the rest close the gap, a dropped row's
+// neighbours glide to their places. A change of view, lens or tag filter is a new list: it replaces the old one, no cascade.
 import { useQueryClient } from "@tanstack/react-query";
+import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
+import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
+import { ReducedMotionConfig, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { AnimatePresence, motion, useIsPresent, type Transition } from "motion/react";
 import { Moon, Plus } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link } from "@/core/record-links";
 import { dateOf } from "@/core/things";
@@ -18,6 +25,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRowDrag } from "@/hooks/drag";
 import { toggleTask, useLingering } from "@/hooks/linger";
+import { useActiveLens } from "@/hooks/lens";
 import { useLinks } from "@/hooks/links";
 import { calm } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
@@ -53,24 +61,47 @@ const sectionOf = (kind: TaskView, t: Task) => (kind === "today" ? (t.evening ? 
 const heading = "mx-3 mt-5 mb-1 flex items-baseline gap-2 border-b border-line pb-2 transition-colors duration-700";
 
 function Heading({ kind, section, today, lit }: { kind: TaskView; section: string; today: string; lit?: boolean }) {
-  if (kind === "today" && section === "evening") return <h3 className={cn(heading, "items-center")}><Moon className="size-3.5 self-center text-brand" /><span className="text-[15px] font-extrabold">This Evening</span></h3>;
-  if (kind === "upcoming") { const p = dayParts(section, today); return <h3 data-day={section} className={cn(heading, "scroll-mt-4", lit && "text-brand")}><span className="text-[15px] font-extrabold">{p.label}</span><span className="text-xs text-dim">{p.detail}</span></h3>; }
-  if (kind === "logbook") return <h3 className={heading}><span className="text-[15px] font-extrabold">{section ? dayLabel(section, today) : "Earlier"}</span></h3>;
+  const move = useTempoTransition(spring.reflow);
+  const glide = { layout: "position", transition: move } as const;
+  if (kind === "today" && section === "evening") return <motion.h3 {...glide} className={cn(heading, "items-center")}><Moon className="size-3.5 self-center text-brand" /><span className="text-[15px] font-extrabold">This Evening</span></motion.h3>;
+  if (kind === "upcoming") { const p = dayParts(section, today); return <motion.h3 {...glide} data-day={section} className={cn(heading, "scroll-mt-4", lit && "text-brand")}><span className="text-[15px] font-extrabold">{p.label}</span><span className="text-xs text-dim">{p.detail}</span></motion.h3>; }
+  if (kind === "logbook") return <motion.h3 {...glide} className={heading}><span className="text-[15px] font-extrabold">{section ? dayLabel(section, today) : "Earlier"}</span></motion.h3>;
   return null;
 }
 
 /** The lists as tabs, below `md` where the rail is a drawer: Inbox and Today with their counts, as the phone's Tasks tab. */
+/** A section of rows. When the last of its rows goes the whole section fades out: it is inert from then on and hands the focus to the list. */
+function Section({ day, fade, children }: { day?: string; fade: Transition; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null), present = useIsPresent();
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!present && el.contains(document.activeElement)) el.closest<HTMLElement>("[data-task-list]")?.focus({ preventScroll: true });
+    el.inert = !present;
+  }, [present]);
+  return (
+    <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
+      {children}
+    </motion.div>
+  );
+}
+
 function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: number }) {
   const { goView } = useNav();
   const count = { inbox, today, upcoming: 0, logbook: 0 };
   return (
     <nav aria-label="Lists" className="flex gap-1 overflow-x-auto border-b border-line px-3 md:hidden">
-      {TASK_VIEWS.map((k) => (
-        <button key={k} type="button" aria-current={k === kind ? "page" : undefined} onClick={() => goView({ kind: k })}
-          className={cn("-mb-px flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-sm font-semibold", k === kind ? "border-brand text-fg" : "border-transparent text-dim")}>
-          {titleOf({ kind: k })}{count[k] ? <span className="text-xs font-normal tabular-nums text-faint">{count[k]}</span> : null}
-        </button>
-      ))}
+      {/* One underline glides to the list in front, as Home's tabs do */}
+      <Highlight controlledItems value={kind} className="inset-x-0 top-auto bottom-0 h-0.5 rounded-none bg-brand">
+        {TASK_VIEWS.map((k) => (
+          <HighlightItem key={k} value={k} className="-mb-px shrink-0">
+            <button type="button" aria-current={k === kind ? "page" : undefined} onClick={() => goView({ kind: k })}
+              className={cn("flex h-10 items-center gap-1.5 px-2.5 text-sm font-semibold transition-colors", k === kind ? "text-fg" : "text-dim")}>
+              {titleOf({ kind: k })}{count[k] ? <span className="text-xs font-normal tabular-nums text-faint">{count[k]}</span> : null}
+            </button>
+          </HighlightItem>
+        ))}
+      </Highlight>
     </nav>
   );
 }
@@ -87,10 +118,12 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   const lingering = useLingering();
   const records = useTasks().data;
   const scroller = useRef<HTMLDivElement>(null);
-  const more = useMoreBelow(scroller);
   const [deleting, setDeleting] = useState<string | null>(null);
   const doomed = (deleting && records?.find((r) => r.id === deleting)) || null;
   const kind = view.kind;
+  const lens = useActiveLens(), fade = useTempoTransition(transition.fade);
+  // What the list is of: when it changes the rows are a new list, not rows coming and going
+  const of = `${kind}|${lens?.rec ?? ""}|${tags.join(",")}`;
 
   const noteTitles = useMemo(() => new Map((notes ?? []).map((n) => [n.rec, n.note.title])), [notes]);
 
@@ -146,7 +179,7 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
   const row = (t: Task, section: string) => {
     const l = lingering.get(t.id), checked = l ? l.checked : !!t.done;
     return (
-      <TaskRowView key={t.id} task={t} today={today} checked={checked} leaving={!!l} selected={open === t.id}
+      <TaskRowView key={t.id} task={t} today={today} checked={checked} leaving={!!l} selected={open === t.id} doomed={deleting === t.id}
         notes={noteSummary(links, t.id, noteTitles)}
         showWhen={kind === "today" && !!t.when && t.when < today}
         drag={reorderable && !l ? rowDrag(section, t.id) : undefined}
@@ -169,46 +202,37 @@ export function TaskList({ view, onAdd, embedded = false, tags = NO_TAGS, focus 
         </header>
       )}
       {embedded ? null : <Tabs kind={kind} inbox={views.inbox.length} today={views.today.length + views.evening.length} />}
-      <div ref={scroller} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
+      {/* The list fades into the page where rows are scrolled out of view (top and bottom), rather than cutting one in half */}
+      <ScrollFade asChild size={48} shrink={0} blur={0}>
+      <div ref={scroller} data-task-list tabIndex={-1} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
         // Focus is the hover of a finger and a keyboard: a tapped or tabbed row lights its day too, until focus leaves the list
         onFocus={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined}
         onBlur={onHoverDay ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) hover(null); } : undefined}
-        className={cn("min-h-0 flex-1 overflow-y-auto", embedded ? "pb-2" : "px-2 pb-24",
-        more && "[mask-image:linear-gradient(to_bottom,black_calc(100%-4rem),transparent)]")}>
-        {isPending ? <div className="space-y-2 px-2 pt-2">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
-          : count ? sections.map(({ key, rows }) => (
-            <div key={key} data-section-day={kind === "upcoming" ? key : undefined}>
-              <Heading kind={kind} section={key} today={today} lit={key === lit} />
-              <ul>{rows.map((t) => row(t, key))}</ul>
+        className={cn("min-h-0 flex-1 overflow-y-auto outline-none", embedded ? "pb-2" : "px-2 pb-24")}>
+        {isPending ? <div className="space-y-2 px-2 pt-2">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}</div> : (
+          <ReducedMotionConfig>
+            <div key={of} className="relative">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {count ? sections.map(({ key, rows }) => (
+                  <Section key={key} day={kind === "upcoming" ? key : undefined} fade={fade}>
+                    <Heading kind={kind} section={key} today={today} lit={key === lit} />
+                    <ul className="relative"><AnimatePresence mode="popLayout" initial={false}>{rows.map((t) => row(t, key))}</AnimatePresence></ul>
+                  </Section>
+                )) : (
+                  <motion.div key="empty" className={cn("grid place-items-center gap-3 px-6 text-center", embedded ? "py-10" : "py-16")}
+                    initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
+                    <Icon className="size-8 text-line" />
+                    <p className="text-sm text-faint">{EMPTY[kind]}</p>
+                    {kind === "inbox" ? <p className="flex items-center gap-1.5 text-xs text-faint any-pointer-coarse:hidden">Press <Kbd>Q</Kbd> to add one</p> : null}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          ))
-          : (
-            <div className={cn("grid place-items-center gap-3 px-6 text-center", embedded ? "py-10" : "py-16")}>
-              <Icon className="size-8 text-line" />
-              <p className="text-sm text-faint">{EMPTY[kind]}</p>
-              {kind === "inbox" ? <p className="flex items-center gap-1.5 text-xs text-faint any-pointer-coarse:hidden">Press <Kbd>Q</Kbd> to add one</p> : null}
-            </div>
-          )}
+          </ReducedMotionConfig>
+        )}
       </div>
+      </ScrollFade>
       <DeleteTask task={doomed} onClose={() => setDeleting(null)} onGone={() => { if (open === deleting && !embedded) openTask(null); }} />
     </section>
   );
-}
-
-/** Whether rows sit below the scroller's fold: the last visible ones fade out while they do. */
-function useMoreBelow(ref: RefObject<HTMLDivElement | null>) {
-  const [more, setMore] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const check = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
-    check();
-    el.addEventListener("scroll", check, { passive: true });
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    const mo = new MutationObserver(check);
-    mo.observe(el, { childList: true, subtree: true });
-    return () => { el.removeEventListener("scroll", check); ro.disconnect(); mo.disconnect(); };
-  }, [ref]);
-  return more;
 }

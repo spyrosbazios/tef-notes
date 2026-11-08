@@ -5,6 +5,7 @@
 // Below `md` it is the phone's Home (mobile/src/ui/home.tsx): one header row (the app's mark, which is the lens control, and the
 // search button, whose drawer takes the page's place: search-drawer.tsx), the days as a strip (days.tsx) where the desktop has the
 // month, the same task box at a fixed height, then the notes. The date is the desktop's; the phone's strip says the month.
+import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import type { Start } from "@/components/quick-add";
 import { Days } from "@/components/days";
 import { LensSwitcher } from "@/components/lens-switcher";
@@ -74,16 +75,21 @@ export function Home({ onNew, onAdd }: { onNew: () => void; onAdd: (s: Start) =>
         <div className="grid items-start gap-x-14 gap-y-12 max-md:grid-cols-[minmax(0,1fr)] max-md:gap-y-2 md:grid-cols-2">
           {phone ? <Days today={today} day={tab === "today" ? today : tab === "upcoming" ? focus?.day ?? null : null} onPick={pick}
             onAdd={(day) => onAdd({ schedule: { when: day, evening: false } })} /> : null}
-          <section aria-label="Tasks" className="flex min-w-0 flex-col md:h-[26rem]">
-            <header className="flex items-center gap-3 pb-2 pl-3 max-md:pr-2 max-md:pl-4">
-              <nav className="flex min-w-0 flex-1 items-center gap-3 sm:gap-5 max-md:gap-3.5" aria-label="Task lists">
-                {TABS.map(([k, name]) => { const Icon = TASK_ICON[k]; return (
-                  <button key={k} type="button" aria-current={tab === k ? "true" : undefined} onClick={() => { setTab(k); if (phone) setFocus(null); }}
-                    className={cn("flex items-center gap-2 text-lg font-bold tracking-tight transition-opacity sm:text-[22px] max-md:gap-1.5 max-md:text-[17px] max-md:font-extrabold focus-visible:outline-2 focus-visible:outline-brand/60 rounded-sm",
-                      tab === k ? "text-fg" : "text-fg opacity-25 hover:opacity-55")}>
-                    {tab === k ? <Icon className="size-5 text-brand max-md:size-[17px]" /> : null}{name}
-                  </button>
-                ); })}
+          <section aria-label="Tasks" className="@container flex min-w-0 flex-col md:h-[26rem]">
+            <header className="flex items-center gap-3 pb-2 max-md:pr-2 max-md:pl-1.5">
+              <nav className="flex min-w-0 flex-1 items-center gap-0.5 sm:gap-1.5" aria-label="Task lists">
+                {/* One background glides to the list in front */}
+                <Highlight controlledItems value={tab} className="inset-0 rounded-full bg-accent">
+                  {TABS.map(([k, name]) => { const Icon = TASK_ICON[k]; return (
+                    <HighlightItem key={k} value={k}>
+                      <button type="button" aria-current={tab === k ? "true" : undefined} onClick={() => { setTab(k); if (phone) setFocus(null); }}
+                        className={cn("flex items-center gap-2 rounded-full px-2.5 py-0.5 text-lg font-bold tracking-tight transition-opacity sm:text-[22px] max-md:gap-1.5 max-md:px-2 max-md:text-[17px] max-md:font-extrabold focus-visible:outline-2 focus-visible:outline-brand/60",
+                          tab === k ? "text-fg" : "text-fg opacity-25 hover:opacity-55")}>
+                        {tab === k ? <Icon className="size-5 text-brand max-md:size-[17px]" /> : null}{name}
+                      </button>
+                    </HighlightItem>
+                  ); })}
+                </Highlight>
               </nav>
               <TagFilter what="Tasks" counts={counts} chosen={tags} onChange={setTags} />
               <Button variant="ghost" size="icon-sm" aria-label="New task" title="New task (Q)" onClick={add} className="shrink-0 text-brand hover:text-brand"><Plus className="max-md:size-[22px]" /></Button>

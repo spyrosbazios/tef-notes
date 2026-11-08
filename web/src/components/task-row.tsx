@@ -2,11 +2,15 @@
 // the deadline in the warn colour. The When button and a ⋮ show on hover (always, under a finger); the title opens the task,
 // a right-click or a long press its menu. A row that can be reordered is dragged by a mouse anywhere, by a finger at its handle.
 // At phone width under a finger the buttons give way to the phone's swipes (hooks/swipe.ts): right asks When (a sheet), left
-// brings out Delete.
+// brings out Delete. The row is the list's item: it rises in, and leaves on a fade (a row being deleted slides away instead) while
+// the others close the gap (task-list.tsx's AnimatePresence); a row that is leaving can no longer be tabbed to and hands its focus on.
 import { Bell, Calendar, Check, EllipsisVertical, Flag, GripVertical, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { motion, useIsPresent, useTransform } from "motion/react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { dayLabel, everyLabel, whenLabel, type Schedule } from "@/core/dates";
 import { TagBadge } from "@/components/tag-badge";
+import { TickBox } from "@/components/tick-box";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { WhenPick } from "@/components/when-picker";
@@ -17,10 +21,12 @@ import { DELETE_WIDTH, WHEN_WIDTH } from "@/lib/swipe";
 import { whenState } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
-export function TaskRowView({ task, today, checked, leaving, selected, notes, showWhen, drag, onTick, onOpen, onSchedule, onDue, onDelete }: {
+export function TaskRowView({ task, today, checked, leaving, selected, doomed, notes, showWhen, drag, onTick, onOpen, onSchedule, onDue, onDelete }: {
   task: Task; today: string;
   /** The box as it shows: ticked rows stay in the list a moment before they go. */
   checked: boolean; leaving: boolean; selected: boolean;
+  /** Its delete is being asked: once it goes, it slides away rather than fading. */
+  doomed: boolean;
   /** The notes it is about (lib/links.ts noteSummary): the first one's title and how many more; null for none. */
   notes: { title: string; more: number } | null;
   /** Whether the scheduled day is worth saying here (for an overdue one in Today; it is the heading in Upcoming). */
@@ -31,28 +37,43 @@ export function TaskRowView({ task, today, checked, leaving, selected, notes, sh
 }) {
   const [menu, setMenu] = useState(false), [picking, setPicking] = useState(false);
   const sw = useSwipe({ when: !checked, onWhen: () => setPicking(true) });
+  const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), away = useTempoTransition(transition.dismiss);
+  const starOpacity = useTransform(sw.x, [0, 0.6 * WHEN_WIDTH], [0, 1]), starScale = useTransform(sw.x, [0, WHEN_WIDTH], [0.6, 1]);
+  const li = useRef<HTMLLIElement>(null), present = useIsPresent();
+  // A row on its way out can't be tabbed to, and hands the focus to the row beside it; one that comes back (a take-back) is live again
+  useLayoutEffect(() => {
+    const el = li.current;
+    if (!el) return;
+    if (!present && el.contains(document.activeElement)) {
+      const near = (el.nextElementSibling ?? el.previousElementSibling)?.querySelector<HTMLElement>("button, a, input");
+      (near ?? el.closest<HTMLElement>("[data-task-list]"))?.focus({ preventScroll: true });
+    }
+    el.inert = !present;
+  }, [present]);
   const when = showWhen ? whenLabel(task, today) : null;
   const overdue = !!task.due && task.due < today;
   const ticked = task.checklist.filter((i) => i.done).length;
   return (
-    <li data-task={task.id} {...drag?.props} {...sw.props} onPointerDown={(e) => { drag?.props.onPointerDown?.(e); sw.props.onPointerDown(e); }}
+    <motion.li ref={li} data-task={task.id} {...drag?.props} {...sw.props} onPointerDown={(e) => { drag?.props.onPointerDown?.(e); sw.props.onPointerDown(e); }}
       onContextMenu={(e) => { e.preventDefault(); setMenu(true); }}
-      className={cn("relative rounded-xl any-pointer-coarse:touch-pan-y transition-opacity duration-500", sw.x !== 0 && "overflow-hidden", leaving && checked && "opacity-35", drag?.dragging && "opacity-40")}>
-      {sw.x > 0 ? (
+      layout="position" transition={move} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0, transition: { ...move, opacity: fade } }}
+      exit="gone" variants={{ gone: doomed ? { opacity: 0, transition: away } : { opacity: 0, scale: 0.96, transition: fade } }}
+      className={cn("relative rounded-xl any-pointer-coarse:touch-pan-y", (sw.side || doomed) && "overflow-hidden")}>
+      {sw.side === "when" ? (
         <div aria-hidden className="absolute inset-y-0 left-0 flex flex-col items-center justify-center gap-1 bg-accent text-brand" style={{ width: WHEN_WIDTH }}>
-          <Star className="size-5" style={{ opacity: Math.min(1, sw.x / (0.6 * WHEN_WIDTH)), transform: `scale(${0.6 + 0.4 * Math.min(1, sw.x / WHEN_WIDTH)})` }} />
+          <motion.span className="flex" style={{ opacity: starOpacity, scale: starScale }}><Star className="size-5" /></motion.span>
           <span className="text-[11px] font-semibold">When</span>
         </div>
       ) : null}
-      {sw.x < 0 ? (
+      {sw.side === "delete" ? (
         <button type="button" data-swipe-skip aria-label="Delete" onClick={() => { sw.close(); onDelete(); }}
           className="absolute inset-y-0 right-0 flex flex-col items-center justify-center gap-1 bg-down text-bg" style={{ width: DELETE_WIDTH }}>
           <Trash2 className="size-5" />
           <span className="text-[11px] font-semibold">Delete</span>
         </button>
       ) : null}
-      <div className={cn("group relative flex items-start gap-3 rounded-xl px-3 py-2 transition-[background-color] duration-500 hover:bg-muted/60", sw.x !== 0 && "bg-bg", selected && "bg-muted")}
-        style={{ transform: sw.x ? `translateX(${sw.x}px)` : undefined, transition: sw.live ? "none" : undefined }}>
+      <motion.div className={cn("group relative flex items-start gap-3 rounded-xl px-3 py-2 transition-[background-color,opacity] duration-500 hover:bg-muted/60", sw.side && "bg-bg", selected && "bg-muted", leaving && checked && "opacity-35", drag?.dragging && "opacity-40")}
+        style={{ x: sw.x }} variants={{ gone: doomed ? { x: "-100%", transition: away } : {} }}>
       {drag?.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", drag.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
       {drag ? (
         <span data-drag-handle aria-hidden onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -60,11 +81,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, notes, sh
           <GripVertical className="size-4" />
         </span>
       ) : null}
-      <button type="button" role="checkbox" aria-checked={checked} aria-label={checked ? `Mark "${task.title}" not done` : `Mark "${task.title}" done`} onClick={onTick}
-        className={cn("hit relative mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors",
-          checked ? "border-brand bg-brand text-bg" : "border-faint text-transparent hover:border-brand hover:text-brand/50")}>
-        <Check className="size-3" strokeWidth={3.5} />
-      </button>
+      <TickBox checked={checked} aria-label={checked ? `Mark "${task.title}" not done` : `Mark "${task.title}" done`} onClick={onTick} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <button type="button" onClick={onOpen} title="Open the task"
           className={cn("block w-full text-left text-[15px] leading-snug transition-colors", checked ? "text-faint line-through decoration-faint" : "text-fg")}>
@@ -107,7 +124,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, notes, sh
           <DropdownMenuItem variant="destructive" onSelect={onDelete}><Trash2 /> Delete…</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      </div>
-    </li>
+      </motion.div>
+    </motion.li>
   );
 }

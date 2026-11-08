@@ -5,6 +5,7 @@
 // actions are its right-click, and under a finger the ⋮ it shows. On a phone the dialog sits at the top, so the keyboard
 // leaves the results room (the list takes what the viewport has left).
 import { EllipsisVertical, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
+import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import { useMemo, useState } from "react";
 import { ago } from "@/core/time";
 import { fold, snippetOf } from "@/core/notes";
@@ -76,7 +77,7 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
           {empty ? (
             <CommandGroup heading="Assistant">
               {!asked ? <CommandItem value="find" onSelect={askAgent}><Sparkles /> Search with the assistant <span className="ml-auto text-xs text-faint">finds what you meant</span></CommandItem>
-                : !asked.found && !asked.error ? <CommandItem value="finding" disabled><Loader2 className="animate-spin" /> Looking through your notes and tasks…</CommandItem>
+                : !asked.found && !asked.error ? <CommandItem value="finding" disabled><Loader2 className="animate-spin" /> <ShimmeringText text="Looking through your notes and tasks…" color="var(--tf-dim)" shimmeringColor="var(--tf-fg)" /></CommandItem>
                 : asked.error ? <CommandItem value="find" onSelect={askAgent}><Sparkles /> Couldn't search: {asked.error}. Try again</CommandItem>
                 : !foundNotes.length && !foundTasks.length ? <CommandItem value="none" disabled>The assistant found nothing either.</CommandItem> : null}
               {foundNotes.map(({ n, why }) => (

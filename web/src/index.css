@@ -130,6 +130,18 @@
   [data-slot="button"][data-size^="icon"] { min-width: 2.5rem; min-height: 2.5rem; }
 }
 
+/* A finger has no hover, so a press is the only answer a button gives: it scales to .97 (Animate UI's press, `scale.press`) on
+   `spring.press`, the timing `node .agents/skills/animate-ui/scripts/css-timing.mjs spring.press --property scale` prints (400ms, a
+   linear() curve of the spring). This is the generated ui/button without an edit to it. Its `transition-all` is overridden here, so the
+   colour changes it carried are listed again at Tailwind's own 150ms: the spring is for the scale alone. */
+@media (any-pointer: coarse) and (prefers-reduced-motion: no-preference) {
+  [data-slot="button"] {
+    transition: scale 400ms linear(0, 0.0261, 0.0935, 0.188, 0.2977, 0.4132, 0.5271, 0.6343, 0.7313, 0.8159, 0.8872, 0.9452, 0.9906, 1.0244, 1.048, 1.063, 1.0709, 1.0732, 1.0713, 1.0663, 1.0594, 1.0514, 1.0429, 1.0346, 1.0267, 1.0196, 1.0134, 1.0082, 1.004, 1.0007, 0.9982, 0.9965, 1, 0.9948, 0.9946, 0.9948, 1, 1, 1, 1),
+      translate 150ms, color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms, opacity 150ms;
+  }
+  [data-slot="button"]:active:not(:disabled) { scale: 0.97; }
+}
+
 /* A small control (a tick box) keeps its look but takes touches over a 40px square around it. The element must be
    positioned (`relative`, or already absolute). */
 @utility hit {
@@ -266,3 +278,11 @@
   .pm-editor .pm-link-tool[data-busy]::before { animation: none; opacity: 0.5; }
   .ProseMirror-gapcursor::after { animation: none; }
 }
+
+/* The theme and accent wipe (hooks/appearance.ts `set`): the new page is revealed left to right over the old, which stays put. Timing is
+   Animate UI's `transition.overlay` (400ms, ease.soft), printed by `.agents/skills/animate-ui/scripts/css-timing.mjs transition.overlay`.
+   Nothing in the app carries a view-transition-name, so the root is the only thing that moves. Reduced motion never starts one. */
+::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; } /* the UA's plus-lighter would add two opaque pages */
+::view-transition-old(root) { animation: none; }
+::view-transition-new(root) { animation: look-wipe 400ms cubic-bezier(0.215, 0.61, 0.355, 1); }
+@keyframes look-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }

@@ -14,8 +14,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Turns } from "@/components/swap";
 import { WhenPick, type WhenState } from "@/components/when-picker";
 import { useNarrow } from "@/hooks/media";
+import { useShake } from "@/hooks/shake";
 import { useGuessedTags } from "@/hooks/tags";
 import { addTask, useToday } from "@/hooks/todo";
 import { scheduleOf } from "@/lib/schedule";
@@ -32,23 +34,24 @@ function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; on
   const [title, setTitle] = useState(""), [notes, setNotes] = useState("");
   const [schedule, setSchedule] = useState<Schedule | null>(initial.schedule), [due, setDue] = useState<string | null>(null);
   const [every, setEvery] = useState(""), [remind, setRemind] = useState(""), [tags, setTags] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
+  const [field, shake] = useShake<HTMLInputElement>();
   const dismiss = useGuessedTags(title, notes, setTags);
   const state = stateOf(schedule, due), when = whenLabel(state, today);
   const pick = (s: Schedule | null) => { setSchedule(s); if (!s) setRemind(""); };
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || busy) return;
-    setBusy(true);
+    setBusy(true); setFailed(false);
     try { await addTask(qc, { title, notes, ...scheduleOf(schedule), due: due ?? "", every, remind: schedule ? remind : "", tags }); onDone(); }
-    catch (x) { toast.error(message(x)); }
+    catch (x) { toast.error(message(x)); setFailed(true); shake(); }
     finally { setBusy(false); }
   };
   const target = !schedule ? "Inbox" : schedule.when === today ? (schedule.evening ? "This Evening" : "Today") : when ?? "Upcoming";
   return (
     <form onSubmit={add} className="space-y-4">
       {narrow ? <DrawerTitle className="text-center text-[15px] font-semibold">New task</DrawerTitle> : <DialogHeader><DialogTitle>New task</DialogTitle></DialogHeader>}
-      <Input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" aria-label="Task" className="h-11 text-base" />
+      <Input ref={field} autoFocus value={title} aria-invalid={failed || undefined} onChange={(e) => { setTitle(e.target.value); setFailed(false); }} placeholder="What needs doing?" aria-label="Task" className="h-11 text-base" />
       <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" aria-label="Notes" className="min-h-20 text-sm" />
       <div className="space-y-0.5 border-t border-line pt-3">
         <Row icon={schedule?.evening ? Moon : Calendar} label="When">
@@ -73,7 +76,7 @@ function Form({ initial, narrow, onDone }: { initial: Start; narrow: boolean; on
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
-        <Button type="submit" className="rounded-full" disabled={busy || !title.trim()}>{busy ? "Adding…" : `Add to ${target}`}</Button>
+        <Button type="submit" className="rounded-full" disabled={busy || !title.trim()}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: `Add to ${target}`, busy: "Adding…" }} /></Button>
       </DialogFooter>
     </form>
   );

@@ -2,7 +2,9 @@
 // One editor for the open note and for the list's tag dialog, which may hold many notes: `dim` marks the tags only some
 // of them carry. It reports a tag added or removed; the caller writes it (applyTags, at the note's rev). At phone width the add
 // button opens a sheet instead of an inline box: the tags in use as switches and a field for a new one, as the phone's picker is.
+import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Check, Plus } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useId, useState } from "react";
 import { fold } from "@/core/notes";
 import { Pick } from "@/components/pick";
@@ -44,17 +46,26 @@ export function TagEditor({ tags, dim = [], onAdd, onRemove, onTag }: {
   const names = useTagNames(), list = useId();
   const [adding, setAdding] = useState(false), [v, setV] = useState("");
   const narrow = useNarrow();
+  const pop = useTempoTransition(spring.pop), reflow = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), out = useTempoTransition(transition.popOut);
   const add = () => {
     const t = v.trim().replace(/^#/, "");
     if (t) onAdd(names.find((d) => fold(d) === fold(t)) ?? t);
     setV(""); setAdding(false);
   };
+  // A tag added pops in from half its size with a fade, one taken off shrinks out, and the others (and the add button) close the gap
+  const half = { opacity: 0, scale: 0.5 };
   return (
     <>
-      {tags.map((t) => (
-        <TagBadge key={t} name={t} onClick={onTag && (() => onTag(t))} onRemove={() => onRemove(t)}
-          className={cn("h-6 text-xs", dim.some((d) => fold(d) === fold(t)) && "border-dashed opacity-60")} />
-      ))}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {tags.map((t) => (
+          <motion.span key={t} layout="position" className="inline-flex" initial={half} animate={{ opacity: 1, scale: 1, transition: { ...pop, opacity: fade } }}
+            exit={{ ...half, transition: out }} transition={{ layout: reflow }}>
+            <TagBadge name={t} onClick={onTag && (() => onTag(t))} onRemove={() => onRemove(t)}
+              className={cn("h-6 text-xs", dim.some((d) => fold(d) === fold(t)) && "border-dashed opacity-60")} />
+          </motion.span>
+        ))}
+      </AnimatePresence>
+      <motion.span layout="position" className="inline-flex items-center" transition={{ layout: reflow }}>
       {narrow ? (
         <Pick title="Tags" trigger={<button type="button" className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-faint hover:bg-muted hover:text-dim"><Plus className="size-3" /> tag</button>}>
           <TagSheet names={names} tags={tags} onAdd={onAdd} onRemove={onRemove} />
@@ -71,6 +82,7 @@ export function TagEditor({ tags, dim = [], onAdd, onRemove, onTag }: {
           <Plus className="size-3" /> tag
         </button>
       )}
+      </motion.span>
     </>
   );
 }

@@ -1,10 +1,11 @@
 // A task's checklist: boxes to add, tick, edit and delete. Each is a change to the task's list, matched by the item's id,
 // so an edit made on another device meanwhile is kept (core/todo.ts addItem, setItem, removeItem).
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { addItem, removeItem, setItem } from "@/core/todo";
 import { DraftInput } from "@/components/draft-field";
+import { TickBox } from "@/components/tick-box";
 import { Button } from "@/components/ui/button";
 import { changeTask } from "@/hooks/todo";
 import { report } from "@/lib/report";
@@ -25,11 +26,8 @@ export function Checklist({ task }: { task: TaskRec }) {
     <ul className="space-y-0.5" aria-label="Checklist">
       {task.checklist.map((i) => (
         <li key={i.id} className="group/item flex items-center gap-2.5">
-          <button type="button" role="checkbox" aria-checked={i.done} aria-label={i.done ? `Untick "${i.text}"` : `Tick "${i.text}"`}
-            onClick={() => report(changeTask(qc, task.id, (cur) => setItem(cur, i.id, { done: !i.done })))}
-            className={cn("hit relative flex size-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors", i.done ? "border-brand bg-brand text-bg" : "border-faint text-transparent hover:border-brand")}>
-            <Check className="size-2.5" strokeWidth={3.5} />
-          </button>
+          <TickBox size="sm" checked={i.done} aria-label={i.done ? `Untick "${i.text}"` : `Tick "${i.text}"`}
+            onClick={() => report(changeTask(qc, task.id, (cur) => setItem(cur, i.id, { done: !i.done })))} />
           <DraftInput value={i.text} aria-label="Checklist item" onSave={(t) => changeTask(qc, task.id, (cur) => (t.trim() ? setItem(cur, i.id, { text: t }) : removeItem(cur, i.id)))}
             className={cn(bare, "flex-1 text-sm md:text-sm", i.done && "text-faint line-through decoration-faint")} />
           <Button variant="ghost" size="icon-sm" aria-label={`Delete "${i.text}"`} onClick={() => report(changeTask(qc, task.id, (cur) => removeItem(cur, i.id)))}

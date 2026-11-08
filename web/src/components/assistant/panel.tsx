@@ -4,9 +4,13 @@
 // and the turn resumes when it is answered. The chat is a server record, made empty on the first send and named in every
 // request; the server writes the messages back, so this component keeps none of its own beyond the screen.
 import { useChat, type Chat } from "@ai-sdk/react";
+import { transition, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
+import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import type { UIMessage } from "ai";
 import { ArrowUp, Eye, History, Loader2, SquarePen, Square, Sparkles, TriangleAlert, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from "react";
 import { ChatList } from "@/components/assistant/chat-list";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Turn } from "@/components/assistant/turn";
@@ -25,10 +29,13 @@ import { useTasks } from "@/hooks/todo";
 import { isTool, type Part } from "@/lib/ask";
 import { pageContext } from "@/lib/assistant";
 import { titleOf, useNav } from "@/lib/nav";
-import { cn } from "@/lib/utils";
 
 const shown = (p: Part) => p.type === "reasoning" || isTool(p) || (p.type === "text" && !!p.text);
 const settled = (p: Part) => isTool(p) && (p.state === "output-available" || p.state === "output-error" || p.state === "output-denied");
+
+/** Pressing Send or Stop must not move the focus off the field: on the phone that closes the keyboard (hooks/keyboard.ts), the layout
+ *  shifts under the finger and the tap misses. */
+const keep = (e: SyntheticEvent) => e.preventDefault();
 
 /** What the assistant sees right now, in a few words: the open note or task, else the list. */
 function Seeing() {
@@ -61,6 +68,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   const { messages, regenerate, status, error, addToolApprovalResponse, addToolOutput } = useChat<UIMessage>({ chat });
   const answer = useCallback((toolCallId: string, output: ChoiceOutput) => { void addToolOutput({ tool: "ask_choice", toolCallId, output }); }, [addToolOutput]);
   const busy = status === "submitted" || status === "streaming";
+  const fade = useTempoTransition(transition.fade);
 
   const field = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { field.current?.focus(); }, [focusKey]);
@@ -116,10 +124,17 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
               {messages.map((m) => (
                 <Turn key={m.id} m={m} streaming={status === "streaming" && m === last} live={busy && m === last} last={m === last} respond={addToolApprovalResponse} choose={answer} />
               ))}
-              {/* Always there, folded away unless waiting: it fades and closes when the first words land instead of blinking out */}
-              <div aria-hidden={!waiting} className={cn("grid transition-[grid-template-rows,opacity] duration-200", waiting ? "grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0")}>
-                <p className="flex items-center gap-2 overflow-hidden text-sm text-dim"><Loader2 className={cn("size-4", waiting && "animate-spin")} /> Thinking…</p>
-              </div>
+              {/* Its box follows its content, so the line opens and closes the space it takes instead of blinking in and out */}
+              <AutoHeight aria-hidden={!waiting} deps={[waiting]}>
+                <AnimatePresence initial={false}>
+                  {waiting ? (
+                    <motion.p key="thinking" className="flex items-center gap-2 text-sm text-dim"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
+                      <Loader2 className="size-4 animate-spin" /><ShimmeringText text="Thinking…" color="var(--tf-dim)" shimmeringColor="var(--tf-fg)" />
+                    </motion.p>
+                  ) : null}
+                </AnimatePresence>
+              </AutoHeight>
               {error ? (
                 <div role="alert" className="space-y-2 rounded-xl border border-down/40 bg-down/10 p-3">
                   <p className="flex items-center gap-2 text-sm font-semibold text-down"><TriangleAlert className="size-4" /> Request failed</p>
@@ -137,9 +152,9 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
                 placeholder={asked ? "Answer the card above first" : "Ask, or say what to note"}
                 className="max-h-48 min-h-9 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:ring-0 dark:bg-transparent" />
               {busy ? (
-                <Button size="icon" className="rounded-full transition-transform active:scale-90" aria-label="Stop" onClick={() => { void stop(); }}><Square className="fill-current" /></Button>
+                <Button size="icon" className="rounded-full" aria-label="Stop" onPointerDown={keep} onMouseDown={keep} onClick={() => { void stop(); }}><Square className="fill-current" /></Button>
               ) : (
-                <Button size="icon" className="rounded-full transition-transform active:scale-90" aria-label="Send" disabled={!ready || !input.trim()} onClick={() => { void go(input); }}><ArrowUp /></Button>
+                <Button size="icon" className="rounded-full" aria-label="Send" onPointerDown={keep} onMouseDown={keep} disabled={!ready || !input.trim()} onClick={() => { void go(input); }}><ArrowUp /></Button>
               )}
             </div>
           </div>

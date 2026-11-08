@@ -5,6 +5,7 @@
 // A long press on a note opens its actions. When words find no note or task, "Search with the assistant" asks the agent for what
 // was meant (core/find.ts; the palette's too, hooks/search.ts), its hits filling the list with why each fits. The palette (⌘K)
 // is the laptop's; this is the phone's, for the same data.
+import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { absorbTags, dropTyping } from "@/core/tags";
@@ -108,7 +109,7 @@ export function SearchDrawer({ header, onClose }: { header: ReactNode; onClose: 
         {f.empty && q.trim() ? (
           <Section title="Assistant">
             {!f.asked ? <button type="button" onClick={f.ask} className={row}><Sparkles className="size-5 shrink-0 text-brand" /><span className="min-w-0"><span className="block">Search with the assistant</span><span className="block text-xs text-dim">Finds what you meant</span></span></button>
-              : !f.asked.found && !f.asked.error ? <p className={cn(row, "text-dim")}><Loader2 className="size-5 shrink-0 animate-spin" />Looking through your notes and tasks…</p>
+              : !f.asked.found && !f.asked.error ? <p className={cn(row, "text-dim")}><Loader2 className="size-5 shrink-0 animate-spin" /><ShimmeringText text="Looking through your notes and tasks…" color="var(--tf-dim)" shimmeringColor="var(--tf-fg)" /></p>
               : f.asked.error ? <button type="button" onClick={f.ask} className={row}><Sparkles className="size-5 shrink-0 text-brand" /><span className="min-w-0"><span className="block">Couldn't search. Try again</span><span className="block text-xs text-dim">{f.asked.error}</span></span></button>
               : !f.foundNotes.length && !f.foundTasks.length ? <p className={cn(row, "text-dim")}><Sparkles className="size-5 shrink-0" />The assistant found nothing either</p> : null}
             {f.foundNotes.map(({ n, why }) => <Result key={n.path} n={n} now={now} why={why} onOpen={() => open(n.note.id)} onMenu={menuOf(n.path)} />)}

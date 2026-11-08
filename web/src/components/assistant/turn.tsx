@@ -1,6 +1,7 @@
 // One message of the assistant's chat. The user's: a bubble. The agent's: its thoughts, tool calls and answer in the order they
 // came. A tool call is a row, a note write a confirm card, the answer streaming markdown. Consecutive finished
 // thoughts and read-only calls fold into one summary line; what is still moving, failed, or left a card to open stays a row.
+import { CopyButton, CopyButtonIcon } from "@animate-ui/react/primitives/buttons/copy";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import type { ChatAddToolApproveResponseFunction, UIMessage } from "ai";
 import { ArrowUpRight, Check, ChevronDown, Copy, ListChecks, Loader2, TriangleAlert } from "lucide-react";
@@ -8,7 +9,7 @@ import { motion } from "motion/react";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import remend from "remend";
 import { Markdown } from "@/components/markdown";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type WriteInput } from "@/core/agent";
 import { plainShared } from "@/core/share";
@@ -49,13 +50,14 @@ function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unkn
 const settledState = (p: ToolPart) => p.state === "output-available" || p.state === "output-error" || p.state === "output-denied";
 const answered = (p: ToolPart) => p.state === "approval-requested" || p.state === "approval-responded";
 
+/** Animate UI's Copy Button: the icon swaps for a check (and back after a moment) in place, through a light blur. It is its own press
+ *  element, dressed in the ghost icon button's classes. */
 function CopyAnswer({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
   return (
-    <Button variant="ghost" size="icon-sm" className="-ml-1.5 text-dim" aria-label="Copy answer"
-      onClick={() => { void navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>
-      {copied ? <Check className="text-brand" /> : <Copy />}
-    </Button>
+    <CopyButton type="button" content={text} delay={1500} aria-label="Copy answer"
+      className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), "-ml-1.5 text-dim any-pointer-coarse:min-h-10 any-pointer-coarse:min-w-10")}>
+      <CopyButtonIcon icon={<Copy className="size-4" />} copiedIcon={<Check className="size-4 text-brand" />} />
+    </CopyButton>
   );
 }
 

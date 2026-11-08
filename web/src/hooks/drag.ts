@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type HTMLAttributes, type PointerEvent } f
 
 export type RowDrag = {
   /** Spread on the row's element. */
-  props: HTMLAttributes<HTMLElement> & { "data-drag-group": string; "data-drag-id": string };
+  props: Pick<HTMLAttributes<HTMLElement>, "onPointerDown"> & { "data-drag-group": string; "data-drag-id": string };
   /** This row is the one picked up. */
   dragging: boolean;
   /** The drop would land on this side of this row. */

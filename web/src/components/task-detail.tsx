@@ -4,7 +4,7 @@
 // outside the rev. Below `md` the card is a bottom sheet over its list (the shadcn drawer), as the phone opens a task, and
 // its pickers (components/pick.tsx) are sheets over it.
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Calendar, Check, ChevronDown, Flag, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
+import { Bell, Calendar, ChevronDown, Flag, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { dayLabel, whenLabel } from "@/core/dates";
 import { readsAsMarkdown, withLineBreaks } from "@/core/task-notes";
@@ -20,6 +20,7 @@ import { DeleteTask } from "@/components/task-delete";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { TickBox } from "@/components/tick-box";
 import { toggleTask, useLingering } from "@/hooks/linger";
 import { useNarrow } from "@/hooks/media";
 import { addLink, removeLink, useLinks } from "@/hooks/links";
@@ -135,10 +136,7 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-xl space-y-5 px-6 pt-8 pb-24 md:px-10">
           <div className="flex items-start gap-3">
-            <button type="button" role="checkbox" aria-checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(qc, task); }}
-              className={cn("mt-2 flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors", checked ? "border-brand bg-brand text-bg" : "border-faint text-transparent hover:border-brand hover:text-brand/50")}>
-              <Check className="size-4" strokeWidth={3.5} />
-            </button>
+            <TickBox size="lg" checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(qc, task); }} className="mt-2" />
             <DraftInput value={task.title} aria-label="Title" placeholder="Title" onSave={(title) => editTask(qc, task.id, { title })}
               className={cn("h-10 border-transparent bg-transparent px-2 text-2xl font-extrabold tracking-tight shadow-none hover:border-input md:text-2xl dark:bg-transparent", checked && "text-faint line-through decoration-faint")} />
           </div>

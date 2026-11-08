@@ -5,11 +5,12 @@
 // note: the format tools, attach, pin and ⋮. A note is pure markdown: tasks are records of their own (task-detail.tsx), and those linked to it show under its title.
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Download, EllipsisVertical, FileCode, FileUp, Paperclip, Link2, Loader2, PenTool, Pin, Sparkles, Trash2, TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { DrawingDialog } from "@/components/drawing-dialog";
 import { FormatTools } from "@/components/format-tools";
 import { LinkedTasks } from "@/components/linked-tasks";
+import { Turns } from "@/components/swap";
 import { COLORS, UNTITLED } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
@@ -44,11 +45,12 @@ function IconButton({ label, children, ...p }: React.ComponentProps<typeof Butto
   );
 }
 
-const STATUS: Record<Status, { text: string; tone: string }> = {
-  saved: { text: "Saved", tone: "text-faint" },
-  unsaved: { text: "Editing…", tone: "text-faint" },
-  saving: { text: "Saving…", tone: "text-faint" },
-  error: { text: "Not saved", tone: "text-down" },
+/** The save state, one line each: the box is as wide as the widest, and one swaps for the next in place (swap.tsx). */
+const STATUS: Record<Status, ReactNode> = {
+  saved: <span className="inline-flex items-center gap-1.5 text-faint"><Check className="size-3" />Saved</span>,
+  unsaved: <span className="text-faint">Editing…</span>,
+  saving: <span className="inline-flex items-center gap-1.5 text-faint"><Loader2 className="size-3 animate-spin" />Saving…</span>,
+  error: <span className="inline-flex items-center gap-1.5 text-down"><TriangleAlert className="size-3" />Not saved</span>,
 };
 
 export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?: React.ReactNode; onNote: (id: string) => void; onGone: () => void }) {
@@ -134,10 +136,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
       <header className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 md:px-4">
         {leading}
         {raw || !ed ? null : <FormatTools editor={ed} />}
-        <span className={cn("ml-2 inline-flex shrink-0 items-center gap-1.5 text-xs", STATUS[d.status].tone, d.status !== "error" && "max-sm:hidden")} aria-live="polite">
-          {d.status === "saving" ? <Loader2 className="size-3 animate-spin" /> : d.status === "saved" ? <Check className="size-3" /> : d.status === "error" ? <TriangleAlert className="size-3" /> : null}
-          {STATUS[d.status].text}
-        </span>
+        <Turns className={cn("ml-2 shrink-0 place-items-start text-xs", d.status !== "error" && "max-sm:hidden")} aria-live="polite" state={d.status} states={STATUS} />
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
         <DropdownMenu>

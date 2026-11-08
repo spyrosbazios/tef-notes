@@ -2,13 +2,14 @@
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
 // carries its first tag. The definitions are the server's, shared by every device; which one is on is this browser's.
 import { Check, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
 import { fold } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEMES } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
 import { Mark } from "@/components/brand";
+import { Turns } from "@/components/swap";
 import { TagEditor } from "@/components/tag-editor";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -19,6 +20,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useShake } from "@/hooks/shake";
 import { setActiveLens, useActiveLens, useCreateLens, useLenses, useRemoveLens, useUpdateLens } from "@/hooks/lens";
 import { Conflict } from "@/core/pocketbase";
 import { message } from "@/services/api";
@@ -34,6 +36,8 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
   const [exclude, setExclude] = useState<string[]>(lens?.exclude ?? []);
   const [accent, setAccent] = useState<LensAccentName | null>(lens?.accent ?? null);
   const problem = lensProblem({ name, tags, exclude }), taken = all.some((l) => l.rec !== lens?.rec && fold(l.name) === fold(name.trim()));
+  const [field, shake] = useShake<HTMLInputElement>(), takenId = useId();
+  useEffect(() => { if (taken) shake(); }, [taken, shake]);   // once, as the name becomes one that exists
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (problem || taken) return;
@@ -41,7 +45,10 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
       if (lens) await update.mutateAsync({ rec: lens.rec, fields: { name, tags, exclude, accent } });
       else setActiveLens((await create.mutateAsync({ name, tags, exclude, accent })).rec);
       onDone();
-    } catch (x) { toast.error(x instanceof Conflict ? "A lens by that name exists." : message(x)); }
+    } catch (x) {
+      if (x instanceof Conflict) shake();
+      toast.error(x instanceof Conflict ? "A lens by that name exists." : message(x));
+    }
   };
   const busy = create.isPending || update.isPending;
   return (
@@ -50,7 +57,7 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
         <DialogTitle>{lens ? "Edit lens" : "New lens"}</DialogTitle>
         <DialogDescription>While a lens is on, every list shows only what carries any of its tags and none it hides, and what you make gets the first tag.</DialogDescription>
       </DialogHeader>
-      <Input autoFocus value={name} maxLength={LENS_NAME_MAX} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Work" aria-label="Lens name" />
+      <Input ref={field} autoFocus value={name} maxLength={LENS_NAME_MAX} aria-invalid={taken || undefined} aria-describedby={taken ? takenId : undefined} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Work" aria-label="Lens name" />
       <div className="space-y-1.5">
         <p className="text-xs font-medium text-dim">Tags (the first is given to what you make)</p>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -65,10 +72,10 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
       </div>
       <LensAccent value={accent} onChange={setAccent} />
       {problem && (tags.length || exclude.length) ? <p className="text-xs text-down">{problem}</p> : null}
-      {taken ? <p className="text-xs text-down">A lens by that name exists.</p> : null}
+      {taken ? <p id={takenId} role="alert" className="text-xs text-down">A lens by that name exists.</p> : null}
       <DialogFooter>
         <Button type="button" variant="ghost" className="rounded-full" onClick={onDone}>Cancel</Button>
-        <Button type="submit" className="rounded-full" disabled={busy || !!problem || taken}>{busy ? "Saving…" : "Save"}</Button>
+        <Button type="submit" className="rounded-full" disabled={busy || !!problem || taken}><Turns aria-live="polite" state={busy ? "busy" : "idle"} states={{ idle: "Save", busy: "Saving…" }} /></Button>
       </DialogFooter>
     </form>
   );

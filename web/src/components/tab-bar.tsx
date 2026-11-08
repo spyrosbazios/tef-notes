@@ -1,14 +1,17 @@
-// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Ask and Settings. The tab in
-// front shows its label on a capsule tinted by the brand, the others are icons. Below `md` only; the rail does this job from
+// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Ask and Settings, on Animate UI's
+// Bottom Navigation. The tab in front shows its label (`show="active"`) on a capsule tinted by the brand that glides to the next
+// one, the others are icons; a press scales them. `scrollBehavior` stays "none": the bar never hides or shrinks on scroll, every
+// view scrolls its own container and the shell reserves `--tab-bar` for it (App.tsx). Below `md` only; the rail does this job from
 // `lg`, and the app bar between. Ask is the assistant's dock opened whole (assistant/dock.tsx): a tab, not a page, so it is
 // "in front" while the dock is open, and any other tab closes it. Hidden under the keyboard (a composer sits on the keys).
 // A dot on Ask: an answer finished while it was not in front (hooks/ask-badge.ts), read when the dock opens.
 import { House, ListChecks, Settings, Sparkles, type LucideIcon } from "lucide-react";
+import { BottomNavigation, BottomNavigationHighlight, BottomNavigationHighlightItem, BottomNavigationItem, BottomNavigationLabel } from "@animate-ui/react/primitives/bottom-navigation";
+import { spring } from "@animate-ui/react/utils/motion";
 import { useEffect, useRef } from "react";
 import { useAskUnread } from "@/hooks/ask-badge";
 import { setDock, useDock } from "@/hooks/dock";
 import { isTaskView, useNav, type View } from "@/lib/nav";
-import { cn } from "@/lib/utils";
 
 type Tab = "home" | "tasks" | "ask" | "settings";
 const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
@@ -30,20 +33,27 @@ export function TabBar() {
     goView(t === "home" ? { kind: "home" } : t === "settings" ? { kind: "settings" } : lastList.current);
   };
   return (
-    <nav aria-label="Tabs" className="relative z-50 h-(--tab-bar) shrink-0 bg-bg px-4 py-2 md:hidden">
-      <div className="flex h-full items-center justify-between rounded-full border border-line bg-raised p-1.5 shadow-lg">
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const on = key === now, dot = key === "ask" && unread;
-          return (
-            <button key={key} type="button" aria-label={dot ? `${label}, new answer` : label} aria-current={on ? "page" : undefined} onClick={() => go(key)}
-              className={cn("relative flex h-full items-center justify-center gap-2 rounded-full transition-colors active:opacity-70", on ? "bg-accent px-4 text-brand" : "px-3 text-dim")}>
-              <Icon className="size-[22px]" strokeWidth={on ? 2.4 : 2} />
-              {on ? <span className="text-sm font-semibold">{label}</span> : null}
-              {dot ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-warn" /> : null}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+    <div className="relative z-50 h-(--tab-bar) shrink-0 bg-bg px-4 py-2 md:hidden">
+      <BottomNavigation aria-label="Tabs" value={now} onValueChange={(v) => go(v as Tab)} scrollBehavior="none"
+        className="flex h-full items-center justify-between rounded-full border border-line bg-raised p-1.5 shadow-lg">
+        <BottomNavigationHighlight className="inset-0 rounded-full bg-accent">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const dot = key === "ask" && unread;
+            return (
+              <BottomNavigationHighlightItem key={key} value={key} className="h-full">
+                <BottomNavigationItem asChild value={key}>
+                  <button type="button" aria-label={dot ? `${label}, new answer` : label}
+                    className="group/tab relative flex h-full items-center justify-center rounded-full px-3 text-dim transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:text-brand">
+                    <Icon className="size-[22px] group-data-[state=active]/tab:[stroke-width:2.4]" />
+                    <BottomNavigationLabel show="active" transition={spring.slide} className="pr-1 pl-2 text-sm font-semibold">{label}</BottomNavigationLabel>
+                    {dot ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-warn" /> : null}
+                  </button>
+                </BottomNavigationItem>
+              </BottomNavigationHighlightItem>
+            );
+          })}
+        </BottomNavigationHighlight>
+      </BottomNavigation>
+    </div>
   );
 }

@@ -230,10 +230,25 @@ npm package is used: none of its registry files (icons, backgrounds) are copied 
 `bunx @animate-ui/cli@latest animate <component>` after a `shadcn add`, never by hand. Motion we write ourselves takes its values from
 `@animate-ui/react/utils/motion` (`spring`, `transition`, `scale`, `useTempoTransition`), as the palette (`palette-dialog.tsx`, a quick
 fade and slight scale: it opens all day from the keyboard, so not the dialog's tilt) and `assistant/turn.tsx`'s `Rise` do.
+State changes reuse three small pieces: `components/swap.tsx` (a label or icon swapping in place, `Turns` reserving the widest label's
+width: Save → Saving…, the note's save state, the offline count), `components/loaded.tsx` (a skeleton giving way to its content) and
+`hooks/shake.ts` (a field in error, once). The offline strip unfolds in height, the assistant's dock slides in only between `md` and
+`xl` (docked it does not move, on the Ask tab it fades), and Home's tiles glide between columns on a wide screen only.
 The full-screen viewers pass `data-side="bottom"` to `DialogContent` on a phone so they slide up like a sheet. The overlays' colour is
 the theme's scrim (`[data-slot$="-overlay"]` in `src/index.css`). `bun x @animate-ui/cli@latest audit src` lists what moves and what
 it costs.
 
+The rest, one line each:
+- `ui/checkbox.tsx` is the animated checkbox and `components/tick-box.tsx` its round task/checklist tick (`sm`, `md`, `lg`): controlled by `checked`, a tick's write waits its linger (`hooks/linger.ts`).
+- The task list (`task-list.tsx`, `task-row.tsx`): rows enter, leave and reflow with `layout="position"` presence; a leaving row or section is inert and hands its focus on, a returning one is live again.
+- A swipe is a Motion value (`hooks/swipe.ts`'s `x`): the row follows the finger, and the When star and Delete button read it through `useTransform`.
+- Bottom Navigation (`tab-bar.tsx`): the phone's tab bar with its sliding highlight; the label is on `spring.slide`, as the spring's default overshoots under a blur.
+- Highlight: the one background that glides between Home's task tabs (`home.tsx`) and the underline under the task list's tabs (`task-list.tsx`).
+- Scroll Fade: the task list's top and bottom edges and the days strip's sides; Copy Button: the assistant's "Copy answer" (`assistant/turn.tsx`); Shimmering Text: its "Thinking…" (`assistant/panel.tsx`).
+- AutoHeight: a box that follows its content's height (the assistant's thinking line), so it opens and closes its space.
+- Touch press: on a finger every `[data-slot="button"]` scales to .97 on `spring.press` from one CSS rule in `index.css`, so buttons carry no `active:scale` of their own.
+
+Picking a theme or accent in Settings wipes the page from one look to the next (a View Transition in `hooks/appearance.ts` `set`, its timing in `index.css`: `transition.overlay`'s curve from the skill's `css-timing.mjs`); a lens's accent cuts, and reduced motion skips the wipe.
 Reduced motion follows the OS setting only, no switch in the app: `root.tsx` wraps the app in `AnimateUIProvider` and
 `MotionConfig reducedMotion="user"`, `index.css` quiets the CSS loops (spinners pulse instead of turning), and scrolls that would glide
 (`calm()` in `hooks/media.ts`) jump.

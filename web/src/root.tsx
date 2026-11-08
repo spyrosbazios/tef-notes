@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { UpdateToast } from "@/components/update-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useApplyAppearance, useAppearance } from "@/hooks/appearance";
+import { useNarrow } from "@/hooks/media";
 import { persister } from "@/lib/offline";
 import { buster, MAX_AGE, persistable } from "@/lib/persist";
 import App from "./App";
@@ -32,9 +33,13 @@ function Look() {
   return null;
 }
 
-/** The app's providers (the assistant's chat above everything the routes show); the toasts follow the chosen theme's scheme. */
+/** The app's providers (the assistant's chat above everything the routes show); the toasts follow the chosen theme's scheme, and on
+ *  the phone sit at the top under the inset (the bottom is the tabs' and the keyboard's): `offset` is sonner's for a window over
+ *  600px, `mobileOffset` its own below, and the tabs show below `md` (768px), so both carry it. */
 export function Root() {
   const { scheme } = useAppearance();
+  const narrow = useNarrow();
+  const clear = narrow ? { top: "calc(env(safe-area-inset-top) + 0.5rem)" } : undefined;
   return (
     <PersistQueryClientProvider
       client={qc}
@@ -50,7 +55,7 @@ export function Root() {
             <AssistantProvider>
               <App />
             </AssistantProvider>
-            <Toaster theme={scheme} position="bottom-right" />
+            <Toaster theme={scheme} position={narrow ? "top-center" : "bottom-right"} offset={clear} mobileOffset={clear} />
             <UpdateToast />
           </TooltipProvider>
         </MotionConfig>

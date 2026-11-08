@@ -5,9 +5,10 @@
 // hooks/note-view.ts), as the phone's Notes tab does: a note with several tags shows under each, and a group folds away.
 // Below `md` it is the phone's: two columns, a header of icons (tag filter, tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
+import { scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { ArrowDownUp, Check, Hash, LayoutGrid, Pin, Plus, Tags, X } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
 import { groupNotes } from "@/core/note-groups";
 import { NOTE_SORT_LABEL, NOTE_SORTS, sortNotes, type NoteSort } from "@/core/note-sort";
@@ -16,6 +17,7 @@ import { matchesTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { BulkBar, DeleteDialog, TagsDialog, TileMenu } from "@/components/note-actions";
 import { NoteGroup } from "@/components/note-groups";
+import { Loaded } from "@/components/loaded";
 import { Masonry } from "@/components/masonry";
 import { TagBadge } from "@/components/tag-badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLongPress } from "@/hooks/long-press";
-import { useNarrow } from "@/hooks/media";
+import { useNarrow, useTouch } from "@/hooks/media";
 import { useLensSorted, useNotes } from "@/hooks/notes";
 import { useNoteView } from "@/hooks/note-view";
 import { useNow } from "@/hooks/now";
@@ -36,33 +38,56 @@ import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
 
+/** The tiles on screen by id. A tile that changes column is a second element with the id while the first one leaves (Masonry's
+ *  columns each have their own presence): the shared layout carries it across, so the newcomer does not fade in and the one it
+ *  replaces is hidden at once, instead of two tiles fading over each other. */
+const onScreen = new Map<string, Set<HTMLElement>>();
+function useMoved(id: string, shared: boolean, el: RefObject<HTMLElement | null>): boolean {
+  const [moved] = useState(() => shared && onScreen.has(id));
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!shared || !node) return;
+    const others = onScreen.get(id) ?? new Set<HTMLElement>();
+    for (const o of others) o.style.visibility = "hidden";
+    others.add(node);
+    onScreen.set(id, others);
+    return () => { others.delete(node); if (!others.size) onScreen.delete(id); };
+  }, [id, shared, el]);
+  return moved;
+}
+
 /** The keys held down on a click or key press: what decides between opening a note and selecting it. */
 type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean };
 
 /** A note as a Keep tile: its picture across the top, the title, the opening prose, tags, then pin and age. A note with a colour
  *  wears it as the tile's tint. On hover a checkbox selects it and a ⋮ opens its actions (a right-click does too); under a finger
  *  both are always there, and holding the tile opens the same menu. */
-function Tile({ n, now, selecting, selected, menuPaths, onPick, onCheck, onTag, onTags, onDelete }: {
-  n: NoteRec; now: number; selecting: boolean; selected: boolean; menuPaths: string[];
+function Tile({ id, n, now, selecting, selected, menuPaths, onPick, onCheck, onTag, onTags, onDelete }: {
+  id: string; n: NoteRec; now: number; selecting: boolean; selected: boolean; menuPaths: string[];
   onPick: (e: Modifiers) => void; onCheck: () => void; onTag: (t: string) => void; onTags: () => void; onDelete: () => void;
 }) {
   const snippet = useMemo(() => snippetOf(n.note.body, 280), [n.note.body]);
   const [ref, pictures, more] = useNotePictures<HTMLDivElement>(n.note.id, n.note.body);
   const [menu, setMenu] = useState(false);
-  const phone = useNarrow();
-  const press = useLongPress(() => (phone ? onCheck() : setMenu(true)), { menu: !phone });
+  const phone = useNarrow(), touch = useTouch();
+  // A short spring for the tile moving (a reorder, a filter, a new column), a tween for its fade; on a finger it dips to `scale.choice`
+  // while held, answering the press before the hold fires
+  const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade), press = useTempoTransition(spring.press);
+  const moved = useMoved(id, !phone, ref);
+  const hold = useLongPress(() => (phone ? onCheck() : setMenu(true)), { menu: !phone });
   const tint = n.note.color;
   const chrome = cn("absolute top-2 z-10 flex size-6 items-center justify-center rounded-md border border-line bg-card/90 text-dim shadow-sm backdrop-blur hover:text-fg",
     "hit opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 any-pointer-coarse:md:opacity-100", menu && "opacity-100");
   return (
-    <motion.div ref={ref} role="button" layout="position" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }} transition={TILE_MOTION} tabIndex={0} onClick={onPick} onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-      {...press}
+    <motion.div ref={ref} role="button" layout="position" layoutId={phone ? undefined : id} initial={moved ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+      whileTap={touch ? { scale: scale.choice } : undefined} exit={{ opacity: 0, scale: 0.96, transition: fade }} transition={{ ...move, opacity: fade, scale: press }} tabIndex={0} onClick={onPick} onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+      {...hold}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPick(e); } }}
       aria-selected={selecting ? selected : undefined} data-color={tint}
       className={cn("group relative w-full cursor-pointer overflow-hidden rounded-2xl border text-left transition-colors any-pointer-coarse:select-none",
         tint ? "bg-tile text-tile-fg" : "bg-card hover:bg-raised",
         selected ? "border-brand ring-2 ring-brand" : tint ? "border-tile-line/50" : "border-line")}>
+      {/* Not ui/checkbox or TickBox: this is a chip on the tile's corner (shown on hover, over a picture), not a form control or a task's tick */}
       <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select ${n.note.title}`} onClick={(e) => { e.stopPropagation(); onCheck(); }}
         className={cn(chrome, "left-2", selecting && "opacity-100", selected && "border-brand bg-brand text-bg hover:text-bg")}>
         {selected ? <Check className="size-3.5" strokeWidth={3} /> : null}
@@ -85,9 +110,6 @@ function Tile({ n, now, selecting, selected, menuPaths, onPick, onCheck, onTag, 
     </motion.div>
   );
 }
-
-/** How a tile moves when the list reorders, filters or grows: a short spring, no overshoot. */
-const TILE_MOTION = { type: "spring", stiffness: 500, damping: 40, mass: 0.6 } as const;
 
 /** A tile's shape while the notes load: some with a picture, titles and prose of varied length, so the masonry looks like itself. */
 const SHAPES = [
@@ -115,14 +137,16 @@ const PAGE = 30;
 /** What Home's sort reads off a note record. */
 const recSortable = (n: NoteRec) => ({ pinned: n.note.pinned, updated: n.updated, created: n.note.created, path: n.path });
 
-/** The tag filter: a button naming what is chosen, opening every tag in the list (with its count) to tick on or off. Home's tasks use it too. */
+/** The tag filter: a button naming what is chosen, opening every tag in the list (with its count) to tick on or off. Home's tasks use it
+ *  too (`what`). The "Tags" word folds into the icon when none is chosen: on a phone, and under 20rem when a `@container` holds it (Home's
+ *  task box, where the three list names and this would collide). */
 export function TagFilter({ counts, chosen, onChange, what = "Notes" }: { counts: [string, number][]; chosen: string[]; onChange: (tags: string[]) => void; what?: string }) {
   const on = (t: string) => chosen.some((c) => fold(c) === fold(t));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" aria-label="Filter by tag" className={cn("max-w-64 max-sm:max-w-28", chosen.length ? "text-fg" : "text-dim")}>
-          <Hash /><span className={cn("truncate", !chosen.length && "max-sm:hidden")}>{chosen.length ? chosen.join(", ") : "Tags"}</span>
+          <Hash /><span className={cn("truncate", !chosen.length && "max-sm:hidden @max-xs:hidden")}>{chosen.length ? chosen.join(", ") : "Tags"}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
@@ -153,6 +177,7 @@ export function NoteList({ onNew }: { onNew: () => void }) {
   const end = useRef<HTMLDivElement>(null);
   const base = useLensSorted();
   const { grouped, collapsed, sort, setGrouped, fold: foldGroup, setSort } = useNoteView();
+  const narrow = useNarrow();
   const sorted = useMemo(() => sortNotes(base, sort, recSortable), [base, sort]);
   const now = useNow(30_000);
   const names = useTagNames();
@@ -212,7 +237,7 @@ export function NoteList({ onNew }: { onNew: () => void }) {
   const tile = (t: NoteRec, key: string) => {
     const on = picked.includes(t.path), menuPaths = on ? picked : [t.path];
     return (
-      <Tile key={key} n={t} now={now} selecting={selecting} selected={on} menuPaths={menuPaths}
+      <Tile key={key} id={key} n={t} now={now} selecting={selecting} selected={on} menuPaths={menuPaths}
         onPick={(e) => pick(t.path, e)} onCheck={() => check(t.path)} onTag={filterTag}
         onTags={() => ask("tags", menuPaths)} onDelete={() => ask("delete", menuPaths)} />
     );
@@ -229,12 +254,20 @@ export function NoteList({ onNew }: { onNew: () => void }) {
             <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
             <span className="mr-auto self-baseline pt-1 text-xs tabular-nums text-faint">{shown.length}</span>
             <TagFilter counts={counts} chosen={chips} onChange={setTags} />
-            <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={grouped ? "tags" : "list"} aria-label="Layout"
-              onValueChange={(v) => { if (v) setGrouped(v === "tags"); }}>
-              {/* On a phone one button, the other layout's (the phone's toggle) */}
-              <ToggleGroupItem value="list" aria-label="Show notes as tiles" title="Tiles" className="text-dim max-md:data-[state=on]:hidden"><LayoutGrid /></ToggleGroupItem>
-              <ToggleGroupItem value="tags" aria-label="Group notes by tag" title="Group by tag" className="text-dim max-md:data-[state=on]:hidden"><Tags /></ToggleGroupItem>
-            </ToggleGroup>
+            {narrow ? (
+              // The phone's toggle: one button showing the other layout (the animated group's gliding highlight has
+              // nothing to sit on when the selected item is hidden, and paints a stray surface)
+              <Button variant="outline" size="icon-sm" className="text-dim" aria-pressed={grouped}
+                aria-label={grouped ? "Show notes as tiles" : "Group notes by tag"} onClick={() => setGrouped(!grouped)}>
+                {grouped ? <LayoutGrid /> : <Tags />}
+              </Button>
+            ) : (
+              <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={grouped ? "tags" : "list"} aria-label="Layout"
+                onValueChange={(v) => { if (v) setGrouped(v === "tags"); }}>
+                <ToggleGroupItem value="list" aria-label="Show notes as tiles" title="Tiles" className="text-dim"><LayoutGrid /></ToggleGroupItem>
+                <ToggleGroupItem value="tags" aria-label="Group notes by tag" title="Group by tag" className="text-dim"><Tags /></ToggleGroupItem>
+              </ToggleGroup>
+            )}
             <Select value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
               <SelectTrigger size="sm" aria-label="Sort notes" className="text-dim max-md:[&_[data-slot=select-value]]:hidden max-md:[&>svg:last-child]:hidden"><ArrowDownUp /><SelectValue /></SelectTrigger>
               <SelectContent align="end">
@@ -245,16 +278,21 @@ export function NoteList({ onNew }: { onNew: () => void }) {
           </div>
         )}
       </header>
-      <div className={cn(grouped && !isPending && shown.length && "space-y-4", selecting && "select-none")} aria-busy={isPending || undefined}>
-        {isPending ? <Masonry>{SHAPES.map((s, i) => <SkeletonTile key={i} shape={s} />)}</Masonry>
-          : shown.length ? (grouped
-            ? groups.map((g) => (
-              <NoteGroup key={g.tag} tag={g.tag} count={g.notes.length} folded={folded(g.tag)} onToggle={foldGroup}>
-                <Masonry animate>{g.notes.map((t) => tile(t, `${g.tag}:${t.path}`))}</Masonry>
-              </NoteGroup>
-            ))
-            : <Masonry animate>{shown.slice(0, limit).map((t) => tile(t, t.path))}</Masonry>)
-          : <p className="px-3 py-10 text-center text-sm text-faint">{chips.length ? "No note has every tag ticked." : "No notes here yet."}</p>}
+      <div className={cn(selecting && "select-none")} aria-busy={isPending || undefined}>
+        {/* Home's tiles are too large a surface to blur: the content fades in alone */}
+        <Loaded loading={isPending} blurred={false} skeleton={<Masonry>{SHAPES.map((s, i) => <SkeletonTile key={i} shape={s} />)}</Masonry>}>
+          {shown.length ? (
+            <div className={cn(grouped && "space-y-4")}>
+              {grouped
+                ? groups.map((g) => (
+                  <NoteGroup key={g.tag} tag={g.tag} count={g.notes.length} folded={folded(g.tag)} onToggle={foldGroup}>
+                    <Masonry animate>{g.notes.map((t) => tile(t, `${g.tag}:${t.path}`))}</Masonry>
+                  </NoteGroup>
+                ))
+                : <Masonry animate>{shown.slice(0, limit).map((t) => tile(t, t.path))}</Masonry>}
+            </div>
+          ) : <p className="px-3 py-10 text-center text-sm text-faint">{chips.length ? "No note has every tag ticked." : "No notes here yet."}</p>}
+        </Loaded>
       </div>
       {more ? <div ref={end} className="h-px" aria-hidden /> : null}
       <TagsDialog paths={target} open={dialog === "tags"} onOpenChange={(o) => { if (!o) setDialog(null); }} />

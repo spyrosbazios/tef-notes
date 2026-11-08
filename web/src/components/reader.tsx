@@ -2,6 +2,7 @@
 // finds the article). Opened from a link card's "Reader view" button; the page itself is a click away.
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
+import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -40,26 +41,28 @@ function Body({ url, onNote }: { url: string; onNote?: (id: string) => void }) {
       </div>
       <DialogDescription className="sr-only">The page as an article</DialogDescription>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {q.isPending ? (
+        <Loaded loading={q.isPending} blurred={false} skeleton={(
           <div className="mx-auto flex max-w-2xl flex-col gap-3 px-6 py-8">
             <Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-1/3" />
             {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-4 w-full" />)}
           </div>
-        ) : q.isError ? (
-          <div className="mx-auto flex max-w-2xl flex-col items-start gap-3 px-6 py-10">
-            <p className="text-dim text-sm">{message(q.error)}</p>
-            <Button variant="outline" size="sm" asChild>
-              <a href={url} target="_blank" rel="noreferrer"><ExternalLink /> Open the page instead</a>
-            </Button>
-          </div>
-        ) : a ? (
-          <article className="mx-auto max-w-2xl px-6 py-8">
-            {a.image && <img src={a.image} alt="" referrerPolicy="no-referrer" className="mb-6 max-h-80 w-full rounded-xl object-cover" onError={(e) => e.currentTarget.remove()} />}
-            <h1 className="text-2xl font-semibold leading-tight text-fg">{a.title || host}</h1>
-            <p className="mt-2 mb-6 text-faint text-xs">{meta}</p>
-            <Markdown body={a.markdown} className="reader" onNote={onNote} />
-          </article>
-        ) : null}
+        )}>
+          {q.isError ? (
+            <div className="mx-auto flex max-w-2xl flex-col items-start gap-3 px-6 py-10">
+              <p className="text-dim text-sm">{message(q.error)}</p>
+              <Button variant="outline" size="sm" asChild>
+                <a href={url} target="_blank" rel="noreferrer"><ExternalLink /> Open the page instead</a>
+              </Button>
+            </div>
+          ) : a ? (
+            <article className="mx-auto max-w-2xl px-6 py-8">
+              {a.image && <img src={a.image} alt="" referrerPolicy="no-referrer" className="mb-6 max-h-80 w-full rounded-xl object-cover" onError={(e) => e.currentTarget.remove()} />}
+              <h1 className="text-2xl font-semibold leading-tight text-fg">{a.title || host}</h1>
+              <p className="mt-2 mb-6 text-faint text-xs">{meta}</p>
+              <Markdown body={a.markdown} className="reader" onNote={onNote} />
+            </article>
+          ) : null}
+        </Loaded>
       </div>
     </>
   );
