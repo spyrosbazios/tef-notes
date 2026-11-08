@@ -1,12 +1,12 @@
 // The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens on, or none (every device follows), make, edit and delete lenses.
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
 // carries its first tag. The definitions are the server's, shared by every device; which one is on is a preference too (hooks/prefs.ts).
-import { Check, ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronUp, ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
 import { fold } from "@/core/notes";
-import { ACCENT_NAMES, ACCENTS, accentColor, THEMES } from "@/core/theme";
+import { ACCENT_NAMES, ACCENTS, accentColor, THEMES, type AccentName } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
 import { Mark } from "@/components/brand";
 import { Turns } from "@/components/swap";
@@ -81,29 +81,43 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
   );
 }
 
-/** The primary colour the app takes while the lens is on: none (the chosen accent) or one of the accents. */
+/** How many swatches the folded picker shows: with its toggle, one row in the dialog on a 360 px phone. */
+const FOLDED = 6;
+
+/** The primary colour the app takes while the lens is on: none (the chosen accent) or one of the accents.
+ *  Folded to one row, with a toggle at its end for them all; a pick beyond the row takes the row's last place, so it stays in view. */
 function LensAccent({ value, onChange }: { value: LensAccentName | null; onChange: (a: LensAccentName | null) => void }) {
   const { theme, accent: own } = useAppearance();
+  const [all, setAll] = useState(false), listId = useId();
   const label = (a: LensAccentName | null) => (a ? ACCENTS[a].label : "This browser's own");
+  const row: readonly AccentName[] = ACCENT_NAMES.slice(0, FOLDED), picked: AccentName = value ?? "theme";
+  const shown = all ? ACCENT_NAMES : row.includes(picked) ? row : [...row.slice(0, -1), picked];
+  const toggle = all ? "Fewer colours" : "All colours";
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-2">
         <p id="lens-accent-h" className="text-xs font-medium text-dim">Colour while on</p>
         <span className="text-xs text-dim">{label(value)}</span>
       </div>
-      <div role="radiogroup" aria-labelledby="lens-accent-h" className="flex flex-wrap gap-1.5">
-        {ACCENT_NAMES.map((a) => {
-          const pick = a === "theme" ? null : a, on = pick === value, colour = accentColor(THEMES[theme], a === "theme" ? own : a);
-          return (
-            <button key={a} type="button" role="radio" aria-checked={on} aria-label={label(pick)} title={label(pick)} onClick={() => onChange(pick)}
-              className="grid size-9 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-              style={{ borderColor: on ? colour : "transparent" }}>
-              <span className={cn("grid size-6 place-items-center rounded-full", a === "theme" && "border-2 border-dashed border-bg")} style={{ backgroundColor: colour }}>
-                {on ? <Check className="size-3.5 text-bg" strokeWidth={3} /> : null}
-              </span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap gap-1.5">
+        <div id={listId} role="radiogroup" aria-labelledby="lens-accent-h" className="contents">
+          {shown.map((a) => {
+            const pick = a === "theme" ? null : a, on = pick === value, colour = accentColor(THEMES[theme], a === "theme" ? own : a);
+            return (
+              <button key={a} type="button" role="radio" aria-checked={on} aria-label={label(pick)} title={label(pick)} onClick={() => onChange(pick)}
+                className="grid size-9 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+                style={{ borderColor: on ? colour : "transparent" }}>
+                <span className={cn("grid size-6 place-items-center rounded-full", a === "theme" && "border-2 border-dashed border-bg")} style={{ backgroundColor: colour }}>
+                  {on ? <Check className="size-3.5 text-bg" strokeWidth={3} /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <button type="button" aria-expanded={all} aria-controls={listId} aria-label={toggle} title={toggle} onClick={() => setAll((x) => !x)}
+          className="grid size-9 place-items-center rounded-full text-dim outline-none transition-colors hover:bg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring">
+          {all ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+        </button>
       </div>
     </div>
   );
