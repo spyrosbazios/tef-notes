@@ -1,5 +1,6 @@
 // A note on its own page (`/note/<id>`): nothing but the note, with a way back. The page is the whole window: no rail, no
-// list, so the editor has the room (note-pane.tsx is the editor and its tools).
+// list, so the editor has the room (note-pane.tsx is the editor and its tools). It lies over the screen it was opened from (App.tsx
+// `NoteLayer`), which stays mounted under it.
 import { ChevronLeft } from "lucide-react";
 import { NotePane } from "@/components/note-pane";
 import { Button } from "@/components/ui/button";

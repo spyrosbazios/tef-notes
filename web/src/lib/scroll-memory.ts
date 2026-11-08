@@ -1,6 +1,6 @@
-// Where each list was scrolled to, and what Home's task box showed, for as long as the app is open. A note is a page that replaces
-// Home, a tab switch replaces the list, a task hides its list on a phone: each unmounts or hides the scroller and the browser forgets
-// its place (wouter does nothing about it), so a way back lands at the top with the task box on Today. The hook that keeps and
+// Where each list was scrolled to, and what Home's task box showed, for as long as the app is open. A tab switch replaces the list, a
+// task hides its list on a phone: each unmounts or hides the scroller and the browser forgets its place (wouter does nothing about
+// it), so a way back lands at the top with the task box on Today. (A note's page does not: it lies over the screen, which stays mounted.) The hook that keeps and
 // restores it is `hooks/scroll-memory.ts`; this is the store and the keys, nothing of React or the DOM.
 
 const tops = new Map<string, number>();

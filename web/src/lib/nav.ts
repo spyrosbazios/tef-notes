@@ -3,7 +3,8 @@
 // The id is the filename, which never changes, so a link to a note survives a retitle. The open task is `?t=<id>` (its
 // record id) in a task list.
 import { fold } from "@/core/notes";
-import { useLocation, useRoute, useSearchParams } from "wouter";
+import { createContext, useContext, useMemo, useState } from "react";
+import { useLocation, useRoute, useSearch } from "wouter";
 
 export const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
 export type TaskView = (typeof TASK_VIEWS)[number];
@@ -42,11 +43,40 @@ export const noteHref = (id: string) => `/note/${encodeURIComponent(id)}`;
 /** Marks a history entry as one the app pushed, so a note's Back can go back to it rather than leave the app. */
 const FROM_APP = { fromApp: true };
 
+/** A place in the URL. */
+export type Here = { path: string; search: string };
+
+/** The view and the open task at a place. */
+export function placeOf({ path, search }: Here): { view: View; task: string | undefined } {
+  const params = new URLSearchParams(search);
+  return { view: viewOf(path, params.get("tags")), task: params.get("t") ?? undefined };
+}
+
+/** A note's page lies over the screen it was opened from, which stays mounted and keeps its scroll, tiles and pictures. That screen
+ *  reads its place from here, not from the URL: the URL is the note's. */
+export const Behind = createContext<Here | null>(null);
+
+/** The last place that was not a note's page (Home at first: a note opened from a link has nothing behind it). */
+export function useBehind(): Here {
+  const [path] = useLocation(), search = useSearch(), [onNote] = useRoute("/note/:id");
+  const live = useMemo(() => ({ path, search }), [path, search]);
+  const [kept, keep] = useState<Here>({ path: "/", search: "" });
+  if (!onNote && kept !== live) keep(live);
+  return onNote ? kept : live;
+}
+
+/** Where the screen on view is: the URL's place, or what lies behind a note's page when it is the screen being read. */
+export function useHere() {
+  const behind = useContext(Behind), [path, go] = useLocation(), search = useSearch();
+  const here = behind ?? { path, search };
+  const params = useMemo(() => new URLSearchParams(here.search), [here.search]);
+  return { here, params, go };
+}
+
 export function useNav() {
-  const [path, go] = useLocation();
-  const [params] = useSearchParams();
+  const { here, go } = useHere();
   const [onNote, note] = useRoute("/note/:id");
-  const view = viewOf(path, params.get("tags")), task = params.get("t") ?? undefined;
+  const { view, task } = placeOf(here);
   /** The note on the page. */
   const open = onNote ? note.id : undefined;
   return {

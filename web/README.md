@@ -81,7 +81,10 @@ button at the corner opens it (`assistant/fab.tsx`).
 Below `md` (768px) the app is the Android app's layout, so the installed PWA can stand in for it (the phone's own map:
 [`../mobile/AGENTS.md`](../mobile/AGENTS.md)). The shell (`App.tsx`) swaps the rail and the app bar for the phone's bottom tabs
 (`components/tab-bar.tsx`: Home, Tasks, Ask, Settings, a floating pill with the front tab's label on a capsule; hidden on a note
-page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). Tasks goes back to the list last in front. Ask is the
+page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). A note's page is a layer over whatever screen it was opened
+from (`NoteLayer` in `App.tsx`; Home, a task list or Settings): that screen stays mounted under it, `invisible` and `inert`, reading its place
+from `useBehind` (`lib/nav.ts`: the last URL that was not a note's), so Back finds it as it was, with no tiles entering again, no
+pictures reloaded and the scroll where it was left; the focus goes into the note and back to the tile. Tasks goes back to the list last in front. Ask is the
 assistant's dock opened whole above the bar (`--dock-bottom`), so it is "in front" while the dock is open and any other tab closes it;
 the dock's X and the corner button are not there, and its history button is the phone's Chats. Home is the phone's Home: a header
 with the lens (the app's mark, `LensSwitcher header`) and a search button, then the days strip (`components/days.tsx` over
@@ -93,8 +96,8 @@ assistant" when nothing matches; it and the palette (⌘K, laptop) share their d
 `components/note-hit.tsx`. Differences from the Android app: scroll-snap stands in for the strip's drag physics (a day does not
 spring as it nears the slot, it steps), the strip does not follow Upcoming scrolled by hand, and a search result's long press opens
 the laptop's note menu. A list comes back where it was left: `lib/scroll-memory.ts` keeps each list's scroll (per view URL and lens) and
-Home's task box (the list in front, its tag filter), and `hooks/scroll-memory.ts` puts the place back instantly when Home returns from a note,
-a tab switch or a hidden list shows again, re-applying it while tiles and pictures lay out. Upcoming scrolled by hand moves the days strip to the
+Home's task box (the list in front, its tag filter), and `hooks/scroll-memory.ts` puts the place back instantly when Home returns from another tab
+or a hidden list shows again, re-applying it while tiles and pictures lay out. Upcoming scrolled by hand moves the days strip to the
 section at its top (`TaskList`'s `onView`); the strip answers only a drag of its own, never its own sliding. The phone's header controls (tag
 filter, layout, sort, +) are one 40px outlined square each (`TOOL` in `note-list.tsx`, shared by the task box). Sending closes the assistant's keyboard
 (the Send tap still keeps the focus, so it lands first time). Where `md` and up draws the laptop's layout, nothing changes.

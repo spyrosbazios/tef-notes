@@ -35,7 +35,7 @@ export function Home({ onNew, onAdd }: { onNew: () => void; onAdd: (s: Start) =>
   const [searching, setSearching] = useState(false);
   const closeSearch = useCallback(() => setSearching(false), []);
   const { views, today } = useViews();
-  // The task box's list and its own tag filter (over its three lists; the notes below keep theirs): kept while a note or another tab
+  // The task box's list and its own tag filter (over its three lists; the notes below keep theirs): kept while another tab
   // takes Home's place, so coming back finds the box as it was left
   const [tab, setTab] = useState(() => boxOf().tab), [tags, setTags] = useState(() => boxOf().tags);
   useEffect(() => { keepBox({ tab, tags }); }, [tab, tags]);

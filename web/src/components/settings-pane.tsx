@@ -8,7 +8,6 @@ import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/h
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Bot, Check, ChevronLeft, ChevronRight, Download, Loader2, Palette, Pencil, Plus, RefreshCw, Server, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useLocation, useSearchParams } from "wouter";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
@@ -41,6 +40,7 @@ import { useNotes } from "@/hooks/notes";
 import { downloadZip } from "@/lib/export";
 import { importNotes, type ImportTally, type Source } from "@/core/import";
 import { folderSource, zipSource } from "@/lib/import";
+import { useHere } from "@/lib/nav";
 import { localDay } from "@/core/time";
 import { useCreateTag, useDescribeTag, useRemoveTag, useTags, useUpdateTag } from "@/hooks/tags";
 import { message } from "@/services/api";
@@ -498,7 +498,7 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 export function SettingsPane() {
-  const narrow = useNarrow(), [, go] = useLocation(), [params] = useSearchParams();
+  const narrow = useNarrow(), { params, go } = useHere();
   const asked = SECTIONS.find((s) => s.id === params.get("section"));
   const open = (id: SectionId) => go(`/settings?section=${id}`);
   const at = asked ?? (narrow ? undefined : SECTIONS[0]);

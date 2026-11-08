@@ -7,6 +7,7 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- Going back from a note to Home no longer plays the notes layout in again or reloads the thumbnails: the screen a note was opened from stays mounted under the note's page, so Back finds it exactly as it was (the same for the task lists and Settings).
 - Closing the on-screen keyboard with Android's Back gesture while writing to the assistant now also lets the field go and brings the tab bar back: the keyboard's presence is read from the viewport, not from focus alone.
 
 ## 0.4.0 - 2026-11-08
