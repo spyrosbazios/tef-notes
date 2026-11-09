@@ -22,11 +22,13 @@ import { dockNow, onDock, setDock } from "@/hooks/dock";
 import { prefsNow } from "@/hooks/prefs";
 import { activeLensOf } from "@/hooks/lens";
 import { NOTES } from "@/hooks/notes";
+import { persisted } from "@/hooks/store";
 import { TASKS } from "@/hooks/todo";
 import { closeUnfinished, pageContext, resumes, runUiTool, type UiHost } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
 import { useNav } from "@/lib/nav";
 import { syncNow } from "@/lib/sync";
+import { STORAGE } from "@/lib/storage-keys";
 import { message } from "@/services/api";
 import { chat as loadChat, createChat, newChatId } from "@/services/agent";
 import type { NoteRec } from "@/services/notes";
@@ -49,11 +51,11 @@ async function halt(chat: Chat<UIMessage>) {
 
 // When the dock was last on screen (kept across a reload) and whether the app was left since: a page loaded fresh counts as
 // left, so a killed PWA does too
-const SEEN = "tefnotes.chat-seen";
+const chatSeen = persisted<{ at: number }>(STORAGE.chatSeen, (p) => ({ at: typeof p.at === "number" ? p.at : 0 }));
 const seen = {
   left: true,
-  at: () => { try { return Number(localStorage.getItem(SEEN)) || 0; } catch { return 0; } },
-  mark: () => { try { localStorage.setItem(SEEN, String(Date.now())); } catch { /* storage unavailable */ } },
+  at: () => chatSeen.read().at,
+  mark: () => chatSeen.replace({ at: Date.now() }),
 };
 
 export function AssistantProvider({ children }: { children: ReactNode }) {

@@ -122,8 +122,8 @@ lens says; only lists are narrowed.
 - The definitions are the `lenses` collection (`server/pb_migrations/1793600000_lenses.js`: `name`, unique ignoring case, and
   `tags` as JSON), so every device has the same ones. Like the `tags` definitions it has open rules and no `rev`: a lens is
   edited whole and the last save wins. Calls: `packages/core/src/pocketbase.ts` `lenses`.
-- Which lens is on is the device's own, and none is the unfiltered app: the web app keeps it in localStorage
-  (`web/src/hooks/lens.ts`), the phone in its prefs (`mobile/src/store/prefs.ts`). A lens deleted elsewhere is none (`activeLens`).
+- Which lens is on is a preference every device shares (`packages/core/src/prefs.ts` `lens`), and none is the unfiltered app;
+  the frozen phone app keeps its own (`mobile/src/store/prefs.ts`). A lens deleted elsewhere is none (`activeLens`).
   The web switcher is at the bottom of the rail; the phone's is on Home, and its lens filters every tab.
 - The assistant is told: both clients send the lens as the request context's `filter` (`lens: Work (tags: work, clients)`,
   `contextFilter`), and the agent's instructions say to scope what it lists, counts and summarises to those tags unless asked

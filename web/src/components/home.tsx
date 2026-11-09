@@ -18,7 +18,7 @@ import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
 import { addDays } from "@/core/dates";
 import { useActiveLens } from "@/hooks/lens";
-import { prefsNow } from "@/hooks/prefs";
+import { layoutPrefsNow } from "@/hooks/prefs";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
 import { useScrollSwitch } from "@/hooks/scroll";
@@ -70,7 +70,7 @@ export function Home() {
   const { today } = useViews();
   // The task box's list (the lens is the only filter): kept while another tab takes Home's place, so coming back finds the
   // box as it was left
-  const [tab, setTab] = useState<Box["tab"]>(() => box?.tab ?? prefsNow().homeList);
+  const [tab, setTab] = useState<Box["tab"]>(() => box?.tab ?? layoutPrefsNow().homeList);
   useEffect(() => { box = { tab }; }, [tab]);
   // Which way the list moves: toward the tab picked, from the one in front before it (set as the tab is, so the leaving list reads it too)
   const [dir, setDir] = useState(1);

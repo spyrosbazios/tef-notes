@@ -10,20 +10,23 @@ export type PhotoChange = { action: "create" | "update" | "delete"; record: { id
 /** A link's record as PocketBase sends it: every column (core/record-links.ts linkOf reads it). */
 export type LinkChange = { action: "create" | "update" | "delete"; record: { id: string; [column: string]: unknown } };
 
+/** The preferences' record as PocketBase sends it (hooks/prefs.ts `takePrefs` reads it). */
+export type PrefsChange = { action: "create" | "update" | "delete"; record: { id: string; key?: unknown; data?: unknown } };
+
 /** A task's record as PocketBase sends it: every column. */
 export type TodoChange = { action: "create" | "update" | "delete"; record: { id: string; rev: number; [column: string]: unknown } };
 
 type Handlers = {
   onNote: (c: NoteChange) => void; onPhoto: (c: PhotoChange) => void; onTask: (c: TodoChange) => void;
-  onLink: (c: LinkChange) => void; onChat: () => void; onReconnect: () => void;
+  onLink: (c: LinkChange) => void; onChat: () => void; onPrefs: (c: PrefsChange) => void; onReconnect: () => void;
 };
 
 const RETRY = 1000, RETRY_MAX = 60_000;
 
-/** Calls `onNote` / `onPhoto` / `onTask` / `onLink` for every change to a note, a photo, a task or a link, `onChat` for one to a chat, `onReconnect` when the stream came back after a gap
+/** Calls `onNote` / `onPhoto` / `onTask` / `onLink` for every change to a note, a photo, a task or a link, `onChat` for one to a chat, `onPrefs` for one to the preferences, `onReconnect` when the stream came back after a gap
  *  (events were missed: the caller refetches); returns the unsubscribe. A dropped stream is reopened on a growing delay,
  *  not the browser's fixed one, and at once when the browser says it is back online; closed, not retried, while it says offline. */
-export function watch({ onNote, onPhoto, onTask, onLink, onChat, onReconnect }: Handlers): () => void {
+export function watch({ onNote, onPhoto, onTask, onLink, onChat, onPrefs, onReconnect }: Handlers): () => void {
   let es: EventSource | null = null, retry: ReturnType<typeof setTimeout> | undefined, wait = RETRY, first = true;
   const close = () => { clearTimeout(retry); es?.close(); es = null; };
   const connect = () => {
@@ -40,7 +43,7 @@ export function watch({ onNote, onPhoto, onTask, onLink, onChat, onReconnect }: 
     };
     mine.addEventListener("PB_CONNECT", (ev) => {
       const { clientId } = JSON.parse((ev as MessageEvent).data);
-      api.post("realtime", { clientId, subscriptions: ["notes", "attachments", "tasks", "links", "chats"] }).catch(() => {});
+      api.post("realtime", { clientId, subscriptions: ["notes", "attachments", "tasks", "links", "chats", "prefs"] }).catch(() => {});
       if (!first) onReconnect();
       first = false;
     });
@@ -49,6 +52,7 @@ export function watch({ onNote, onPhoto, onTask, onLink, onChat, onReconnect }: 
     mine.addEventListener("tasks", (ev) => onTask(JSON.parse((ev as MessageEvent).data)));
     mine.addEventListener("links", (ev) => onLink(JSON.parse((ev as MessageEvent).data)));
     mine.addEventListener("chats", () => onChat());
+    mine.addEventListener("prefs", (ev) => onPrefs(JSON.parse((ev as MessageEvent).data)));
   };
   const online = () => { wait = RETRY; connect(); };
   // Offline the stream can only fail: stop reopening it until the browser says it is back (then `connect` reopens it,

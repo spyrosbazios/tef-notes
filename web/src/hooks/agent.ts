@@ -20,8 +20,7 @@ export function useRemoveChat() {
   return useMutation({ mutationFn: agent.removeChat, onSuccess: () => qc.invalidateQueries({ queryKey: CHATS }) });
 }
 
-type AgentPrefs = Prefs["agent"];
-const setAgent = (patch: Partial<AgentPrefs>) => setPrefs({ agent: { ...prefsNow().agent, ...patch } });
+const setAgent = (patch: Partial<Prefs["agent"]>) => setPrefs({ agent: patch });
 
 /** The current choice, resolved against what the server offers. */
 export function useModel() {

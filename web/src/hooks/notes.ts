@@ -18,6 +18,7 @@ import { CHATS } from "./agent";
 import { useActiveLens, activeLensOf } from "./lens";
 import { projectLinks } from "./links";
 import { PHOTOS } from "./photos";
+import { pullPrefs, takePrefs } from "./prefs";
 import { projectTasks } from "./todo";
 
 export const NOTES = ["notes"] as const;
@@ -76,7 +77,7 @@ export const useNote = (id: string | undefined) => {
 
 /** Mounted once, in the shell: the sync's triggers (lib/sync.ts), the redraw of the lists after it changes the copy, and what
  *  the realtime feed says: a note, task or link another device changed is news for the sync (an edit made here echoing back is
- *  not), a new photo refreshes the photo lists, a chat the chat list. */
+ *  not), a new photo refreshes the photo lists, a chat the chat list, the preferences' record the preferences (hooks/prefs.ts). */
 export function useLive() {
   const qc = useQueryClient();
   useEffect(() => {
@@ -90,7 +91,8 @@ export function useLive() {
       onTask: (c) => heard("tasks", c.action, c.record),
       onLink: (c) => heard("links", c.action, c.record),
       onChat: relist,
-      onReconnect: () => { void syncNow(); relist(); },
+      onPrefs: (c) => { if (c.action !== "delete") takePrefs(c.record); },
+      onReconnect: () => { void syncNow(); relist(); void pullPrefs(); },
     });
     return () => { clearTimeout(photos); clearTimeout(chats); stop(); stopSync(); redraw(); };
   }, [qc]);

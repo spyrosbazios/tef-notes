@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { sweepStorage } from "@/hooks/store";
 import { splashUntilRendered } from "@/lib/splash";
 import { Root } from "./root";
 import { router } from "./router";
@@ -8,6 +9,7 @@ import { router } from "./router";
 import "virtual:tefnotes-theme.css";
 import "./index.css";
 
+sweepStorage();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Root />

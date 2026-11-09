@@ -14,7 +14,7 @@ export const lensesQuery = queryOptions({ queryKey: LENSES, queryFn: lenses.list
 export const useLenses = () => useQuery(lensesQuery);
 
 /** Turn the lens `rec` on, or none with null. */
-export const setActiveLens = (rec: string | null) => setPrefs({ lens: rec ?? undefined });
+export const setActiveLens = (rec: string | null) => setPrefs({ lens: rec });
 
 /** The lens on: null when none is, and while the definitions load or when the chosen one is gone (deleted
  *  from another device). */

@@ -3,9 +3,10 @@
 import { useCallback } from "react";
 import { flipped } from "@/core/note-groups";
 import type { NoteSort } from "@/core/note-sort";
+import type { Prefs } from "@/core/prefs";
 import { prefsNow, setPrefs, usePrefs } from "./prefs";
 
-const write = (patch: Partial<ReturnType<typeof prefsNow>["notes"]>) => setPrefs({ notes: { ...prefsNow().notes, ...patch } });
+const write = (patch: Partial<Prefs["notes"]>) => setPrefs({ notes: patch });
 
 /** The list layout: `grouped`, the folded groups, the sort, and the ways to change them. */
 export function useNoteView() {

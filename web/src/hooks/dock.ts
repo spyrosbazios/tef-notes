@@ -1,5 +1,6 @@
 // The assistant's dock as this browser keeps it: open or not, how wide, and which chat is the current one (so a reload
-// comes back to the thread). Per browser, like the agent's settings.
+// comes back to the thread). The state of this browser's window, not a preference: kept here alone (core/prefs.ts says why).
+import { STORAGE } from "@/lib/storage-keys";
 import { persisted } from "./store";
 
 export const DOCK_WIDTH = { min: 320, max: 640, init: 400 } as const;
@@ -8,7 +9,7 @@ export const clampWidth = (w: number) => Math.min(DOCK_WIDTH.max, Math.max(DOCK_
 
 type Dock = { open: boolean; width: number; chat?: string };
 
-const dock = persisted<Dock>("tefnotes.dock", (p) => ({
+const dock = persisted<Dock>(STORAGE.dock, (p) => ({
   // Docked beside the page from `xl` up: a first visit there starts with it open. Narrower, it covers the page: closed
   open: typeof p.open === "boolean" ? p.open : matchMedia("(min-width: 1280px)").matches,
   width: typeof p.width === "number" && Number.isFinite(p.width) ? clampWidth(p.width) : DOCK_WIDTH.init,

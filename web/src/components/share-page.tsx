@@ -20,8 +20,9 @@ import { askText, clipOf, clipTags, fromPasted, fromPost, type Shared } from "@/
 import { useAssistant } from "@/hooks/assistant";
 import { useActiveLens } from "@/hooks/lens";
 import { ALL_PHOTOS } from "@/hooks/photos";
+import { setPrefs, usePrefs } from "@/hooks/prefs";
 import { previewQuery } from "@/hooks/previews";
-import { clipSummary, saveShared, takeShared } from "@/hooks/share";
+import { saveShared, takeShared } from "@/hooks/share";
 import { downscale, look } from "@/lib/picture";
 import { INSETS } from "@/hooks/shell";
 import { cn } from "@/lib/utils";
@@ -85,7 +86,7 @@ export function SharePage() {
   // `?shared=err`: the worker could not read what was shared; the box is shown with a line saying so
   const [failed, setFailed] = useState(arrived === "err");
   const [held, setHeld] = useState<Held | null | "loading">(arrived && !failed ? "loading" : null);
-  const [{ on: summary }, setSummary] = clipSummary.use();
+  const summary = usePrefs().clip.summary;
   const [busy, setBusy] = useState<"note" | "agent" | "clip" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -220,7 +221,7 @@ export function SharePage() {
                 <Textarea placeholder="Add a note (optional)" value={note} disabled={!!busy} aria-label="A note to save with it" className="min-h-20"
                   onChange={(e) => { setNote(e.target.value); clearTimeout(pause.current); pause.current = setTimeout(rerank, RERANK_MS); }} onBlur={rerank} />
                 <div className="flex items-center gap-3 px-1">
-                  <Switch id="clip-summary" checked={summary} onCheckedChange={(on) => setSummary({ on })} disabled={!!busy} />
+                  <Switch id="clip-summary" checked={summary} onCheckedChange={(on) => setPrefs({ clip: { summary: on } })} disabled={!!busy} />
                   <Label htmlFor="clip-summary" className="text-[15px] font-normal">Add a summary</Label>
                 </div>
                 {ask.state === "loading" && <p className="flex items-center gap-3 px-2 text-sm text-dim"><Loader2 className="size-4 animate-spin" /> Finding where it fits…</p>}

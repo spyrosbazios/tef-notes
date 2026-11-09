@@ -9,7 +9,6 @@ import { bodyFor, titleFor, type Shared } from "@/core/share";
 import { localDay } from "@/core/time";
 import { addFiles } from "./photos";
 import { createNote, write } from "./notes";
-import { persisted } from "./store";
 
 let taken: Promise<Posted | null> | undefined;
 
@@ -20,9 +19,6 @@ export function takeShared(): Promise<Posted | null> {
   taken ??= caches.open(SHARE_CACHE).then(takePost).catch(() => null);
   return taken;
 }
-
-/** "Add a summary" on a link or picture: this browser's choice, off until ticked (the phone's, too). */
-export const clipSummary = persisted<{ on: boolean }>("tefnotes.clip", (p) => ({ on: p.on === true }));
 
 const two = (n: number) => String(n).padStart(2, "0");
 

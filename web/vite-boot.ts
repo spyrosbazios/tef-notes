@@ -1,7 +1,7 @@
 // The boot: what index.html shows before any script of ours has run, so the installed app's launch has no blank or
 // wrong-coloured frame between Android's splash (the manifest's colours, which the server gives the chosen theme:
 // server/pb_hooks/manifest.pb.js) and the first screen. An inline script reads the preferences this browser keeps
-// (src/lib/boot.ts `PREFS_STORAGE`, hooks/prefs.ts) and puts the theme's ground, text and accent on :root, with the `dark`
+// (src/lib/storage-keys.ts `STORAGE.prefs`, hooks/prefs.ts) and puts the theme's ground, text and accent on :root, with the `dark`
 // class, the scheme and the tab's colour, as hooks/appearance.ts does in full before React's first paint; a layer of the
 // theme's ground covers the page (the stylesheet, and the body's colour, are still on their way) until the router's first
 // screen is on, then fades into it (src/lib/splash.ts). The ground alone, no mark: the installed app's launch has just shown
@@ -9,7 +9,8 @@
 // core's palette, read at build: nothing is written twice. The fade is Animate UI's `transition.reveal` (300ms, ease.out).
 import type { Plugin } from "vite";
 import { ACCENTS, DEFAULT_ACCENT, DEFAULT_THEME, THEMES } from "../packages/core/src/theme";
-import { PREFS_STORAGE, SPLASH_ID } from "./src/lib/boot";
+import { SPLASH_ID } from "./src/lib/boot";
+import { STORAGE } from "./src/lib/storage-keys";
 
 /** Each theme as [ground, text, brand, scheme]; each accent as [on dark, on light]. */
 const data = () => ({
@@ -19,7 +20,7 @@ const data = () => ({
 
 const script = () => `(function(){
 var T=${JSON.stringify(data().themes)},A=${JSON.stringify(data().accents)},t=${JSON.stringify(DEFAULT_THEME)},a=${JSON.stringify(DEFAULT_ACCENT)};
-try{var p=JSON.parse(localStorage.getItem(${JSON.stringify(PREFS_STORAGE)})||"{}")||{};if(T[p.theme])t=p.theme;if(p.accent==="theme"||A[p.accent])a=p.accent;}catch(e){}
+try{var p=JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE.prefs)})||"{}")||{};if(T[p.theme])t=p.theme;if(p.accent==="theme"||A[p.accent])a=p.accent;}catch(e){}
 var l=T[t],s=l[3],b=a==="theme"?l[2]:A[a][s==="dark"?0:1],r=document.documentElement,st=r.style;
 st.setProperty("--tf-bg",l[0]);st.setProperty("--tf-fg",l[1]);st.setProperty("--tf-brand",b);
 st.colorScheme=s;r.classList.toggle("dark",s==="dark");r.dataset.scheme=s;

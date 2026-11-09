@@ -1,6 +1,7 @@
 // A media query as state (changes with the window, a rotation or a keyboard dock). The phone-width layout is `< md`
 // (Tailwind's 768px), the same line the CSS classes `max-md:` and `md:` draw.
 import { useSyncExternalStore } from "react";
+import type { Layout } from "@/core/prefs";
 
 export function useMedia(query: string): boolean {
   return useSyncExternalStore(
@@ -9,8 +10,15 @@ export function useMedia(query: string): boolean {
   );
 }
 
+const NARROW = "(max-width: 767px)";
+
 /** The window is narrower than `md`: panes become sheets and pages take turns. */
-export const useNarrow = () => useMedia("(max-width: 767px)");
+export const useNarrow = () => useMedia(NARROW);
+
+/** The layout the window is drawn in, which has preferences of its own (core/prefs.ts `Layout`): the phone's below `md`, the
+ *  desktop's from it. */
+export const layoutNow = (): Layout => (matchMedia(NARROW).matches ? "phone" : "desktop");
+export const useLayout = (): Layout => (useNarrow() ? "phone" : "desktop");
 
 /** A finger is among the pointers (a phone, a tablet, a laptop with a touch screen): the switch of the touch pass, the same query as
  *  the CSS variant `any-pointer-coarse:` (index.css). The main pointer alone would miss a mouse and a screen on one machine. */

@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { useViews } from "@/hooks/todo";
 import { usePrefs } from "@/hooks/prefs";
-import { shownTabs } from "@/core/prefs";
 import { TASK_VIEWS, titleOf, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +33,7 @@ export function Rail({ onSearch, onPick }: { onSearch: () => void; onPick?: () =
   const counts = { inbox: views.inbox.length, today: views.today.length + views.evening.length };
   const { view, goView } = useNav();
   const is = (v: View) => view.kind === v.kind;
-  const notesOn = shownTabs(usePrefs()).includes("notes");
+  const notesOn = usePrefs().desktop.notesPage;
   const go = (v: View) => { goView(v); onPick?.(); };
 
   return (

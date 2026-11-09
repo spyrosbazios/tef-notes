@@ -1,5 +1,5 @@
-// Settings: the look (theme and accent), the phone's tabs and where the app opens (all the owner's preferences, on the server,
-// hooks/prefs.ts), the agent (which model
+// Settings: the look (theme and accent), each layout's own (where the app opens, Home's list, the phone's tabs, the desktop's
+// sidebar; all the owner's preferences, on the server, hooks/prefs.ts), the agent (which model
 // Ask uses, how hard it thinks, whether it writes notes without asking: preferences too; what it remembers of the owner,
 // agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
@@ -9,13 +9,13 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Mic, Monitor, Palette, Pencil, Plus, RefreshCw, Settings, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, movedTab, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Tab } from "@/core/prefs";
+import { HIDEABLE, LAYOUT_LABEL, movedTab, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { KEEP_LABEL, KEEPS } from "@/core/voice";
 import { ModelMenu } from "@/components/assistant/model-menu";
@@ -28,6 +28,7 @@ import { TagBadge } from "@/components/tag-badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ import { useAppearance } from "@/hooks/appearance";
 import { useRowDrag } from "@/hooks/drag";
 import { prefsNow, setPrefs, usePrefs } from "@/hooks/prefs";
 import { TAB_ICON } from "@/components/tab-icons";
-import { useNarrow } from "@/hooks/media";
+import { useLayout, useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
 import { useSyncStatus } from "@/hooks/sync";
 import { usePush } from "@/hooks/push";
@@ -230,67 +231,120 @@ function Choice<T extends string>({ label, value, options, names, onPick }: { la
   );
 }
 
-/** What a tab's row opens to, when it has a choice of its own. */
+/** What a phone tab's row opens to, when it has a choice of its own. */
 function TabOptions({ tab }: { tab: Tab }) {
-  const { homeList, tasksList } = usePrefs();
+  const { homeList, tasksList } = usePrefs().phone;
   if (tab === "home") return (
     <div className="space-y-2 pb-1"><p className="text-[13px] text-dim">Home's task box opens on</p>
-      <Choice label="Home's task box opens on" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ homeList: v })} /></div>
+      <Choice label="Home's task box opens on" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ phone: { homeList: v } })} /></div>
   );
   if (tab === "tasks") return (
     <div className="space-y-2 pb-1"><p className="text-[13px] text-dim">The Tasks tab opens on</p>
-      <Choice label="The Tasks tab opens on" value={tasksList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ tasksList: v })} /></div>
+      <Choice label="The Tasks tab opens on" value={tasksList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ phone: { tasksList: v } })} /></div>
   );
   return null;
 }
 
-/** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger after a long press), shown or
- *  hidden, and Home and Tasks tapped open for the list each starts on. */
-function Layout() {
-  const { tabs, hidden, start, tabLabels } = usePrefs();
+const setLayout = (layout: Layout, patch: Partial<LayoutPrefs>) => setPrefs(layout === "phone" ? { phone: patch } : { desktop: patch });
+
+/** One layout's preferences (core/prefs.ts): its name, whether this window is drawn in it, its rows. */
+function LayoutCard({ layout, here, children }: { layout: Layout; here: boolean; children: ReactNode }) {
+  const Icon = layout === "phone" ? Smartphone : Monitor;
+  return (
+    <div className="divide-y divide-line rounded-xl border border-line">
+      <div className="flex items-center gap-2.5 px-3 py-2.5">
+        <Icon className="size-4 shrink-0 text-brand" />
+        <h3 className="min-w-0 flex-1 text-sm font-semibold">{LAYOUT_LABEL[layout]}</h3>
+        {here ? <Badge variant="secondary">This screen</Badge> : null}
+      </div>
+      <StartRow layout={layout} />
+      {children}
+    </div>
+  );
+}
+
+function StartRow({ layout }: { layout: Layout }) {
+  const { start } = usePrefs()[layout];
+  return (
+    <div className="space-y-2.5 px-3 py-2.5">
+      <p className="text-sm font-semibold">Open the app on</p>
+      <Choice label={`Open the app on, ${LAYOUT_LABEL[layout]}`} value={start} options={STARTS} names={START_LABEL} onPick={(v) => setLayout(layout, { start: v })} />
+    </div>
+  );
+}
+
+/** The phone's bottom bar: the tabs dragged into order (a finger after a long press), shown or hidden, and Home and Tasks tapped
+ *  open for the list each starts on. */
+function PhoneLayout({ here }: { here: boolean }) {
+  const { tabs, hidden, tabLabels } = usePrefs().phone;
   const [open, setOpen] = useState<Tab | null>(null);
-  const drag = useRowDrag((_g, id, over, after) => setPrefs({ tabs: movedTab(prefsNow().tabs, id as Tab, over as Tab, after) }));
+  const drag = useRowDrag((_g, id, over, after) => setPrefs({ phone: { tabs: movedTab(prefsNow().phone.tabs, id as Tab, over as Tab, after) } }));
+  return (
+    <LayoutCard layout="phone" here={here}>
+      <div className="space-y-2.5 px-3 py-2.5">
+        <p className="text-sm font-semibold">Tab labels</p>
+        <Choice label="Tab labels" value={tabLabels} options={TAB_LABELS} names={TAB_LABELS_LABEL} onPick={(v) => setPrefs({ phone: { tabLabels: v } })} />
+      </div>
+      <div className="px-3 py-2.5">
+        <p className="text-sm font-semibold">Tabs</p>
+        <p className="text-[13px] leading-snug text-dim">Drag to reorder (long press on a phone). Tap Home or Tasks to pick the list it opens on. Settings stays, so the bar can always be changed back.</p>
+      </div>
+      <ul aria-label="Tabs" className="divide-y divide-line">
+        {tabs.map((t) => {
+          const shown = !hidden.includes(t), d = drag("tabs", t), opens = t === "home" || t === "tasks", Icon = TAB_ICON[t];
+          return (
+            <li key={t} {...d.props} className={cn("relative select-none", d.dragging && "opacity-40")}>
+              {d.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", d.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
+              <div className="flex items-center gap-2 px-1.5 py-1">
+                <button type="button" disabled={!opens} aria-expanded={opens ? open === t : undefined} onClick={() => setOpen(open === t ? null : t)}
+                  className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-muted">
+                  <Icon className={cn("size-4 shrink-0", shown ? "text-brand" : "text-faint")} />
+                  <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{TAB_LABEL[t]}</span>
+                  {opens ? <ChevronDown className={cn("size-4 text-faint transition-transform", open === t && "rotate-180")} /> : null}
+                </button>
+                {HIDEABLE.includes(t) ? (
+                  <Switch checked={shown} aria-label={`Show ${TAB_LABEL[t]}`} className="mr-1.5"
+                    onCheckedChange={(on) => setPrefs({ phone: { hidden: on ? hidden.filter((h) => h !== t) : [...hidden, t] } })} />
+                ) : null}
+              </div>
+              {open === t ? <div className="pr-3 pl-12"><TabOptions tab={t} /></div> : null}
+            </li>
+          );
+        })}
+      </ul>
+    </LayoutCard>
+  );
+}
+
+/** The desktop's: Home's list, and whether the sidebar lists Notes. */
+function DesktopLayout({ here }: { here: boolean }) {
+  const { homeList, notesPage } = usePrefs().desktop;
+  return (
+    <LayoutCard layout="desktop" here={here}>
+      <div className="space-y-2.5 px-3 py-2.5">
+        <p className="text-sm font-semibold">Home's task box opens on</p>
+        <Choice label="Home's task box opens on, Desktop" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ desktop: { homeList: v } })} />
+      </div>
+      <label className="flex items-center gap-3 px-3 py-2.5">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Notes in the sidebar</span>
+          <span className="block text-[13px] leading-snug text-dim">A page of only the notes, which Home already lists under its tasks.</span>
+        </span>
+        <Switch checked={notesPage} onCheckedChange={(on) => setPrefs({ desktop: { notesPage: on } })} aria-label="Notes in the sidebar" />
+      </label>
+    </LayoutCard>
+  );
+}
+
+/** Each layout's own preferences, the one this window is drawn in first. */
+function Layouts() {
+  const here = useLayout();
+  const phone = <PhoneLayout here={here === "phone"} />, desktop = <DesktopLayout here={here === "desktop"} />;
   return (
     <section className="space-y-3" aria-labelledby="layout-h">
       <h2 id="layout-h" className={TITLE}>Layout</h2>
-      <p className="text-sm text-dim">The tabs at the bottom of the phone, what each opens on, and the screen the app starts on. Kept on the server, like the look.</p>
-      <div className="divide-y divide-line rounded-xl border border-line">
-        <div className="space-y-2.5 px-3 py-2.5">
-          <p className="text-sm font-semibold">Open the app on</p>
-          <Choice label="Open the app on" value={start} options={STARTS} names={START_LABEL} onPick={(v) => setPrefs({ start: v })} />
-        </div>
-        <div className="space-y-2.5 px-3 py-2.5">
-          <p className="text-sm font-semibold">Tab labels</p>
-          <Choice label="Tab labels" value={tabLabels} options={TAB_LABELS} names={TAB_LABELS_LABEL} onPick={(v) => setPrefs({ tabLabels: v })} />
-        </div>
-        <div className="px-3 py-2.5">
-          <p className="text-sm font-semibold">Tabs</p>
-          <p className="text-[13px] leading-snug text-dim">Drag to reorder (long press on a phone). Tap Home or Tasks to pick the list it opens on. Settings stays, so the bar can always be changed back.</p>
-        </div>
-        <ul aria-label="Tabs" className="divide-y divide-line">
-          {tabs.map((t) => {
-            const shown = !hidden.includes(t), d = drag("tabs", t), opens = t === "home" || t === "tasks", Icon = TAB_ICON[t];
-            return (
-              <li key={t} {...d.props} className={cn("relative select-none", d.dragging && "opacity-40")}>
-                {d.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", d.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
-                <div className="flex items-center gap-2 px-1.5 py-1">
-                  <button type="button" disabled={!opens} aria-expanded={opens ? open === t : undefined} onClick={() => setOpen(open === t ? null : t)}
-                    className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-muted">
-                    <Icon className={cn("size-4 shrink-0", shown ? "text-brand" : "text-faint")} />
-                    <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{TAB_LABEL[t]}</span>
-                    {opens ? <ChevronDown className={cn("size-4 text-faint transition-transform", open === t && "rotate-180")} /> : null}
-                  </button>
-                  {HIDEABLE.includes(t) ? (
-                    <Switch checked={shown} aria-label={`Show ${TAB_LABEL[t]}`} className="mr-1.5"
-                      onCheckedChange={(on) => setPrefs({ hidden: on ? hidden.filter((h) => h !== t) : [...hidden, t] })} />
-                  ) : null}
-                </div>
-                {open === t ? <div className="pr-3 pl-12"><TabOptions tab={t} /></div> : null}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      <p className="text-sm text-dim">The phone and the desktop each keep their own: the screen the app starts on, Home's list, and the phone's tabs or the desktop's sidebar. A window narrower than a tablet is drawn as a phone's and follows the phone's. Kept on the server, like the look.</p>
+      {here === "phone" ? <>{phone}{desktop}</> : <>{desktop}{phone}</>}
     </section>
   );
 }
@@ -659,7 +713,7 @@ function Maintenance() {
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
-  { id: "layout", label: "Layout", about: "Phone tabs, what they open on, the start screen", icon: LayoutGrid, body: Layout },
+  { id: "layout", label: "Layout", about: "Phone and desktop: start screen, Home's list, tabs, sidebar", icon: LayoutGrid, body: Layouts },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "voice", label: "Voice", about: "Dictation, how long the model stays loaded", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },

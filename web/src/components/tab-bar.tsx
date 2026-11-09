@@ -1,4 +1,4 @@
-// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Notes, Ask and Settings (in the owner's order; Tasks, Notes and Ask hideable, Notes off at first: core/prefs.ts), on Animate UI's
+// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Notes, Ask and Settings (in the owner's order; Tasks, Notes and Ask hideable, Notes off at first: core/prefs.ts `phone`), on Animate UI's
 // Bottom Navigation. The tab in front shows its label (`show="active"`) on a capsule tinted by the brand that glides to the next
 // one, the others are icons; a press scales them. The pill is liquid glass (quick-liquid's `LiquidGlass`, its optics only: the
 // motion stays Animate UI's; the glass is the app's one, hooks/glass.ts): the page scrolling under it is refracted through its rim,
@@ -26,15 +26,15 @@ export function TabBar() {
   const { view, goView } = useNav();
   const [{ open }] = useDock();
   const unread = useAskUnread();
-  const prefs = usePrefs(), tabs = shownTabs(prefs);
+  const { phone } = usePrefs(), tabs = shownTabs(phone);
   const glass = useGlass();
   const now: Tab = open ? "ask" : isTaskView(view) ? "tasks" : view.kind === "settings" || view.kind === "notes" ? view.kind : "home";
-  // The list Tasks goes back to: the one last in front, at first the owner's pick (core/prefs.ts `tasksList`)
+  // The list Tasks goes back to: the one last in front, at first the owner's pick (core/prefs.ts `phone.tasksList`)
   const lastList = useRef<View | null>(null);
   useEffect(() => { if (isTaskView(view)) lastList.current = { kind: view.kind }; }, [view]);
   const go = (t: Tab) => {
     if (t === "ask") { setDock({ open: true }); return; }
-    goView(t === "tasks" ? lastList.current ?? { kind: prefs.tasksList } : { kind: t });
+    goView(t === "tasks" ? lastList.current ?? { kind: phone.tasksList } : { kind: t });
   };
   return (
     <div className="relative z-50 flex h-(--tab-bar) justify-center px-4 py-2 md:hidden">
@@ -53,7 +53,7 @@ export function TabBar() {
                   <button type="button" aria-label={dot ? `${label}, new answer` : label}
                     className="group/tab relative flex h-full items-center justify-center rounded-full px-3 text-dim transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:text-brand">
                     <Icon className="size-[22px] group-data-[state=active]/tab:[stroke-width:2.4]" />
-                    {prefs.tabLabels !== "never" ? <BottomNavigationLabel show={prefs.tabLabels} transition={spring.slide} className="pr-1 pl-2 text-sm font-semibold">{label}</BottomNavigationLabel> : null}
+                    {phone.tabLabels !== "never" ? <BottomNavigationLabel show={phone.tabLabels} transition={spring.slide} className="pr-1 pl-2 text-sm font-semibold">{label}</BottomNavigationLabel> : null}
                     {dot ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-warn" /> : null}
                   </button>
                 </BottomNavigationItem>

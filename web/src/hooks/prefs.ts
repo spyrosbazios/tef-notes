@@ -1,96 +1,66 @@
-// The owner's preferences (core/prefs.ts) as state. The server's record is the truth every device shares; this browser keeps
-// a copy (localStorage, hooks/store.ts) so the page paints with them at once and works offline. A change is applied to the copy
-// and sent to the server shortly after (several quick ones go as one); until it lands the copy is `dirty`, and a fetch neither
-// overwrites it nor stops it being sent again. The server is fetched on start and whenever the window comes back, so a pick
-// made on the laptop reaches the phone next time it is opened. `usePrefsSync` does the fetching: mounted once, in root.tsx.
+// The owner's preferences (core/prefs.ts) as state, kept in step with the server by the core's engine (core/prefs-sync.ts).
+// This browser's copy is in localStorage (lib/storage-keys.ts `STORAGE.prefs`), so the page paints with it at once (the boot
+// script reads its theme and accent) and works offline. A change is on the copy at once and goes to the server shortly after,
+// several quick ones as one, carrying only what changed. The server is pulled on start, when the window comes back
+// (`usePrefsSync`, mounted once in root.tsx) and after the realtime feed was down; another device's save arrives over the feed
+// (`takePrefs` and `pullPrefs`, called by hooks/notes.ts `useLive`).
 import { useQuery } from "@tanstack/react-query";
-import { prefsOf, type Prefs } from "@/core/prefs";
-import { PREFS_STORAGE as KEY } from "@/lib/boot";
+import { useSyncExternalStore } from "react";
+import { isPrefPath, PREFS_KEY, prefsOf, type LayoutPrefs, type Prefs, type PrefsPatch } from "@/core/prefs";
+import { prefsSync, type PrefsCopy } from "@/core/prefs-sync";
+import { STORAGE } from "@/lib/storage-keys";
 import * as remote from "@/services/prefs";
+import { layoutNow } from "./media";
 import { persisted } from "./store";
 
-// One-shot: the settings this browser kept per key before they moved to the server become its first copy, which seeds the
-// server's record if there is none yet. Delete once every browser has opened the app since (2026-11).
-function adopt() {
-  if (localStorage.getItem(KEY) !== null) return;
-  const old = (k: string) => { try { return JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; } catch { return {}; } };
-  const look = old("tefnotes.appearance"), view = old("tefnotes.note-view"), agent = old("tefnotes.agent");
-  localStorage.setItem(KEY, JSON.stringify(prefsOf({
-    theme: look.theme, accent: look.accent,
-    notes: { grouped: view.view === "tags", collapsed: view.collapsed, sort: view.sort },
-    agent: { model: agent.model, effort: agent.effort, unasked: agent.unasked },
-  })));
-  ["tefnotes.appearance", "tefnotes.note-view", "tefnotes.agent"].forEach((k) => localStorage.removeItem(k));
-}
-// One-shot, likewise: the lens this browser had on, from before it was a preference. Delete with `adopt`.
-function adoptLens() {
-  const raw = localStorage.getItem("tefnotes.lens");
-  if (raw === null) return;
-  let lens: unknown;
-  try { lens = JSON.parse(raw)?.lens; } catch { /* none */ }
-  const now = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-  if (typeof lens === "string" && lens && !now.lens) localStorage.setItem(KEY, JSON.stringify({ ...now, lens, dirty: true }));
-  localStorage.removeItem("tefnotes.lens");
-}
-try { adopt(); adoptLens(); } catch { /* storage unavailable: the defaults */ }
+// Stored flat, `dirty` beside the preferences' own keys: the boot script reads `theme` and `accent` at the top
+type Stored = Prefs & { dirty?: string[] };
+const local = persisted<Stored>(STORAGE.prefs, (p) => {
+  const dirty = Array.isArray(p.dirty) ? p.dirty.filter(isPrefPath) : [];
+  return { ...prefsOf(p), ...(dirty.length ? { dirty } : {}) };
+});
 
-const local = persisted<Prefs & { rec?: string; dirty?: boolean }>(KEY, (p) => ({
-  ...prefsOf(p), ...(typeof p.rec === "string" && p.rec ? { rec: p.rec } : {}), ...(p.dirty === true ? { dirty: true } : {}),
-}));
+// The copy as the engine and React read it: one object per stored value, as useSyncExternalStore needs until the value changes
+let seen: { stored: Stored; copy: PrefsCopy } | undefined;
+function copy(): PrefsCopy {
+  const stored = local.read();
+  if (seen?.stored !== stored) {
+    const { dirty = [], ...prefs } = stored;
+    seen = { stored, copy: { prefs, dirty } };
+  }
+  return seen.copy;
+}
 
-const strip = ({ rec: _r, dirty: _d, ...p }: Prefs & { rec?: string; dirty?: boolean }): Prefs => p;
+const sync = prefsSync({ read: copy, write: (c) => local.replace({ ...c.prefs, ...(c.dirty.length ? { dirty: c.dirty } : {}) }) }, remote);
 
 /** The preferences now, for code outside a component. */
-export const prefsNow = (): Prefs => strip(local.read());
+export const prefsNow = (): Prefs => copy().prefs;
 
 /** The preferences; every component using them follows a change. */
-export function usePrefs(): Prefs {
-  const [p] = local.use();
-  return strip(p);
-}
+export const usePrefs = (): Prefs => useSyncExternalStore(local.subscribe, prefsNow);
+
+/** The preferences of the layout the window is drawn in now (core/prefs.ts `Layout`), for code outside a component. */
+export const layoutPrefsNow = (): LayoutPrefs => prefsNow()[layoutNow()];
 
 let timer: ReturnType<typeof setTimeout> | undefined;
-let sending: Promise<void> | null = null;
 
-/** Send the copy if it has changes. A failure (offline, server down) leaves it dirty for the next fetch to send. */
-function send(): Promise<void> {
-  if (sending) return sending.then(() => send());
-  const now = local.read();
-  if (!now.dirty) return Promise.resolve();
-  sending = remote.save(now.rec ?? null, strip(now))
-    .then((s) => {
-      // Only clear `dirty` when nothing changed while it was in flight.
-      const after = local.read();
-      local.set(JSON.stringify(strip(after)) === JSON.stringify(strip(now)) ? { rec: s.rec, dirty: undefined } : { rec: s.rec });
-    })
-    .catch(async () => {
-      // Created by another device meanwhile: take its record and send ours over it.
-      if (!now.rec) { const s = await remote.get().catch(() => null); if (s) local.set({ rec: s.rec }); }
-    })
-    .finally(() => { sending = null; });
-  return sending;
-}
-
-/** Merge `patch` into the preferences, here at once and on the server shortly. */
-export function setPrefs(patch: Partial<Prefs>) {
-  local.set({ ...patch, dirty: true });
+/** `patch` into the preferences, here at once and on the server shortly. A group takes only the fields given:
+ *  `setPrefs({ notes: { sort } })` leaves the rest of `notes` as it is. */
+export function setPrefs(patch: PrefsPatch) {
+  sync.set(patch);
   clearTimeout(timer);
-  timer = setTimeout(() => void send(), 400);
+  timer = setTimeout(() => void sync.push(), 400);
 }
 
-/** Fetches the server's preferences into the copy, or sends the copy when it has changes or the server has none. */
+/** A `prefs` record from the realtime feed: the owner's becomes the copy, what is unsent here kept over it. */
+export function takePrefs(record: { id: string; key?: unknown; data?: unknown }) {
+  if (record.key === PREFS_KEY) sync.take({ rec: record.id, prefs: prefsOf(record.data) });
+}
+
+/** Fetches the server's preferences into the copy, then sends what is unsent here. */
+export const pullPrefs = (): Promise<void> => sync.pull();
+
+/** Pulls on start and whenever the window comes back. */
 export function usePrefsSync() {
-  useQuery({
-    queryKey: ["prefs"], refetchOnWindowFocus: true, staleTime: 0,
-    queryFn: async () => {
-      const s = await remote.get();
-      if (s && !local.read().dirty) local.set({ ...s.prefs, rec: s.rec });
-      else {
-        if (s) local.set({ rec: s.rec });
-        local.set({ dirty: true });
-        await send();
-      }
-      return true;
-    },
-  });
+  useQuery({ queryKey: ["prefs"], refetchOnWindowFocus: true, staleTime: 0, queryFn: async () => { await pullPrefs(); return true; } });
 }
