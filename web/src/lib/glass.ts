@@ -1,5 +1,5 @@
-// Liquid glass (quick-liquid): one material and tint for every glass surface, so the phone's tab bar, the assistant's button, the
-// Notes header and the PDF counter are the same glass. The tint is the theme's raised surface at a touch over half, so a surface
+// Liquid glass (quick-liquid): one material and tint for every glass surface, so the phone's tab bar, the assistant's button and
+// the PDF counter are the same glass. The tint is the theme's raised surface at a touch over half, so a surface
 // reads as the theme's and not as clear glass over whatever scrolls by; light and shadow follow the scheme. Only the optics: the
 // motion stays Animate UI's. React surfaces take it from hooks/glass.ts; a page built outside React (pdf/pages.ts) from `glassOfPage`.
 import type { LiquidGlassConfig } from "quick-liquid";

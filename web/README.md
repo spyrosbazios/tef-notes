@@ -337,8 +337,8 @@ Reduced motion follows the OS setting only, no switch in the app (route transiti
 The surfaces that float over scrolling content are liquid glass: `quick-liquid` (SVG backdrop refraction on Chromium, frost elsewhere),
 its optics only, the motion still Animate UI's. One glass for all of them, `lib/glass.ts` (the theme's raised surface as the tint;
 `hooks/glass.ts` for React, `glassOfPage` for a page built outside React): the phone's tab bar (`tab-bar.tsx`), the assistant's button
-(`assistant/fab.tsx`), the Notes header (`note-list.tsx`) and the PDF page counter (`pdf/pages.ts`). Nothing else: a surface nothing
-scrolls under pays for glass and shows none, and at most two share a screen. A snapshot can't carry a child's backdrop-filter, so a
+(`assistant/fab.tsx`) and the PDF page counter (`pdf/pages.ts`). Nothing else: a surface nothing scrolls under pays for glass and
+shows none, at most two share a screen, and a full-width bar is not glass (the Notes header was tried: a square slab, declined). A snapshot can't carry a child's backdrop-filter, so a
 glass surface a route change names gets its blur from the transition group instead (`index.css`, the tab bar).
 
 ## Colours
