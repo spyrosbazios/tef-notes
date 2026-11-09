@@ -1,14 +1,15 @@
 // Global search: notes and tasks by their text and tags, plus navigation. Enter opens the selected result.
 // A note shows as it does in the notes list (its picture, title, opening prose, tags, age, colour), and on a wide screen
-// the highlighted one is previewed beside the results. When nothing matches, "Search with the assistant" asks the agent to
+// the highlighted one is previewed beside the results, its body as Markdown. When nothing matches, "Search with the assistant" asks the agent to
 // look for what was meant (core/find.ts); its hits fill the same list, each with why it fits. No chat opens. A note row's
 // actions are its right-click, and under a finger the ⋮ it shows. On a phone the dialog sits at the top, so the keyboard
 // leaves the results room (the list takes what the viewport has left).
 import { EllipsisVertical, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ago } from "@/core/time";
-import { fold, snippetOf } from "@/core/notes";
+import { fold } from "@/core/notes";
+import { Markdown } from "@/components/markdown";
 import { DeleteDialog, MenuAt, TagsDialog } from "@/components/note-actions";
 import { NoteHit, Thumb } from "@/components/note-hit";
 import { PaletteDialog } from "@/components/palette-dialog";
@@ -24,14 +25,15 @@ import type { NoteRec } from "@/services/notes";
 
 /** The highlighted note, larger: its picture across the top, the title and more of its prose. */
 function Preview({ n, now }: { n: NoteRec; now: number }) {
-  const snippet = useMemo(() => snippetOf(n.note.body, 900), [n.note.body]);
   const tint = n.note.color;
   return (
     <div data-color={tint} className={cn("flex h-full flex-col overflow-hidden rounded-xl border", tint ? "border-tile-line/50 bg-tile text-tile-fg" : "border-line bg-card")}>
       <Thumb key={n.path} n={n} className="h-40 w-full shrink-0 bg-raised object-cover" />
       <div className="flex min-h-0 flex-col gap-2 overflow-y-auto p-4">
         <h3 className="font-semibold text-base leading-snug">{n.note.title}</h3>
-        <p className={cn("whitespace-pre-line text-[13px] leading-relaxed", tint ? "opacity-85" : "text-dim")}>{snippet || "Empty"}</p>
+        {n.note.body.trim()
+          ? <Markdown body={n.note.body} className={cn("text-[13px] [&_a]:pointer-events-none [&_img]:hidden [&_input]:pointer-events-none", tint ? "opacity-85" : "text-dim")} />
+          : <p className="text-[13px] text-dim">Empty</p>}
         {n.note.tags.length ? <span className="flex flex-wrap gap-1">{n.note.tags.map((t) => <TagBadge key={t} name={t} />)}</span> : null}
         <span className={cn("text-[11px] tabular-nums", tint ? "text-tile-line" : "text-faint")}>Edited {ago(ms(n.updated), now)} · Enter to open</span>
       </div>
