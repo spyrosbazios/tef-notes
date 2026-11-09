@@ -1,8 +1,9 @@
 // A new build of the app, announced: the service worker (vite.config.ts) finds it on load and once an hour, and a toast
-// offers to reload rather than swapping the page under an open note. Dismissed, it stays away until the next check.
+// offers to reload rather than swapping the page under an open note.
 // Also the one place the page hears its service worker: a tapped reminder asks the open app to go to its task (sw/sw.ts), an
 // address the router takes as it is (`href`), validated by the route it lands on. Reload is a status button (Animate UI's recipe): once
 // pressed it says "Reloading…" in place, through a light blur, while the new worker takes over, and back to "Reload" if the page has not gone after a few seconds.
+// "Later" hides it until the next hourly check, which offers the same waiting worker again.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRegisterSW } from "virtual:pwa-register/react";
@@ -17,7 +18,10 @@ const RELOAD_MS = 4000;
 
 export function UpdateToast() {
   const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW({
-    onRegisteredSW: (_url, r) => { if (r) setInterval(() => { void r.update(); }, CHECK_MS); },
+    // A worker still waiting after a check is offered again: dismissed with "Later", it fires no new `waiting` event of its own
+    onRegisteredSW: (_url, r) => {
+      if (r) setInterval(() => { void r.update().then(() => { if (r.waiting) setNeedRefresh(true); }); }, CHECK_MS);
+    },
   });
   const router = useRouter();
   const [reloading, setReloading] = useState(false);
@@ -42,6 +46,9 @@ export function UpdateToast() {
           e.preventDefault();                                 // the toast stays up, showing the status, until the page reloads
           if (reloading) return;
           setReloading(true);
+          // The page reloads itself on the hand-over: the plugin's own reload only fires when a worker controlled the page when it
+          // loaded, so a page opened before any worker was installed (a first visit) would otherwise sit on "Reloading…"
+          navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload(), { once: true });
           // The page reloads when the new worker takes over, which this never sees. If it has not by RELOAD_MS (no worker waiting, a
           // failed hand-over), the button is a button again rather than "Reloading…" for good
           updateServiceWorker(true)
