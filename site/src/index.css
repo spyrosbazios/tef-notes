@@ -92,11 +92,13 @@
     transform-origin: 50% 0;
     will-change: transform;
   }
-  @media (max-width: 767px) { .stage-plane { transform: rotateX(calc((1 - var(--rise)) * 20deg)) scale(calc(0.7 + var(--rise) * 0.2)); } }
+  @media (max-width: 767px) { .stage-plane { transform: rotateX(calc((1 - var(--rise)) * 20deg)) scale(calc(0.8 + var(--rise) * 0.2)); } }
   @media (prefers-reduced-motion: reduce) { .stage-title, .stage-plane { transform: none; } }
 
   /* The feature tiles' hover (Features.tsx): each `.hov-*` piece has a rest and a hovered state, the card (`.group`)
-     being hovered. Nothing moves when the visitor asks for no motion. */
+     being hovered. With no pointer to hover (a phone), a tile plays its hover once it has scrolled into view instead
+     (Reveal sets data-in on the wrapper), all but the card's approval, which stays a card, and the tick, a flourish.
+     Nothing moves when the visitor asks for no motion. */
   .hov-pop { opacity: 0; transform: translateY(6px); transition: opacity 0.35s, transform 0.35s; }
   .group:hover .hov-pop { opacity: 1; transform: none; }
   .hov-line { opacity: 0; transition: opacity 0.2s; }
@@ -127,6 +129,15 @@
   .group:hover .hov-fade { opacity: 1; }
   .group:hover .lens-a { animation: none; opacity: 0; }
   .group:hover .lens-b { animation: none; opacity: 1; }
+  @media (hover: none) {
+    .reveal[data-in] .hov-pop { opacity: 1; transform: none; }
+    .reveal[data-in] .hov-line { opacity: 1; }
+    .reveal[data-in] .hov-draw path { stroke-dashoffset: 0; }
+    .reveal[data-in] .hov-lit > * { border-color: var(--tf-brand); background: var(--tf-accent); color: var(--tf-fg); }
+    .reveal[data-in] .hov-out { opacity: 0; transform: scale(0.97); }
+    .reveal[data-in] .hov-in { opacity: 1; transform: none; }
+    .reveal[data-in] .hov-fade { opacity: 1; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .hov-pop, .hov-line, .hov-done { opacity: 1; transform: none; }
     .hov-draw path { stroke-dashoffset: 0; }
@@ -142,6 +153,10 @@
   @keyframes lens-a { 0%, 44% { opacity: 1; } 50%, 94% { opacity: 0; } 100% { opacity: 1; } }
   @keyframes lens-b { 0%, 44% { opacity: 0; } 50%, 94% { opacity: 1; } 100% { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .lens-a { animation: none; opacity: 0; } .lens-b { animation: none; opacity: 1; } }
+
+  /* The themes on a phone (Themes.tsx): one row that scrolls sideways, a card per stop, no scrollbar drawn */
+  .strip { scrollbar-width: none; }
+  .strip::-webkit-scrollbar { display: none; }
 
   /* Hairline grid, faded out toward its edges */
   .bg-grid {

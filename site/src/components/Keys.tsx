@@ -55,7 +55,7 @@ export function Keys() {
     <section id="keys" className="relative border-y border-hair bg-card/40 py-24 md:py-32">
       <div className="mx-auto max-w-6xl px-5 sm:px-8">
         <Heading eyebrow="Bring your own keys" title="Three keys. Each one optional.">
-          A key is one file on your server, and nowhere else.
+          Each is one file on your server, and nowhere else. Voice needs none: the speech model runs on your own CPU.
         </Heading>
         <div className="mt-16 grid gap-4 lg:grid-cols-3">
           {KEYS.map((k, i) => (

@@ -33,7 +33,7 @@ const ROWS: Row[] = [
     caption: "The top of a note on the web: its tasks, a photo strip, a link card and its summary.",
     visual: (
       <Peek label="The top of a travel note on the web: title, tags, two linked tasks, three photos, a link card with its summary"
-        crop={{ x: 312, y: 56, w: 816, h: 640 }} fade="bottom"><div className="flex h-full w-full bg-bg"><LisbonPage /></div></Peek>
+        crop={{ x: 312, y: 56, w: 816, h: 640 }} narrow={{ x: 352, y: 56, w: 600, h: 560 }} fade="both"><div className="flex h-full w-full bg-bg"><LisbonPage /></div></Peek>
     ),
   },
   {
@@ -43,21 +43,21 @@ const ROWS: Row[] = [
     points: ["Checklists, reminders and deadlines", "Repeats: every Friday, every two weeks, a month's last day", "Tags as you type, and the notes a task is about"],
     caption: "Today on the web, with a task open beside it.",
     wide: true,
-    visual: <Peek label="Today on the web: the list on the left, the open task with its checklist and fields on the right" crop={{ x: 240, y: 0, w: 1080, h: 600 }} fade="bottom"><WebTasks /></Peek>,
+    visual: <Peek label="Today on the web: the list on the left, the open task with its checklist and fields on the right" crop={{ x: 240, y: 0, w: 1080, h: 600 }} narrow={{ x: 240, y: 0, w: 440, h: 560 }} fade="bottom"><WebTasks /></Peek>,
   },
   {
     eyebrow: "Ask",
     title: "An assistant that knows what you are looking at.",
     text: "Open it beside any page. It reads the note you have open, searches the rest by meaning, and proposes changes as cards you approve or turn down.",
-    points: ["Finds notes by what they mean, PDFs too", "Adds and edits tasks in one card", "Remembers how you keep your notes"],
+    points: ["Finds notes by what they mean, PDFs too", "Adds and edits tasks in one card", "Takes a photo or a PDF with your question, and dictation"],
     caption: "The assistant's dock on the web, proposing two tasks. On the phone it is the Ask tab.",
-    visual: <Peek label="The assistant's dock: a question, what it read, and a card proposing two tasks with Add them and Turn down" size={DOCK} className="mx-auto max-w-sm"><AskDock /></Peek>,
+    visual: <Peek label="The assistant's dock: a question, what it read, and a card proposing two tasks with Add them and Not now" size={DOCK} className="mx-auto max-w-sm"><AskDock /></Peek>,
   },
   {
     eyebrow: "Lenses",
     title: "One app for work and home. Never both at once.",
     text: "A lens is a set of tags, and the tags it hides. Turn one on and Home, the task lists, search and the assistant all keep to it, in the lens's own colour.",
-    points: ["Picked from the mark on the phone, the rail on the web", "What you make inherits the lens's first tag", "Set up once, there on every device; each picks its own"],
+    points: ["Picked from the mark on the phone, the rail on the web", "What you make inherits the lens's first tag", "Set up once; the lens you turn on follows you to every device"],
     caption: "The same Home through the Home lens and the Work lens.",
     visual: (
       <Pair
@@ -70,14 +70,14 @@ const ROWS: Row[] = [
     eyebrow: "Install",
     title: "The same app, in your pocket.",
     text: "Open your server in Chrome on Android and choose Install app. It is the web app laid out for a thumb, with an animated interface that follows your device's reduced-motion setting.",
-    points: ["Bottom tabs for Home, Tasks, Ask and Settings, and a strip of days", "Swipe a task for When or Delete; tick it, with a moment to Undo", "Task reminders as notifications, no store and no APK"],
+    points: ["Bottom tabs for Home, Tasks, Ask and Settings, in the order you like, and a strip of days", "Swipe a task for When or Delete; tick it, with a moment to Undo", "Task reminders as notifications, no store and no APK"],
     caption: "Tasks and Ask in the installed app.",
     visual: <Pair a={<PhoneFrame label="The Tasks tab on Today: the lists as tabs, the day's tasks and This Evening"><PhoneTasks /></PhoneFrame>} b={<PhoneFrame label="The Ask tab: a chat with a note the assistant found and a task it points to"><PhoneAsk /></PhoneFrame>} />,
   },
   {
     eyebrow: "Search and share",
     title: "Find anything. File anything.",
-    text: "Search drops down from Home and works offline, forgiving accents. Share a page, a photo or a screenshot from any app and the server suggests where it goes.",
+    text: "Search drops down from Home and works offline, forgiving accents; when it finds nothing, the assistant looks for what you meant. Share a page, a photo or a screenshot from any app and the server suggests where it goes.",
     points: ["A #tag in the search narrows notes and tasks alike", "Offline edits are kept and merged when you reconnect", "A link, text, photos or a PDF shared from any app"],
     caption: "Search over Home, and a page shared from the browser.",
     visual: <Pair a={<PhoneFrame label="Search on the phone, notes and tasks as you type"><PhoneSearch /></PhoneFrame>} b={<PhoneFrame label="A shared page, with the server's suggestions of where it goes"><PhoneShare /></PhoneFrame>} />,

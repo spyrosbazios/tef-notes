@@ -1,4 +1,4 @@
-import { ArrowDownUp, ChevronDown, Hash, LayoutGrid, Plus, Tags } from "lucide-react";
+import { ArrowDownUp, ChevronDown, LayoutGrid, Plus, Tags } from "lucide-react";
 import type { ReactNode } from "react";
 import { BoxWords, Evening, NOTES, NoteTile, Planner, TaskRow, WebShell, type DemoTask } from "./parts";
 
@@ -25,7 +25,6 @@ export function WebHome() {
             <section className="flex h-[416px] min-w-0 flex-col">
               <header className="flex items-center gap-3 pb-2 pl-3">
                 <BoxWords />
-                <Outline><Hash className="size-3.5" />Tags</Outline>
                 <span className="flex size-7 items-center justify-center rounded-lg text-brand"><Plus className="size-4" /></span>
               </header>
               <div>
@@ -40,7 +39,6 @@ export function WebHome() {
             <div className="flex h-8 items-center gap-2 pb-3" style={{ boxSizing: "content-box" }}>
               <h2 className="text-[22px] font-bold tracking-tight">Notes</h2>
               <span className="flex-1 self-end pb-1 text-xs tabular-nums text-faint">24</span>
-              <Outline><Hash className="size-3.5" />Tags</Outline>
               <span className="flex overflow-hidden rounded-lg border border-line text-dim">
                 <span className="flex h-7 min-w-7 px-1.5 items-center justify-center bg-accent text-brand"><LayoutGrid className="size-4" /></span>
                 <span className="flex h-7 min-w-7 px-1.5 items-center justify-center"><Tags className="size-4" /></span>

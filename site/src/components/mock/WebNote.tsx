@@ -1,4 +1,4 @@
-import { Bold, BookOpen, Check, ChevronLeft, ChevronRight, Circle, Ellipsis, EllipsisVertical, FileText, Italic, Link2, ListTodo, Paperclip, Pin, Plus, Sparkles } from "lucide-react";
+import { Bold, BookOpen, Check, ChevronLeft, ChevronRight, Circle, Copy, Ellipsis, EllipsisVertical, FileText, Italic, Link2, ListTodo, Mic, Paperclip, Pin, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib";
 import { Fab, Mosaic, Picture, Tag } from "./parts";
 
@@ -16,7 +16,7 @@ export function LisbonPage({ narrow }: { narrow?: boolean }) {
         <span className="flex gap-0.5">{[Bold, Italic, ListTodo, Link2, Ellipsis].map((I, i) => <span key={i} className="flex h-7 min-w-7 items-center justify-center"><I className="size-4" /></span>)}</span>
         <span className="ml-2 flex items-center gap-1.5 text-xs text-faint"><Check className="size-3" />Saved</span>
         <span className="flex-1" />
-        {[Paperclip, Pin, EllipsisVertical].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
+        {[Mic, Paperclip, Pin, EllipsisVertical].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
       </header>
       <div className={cn("mx-auto w-full max-w-3xl pt-8", narrow ? "px-12" : "px-10")}>
         <h1 className="text-[30px] font-extrabold leading-tight tracking-tight">Autumn trip: Lisbon in five days</h1>
@@ -44,7 +44,7 @@ export function LisbonPage({ narrow }: { narrow?: boolean }) {
               <p className="text-[13px] leading-snug text-dim">Small family places, a short menu written on the wall, and the grilled fish of the day.</p>
               <p className="pt-0.5 text-xs text-faint">food-on-foot.example</p>
             </div>
-            <span className="flex shrink-0 gap-1"><Tool icon={BookOpen} label="Read" /><Tool icon={Sparkles} label="Summarised" /></span>
+            <span className="flex shrink-0 gap-1"><Tool icon={Copy} label="Copy" /><Tool icon={BookOpen} label="Read" /><Tool icon={Sparkles} label="Summarised" /></span>
           </div>
           <blockquote className="mt-3 rounded-r-md border-l-2 border-line bg-card py-1 pl-3 text-dim">
             <p><strong className="font-semibold text-fg">Summary</strong>: Ten small restaurants in Alfama and Mouraria; go before 19:30 or queue, cash at three of them.</p>

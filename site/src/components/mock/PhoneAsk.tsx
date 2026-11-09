@@ -1,12 +1,12 @@
-import { AssistantComposer, AssistantHeader, ChatNote, PhoneShell, TaskRow, ToolLine, UserBubble } from "./parts";
+import { AssistantComposer, AssistantHeader, ChatNote, PhoneShell, TaskRow, ToolLine, UNDER_TABS, UserBubble } from "./parts";
 
 /** The Ask tab (web/src/components/assistant/dock.tsx below `md`): the assistant's panel over the whole page, above the tab bar. A
  *  short chat with the cards the agent shows, what it sees, and the composer. */
 export function PhoneAsk() {
   return (
     <PhoneShell tab="Ask">
-      <div className="flex h-full flex-col">
-        <AssistantHeader />
+      <div className={`flex h-full flex-col ${UNDER_TABS}`}>
+        <AssistantHeader phone />
         <div className="min-h-0 flex-1 space-y-4 overflow-hidden px-4 py-5">
           <UserBubble>What should I cook this week, and what&apos;s left to do for Lisbon?</UserBubble>
           <ToolLine>Searched · read tasks</ToolLine>

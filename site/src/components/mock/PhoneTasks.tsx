@@ -13,17 +13,14 @@ const TODAY: DemoTask[] = [
 
 const LISTS: [string, number?][] = [["Inbox", 3], ["Today", 7], ["Upcoming"], ["Logbook"]];
 
-/** The Tasks tab on Today (web/src/components/task-list.tsx below `md`): the list's title and date, the + beside them, the lists as
- *  tabs under a gliding line, the day's tasks and This Evening. */
+/** The Tasks tab on Today (web/src/components/task-list.tsx below `md`): the tabs' header (page-header.tsx) with the list's name and
+ *  the + in brand, the lists as tabs under a gliding line, the day's tasks and This Evening, running on under the floating tab bar. */
 export function PhoneTasks() {
   return (
     <PhoneShell tab="Tasks">
-      <div className="flex items-start justify-between px-4 pb-2 pt-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Star className="size-5 text-brand" />Today</h1>
-          <p className="pl-7 text-sm text-dim">Monday, November 2</p>
-        </div>
-        <span className="mt-0.5 flex size-8 items-center justify-center text-dim"><Plus className="size-4" /></span>
+      <div className="flex h-11 items-center gap-1 pl-4 pr-2">
+        <h1 className="flex min-w-0 flex-1 items-center gap-2 text-[22px] font-bold tracking-tight"><Star className="size-5 shrink-0 text-brand" />Today</h1>
+        <span className="flex size-9 items-center justify-center text-brand"><Plus className="size-[22px]" /></span>
       </div>
       <div className="flex gap-1 border-b border-line px-3">
         {LISTS.map(([t, n]) => (

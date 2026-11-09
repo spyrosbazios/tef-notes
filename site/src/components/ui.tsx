@@ -1,6 +1,6 @@
 // The small parts every section shares: scroll reveal, a card that lights under the pointer, the section heading,
 // the brand mark, and the two device frames the drawn screens sit in.
-import { useEffect, useRef, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { MARK_PATH, MARK_VIEWBOX } from "@/core/brand";
 import { themeVars, type Theme } from "@/core/theme";
 import { cn } from "@/lib";
@@ -9,6 +9,17 @@ import { PHONE, Screen, WEB, type Crop, type Size } from "./mock/screen";
 /** A theme's palette set as --tf-* on one element: everything inside it, written with the same classes as the rest of
  *  the page, draws in that theme. */
 export const scoped = (t: Theme) => Object.fromEntries(Object.entries(themeVars(t)).map(([k, v]) => [`--tf-${k}`, v])) as CSSProperties;
+
+/** Whether the page is at phone width (under Tailwind's `sm`), followed as the window resizes. */
+export function useNarrow() {
+  const [narrow, setNarrow] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(max-width: 639px)").matches);
+  useEffect(() => {
+    const mq = matchMedia("(max-width: 639px)"), on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
 
 export function Reveal({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -118,14 +129,17 @@ export function BrowserFrame({ label, children, className }: { label: string; ch
 }
 
 /** One part of a screen, close up: a region of a drawn web screen (or a panel drawn on its own, at `size`) in a plain
- *  card, no browser chrome, so the eye lands on the detail and not on the device. `fade` softens the edge a crop cuts
- *  through. */
-export function Peek({ label, crop, size = WEB, fade, children, className }: { label: string; crop?: Crop; size?: Size; fade?: "bottom" | "right"; children: ReactNode; className?: string }) {
+ *  card, no browser chrome, so the eye lands on the detail and not on the device. `narrow` is a closer crop for a phone,
+ *  where the whole region would scale to print too small to read. `fade` softens the edges a crop cuts through. */
+export function Peek({ label, crop, narrow, size = WEB, fade, children, className }: {
+  label: string; crop?: Crop; narrow?: Crop; size?: Size; fade?: "bottom" | "right" | "both"; children: ReactNode; className?: string;
+}) {
+  const phone = useNarrow();
   return (
     <div role="img" aria-label={label} className={cn("relative overflow-hidden rounded-2xl border border-line bg-bg shadow-lift ring-1 ring-hair", className)}>
-      <Screen size={size} crop={crop}>{children}</Screen>
-      {fade === "bottom" ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-bg" aria-hidden="true" /> : null}
-      {fade === "right" ? <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-r from-transparent to-bg" aria-hidden="true" /> : null}
+      <Screen size={size} crop={phone && narrow ? narrow : crop}>{children}</Screen>
+      {fade === "bottom" || fade === "both" ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-bg" aria-hidden="true" /> : null}
+      {fade === "right" || fade === "both" ? <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-r from-transparent to-bg" aria-hidden="true" /> : null}
     </div>
   );
 }

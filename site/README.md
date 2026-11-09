@@ -9,4 +9,4 @@ The marketing page: Vite, React 19, Tailwind 4. Its colours and fonts come from 
 - GitHub Pages: `.github/workflows/pages.yml` builds it on a push to `main` that touches `site/`, `packages/core/` or `mobile/assets/`, and publishes `dist/` at `https://spyrosbazios.github.io/tef-notes/` (Settings > Pages > Source: GitHub Actions). That build sets `SITE_BASE=/tef-notes/`; `vite.config.ts` reads it as `base` and defaults to `/`, so the Dockerfile and any root-served host are unchanged. Build with it to check: `SITE_BASE=/tef-notes/ bun run build`.
 - A path the page names itself goes through Vite's `base` (`%BASE_URL%` in `index.html`, `import.meta.env.BASE_URL` in code), never a bare `/...`. There is one page and no router, so no SPA fallback.
 
-<!-- reviewed: 2026-11-08 -->
+<!-- reviewed: 2026-11-09 -->

@@ -4,7 +4,7 @@
 // the app. Photos are drawn stand-ins in the note colours (index.css `.pic`), never pictures.
 import {
   ArrowUp, BatteryFull, Bell, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleCheckBig, Eye, Flag, Focus,
-  History, House, Inbox, ListChecks, Moon, NotebookText, Pin, Repeat, Search, Settings, Settings2, Signal, Sparkles,
+  History, House, Inbox, ListChecks, Mic, Moon, NotebookText, Pin, Plus, Repeat, Search, Settings, Signal, Sparkles,
   SquarePen, Star, Wifi, X, type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -95,9 +95,12 @@ export function Rail({ active, lens }: { active: RailView; lens?: string }) {
   );
 }
 
-/** The assistant's round button at the corner, while its dock is closed. */
+/** The app's glass (web/src/lib/glass.ts): the raised surface at a touch over half, the page blurred through it. */
+export const GLASS = "border border-hair bg-raised/55 shadow-lift backdrop-blur-md";
+
+/** The assistant's round glass button at the corner, while its dock is closed (assistant/fab.tsx). */
 export const Fab = () => (
-  <span className="absolute bottom-5 right-5 flex size-14 items-center justify-center rounded-full bg-brand text-bg shadow-lift"><Sparkles className="size-6" /></span>
+  <span className={cn("absolute bottom-5 right-5 flex size-14 items-center justify-center rounded-full text-brand", GLASS)}><Sparkles className="size-6" /></span>
 );
 
 /** A web screen: the rail, the view's columns, and the assistant (its dock, or the button that opens it). */
@@ -215,6 +218,11 @@ export const Evening = ({ phone }: { phone?: boolean }) => (
   <p className={cn("flex items-center font-semibold", phone ? "mx-3 mb-1 mt-5 gap-2 border-b border-line pb-2 text-[15px] font-extrabold" : "gap-1.5 px-3 pb-1 pt-5 text-sm")}>
     <Moon className={phone ? "size-3.5 text-brand" : "size-3.5 text-dim"} />This Evening
   </p>
+);
+
+/** The phone's header control (note-list.tsx TOOL): a 40px outlined rounded square, its icon 20px, brand for the + that adds. */
+export const Tool = ({ children, brand }: { children: ReactNode; brand?: boolean }) => (
+  <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl border border-line", brand ? "text-brand" : "text-dim")}>{children}</span>
 );
 
 /** The task box's head: Today, the Inbox and Upcoming as quiet words, the chosen one in full (on the phone on a capsule). */
@@ -345,25 +353,38 @@ export function ConfirmCard({ title, why, tasks }: { title: string; why?: string
   );
 }
 
-/** The assistant's header (assistant/panel.tsx): model, past chats, a new chat, and the X that closes the dock (not on the phone, where Ask is a tab). */
-export function AssistantHeader({ close }: { close?: boolean }) {
+/** The assistant's header (assistant/panel.tsx): past chats, a new chat, and the X that closes the dock. On the phone it wears the
+ *  tabs' header (page-header.tsx): the name large on the left, no rule under it, the icons at 22px. */
+export function AssistantHeader({ close, phone }: { close?: boolean; phone?: boolean }) {
+  if (phone) return (
+    <header className="flex h-11 shrink-0 items-center gap-1 pl-4 pr-2 text-dim">
+      <Sparkles className="size-5 text-brand" /><h1 className="ml-1 text-[22px] font-bold tracking-tight text-fg">Assistant</h1><span className="flex-1" />
+      {[History, SquarePen].map((I, i) => <span key={i} className="flex size-9 items-center justify-center"><I className="size-[22px]" /></span>)}
+    </header>
+  );
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-3 text-dim">
       <Sparkles className="size-4 text-brand" /><h2 className="px-1 text-[15px] font-bold tracking-tight text-fg">Assistant</h2><span className="flex-1" />
-      <span className="flex h-8 items-center gap-0.5 px-2 text-faint"><Settings2 className="size-4" /><ChevronDown className="size-3" /></span>
       {[History, SquarePen, ...(close ? [X] : [])].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
     </header>
   );
 }
 
-/** What the assistant sees of the page, and the composer: a field and the round Send, which waits for a message. */
+/** What the assistant sees of the page, and the composer (assistant/panel.tsx): the field, then a row of Attach, the model and
+ *  effort pill, the mic and the round Send, which waits for a message. */
 export function AssistantComposer({ sees, ready }: { sees: string; ready?: boolean }) {
   return (
-    <div className="shrink-0 border-t border-line p-3">
+    <div className="shrink-0 border-t border-line px-3 pb-3 pt-3">
       <p className="flex items-center gap-1.5 px-1 pb-1.5 text-xs text-faint"><Eye className="size-3.5" /><span className="truncate">{sees}</span></p>
-      <div className="flex items-end gap-2 rounded-2xl border border-line bg-card p-2">
-        <span className="min-h-9 flex-1 px-2 py-1.5 text-sm text-faint">Ask, or say what to note</span>
-        <span className={cn("flex size-8 items-center justify-center rounded-full bg-brand text-bg", !ready && "opacity-50")}><ArrowUp className="size-4" /></span>
+      <div className="rounded-3xl border border-line bg-card p-2">
+        <p className="min-h-9 px-2 py-1.5 text-sm text-faint">Ask, or tap the mic and say what to note</p>
+        <div className="flex items-center gap-1 pt-1 text-dim">
+          <span className="flex size-8 items-center justify-center rounded-full"><Plus className="size-4" /></span>
+          <span className="flex-1" />
+          <span className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium">deepseek-flash<span className="font-normal text-faint">Normal</span><ChevronDown className="size-3 text-faint" /></span>
+          <span className="flex size-8 items-center justify-center rounded-full"><Mic className="size-4" /></span>
+          <span className={cn("flex size-8 items-center justify-center rounded-full bg-brand text-bg", !ready && "opacity-50")}><ArrowUp className="size-4" /></span>
+        </div>
       </div>
     </div>
   );
@@ -396,15 +417,16 @@ export type PhoneTab = "Home" | "Tasks" | "Ask" | "Settings";
 
 const TABS: [LucideIcon, PhoneTab][] = [[House, "Home"], [ListChecks, "Tasks"], [Sparkles, "Ask"], [Settings, "Settings"]];
 
-/** The floating pill of tabs: the active one's icon and label on a brand capsule, the rest icons alone. */
+/** The pill of tabs (web/src/components/tab-bar.tsx): liquid glass that floats over the page, hugging its tabs, centred; the
+ *  tab in front shows its label on a brand capsule, the rest are icons. The page scrolls on under it. */
 export function TabBar({ active }: { active: PhoneTab }) {
   return (
-    <div className="shrink-0 bg-bg px-4 pb-5 pt-3">
-      <div className="flex items-center justify-between rounded-full border border-line bg-raised p-1.5 shadow-lift">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pb-5">
+      <div className={cn("flex h-[58px] items-center gap-1 rounded-full p-1.5", GLASS)}>
         {TABS.map(([Icon, label]) => (
-          <span key={label} className={cn("flex h-12 items-center justify-center gap-2 rounded-full", label === active ? "bg-accent px-4 text-brand" : "px-3 text-dim")}>
+          <span key={label} className={cn("flex h-full items-center justify-center rounded-full px-3", label === active ? "bg-accent text-brand" : "text-dim")}>
             <Icon className="size-[22px]" strokeWidth={label === active ? 2.4 : 2} />
-            {label === active ? <span className="text-[14px] font-semibold">{label}</span> : null}
+            {label === active ? <span className="pl-2 pr-1 text-sm font-semibold">{label}</span> : null}
           </span>
         ))}
       </div>
@@ -412,25 +434,32 @@ export function TabBar({ active }: { active: PhoneTab }) {
   );
 }
 
-/** A phone screen: status bar, the body, and (for the tab screens) the bar of tabs. */
+/** A phone screen: status bar, the body, and (for the tab screens) the bar of tabs floating over its foot. A screen that is
+ *  not a scroller (the Ask tab, whose composer sits above the bar) pads its own foot by `UNDER_TABS`. */
+export const UNDER_TABS = "pb-[84px]";
 export function PhoneShell({ tab, children }: { tab?: PhoneTab; children: ReactNode }) {
   return (
     <div className="flex h-full w-full flex-col bg-bg">
       <StatusBar />
-      <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
-      {tab ? <TabBar active={tab} /> : <div className="flex h-5 shrink-0 items-center justify-center"><span className="h-1 w-28 rounded-full bg-fg/50" /></div>}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {children}
+        {tab ? <TabBar active={tab} /> : null}
+      </div>
+      {tab ? null : <div className="flex h-5 shrink-0 items-center justify-center"><span className="h-1 w-28 rounded-full bg-fg/50" /></div>}
     </div>
   );
 }
 
-/** Home's header (web/src/components/home.tsx): the mark, which is the lens (its name beside it while one is on), and Search in the corner. */
+/** Home's header (web/src/components/home.tsx): the mark is the lens picker (lens-switcher.tsx), the lens's name beside it, or
+ *  "All" while none is on, and a chevron so it reads as a control; Search in the corner. */
 export function HomeHeader({ lens, searching }: { lens?: string; searching?: boolean }) {
   return (
     <div className="flex h-11 items-center gap-1 pl-4 pr-2">
       <span className="flex min-w-0 flex-1">
-        <span className="flex h-11 items-center gap-2.5">
+        <span className={cn("flex h-11 items-center gap-2.5 pr-2", lens ? "text-brand" : "text-dim")}>
           <Mark className="h-7" />
-          {lens ? <span className="text-[15px] font-extrabold tracking-tight text-brand">{lens}</span> : null}
+          <span className="text-[15px] font-extrabold tracking-tight">{lens ?? "All"}</span>
+          <ChevronDown className="size-4" />
         </span>
       </span>
       <span className={cn("flex size-9 items-center justify-center", searching ? "text-brand" : "text-dim")}>{searching ? <X className="size-[22px]" /> : <Search className="size-[22px]" />}</span>

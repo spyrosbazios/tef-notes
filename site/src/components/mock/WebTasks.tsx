@@ -24,7 +24,7 @@ export function WebTasks() {
     <WebShell active="today">
       <section className="flex h-full w-[420px] shrink-0 flex-col overflow-hidden border-r border-line">
         <header className="flex items-start justify-between px-4 pb-2 pt-4">
-          <h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Star className="size-5 text-brand" />Today</h2>
+          <div><h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Star className="size-5 text-brand" />Today</h2><p className="pl-7 text-sm text-dim">Monday, November 2</p></div>
           <span className="mt-0.5 flex size-7 items-center justify-center text-dim"><Plus className="size-4" /></span>
         </header>
         <div className="px-2">

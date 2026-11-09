@@ -1,11 +1,11 @@
-import { ArrowRight, BookOpen, Check, ChevronDown, Circle, FileText, MousePointer2, NotebookText, PenTool, Sparkles, Square, Type, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, ChevronDown, Circle, FileText, Globe, MousePointer2, NotebookText, PenTool, Smartphone, Sparkles, Square, Type, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib";
 import { THEMES, withAccent } from "@/core/theme";
 import { Mosaic, Picture, PTag, Radio, TaskRow } from "./mock/parts";
 import { Heading, Mark, Reveal, scoped, Spotlight } from "./ui";
 
-/** Each feature is a detail of the app drawn at full size, and three or four words. */
+/** Each feature is a detail of the app drawn at full size, and three or four words. A `wide` one takes two columns. */
 type Feature = { title: string; text: string; art: ReactNode; wide?: boolean };
 
 /** A terminal; its output lines (and a second command) appear one after another when the tile is hovered. */
@@ -33,7 +33,7 @@ function Through({ lens, className }: { lens: "Home" | "Work"; className: string
   return (
     <div className={cn("absolute inset-0 flex flex-col", className)}>
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent pl-1.5 pr-2.5 text-sm font-semibold text-brand"><Mark className="h-6" />{lens}<ChevronDown className="size-3.5" /></span>
+        <span className="inline-flex h-9 items-center gap-2 pr-2 text-[15px] font-extrabold tracking-tight text-brand"><Mark className="h-7" />{lens}<ChevronDown className="size-4" /></span>
         <span className="text-xs text-faint">{keep.map((t) => `#${t}`).join(" ")}</span>
       </div>
       <div className="mt-3 space-y-1">
@@ -64,9 +64,10 @@ const blob = (cx: number, cy: number, rx: number, ry: number) =>
   `M${cx - rx} ${cy} q0.5 -${ry} ${rx} -${ry} q${rx} 0.5 ${rx} ${ry} q-0.5 ${ry} -${rx} ${ry} q-${rx} -0.5 -${rx} -${ry} z`;
 
 /** A mind map as Excalidraw draws one: an ellipse in the middle, boxes around it, arrows between, one box hatched. The
- *  arrows draw and the hatching fills when the tile is hovered. */
+ *  arrows draw and the hatching fills when the tile is hovered. The view box keeps a band under the drawing for the
+ *  frame's chips (Drawing), so neither covers a box. */
 const Sketch = () => (
-  <svg viewBox="0 0 320 150" className="h-36 w-full" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg viewBox="0 -6 320 186" className="h-44 w-full" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <defs>
       <pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><path d="M0 0 V5" className="stroke-brand" strokeWidth="1" /></pattern>
     </defs>
@@ -98,6 +99,36 @@ const Sketch = () => (
 );
 
 const TOOLS = [MousePointer2, Square, Circle, ArrowRight, PenTool, Type];
+
+const BARS = [6, 12, 16, 10, 7];
+
+/** Dictation, as the field's mic draws it (web/src/components/mic-button.tsx): the words so far in the field, the pill that
+ *  listens (a red dot, bars that follow the voice, the clock, a cancel) and the stop button beside it. */
+const Dictation = () => (
+  <div className="mx-auto w-full max-w-md rounded-2xl border border-line bg-card px-4 py-3">
+    <p className="text-[16px] leading-snug">Call the plumber about the radiator, Tuesday morning<span className="ml-px inline-block h-5 w-0.5 bg-brand align-[-4px]" /></p>
+    <div className="mt-3 flex items-center justify-end gap-1.5">
+      <span className="flex h-8 items-center gap-2 rounded-full border border-down/40 bg-down/10 px-2.5 text-xs font-semibold tabular-nums text-down">
+        <span className="size-2 rounded-full bg-down" />Listening
+        <span className="flex h-4 items-center gap-[2px]">{BARS.map((h, i) => <span key={i} className="w-[3px] rounded-full bg-down" style={{ height: h }} />)}</span>
+        0:07<X className="size-3.5" />
+      </span>
+      <span className="flex size-8 items-center justify-center rounded-full bg-down text-bg"><Square className="size-4 fill-current" /></span>
+    </div>
+  </div>
+);
+
+/** Settings as they travel: a few rows of the owner's preferences, the same on the laptop and the phone. */
+const Shared = () => (
+  <div>
+    <div className="divide-y divide-line rounded-2xl border border-line bg-card text-[13px]">
+      {[["Theme", "Midnight"], ["Accent", "Teal"], ["Tabs", "Home · Tasks · Ask"], ["Opens on", "Today"]].map(([k, v]) => (
+        <div key={k} className="flex items-center justify-between px-3 py-1.5"><span className="text-dim">{k}</span><span className="font-medium">{v}</span></div>
+      ))}
+    </div>
+    <p className="mt-2 flex items-center gap-1.5 text-xs text-faint"><Globe className="size-3.5" /><Smartphone className="size-3.5" />The same on every device</p>
+  </div>
+);
 
 /** The sketch in its frame: Excalidraw's island of tools on top, the file's name, and the way into Excalidraw. */
 const Drawing = () => (
@@ -175,7 +206,11 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: "An assistant that asks first", text: "Every write is a card you approve.",
+    title: "Say it instead", text: "Dictate wherever you type. Transcribed on your own server, nothing kept.", wide: true,
+    art: <Dictation />,
+  },
+  {
+    title: "An assistant that asks first", text: "Each write is a card you approve, until you say it needn't.",
     art: (
       <div className="relative">
         <div className="hov-card space-y-2.5 rounded-2xl border border-brand/40 bg-card p-3.5 text-sm">
@@ -230,15 +265,20 @@ const FEATURES: Feature[] = [
     title: "Reader view", text: "The linked article, clutter gone.",
     art: <Reader />,
   },
+  {
+    title: "Set up once", text: "Theme, accent, tabs and the lens that is on follow you to every device.",
+    art: <Shared />,
+  },
 ];
 
 export function Features() {
   return (
     <section id="features" className="relative mx-auto max-w-6xl px-5 py-24 sm:px-8 md:py-32">
       <Heading eyebrow="Features" title="Everything a notebook should do." />
-      <div className="mt-16 grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Dense: the wide tile takes two columns wherever it lands, and the next tile fills what it skipped */}
+      <div className="mt-16 grid grid-cols-[minmax(0,1fr)] gap-4 [grid-auto-flow:dense] sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((f, i) => (
-          <Reveal key={f.title} delay={(i % 3) * 80} className="h-full">
+          <Reveal key={f.title} delay={(i % 3) * 80} className={cn("h-full", f.wide && "sm:col-span-2")}>
             <Spotlight className="group flex h-full flex-col rounded-card border border-line bg-glass p-5 backdrop-blur transition-colors hover:bg-card">
               <div className="flex min-h-36 flex-1 flex-col justify-center">{f.art}</div>
               <h3 className="mt-5 text-[17px] font-bold leading-snug tracking-tight">{f.title}</h3>

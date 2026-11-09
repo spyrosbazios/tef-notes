@@ -1,4 +1,4 @@
-import { Boxes, Container, Database, Globe, Puzzle, Smartphone, SquareTerminal, Zap, type LucideIcon } from "lucide-react";
+import { Boxes, CloudOff, Container, Database, Globe, Mic, Puzzle, Smartphone, SquareTerminal, Zap, type LucideIcon } from "lucide-react";
 import { Heading, Reveal } from "./ui";
 
 const CLIENTS: [LucideIcon, string, string][] = [
@@ -10,9 +10,11 @@ const CLIENTS: [LucideIcon, string, string][] = [
 
 const STACK: [LucideIcon, string, string][] = [
   [Database, "PocketBase", "One binary, SQLite inside. Hooks hold the write contract; migrations are the schema."],
-  [Zap, "The agent", "A bun sidecar that streams the chat. MCP for other agents, if you want it."],
+  [Zap, "The agent", "A bun sidecar that streams the chat and finds notes by meaning. MCP for other agents, if you want it."],
+  [Mic, "Speech to text", "Parakeet on the CPU, in a container of its own. Loads when you tap the mic, unloads once idle."],
   [Boxes, "One core", "Note format, merge, task rules and palettes, imported by every client."],
-  [Container, "One compose", "Server, web app and extension in one build. Your data is one directory."],
+  [Container, "One compose", "Three containers from one file; the web app and the extension ride in the server's. Your notes are one directory."],
+  [CloudOff, "An offline copy", "The phone keeps notes, tasks and links in the browser, and merges what you wrote offline when it reconnects."],
 ];
 
 /** Four ways in converge on one server. The wires are one SVG stretched to the row (non-scaling strokes), the flow a
@@ -49,7 +51,7 @@ export function Fits() {
             <p className="text-2xl font-extrabold tracking-tight">One PocketBase server</p>
             <p className="text-[15px] text-dim">On a machine you own. Reached only over your private network.</p>
           </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {STACK.map(([Icon, name, text]) => (
               <div key={name} className="flex items-start gap-3.5 rounded-xl border border-line bg-bg/60 p-4">
                 <Icon className="mt-0.5 size-5 shrink-0 text-brand" strokeWidth={1.9} />

@@ -1,5 +1,5 @@
-import { ArrowDownUp, Hash, Plus, Tags } from "lucide-react";
-import { BoxWords, Days, Evening, HomeHeader, NOTES, NoteTile, PhoneShell, TaskRow, type DemoNote, type DemoTask } from "./parts";
+import { ArrowDownUp, Plus, Tags } from "lucide-react";
+import { BoxWords, Days, Evening, HomeHeader, NOTES, NoteTile, PhoneShell, TaskRow, Tool, type DemoNote, type DemoTask } from "./parts";
 
 type View = { tasks: DemoTask[]; evening?: DemoTask; notes: DemoNote[]; count: number };
 
@@ -32,10 +32,6 @@ const LENSES: Record<"Home" | "Work", View> = {
   },
 };
 
-const Ghost = ({ children, brand }: { children: React.ReactNode; brand?: boolean }) => (
-  <span className={brand ? "flex size-9 items-center justify-center text-brand" : "flex size-8 items-center justify-center rounded-lg border border-line text-dim"}>{children}</span>
-);
-
 /** Home as the installed app draws it (web/src/components/home.tsx below `md`): the mark (the lens) and Search, the days strip, the
  *  task box at a fixed height, then every note in two columns. */
 export function PhoneHome({ lens = "Home" }: { lens?: "Home" | "Work" }) {
@@ -48,10 +44,9 @@ export function PhoneHome({ lens = "Home" }: { lens?: "Home" | "Work" }) {
           <HomeHeader lens={lens} />
           <Days />
           <div>
-            <div className="flex items-center gap-2 pl-1.5 pr-2 pb-2">
+            <div className="flex items-center gap-2 pl-1.5 pr-4 pb-2">
               <BoxWords phone />
-              <Ghost><Hash className="size-4" /></Ghost>
-              <Ghost brand><Plus className="size-[22px]" /></Ghost>
+              <Tool brand><Plus className="size-5" /></Tool>
             </div>
             <div className="relative h-72 overflow-hidden">
               {v.tasks.map((t) => <TaskRow key={t.title} task={t} />)}
@@ -62,10 +57,9 @@ export function PhoneHome({ lens = "Home" }: { lens?: "Home" | "Work" }) {
         </div>
         <div className="flex items-center gap-2 px-4">
           <b className="text-lg font-extrabold tracking-tight">Notes</b><span className="flex-1 pt-1 text-xs tabular-nums text-faint">{v.count}</span>
-          <Ghost><Hash className="size-4" /></Ghost>
-          <Ghost><Tags className="size-4" /></Ghost>
-          <Ghost><ArrowDownUp className="size-4" /></Ghost>
-          <Ghost brand><Plus className="size-[22px]" /></Ghost>
+          <Tool><Tags className="size-5" /></Tool>
+          <Tool><ArrowDownUp className="size-5" /></Tool>
+          <Tool brand><Plus className="size-5" /></Tool>
         </div>
         <div className="flex items-start gap-3 px-4 pb-4">
           {cols.map((c, i) => <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">{c.map((n) => <NoteTile key={n.title} note={n} maxTags={2} />)}</div>)}
