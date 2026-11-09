@@ -107,7 +107,7 @@ function placeOf(o) {
   const name = placeText(o.name);
   if (!name) return null;
   const address = placeText(o.address), lat = coord(o.lat, 90), lng = coord(o.lng, 180);
-  const id = typeof o.place_id === "string" && /^[\w-]{10,300}$/.test(o.place_id) ? o.place_id : undefined;
+  const id = typeof o.place_id === "string" && /^[NWR]\d{1,15}$/.test(o.place_id) ? o.place_id : undefined;
   const p = { name };
   if (address && address !== name) p.address = address;
   if (lat != null && lng != null) { p.lat = lat; p.lng = lng; }
