@@ -18,7 +18,7 @@ import { useNarrow } from "@/hooks/media";
 import { cn } from "@/lib/utils";
 import { mapSrc } from "@/services/places";
 
-/** The map picture's size as asked for (drawn at 2×): wide enough for the note's column, cropped to the card's height. */
+/** The map picture's size as asked for, in CSS pixels: wide enough for the note's column, cropped to the card's height. */
 const MAP_W = 640, MAP_H = 220;
 
 /** Off the page, in a new tab or the Maps app. */
@@ -46,7 +46,7 @@ export function AddPlace({ onSet }: { onSet: (p: Place) => void }) {
   );
 }
 
-/** The map, a link to the place; gone when the server can't draw it (no key, no coordinates, offline). */
+/** The map, a link to the place; gone when the server can't draw it (no coordinates, offline). */
 function MapPicture({ where }: { where: Place }) {
   const { theme, accent } = useAppearance(), shown = lensAccent(useActiveLens(), accent);
   const src = mapSrc(where, MAP_W, MAP_H, theme, shown);

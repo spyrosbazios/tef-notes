@@ -25,7 +25,7 @@ import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, Unavailable } from "./models";
 import { inlinePdfs, preview } from "./pdfs";
-import { PLACE_SEARCH, placeProblem, type PlaceInput } from "./placeTools";
+import { placeProblem, type PlaceInput } from "./placeTools";
 import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
 import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
 import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type AddManyInput, type UpdateInput } from "./todoTools";
@@ -97,14 +97,14 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = pdfs ? async () => true : read;
-  const web = !!(await key("exa")), maps = !!(await key("maps")), all = tools(notes, todo, untrusted);
-  // Out of the prompt: the web tools without an Exa key, place search without a Maps key, and the tools the client does
+  const web = !!(await key("exa")), all = tools(notes, todo, untrusted);
+  // Out of the prompt: the web tools without an Exa key, and the tools the client does
   // itself unless this page can do them
-  const ui = uiToolsFor(page), off = new Set<string>([...(web ? [] : WEB_TOOLS), ...(maps ? [] : [PLACE_SEARCH]), ...UI_TOOL_NAMES.filter((n) => !ui.includes(n))]);
+  const ui = uiToolsFor(page), off = new Set<string>([...(web ? [] : WEB_TOOLS), ...UI_TOOL_NAMES.filter((n) => !ui.includes(n))]);
   const base = (Object.keys(all) as (keyof Tools)[]).filter((n) => !off.has(n));
   return new ToolLoopAgent({
     model: m,
-    instructions: `${SYSTEM}${maps ? `\n${PLACES}` : ""}${web ? `\n${WEB}` : ""}`,
+    instructions: `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}`,
     tools: all,
     stopWhen: isStepCount(steps),
     reasoning,

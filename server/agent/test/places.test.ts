@@ -1,44 +1,48 @@
-// Place search's pure parts: Google's answers as the core's shapes, the themed map request, and the routes' refusals
-// before Google is asked (no key here: TEF_NOTES_KEYS_DIR points at an empty directory).
-import { afterAll, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+// Place search's pure parts: OpenStreetMap's answers as the core's shapes, the tiles a map needs, the themed picture,
+// and the routes' refusals before anything is asked.
+import { describe, expect, it } from "bun:test";
 import { THEMES } from "@/core/theme";
-import { fromGoogle, mapRoute, mapStyle, mapUrl, NO_KEY, placeRoute, suggestionsFrom, suggestRoute } from "../src/places";
+import { duotone, fromNominatim, fromPhoton, mapRoute, mapSvg, placeRoute, placesFrom, suggestRoute, tilesFor, worldPx } from "../src/places";
 
-const dir = mkdtempSync(join(tmpdir(), "places-")), was = process.env.TEF_NOTES_KEYS_DIR;
-process.env.TEF_NOTES_KEYS_DIR = dir;
-afterAll(() => { rmSync(dir, { recursive: true }); if (was === undefined) delete process.env.TEF_NOTES_KEYS_DIR; else process.env.TEF_NOTES_KEYS_DIR = was; });
+const LUKUMADES = { properties: { osm_type: "N", osm_id: 9675835944, name: "LUKUΜΑΔΕΣ", housenumber: "21", street: "Αιόλου", locality: "Plaka", city: "Athens", postcode: "105 56", country: "Greece" }, geometry: { coordinates: [23.7275759, 37.9769476] as [number, number] } };
 
-describe("Google's answers", () => {
+describe("Photon's answers", () => {
   it("a place as a note keeps it", () => {
-    expect(fromGoogle({ id: "ChIJ8UNwBh-9oRQR3Y1mdkU1Nic", displayName: { text: "Acropolis Museum" }, formattedAddress: "Dionysiou Areopagitou 15, Athina 117 42, Greece", location: { latitude: 37.968450012, longitude: 23.7285 } }))
-      .toEqual({ name: "Acropolis Museum", address: "Dionysiou Areopagitou 15, Athina 117 42, Greece", lat: 37.96845, lng: 23.7285, place_id: "ChIJ8UNwBh-9oRQR3Y1mdkU1Nic" });
-    expect(fromGoogle({ id: "ChIJ8UNwBh-9oRQR3Y1mdkU1Nic" })).toBeNull();
+    expect(fromPhoton(LUKUMADES)).toEqual({ name: "LUKUΜΑΔΕΣ", address: "Αιόλου 21, 105 56 Athens, Greece", lat: 37.9769476, lng: 23.7275759, place_id: "N9675835944" });
   });
-  it("suggestions: the name, and the rest of the line under it", () => {
-    expect(suggestionsFrom({ suggestions: [
-      { placePrediction: { placeId: "ChIJ8UNwBh-9oRQR", text: { text: "Acropolis Museum, Athens" }, structuredFormat: { mainText: { text: "Acropolis Museum" }, secondaryText: { text: "Athens, Greece" } } } },
-      { placePrediction: { placeId: "ChIJ8UNwBh-9oRQS", text: { text: "Somewhere" } } },
-      {},
-    ] })).toEqual([
-      { place_id: "ChIJ8UNwBh-9oRQR", name: "Acropolis Museum", detail: "Athens, Greece" },
-      { place_id: "ChIJ8UNwBh-9oRQS", name: "Somewhere", detail: "" },
-    ]);
-    expect(suggestionsFrom(null)).toEqual([]);
+  it("an address without a name is named by its street", () => {
+    expect(fromPhoton({ properties: { osm_type: "W", osm_id: 12, street: "Ermou", housenumber: "5", city: "Athens" }, geometry: { coordinates: [23.73, 37.97] } }))
+      .toMatchObject({ name: "Ermou 5", address: "Ermou 5, Athens", place_id: "W12" });
+  });
+  it("drops nameless hits and repeats", () => {
+    expect(placesFrom({ features: [LUKUMADES, LUKUMADES, { properties: {} }] })).toHaveLength(1);
+    expect(placesFrom(null)).toEqual([]);
+  });
+});
+
+describe("Nominatim's answer", () => {
+  it("a place by its id", () => {
+    expect(fromNominatim({ osm_type: "node", osm_id: 9675835944, lat: "37.9769476", lon: "23.7275759", name: "LUKUΜΑΔΕΣ", display_name: "LUKUΜΑΔΕΣ, 21, Αιόλου, Athens", address: { road: "Αιόλου", house_number: "21", postcode: "105 56", city: "Athens", country: "Greece" } }))
+      .toEqual({ name: "LUKUΜΑΔΕΣ", address: "Αιόλου 21, 105 56 Athens, Greece", lat: 37.9769476, lng: 23.7275759, place_id: "N9675835944" });
+    expect(fromNominatim({})).toBeNull();
   });
 });
 
 describe("the map", () => {
-  it("is drawn at 2× in the theme's colours, the pin in the accent", () => {
-    const u = new URL(mapUrl(37.97, 23.73, 320, 160, "light", "red", "K"));
-    expect(u.searchParams.get("size")).toBe("320x160");
-    expect(u.searchParams.get("scale")).toBe("2");
-    expect(u.searchParams.get("markers")).toBe("color:0xc62828|37.97,23.73");
-    expect(u.searchParams.getAll("style")).toEqual(mapStyle(THEMES.light.C));
-    expect(u.searchParams.getAll("style")[0]).toBe(`element:geometry|color:0x${THEMES.light.C.card.slice(1)}`);
-    expect(new URL(mapUrl(1, 2, 100, 100, "oled", "theme", "K")).searchParams.get("markers")).toBe(`color:0x${THEMES.oled.C.brand.slice(1)}|1,2`);
+  it("centres the point and covers the picture with tiles", () => {
+    const c = worldPx(37.9769476, 23.7275759), ts = tilesFor(37.9769476, 23.7275759, 320, 160);
+    expect(Math.floor(c.x / 256)).toBe(37087);
+    for (const t of ts) expect(t.dx).toBeGreaterThan(-256);
+    const xs = new Set(ts.map((t) => t.x)), ys = new Set(ts.map((t) => t.y));
+    expect(xs.size * 256).toBeGreaterThanOrEqual(640);
+    expect(ys.size * 256).toBeGreaterThanOrEqual(320);
+  });
+  it("is the theme's duotone, the pin in the accent, OSM credited", () => {
+    expect(duotone(THEMES.light.C)[0].split(" ")).toHaveLength(3);
+    const svg = mapSvg(320, 160, [{ href: "data:image/png;base64,AA", dx: 0, dy: 0 }], "light", "red");
+    expect(svg).toContain('fill="#c62828"');
+    expect(svg).toContain("© OpenStreetMap");
+    expect(svg).toContain(`fill="${THEMES.light.C.card}"`);
   });
 });
 
@@ -46,14 +50,8 @@ describe("the routes", () => {
   const get = (path: string) => new Request(`http://agent/agent/${path}`);
   it("refuse a malformed request before anything else", async () => {
     expect((await suggestRoute(get("places/suggest?q="))).status).toBe(400);
-    expect((await placeRoute(get("places/place?id=x"))).status).toBe(400);
+    expect((await placeRoute(get("places/place?id=ChIJ8UNwBh-9oRQR"))).status).toBe(400);
     expect((await mapRoute(get("places/map?lat=91&lng=0&w=100&h=100"))).status).toBe(400);
     expect((await mapRoute(get("places/map?lat=1&lng=2&w=10&h=100"))).status).toBe(400);
-  });
-  it("say so without a key", async () => {
-    for (const r of [await suggestRoute(get("places/suggest?q=cafe")), await placeRoute(get("places/place?id=ChIJ8UNwBh-9oRQR")), await mapRoute(get("places/map?lat=1&lng=2&w=100&h=100"))]) {
-      expect(r.status).toBe(503);
-      expect(await r.json()).toEqual({ message: NO_KEY });
-    }
   });
 });

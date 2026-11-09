@@ -1,23 +1,19 @@
-// Place search for a note's Where, over the agent's routes (contract: core/places.ts): the server holds the Google Maps key,
-// so suggestions, the picked place and its map all come from there.
-import { AxiosError } from "axios";
+// Place search for a note's Where, over the agent's routes (contract: core/places.ts): the server asks OpenStreetMap, so
+// suggestions, a place by its id and its map all come from there.
 import { mapPath, placeOf, placePath, suggestionsOf, suggestPath, type Place, type Suggestion } from "@/core/places";
 import { api } from "./api";
 
 const agent = { baseURL: "", timeout: 15_000 } as const;
 const lang = () => navigator.language || undefined;
 
-/** The server has no Google Maps key: a place can only be typed by name. */
-export const noSearch = (e: unknown) => e instanceof AxiosError && e.response?.status === 503;
-
-export async function suggest(input: string, session: string, signal?: AbortSignal): Promise<Suggestion[]> {
-  return suggestionsOf((await api.get(`/agent/${suggestPath(input, session, lang())}`, { ...agent, signal })).data);
+export async function suggest(input: string, signal?: AbortSignal): Promise<Suggestion[]> {
+  return suggestionsOf((await api.get(`/agent/${suggestPath(input, lang())}`, { ...agent, signal })).data);
 }
 
-/** The place a suggestion stands for, whole: its address and coordinates. */
-export async function place(placeId: string, session: string): Promise<Place> {
-  const p = placeOf((await api.get(`/agent/${placePath(placeId, session, lang())}`, agent)).data);
-  if (!p) throw new Error("Google Maps sent no place.");
+/** A place by its OpenStreetMap id, whole: its address and coordinates. */
+export async function place(placeId: string): Promise<Place> {
+  const p = placeOf((await api.get(`/agent/${placePath(placeId, lang())}`, agent)).data);
+  if (!p) throw new Error("OpenStreetMap sent no place.");
   return p;
 }
 

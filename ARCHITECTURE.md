@@ -44,17 +44,17 @@ where:
   address: 12 Example St, Athens
   lat: 37.9838
   lng: 23.7275
-  place_id: ChIJ8UNwBh-9oRQR3Y1mdkU1Nic
+  place_id: N9675835944
 ---
 Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, code, images.
 ```
 
 - `title` and `created` are always present. `pinned`, `color`, `tags` and `where` appear only when set.
 - `where` is the one place a note is about (`packages/core/src/places.ts`): a block of `name` (required), `address`,
-  `lat`/`lng` (a pair) and Google's `place_id`, or a plain `where: Home`, a name alone. It is a flag like `pinned`: set in
+  `lat`/`lng` (a pair) and its OpenStreetMap id `place_id` (`N`, `W` or `R` and a number), or a plain `where: Home`, a name alone. It is a flag like `pinned`: set in
   one edit (`withFlags`), and where both sides changed it, the merge keeps mine. The web app shows it under the title with
   the place's map, Directions and Open in Maps (Google Maps URLs, no key; a phone opens the Maps app). Picking one searches
-  Google through the agent (`/agent/places/*`, the `maps` key); without the key a place is typed by name.
+  OpenStreetMap through the agent (`/agent/places/*`, no key); a place a map can't know is typed by name.
 - There is no `updated` field on purpose: both sides would touch it on every edit and the line merge would conflict every
   time. The server's own `updated` column tracks it.
 - `color` is one of `yellow pink blue green purple gray`: the note card's tint in the list.
@@ -200,10 +200,11 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   `server/pb_hooks/lib/llm.js` its plain-HTTP copy for the hooks); `exa` powers web search. Without the provider's key a chat is refused; without
   `exa` the web tools are left out of the prompt.
 - Places (`src/places.ts`, `src/placeTools.ts`): `GET /agent/places/suggest`, `place` and `map` are a note's place search
-  over Google Maps Platform with the `maps` key (Autocomplete with a session token per pick, Place Details, and Maps Static
-  drawn in the owner's theme); the key never reaches a client. The assistant's `find_place` (Text Search; taints the chat
-  like the web, a business names itself) and `set_place`, which writes a note's `where:` block or a task's `where` from
-  Google's own details by `place_id`, or a name alone. Without the key `find_place` is left out of the prompt and the routes answer 503.
+  over OpenStreetMap's free services, no key: Photon for suggestions (each a whole place) and the assistant's `find_place`
+  (taints the chat like the web, a business names itself), Nominatim for a place by its OSM id, and OSM's tiles composed
+  into an SVG in the owner's theme (tiles cached in memory). Their policies ask for an identifying User-Agent, light use
+  and the credit shown. `set_place` writes a note's `where:` block or a task's `where` from the details by `place_id`, or
+  a name alone.
 - Voice input (`src/transcribe.ts`): `POST /agent/transcribe?keep=S` takes a clip as raw mono 16 kHz float32 samples and
   answers its text from the `stt` service (`TEF_NOTES_STT`); `/agent/transcribe/warm` loads the model as recording
   starts; `keep` is how long the model stays loaded once idle, the owner's setting (`packages/core/src/prefs.ts`

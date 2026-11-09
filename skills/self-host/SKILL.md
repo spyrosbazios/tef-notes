@@ -52,7 +52,7 @@ directory and `cp .env.example .env`. Every variable has a default; edit `.env` 
 | `TEF_NOTES_PROVIDER` | Model provider for the chat agent: `deepseek` (default), `anthropic`, `openai`, `xai`, `qwen`, `zai`, `ollama` |
 | `TEF_NOTES_MODEL` | Model name; empty = the provider's default; Ollama has none, name a pulled model |
 | `TEF_NOTES_LLM_URL`, `TEF_NOTES_OLLAMA_URL` | Provider API root override; Ollama's address (`http://host.docker.internal:11434` for the Docker host) |
-| `TEF_NOTES_KEY_TYPESAFE`, `TEF_NOTES_KEY_LLM`, `TEF_NOTES_KEY_EXA`, `TEF_NOTES_KEY_MAPS` | Key directories (step 3). Defaults `./keys/typesafe`, `./keys/<provider>`, `./keys/exa`, `./keys/maps` |
+| `TEF_NOTES_KEY_TYPESAFE`, `TEF_NOTES_KEY_LLM`, `TEF_NOTES_KEY_EXA` | Key directories (step 3). Defaults `./keys/typesafe`, `./keys/<provider>`, `./keys/exa` |
 | `PB_PORT`, `AGENT_PORT` | Host ports, loopback only. Defaults `8097`, `8098` |
 | `TEF_NOTES_URL` | The public origin devices use, i.e. the proxy's address (step 5). Not the loopback one |
 | `TEF_NOTES_VERSION` | The version of the images/builds; see its comment in `.env.example` |
@@ -69,7 +69,7 @@ Each key is a file `api-key` holding the key alone, in its own directory. Create
 `up`, or Docker creates them root-owned:
 
 ```sh
-mkdir -p keys/typesafe keys/deepseek keys/exa keys/push keys/maps   # keys/<provider> for another TEF_NOTES_PROVIDER
+mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<provider> for another TEF_NOTES_PROVIDER
 chmod 644 keys/*/api-key                            # the containers run as uid 1000 and must be able to read them
 ```
 
@@ -78,7 +78,6 @@ chmod 644 keys/*/api-key                            # the containers run as uid 
 | `keys/<provider>/api-key` | Chat agent, clipper write-up and summary, tag descriptions | Chat refused; models `available: false` |
 | `keys/typesafe/api-key` | Auto-tagging, the clipper's "where does this fit" suggestions | Nothing auto-tagged; clips still save |
 | `keys/exa/api-key` | The agent's web search and page reading | Agent runs without web tools |
-| `keys/maps/api-key` | A note's place search and map, the agent's `find_place` (Google: Places API (New) and Maps Static API enabled) | A place is typed by name, with no search or map |
 | `keys/push/api-key` | Task reminders as push notifications to the installed web app (the VAPID private key, with `TEF_NOTES_VAPID_SUBJECT`) | Reminders do not ring; the agent logs "web push is off" |
 
 Ollama needs no key. **The agent never asks for a key value in chat and never writes one.** Tell the owner:

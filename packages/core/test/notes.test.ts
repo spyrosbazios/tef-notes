@@ -337,12 +337,12 @@ describe("appended", () => {
 });
 
 describe("where", () => {
-  const CAFE = { name: "Café Central", address: "Herrengasse 14, 1010 Wien, Austria", lat: 48.2104, lng: 16.3655, place_id: "ChIJ0ZqNNH8HbUcR9ZwHPzK9lMg" };
+  const CAFE = { name: "Café Central", address: "Herrengasse 14, 1010 Wien, Austria", lat: 48.2104, lng: 16.3655, place_id: "N2622869133" };
   const md = serializeNote({ title: "T", created: "2026-10-05" }, "body\n");
 
   it("is a block under the flags, read back as it was written", () => {
     const on = withFlags(P, md, { where: CAFE });
-    expect(on).toBe("---\ntitle: T\ncreated: 2026-10-05\nwhere:\n  name: Café Central\n  address: Herrengasse 14, 1010 Wien, Austria\n  lat: 48.2104\n  lng: 16.3655\n  place_id: ChIJ0ZqNNH8HbUcR9ZwHPzK9lMg\n---\nbody\n");
+    expect(on).toBe("---\ntitle: T\ncreated: 2026-10-05\nwhere:\n  name: Café Central\n  address: Herrengasse 14, 1010 Wien, Austria\n  lat: 48.2104\n  lng: 16.3655\n  place_id: N2622869133\n---\nbody\n");
     expect(parseNote(P, on).where).toEqual(CAFE);
     expect(on).toBe(serializeNote({ title: "T", created: "2026-10-05", where: CAFE }, "body\n"));
     expect(withFlags(P, on, { where: null })).toBe(md);

@@ -58,7 +58,7 @@ describe("tags", () => {
 });
 
 describe("where", () => {
-  const MUSEUM = { name: "Acropolis Museum", address: "Dionysiou Areopagitou 15, Athens", lat: 37.9684, lng: 23.7285, place_id: "ChIJ8UNwBh-9oRQR3Y1mdkU1Nic" };
+  const MUSEUM = { name: "Acropolis Museum", address: "Dionysiou Areopagitou 15, Athens", lat: 37.9684, lng: 23.7285, place_id: "N9675835944" };
   it("is read off the wire defensively, and set and cleared by a patch", () => {
     expect(taskOf({ id: "a", title: "x", where: MUSEUM }).where).toEqual(MUSEUM);
     expect(taskOf({ id: "a", title: "x", where: { address: "no name" } }).where).toBeNull();

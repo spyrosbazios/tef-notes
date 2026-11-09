@@ -39,7 +39,6 @@ services:
     volumes:   # the keys (an api-key file in each directory), re-read every use; without the provider's the agent is unavailable, without exa its web search, without push its reminders. Runs as uid 1000: the key files must be readable by it
       - ${TEF_NOTES_KEY_LLM:-./keys/${TEF_NOTES_PROVIDER:-deepseek}}:/run/llm:ro
       - ${TEF_NOTES_KEY_EXA:-./keys/exa}:/run/exa:ro
-      - ${TEF_NOTES_KEY_MAPS:-./keys/maps}:/run/maps:ro   # a Google Maps Platform key (api-key) for a note's place search and map; without it a place is typed by name
       - ${TEF_NOTES_KEY_PUSH:-./keys/push}:/run/push:ro   # the VAPID private key (api-key) for push reminders; without it, or the subject above, they are off
       - agent_data:/data   # search by meaning: the model and the notes' vectors, derived (deleting it costs one re-embed)
     depends_on: [pocketbase]

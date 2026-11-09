@@ -53,7 +53,7 @@ export async function repair<M extends UIMessage>(ms: M[], tools: ToolSet): Prom
 
 export const WEB_TOOLS = new Set(["web_search", "read_url"]);
 /** Tools whose result is someone else's text, which can carry instructions aimed at the model: the web's, a page's, a PDF's,
- *  a picture's, Google Maps' (a business names itself). */
+ *  a picture's, OpenStreetMap's (a business names itself). */
 const UNTRUSTED = new Set([...WEB_TOOLS, "read_attachment", "read_image", "read_page", "find_place"]);
 
 /** The tools that hand the model a note's text, or a snippet of it, or a task's (list_tasks also the paths

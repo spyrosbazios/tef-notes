@@ -63,7 +63,7 @@ const LABEL: Record<ToolName, string> = {
   create_note: "New note", append_to_note: "Adding to a note", rewrite_note: "Rewriting a note", summarise_links: "Summarising links", set_note_flags: "Changing a note's flags", delete_note: "Deleting a note",
   update_memory: "Memory", web_search: "Searching the web", read_url: "Reading a page",
   list_tasks: "Reading your tasks", list_tagged: "Gathering by tag", add_task: "Adding a task", add_tasks: "Adding tasks", update_task: "Changing a task", complete_task: "Completing a task",
-  delete_task: "Deleting a task", find_place: "Searching Google Maps", set_place: "Setting a place",
+  delete_task: "Deleting a task", find_place: "Searching the map", set_place: "Setting a place",
   open_note: "Opening a note", open_task: "Opening a task", go_view: "Going to a view", ask_choice: "Asking you to choose",
 };
 export const label = (name: string) => LABEL[name as ToolName] ?? name;
@@ -186,7 +186,7 @@ export type WriteInput = {
    *  (`null` clears one), `done` false to reopen; the notes it is linked to (`link`, and update_task's `unlink`: paths),
    *  its checklist (a list of texts when added, ops by item id when changed). */
   id?: string; about?: string; done?: boolean; notes?: string;
-  /** set_place's: the task (its id; a note is `path`), and the place: Google's id, a name alone, or `clear`. */
+  /** set_place's: the task (its id; a note is `path`), and the place: its OpenStreetMap id, a name alone, or `clear`. */
   task?: string; place_id?: string; clear?: boolean;
   /** update_task's text added after its notes. */
   addNotes?: string;

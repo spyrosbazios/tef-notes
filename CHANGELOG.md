@@ -4,6 +4,11 @@ All notable changes to TEF Notes. The format follows [Keep a Changelog](https://
 version is one semver number for the whole repository, set by the git tag (see [CONTRIBUTING.md](CONTRIBUTING.md#versioning)).
 
 ## Unreleased
+### Changed
+- Place search uses OpenStreetMap (Photon, Nominatim and its tiles) instead of Google Maps: no key and no billing account.
+  The map card is drawn from OSM's tiles in your theme; Directions and Open in Maps still open Google Maps.
+### Removed
+- The `maps` key and `TEF_NOTES_KEY_MAPS`. A place saved with a Google place id keeps its name, address and position.
 
 ## 0.7.0 - 2026-11-09
 

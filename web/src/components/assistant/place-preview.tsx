@@ -1,29 +1,26 @@
 // What the assistant's set_place would write, on its confirm card: the record it goes on (a note by path, a task by id,
-// named as the web app holds them), and the place itself as its card will show it. A place picked by Google's id is
+// named as the web app holds them), and the place itself as its card will show it. A place picked by its OpenStreetMap id is
 // looked up here (the agent's places/place route, the same details set_place writes), so the owner sees the address and
 // map before saying yes, never just an id; the place it replaces is named, and a clear says what goes.
 import { useQuery } from "@tanstack/react-query";
 import { MapPin } from "lucide-react";
-import { useState } from "react";
 import type { WriteInput } from "@/core/agent";
-import { placeSession } from "@/core/places";
 import { WhereCard } from "@/components/where-card";
 import { usePlaceTarget } from "@/hooks/place-target";
 import { message } from "@/services/api";
-import { noSearch, place } from "@/services/places";
+import { place } from "@/services/places";
 
-/** The place being set: Google's (looked up), or a name alone. */
+/** The place being set: OpenStreetMap's (looked up), or a name alone. */
 function Proposed({ i }: { i: WriteInput }) {
-  const [session] = useState(placeSession);
   const id = i.place_id ?? "";
-  const found = useQuery({ queryKey: ["place", id], queryFn: () => place(id, session), enabled: !!id, staleTime: Infinity, retry: false });
+  const found = useQuery({ queryKey: ["place", id], queryFn: () => place(id), enabled: !!id, staleTime: Infinity, retry: false });
   if (!id) return <WhereCard where={{ name: i.name ?? "" }} />;
   if (found.data) return <WhereCard where={found.data} />;
   if (found.isPending) return <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-label="Looking the place up" />;
   return (
     <p className="flex items-center gap-2 text-sm text-dim">
       <MapPin className="size-4 shrink-0" />
-      {noSearch(found.error) ? "A place from Google Maps (it can't be shown: the server has no Maps key)" : `A place from Google Maps (${message(found.error)})`}
+      A place from OpenStreetMap ({message(found.error)})
     </p>
   );
 }
