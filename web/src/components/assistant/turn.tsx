@@ -29,7 +29,8 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 /** The line beside a tool's name: what it looked for, which note, or the agent's why. */
 function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unknown) => string): string {
   switch (name) {
-    case "search_notes": case "web_search": return str(i.query);
+    case "search_notes": case "web_search": case "find_place": return str(i.query);
+    case "set_place": return [i.path ? titleOf(i.path) : "a task", i.clear ? "no place" : str(i.name) || "a place from Maps"].join(" · ");
     case "list_notes": return str(i.filter);
     case "list_tagged": return Array.isArray(i.tags) ? i.tags.map(str).join(i.match === "all" ? " + " : " · ") : "";
     case "read_note": case "append_to_note": case "summarise_links": case "delete_note": return titleOf(i.path);

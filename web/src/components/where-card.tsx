@@ -70,9 +70,11 @@ function Icon({ label, children, ...p }: React.ComponentProps<typeof Button> & {
   );
 }
 
-/** The note's place, once it has one. `onSet(null)` takes it off (with a toast to put it back). */
-export function WhereCard({ where, onSet, className }: { where: Place; onSet: (p: Place | null) => void; className?: string }) {
+/** A note's or task's place, once it has one. `onSet(null)` takes it off (with a toast to put it back). Without `onSet` it
+ *  is a preview (the assistant's confirm card): nothing to change, and only Open in Maps, to check it is the place meant. */
+export function WhereCard({ where, onSet, className }: { where: Place; onSet?: (p: Place | null) => void; className?: string }) {
   const remove = () => {
+    if (!onSet) return;
     onSet(null);
     toast(`Removed ${where.name}`, { action: { label: "Undo", onClick: () => onSet(where) } });
   };
@@ -85,14 +87,18 @@ export function WhereCard({ where, onSet, className }: { where: Place; onSet: (p
           <p className="line-clamp-2 font-semibold text-sm">{where.name}</p>
           {where.address ? <p className="line-clamp-2 text-xs text-dim">{where.address}</p> : <p className="text-xs text-faint">No address: Maps searches by the name</p>}
         </div>
-        <PlacePick title="Change place" start={where.name} onSet={onSet} trigger={
-          <Button variant="ghost" size="icon-sm" aria-label="Change place" title="Change place"><Pencil className="text-dim" /></Button>
-        } />
-        <Icon label="Remove place" onClick={remove}><X className="text-dim" /></Icon>
+        {onSet ? (
+          <>
+            <PlacePick title="Change place" start={where.name} onSet={onSet} trigger={
+              <Button variant="ghost" size="icon-sm" aria-label="Change place" title="Change place"><Pencil className="text-dim" /></Button>
+            } />
+            <Icon label="Remove place" onClick={remove}><X className="text-dim" /></Icon>
+          </>
+        ) : null}
       </div>
       {/* Under the name once the card is wide enough for the pin beside it (a container query: the card is as wide as its column) */}
       <div className="flex flex-wrap gap-2 px-3 pt-2.5 pb-3 @sm:pl-15">
-        <Button asChild size="sm"><a href={directionsUrl(where)} {...away}><Navigation /> Directions</a></Button>
+        {onSet ? <Button asChild size="sm"><a href={directionsUrl(where)} {...away}><Navigation /> Directions</a></Button> : null}
         <Button asChild size="sm" variant="outline"><a href={mapsUrl(where)} {...away}><ExternalLink /> Open in Maps</a></Button>
       </div>
     </section>

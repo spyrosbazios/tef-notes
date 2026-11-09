@@ -1,5 +1,5 @@
 // A note write the agent proposes, shown as what it does before it is done: a new note rendered, the lines an append
-// adds, a rewrite as a line diff, a flag change in one line. The user decides. Changes carry a sign or a word as well as
+// adds, a rewrite as a line diff, a flag change in one line, a place as its card (place-preview.tsx). The user decides. Changes carry a sign or a word as well as
 // a colour (never colour alone). Answered, the card folds into one line.
 import { useQuery } from "@tanstack/react-query";
 import type { ChatAddToolApproveResponseFunction } from "ai";
@@ -12,6 +12,8 @@ import { appended, parseNote } from "@/core/notes";
 import { useNotes } from "@/hooks/notes";
 import { cn } from "@/lib/utils";
 import { memory } from "@/services/notes";
+import { usePlaceTarget } from "@/hooks/place-target";
+import { PlacePreview } from "./place-preview";
 
 const CONTEXT = 2;                          // unchanged lines kept around each change; the rest fold to a count
 
@@ -96,6 +98,7 @@ const VERB: Record<string, [done: string, skipped: string]> = {
   create_tag: ["Created", "create"], create_lens: ["Created", "create"], update_tag: ["Updated", "update"],
   create_note: ["Created", "create"], append_to_note: ["Added to", "add to"], rewrite_note: ["Rewrote", "rewrite"], summarise_links: ["Summarised links in", "summarise links in"],
   set_note_flags: ["Changed flags of", "change flags of"], delete_note: ["Deleted", "delete"], update_memory: ["Updated", "update"],
+  set_place: ["Set the place of", "set the place of"],
 };
 
 /** The agent wants to write one of the notes (or, after reading the web, its memory): show it and why; The user decides.
@@ -105,16 +108,17 @@ export function Confirm({ name, input, id, respond, answer }: {
 }) {
   const { data } = useNotes();
   const title = (input.path ? data?.find((n) => n.path === input.path)?.note.title : undefined) ?? input.path ?? "the note";
-  const todo = todoWords(name, input);
+  const todo = todoWords(name, input), target = usePlaceTarget(input);
   const head = todo?.head ?? ({
     create_tag: `Create tag “${input.name ?? ""}”?`, create_lens: `Create lens “${input.name ?? ""}”?`, update_tag: `Update tag “${input.name ?? input.id ?? ""}”?`,
     create_note: `Create note “${input.title ?? ""}”?`, append_to_note: `Add to ${title}?`, rewrite_note: `Rewrite ${title}?`, summarise_links: `Summarise the links in ${title}?`,
     set_note_flags: `Change flags of ${title}?`, delete_note: `Delete ${title}?`, update_memory: "Update the agent's memory?",
+    set_place: input.clear ? `Remove the place of ${target.title}?` : `Set the place of ${target.title}?`,
   } as Record<string, string>)[name] ?? "Go ahead?";
   const yes = todo?.yes ?? (name === "create_note" ? "Create it" : name === "append_to_note" ? "Add it" : name === "delete_note" ? "Delete it" : "Save it");
   const flags = name === "create_note" ? flagLine(input) : "";
   const [done, skipped] = todo ? [todo.done, todo.skipped] : VERB[name] ?? ["Allowed", "allow"];
-  const subject = todo?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_lens" ? `lens “${input.name ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "update_memory" ? "memory" : title);
+  const subject = todo?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_lens" ? `lens “${input.name ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "update_memory" ? "memory" : name === "set_place" ? target.title : title);
 
   if (answer)
     return (
@@ -137,6 +141,7 @@ export function Confirm({ name, input, id, respond, answer }: {
           : (name === "create_tag" || name === "update_tag") ? <p className="whitespace-pre-wrap text-sm">{tagLine(name, input)}</p>
           : name === "create_lens" ? <p className="whitespace-pre-wrap text-sm">{lensLine(input)}</p>
           : name === "set_note_flags" ? <p className="text-sm">{flagLine(input, true) || "No change"}</p>
+          : name === "set_place" ? <PlacePreview input={input} />
           : name === "summarise_links" ? <p className="text-sm">A summary under each link card without one, as its Summary button writes it</p>
           : name === "delete_note" ? <p className="text-sm">Delete it for good, with its photos and PDFs</p>
           : todo ? <TodoPreview name={name} input={input} />
