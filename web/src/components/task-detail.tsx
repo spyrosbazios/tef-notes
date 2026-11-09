@@ -162,10 +162,11 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
             <Row icon={Repeat} label="Repeat"><RepeatPicker value={task.every} onChange={(every) => patch({ every })} /></Row>
             <Row icon={Bell} label="Reminder"><RemindPicker value={task.remind} dated={!!task.when} today={today} onChange={patch} /></Row>
             <Row icon={Tag} label="Tags"><TaskTags task={task} /></Row>
-            <Row icon={MapPin} label="Where" top={!!task.where}>
-              {task.where ? <WhereCard where={task.where} onSet={(where) => patch({ where })} className="w-full" />
-                : <PlacePick title="Where" onSet={(where) => patch({ where })} trigger={<button type="button" className={cn(chip, "text-faint")}>None</button>} />}
+            {/* A set place's card takes the column's whole width, under its label: the field's own column is too narrow for a map */}
+            <Row icon={MapPin} label="Where">
+              {task.where ? null : <PlacePick title="Where" onSet={(where) => patch({ where })} trigger={<button type="button" className={cn(chip, "text-faint")}>None</button>} />}
             </Row>
+            {task.where ? <WhereCard where={task.where} onSet={(where) => patch({ where })} className="mt-0.5 mb-2" /> : null}
             <Row icon={NotebookText} label="Notes"><LinkedNotes task={task} /></Row>
           </div>
         </div>

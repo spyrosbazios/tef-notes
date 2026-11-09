@@ -14,13 +14,12 @@ import { cn } from "@/lib/utils";
 
 export const chip = "inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-muted px-2.5 text-sm hover:text-fg";
 
-/** One thing a task says about itself: its icon and name, and the control that changes it. `top`: the name sits at the top
- *  of a control taller than a line (the Where card). */
-export function Row({ icon: Icon, label, top = false, children }: { icon: LucideIcon; label: string; top?: boolean; children: React.ReactNode }) {
+/** One thing a task says about itself: its icon and name, and the control that changes it. */
+export function Row({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: React.ReactNode }) {
   return (
-    <div className={cn("flex min-h-9 gap-3", top ? "items-start py-1" : "items-center")}>
-      <Icon className={cn("size-4 shrink-0 text-dim", top && "mt-1.5")} />
-      <span className={cn("w-20 shrink-0 text-sm text-dim", top && "mt-1")}>{label}</span>
+    <div className="flex min-h-9 items-center gap-3">
+      <Icon className="size-4 shrink-0 text-dim" />
+      <span className="w-20 shrink-0 text-sm text-dim">{label}</span>
       <div className="flex min-w-0 flex-1 items-center gap-1">{children}</div>
     </div>
   );

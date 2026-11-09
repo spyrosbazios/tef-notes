@@ -77,12 +77,12 @@ export function WhereCard({ where, onSet, className }: { where: Place; onSet: (p
     toast(`Removed ${where.name}`, { action: { label: "Undo", onClick: () => onSet(where) } });
   };
   return (
-    <section aria-label="Where" className={cn("overflow-hidden rounded-2xl border border-line bg-card", className)}>
+    <section aria-label="Where" className={cn("@container overflow-hidden rounded-2xl border border-line bg-card", className)}>
       <MapPicture where={where} />
       <div className="flex items-start gap-3 px-3 pt-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand/10 text-brand"><MapPin className="size-4" /></span>
+        <span className="hidden size-9 shrink-0 place-items-center rounded-full bg-brand/10 text-brand @xs:grid"><MapPin className="size-4" /></span>
         <div className="min-w-0 flex-1 py-0.5">
-          <p className="truncate font-semibold text-sm">{where.name}</p>
+          <p className="line-clamp-2 font-semibold text-sm">{where.name}</p>
           {where.address ? <p className="line-clamp-2 text-xs text-dim">{where.address}</p> : <p className="text-xs text-faint">No address: Maps searches by the name</p>}
         </div>
         <PlacePick title="Change place" start={where.name} onSet={onSet} trigger={
@@ -90,7 +90,8 @@ export function WhereCard({ where, onSet, className }: { where: Place; onSet: (p
         } />
         <Icon label="Remove place" onClick={remove}><X className="text-dim" /></Icon>
       </div>
-      <div className="flex flex-wrap gap-2 pt-2.5 pr-3 pb-3 pl-15">
+      {/* Under the name once the card is wide enough for the pin beside it (a container query: the card is as wide as its column) */}
+      <div className="flex flex-wrap gap-2 px-3 pt-2.5 pb-3 @sm:pl-15">
         <Button asChild size="sm"><a href={directionsUrl(where)} {...away}><Navigation /> Directions</a></Button>
         <Button asChild size="sm" variant="outline"><a href={mapsUrl(where)} {...away}><ExternalLink /> Open in Maps</a></Button>
       </div>
