@@ -16,12 +16,14 @@ import { CalendarDays, ChevronLeft, ChevronRight, Circle, Flag, Moon, Plus } fro
 import { useMemo, useState, type ReactNode } from "react";
 
 const SHOWN = 5;
+type PlannedTask = NonNullable<ReturnType<ReturnType<typeof plannedByDay>["get"]>>[number];
 
 
-/** A day's cell: holding it (a finger's long press) adds a task for that day, when it can still be planned. */
-function Cell({ onLong, children }: { onLong?: () => void; children: ReactNode }) {
+/** A day's cell: under a mouse a day with tasks (`lift`) pops up like a dock's magnification, its row neighbours a little; holding it (a finger's long press) adds a task for that day, when it can still be planned. */
+function Cell({ onLong, lift, children }: { onLong?: () => void; lift: boolean; children: ReactNode }) {
   const press = useLongPress(() => onLong?.());
-  return <div {...press} className="group relative min-h-0">{children}</div>;
+  return <div {...press} className={cn("group relative min-h-0 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none",
+    lift && "hover:z-10 hover:scale-[1.18] [*:hover+&]:scale-[1.06] [&:has(+_*:hover)]:scale-[1.06] motion-reduce:scale-100")}>{children}</div>;
 }
 
 /** `lit`: the day of the task hovered in the task box, ringed here (and its month shown); `onHover`: the day under the pointer, null as it leaves. */
@@ -60,39 +62,20 @@ export function Planned({ onPick, onAdd, lit = null, onHover }: { onPick: (day: 
             const tile = (
               <button type="button" onClick={() => onPick(d)} onMouseEnter={onHover ? () => onHover(d) : undefined} onFocus={onHover ? () => onHover(d) : undefined} disabled={past} aria-label={`${at(d).toLocaleDateString(undefined, { day: "numeric", month: "long" })}, ${n} planned`}
                 className={cn("flex size-full items-start justify-end rounded-lg p-1.5 text-[11px] leading-none tabular-nums transition-transform duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-brand/60",
-                  SHADE[shadeOf(n)], n >= 3 ? "text-primary-foreground" : "text-dim", !past && "cursor-pointer hover:brightness-110", past && "opacity-40",
+                  SHADE[shadeOf(n)], n >= 3 ? "text-primary-foreground" : "text-dim", !past && "cursor-pointer group-hover:brightness-110 group-hover:shadow-lg", past && "opacity-40",
                   d === today && "font-semibold text-fg ring-2 ring-brand ring-offset-1 ring-offset-bg",
                   d === lit && "scale-110 font-semibold motion-reduce:scale-100 ring-2 ring-fg/70 ring-offset-1 ring-offset-bg")}>
                 {Number(d.slice(8))}
               </button>
             );
             return (
-              <Cell key={d} onLong={past ? undefined : () => onAdd(d)}>
+              <Cell key={d} lift={!!n && hovers} onLong={past ? undefined : () => onAdd(d)}>
                 {n && hovers ? (
                   <Tooltip side="top" sideOffset={6}>
                     <TooltipTrigger asChild>{tile}</TooltipTrigger>
-                    <TooltipContent className="z-50 block w-64 max-w-64 rounded-md bg-foreground p-0 text-xs text-background">
+                    <TooltipContent className="z-50 block w-64 max-w-64 overflow-hidden rounded-lg bg-foreground p-0 text-xs text-background shadow-xl">
                       <TooltipArrow className="size-2.5 fill-foreground" />
-                      <p className="flex items-baseline justify-between gap-2 border-b border-background/15 px-3 py-2">
-                        <span className="font-semibold">{at(d).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })}</span>
-                        <span className="opacity-60">{n} {n === 1 ? "task" : "tasks"}</span>
-                      </p>
-                      <ul className="space-y-1.5 px-3 py-2">
-                        {list.slice(0, SHOWN).map((t) => (
-                          <li key={t.id} className="flex items-start gap-2">
-                            <Circle className="mt-px size-3 shrink-0 opacity-50" />
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-center gap-1">
-                                <span className="truncate">{t.title || "Untitled"}</span>
-                                {t.evening && t.when === d ? <Moon className="size-3 shrink-0 opacity-60" /> : null}
-                                {t.due === d ? <Flag className="size-3 shrink-0 text-warn" /> : null}
-                              </span>
-                              {t.tags.length ? <span className="block truncate text-[10px] opacity-55">{t.tags.map((g) => `#${g}`).join(" ")}</span> : null}
-                            </span>
-                          </li>
-                        ))}
-                        {n > SHOWN ? <li className="pl-5 opacity-55">and {n - SHOWN} more</li> : null}
-                      </ul>
+                      <DayTasks day={d} list={list} />
                     </TooltipContent>
                   </Tooltip>
                 ) : tile}
@@ -116,5 +99,34 @@ export function Planned({ onPick, onAdd, lit = null, onHover }: { onPick: (day: 
         </div>
       </footer>
     </section>
+  );
+}
+
+/** The tooltip's body: the day, its count, its first tasks (evening, due, tags). */
+function DayTasks({ day, list }: { day: string; list: PlannedTask[] }) {
+  const n = list.length;
+  return (
+    <>
+      <p className="flex items-baseline justify-between gap-2 border-b border-background/15 px-3 py-2">
+        <span className="font-semibold">{at(day).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })}</span>
+        <span className="opacity-60">{n} {n === 1 ? "task" : "tasks"}</span>
+      </p>
+      <ul className="space-y-1.5 px-3 py-2">
+        {list.slice(0, SHOWN).map((t) => (
+          <li key={t.id} className="flex items-start gap-2">
+            <Circle className="mt-px size-3 shrink-0 opacity-50" />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1">
+                <span className="truncate">{t.title || "Untitled"}</span>
+                {t.evening && t.when === day ? <Moon className="size-3 shrink-0 opacity-60" /> : null}
+                {t.due === day ? <Flag className="size-3 shrink-0 text-warn" /> : null}
+              </span>
+              {t.tags.length ? <span className="block truncate text-[10px] opacity-55">{t.tags.map((g) => `#${g}`).join(" ")}</span> : null}
+            </span>
+          </li>
+        ))}
+        {n > SHOWN ? <li className="pl-5 opacity-55">and {n - SHOWN} more</li> : null}
+      </ul>
+    </>
   );
 }
