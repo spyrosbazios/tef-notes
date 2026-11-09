@@ -66,6 +66,8 @@ type Section = { key: string; rows: Task[] };
 const sectionOf = (kind: TaskView, t: Task) => (kind === "today" ? (t.evening ? "evening" : "today") : kind === "upcoming" ? t.when : kind === "logbook" ? t.done : "");
 
 /** A section's title over a hairline, as the phone draws it: This Evening, a day. */
+/** The box's fades (px), and the room a day scrolled to keeps above its heading, so the fade never covers it */
+const FADE = 48, FADE_ROOM = 20;
 const heading = "mx-3 mt-5 mb-1 flex items-baseline gap-2 border-b border-line pb-2 transition-colors duration-700";
 
 function Heading({ kind, section, today, lit }: { kind: TaskView; section: string; today: string; lit?: boolean }) {
@@ -77,15 +79,13 @@ function Heading({ kind, section, today, lit }: { kind: TaskView; section: strin
   return null;
 }
 
-/** The pop of the Upcoming day the planner points at: a little past its size and back, like a dock's magnification. */
-const MAGNIFY: Transition = { type: "spring", stiffness: 420, damping: 18 };
-
-/** A section of rows; `lit`, the planner's day, stands out magnified. When the last of its rows goes the whole section fades out: it is inert from then on and hands the focus to the list. */
+/** A section of rows; `lit`, the day the planner's pointer is on, stands out: a touch larger (Animate UI's pop) on a faint brand ground. */
 function Section({ day, fade, lit = false, children }: { day?: string; fade: Transition; lit?: boolean; children: ReactNode }) {
   const ref = useLeaving<HTMLDivElement>("[data-task-list]", { sibling: false });
+  const pop = useTempoTransition(spring.pop);
   return (
-    <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, scale: lit ? 1.035 : 1, transition: { opacity: fade, scale: MAGNIFY } }}
-      exit={{ opacity: 0, transition: fade }} className={cn("origin-left rounded-xl transition-colors duration-300", lit && "bg-brand/8")}>
+    <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, scale: lit ? 1.02 : 1, transition: { opacity: fade, scale: pop } }}
+      exit={{ opacity: 0, transition: fade }} className={cn("mx-1 rounded-xl px-1 pb-1 transition-colors duration-300", lit && "bg-brand/8")}>
       {children}
     </motion.div>
   );
@@ -114,10 +114,10 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
 
 /** `embedded`: a list inside Home's task box, which draws the heading and the +: no header, no frame, scrolling inside the box's
  * fixed height, a row opening beside its own list rather than Home's.
- * `focus`: a day Home's planner picked or is hovering: scrolled to that day (or the next one with tasks), its heading lit.
+ * `focus`: a day Home's planner picked or is hovering: scrolled to that day (or the next one with tasks), its heading lit; `magnify`: the pointer is still on the planner, the day's section stands out.
  * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves.
  * `onView`: Upcoming scrolled by hand: the day whose section is at the top of the list, reported as it changes (the phone's strip follows). */
-export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; focus?: { day: string; n: number } | null; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
+export function TaskList({ view, onAdd, embedded = false, focus = null, magnify = false, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; focus?: { day: string; n: number } | null; magnify?: boolean; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
   const qc = useQueryClient();
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
@@ -200,7 +200,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
     // Only the list's own box scrolls, never the page around it
     const id = requestAnimationFrame(() => {
       const box = scroller.current, el = box?.querySelector(`[data-day="${lit}"]`);
-      if (box && el) box.scrollTo({ top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top, behavior: calm() ? "instant" : "smooth" });
+      if (box && el) box.scrollTo({ top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - FADE_ROOM, behavior: calm() ? "instant" : "smooth" });
     });
     return () => cancelAnimationFrame(id);
   }, [focus, lit, scroller]);
@@ -248,7 +248,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
       )}
       {embedded ? null : <Tabs kind={kind} inbox={views.inbox.length} today={views.today.length + views.evening.length} />}
       {/* The list fades into the page where rows are scrolled out of view (top and bottom), rather than cutting one in half */}
-      <ScrollFade asChild size={48} shrink={0} blur={0}>
+      <ScrollFade asChild size={FADE} shrink={0} blur={0}>
       <div ref={scroller} data-scroll-restoration-id={scrollId} data-task-list data-vt={embedded ? undefined : "list"} tabIndex={-1} onMouseOver={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined} onMouseLeave={onHoverDay ? () => hover(null) : undefined}
         // Focus is the hover of a finger and a keyboard: a tapped or tabbed row lights its day too, until focus leaves the list
         onFocus={onHoverDay ? (e) => hover(dayUnder(e.target)) : undefined}
@@ -259,7 +259,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
             <div key={of} className="relative">
               <AnimatePresence mode="popLayout" initial={false}>
                 {count ? sections.map(({ key, rows }) => (
-                  <Section key={key} day={kind === "upcoming" ? key : undefined} fade={fade} lit={key === lit}>
+                  <Section key={key} day={kind === "upcoming" ? key : undefined} fade={fade} lit={magnify && key === lit}>
                     <Heading kind={kind} section={key} today={today} lit={key === lit} />
                     <ul className="relative"><AnimatePresence mode="popLayout" initial={false}>{rows.map((t) => row(t, key))}</AnimatePresence></ul>
                   </Section>

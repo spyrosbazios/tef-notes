@@ -86,17 +86,19 @@ export function Home() {
   const [focus, setFocus] = useState<{ day: string; n: number } | null>(null);
   // The day Upcoming was scrolled to by hand, which the days strip follows (phone)
   const [viewing, setViewing] = useState<string | null>(null);
-  const pick = (day: string) => { show(day === today ? "today" : "upcoming"); setFocus(day === today ? null : { day, n: (focus?.n ?? 0) + 1 }); setViewing(null); };
+  const pick = (day: string) => { setPeeking(false); show(day === today ? "today" : "upcoming"); setFocus(day === today ? null : { day, n: (focus?.n ?? 0) + 1 }); setViewing(null); };
   // Planner and task box follow each other on hover: a planner day scrolls Upcoming to it (from Today too) and magnifies its day (after a short rest, so a pointer
   // crossing the month doesn't drag the list along), and a row or Upcoming day lights its day in the planner
   const [hot, setHot] = useState<string | null>(null);
   const rest = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(rest.current), []);
+  // `peeking`: the pointer is on a later planner day, its section magnified in Upcoming; the list stays where it is as the pointer leaves
+  const [peeking, setPeeking] = useState(false);
   const peek = (day: string | null) => {
     window.clearTimeout(rest.current);
-    if (!day || (tab !== "upcoming" && tab !== "today") || day <= today) return;
+    if (!day || (tab !== "upcoming" && tab !== "today") || day <= today) { setPeeking(false); return; }
     // Today's list holds no later day: a later day hovered brings Upcoming in front
-    rest.current = window.setTimeout(() => { show("upcoming"); setFocus((f) => (f?.day === day ? f : { day, n: (f?.n ?? 0) + 1 })); }, 120);
+    rest.current = window.setTimeout(() => { show("upcoming"); setPeeking(true); setFocus((f) => (f?.day === day ? f : { day, n: (f?.n ?? 0) + 1 })); }, 120);
   };
   const add = () => onAdd({ schedule: tab === "inbox" ? null : { when: tab === "today" ? today : addDays(today, 1), evening: false } });
 
@@ -144,7 +146,7 @@ export function Home() {
                 <ReducedMotionConfig>
                   <AnimatePresence initial={false} custom={dir}>
                     <Panel key={tab} className="absolute inset-0" custom={dir} variants={panels} initial="enter" animate="shown" exit="leave">
-                      <TaskList embedded view={{ kind: tab }} focus={tab === "upcoming" ? focus : null} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} />
+                      <TaskList embedded view={{ kind: tab }} focus={tab === "upcoming" ? focus : null} magnify={peeking} onHoverDay={phone ? undefined : setHot} onView={phone ? setViewing : undefined} />
                     </Panel>
                   </AnimatePresence>
                 </ReducedMotionConfig>
