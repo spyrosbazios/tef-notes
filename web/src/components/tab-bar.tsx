@@ -8,7 +8,7 @@
 // height (one that did would move the shell's `--tab-bar` and `--dock-bottom`, shell.tsx, under a scrolling page); every view
 // scrolls its own container. Below `md` only; the rail does this job from
 // `lg`, and the app bar between. Ask is the assistant's dock opened whole (assistant/dock.tsx): a tab, not a page, so it is
-// "in front" while the dock is open, and any other tab closes it. Hidden under the keyboard (a composer sits on the keys).
+// "in front" while the dock is open; it is a step in the history, which any other tab navigates away from, closing it. Hidden under the keyboard (a composer sits on the keys).
 // A dot on Ask: an answer finished while it was not in front (hooks/ask-badge.ts), read when the dock opens.
 import { BottomNavigation, BottomNavigationHighlight, BottomNavigationHighlightItem, BottomNavigationItem, BottomNavigationLabel } from "@animate-ui/react/primitives/bottom-navigation";
 import { spring } from "@animate-ui/react/utils/motion";
@@ -34,7 +34,6 @@ export function TabBar() {
   useEffect(() => { if (isTaskView(view)) lastList.current = { kind: view.kind }; }, [view]);
   const go = (t: Tab) => {
     if (t === "ask") { setDock({ open: true }); return; }
-    setDock({ open: false });
     goView(t === "tasks" ? lastList.current ?? { kind: prefs.tasksList } : { kind: t });
   };
   return (

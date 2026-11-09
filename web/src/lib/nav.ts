@@ -13,6 +13,8 @@ declare module "@tanstack/react-router" {
   interface HistoryState {
     /** Set on the entry `showTask` pushes: the task was opened from another screen, so closing it goes back there. */
     taskFrom?: boolean;
+    /** Set on the entry the phone's Ask tab pushes (assistant/dock.tsx `useAskStep`): the dock is open on it, and only on it. */
+    ask?: boolean;
   }
 }
 

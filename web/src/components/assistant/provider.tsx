@@ -41,9 +41,6 @@ async function find<T>(qc: QueryClient, key: QueryKey, is: (r: T) => boolean): P
   return held();
 }
 
-/** Below `md` the dock covers the whole page: what the agent opened would stay hidden behind it, so it steps aside. */
-const uncover = () => { if (!matchMedia("(min-width: 768px)").matches) setDock({ open: false }); };
-
 /** Stop the reply, and close the calls it left open (lib/assistant.ts `closeUnfinished` says why). */
 async function halt(chat: Chat<UIMessage>) {
   await chat.stop();
@@ -81,9 +78,10 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     note: (path) => find<NoteRec>(qc, NOTES, (n) => n.path === path),
     task: (id) => find<TaskRec>(qc, TASKS, (t) => t.id === id),
     nav: {
-      openNote: (id) => { navNow.current.openNote(id); uncover(); },
-      showTask: (v, id) => { navNow.current.showTask(v, id); uncover(); },
-      goView: (v) => { navNow.current.goView(v); uncover(); },
+      // Below `md` the dock covers the page, but a navigation leaves the Ask step (dock.tsx `useAskStep`), uncovering what was opened
+      openNote: (id) => navNow.current.openNote(id),
+      showTask: (v, id) => navNow.current.showTask(v, id),
+      goView: (v) => navNow.current.goView(v),
     },
     showAssistant: () => setDock({ open: true }),
   }), [qc]);

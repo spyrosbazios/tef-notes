@@ -3,18 +3,39 @@
 // notes and tasks panes keep their widths, and are not squeezed. Closed, it is gone from the layout, but the chat is not:
 // that is the provider's (provider.tsx). Under a finger it is opened by the app bar's Assistant button (or the corner button
 // while closed) and closed by the panel's X: there is no edge to drag and no scrim, the page is behind it, not beside it.
-// Below `md` it is the Ask tab: the whole page above the tab bar (`--dock-bottom`, set by the shell), closed by any other tab.
+// Below `md` it is the Ask tab: the whole page above the tab bar (`--dock-bottom`, set by the shell), and a step in the history
+// (`useAskStep`): the back gesture leaves it, and so does any navigation from inside it (a note or a task picked in the chat, another tab).
 // How it comes and goes follows that: the sheet slides in from the right and speeds off it (Animate UI's sheet), the tab only fades
 // quickly (a tab switch is not a place to travel to), and the docked one does not move at all, as the page beside it would have to
 // animate its width with it.
 import { transition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AnimatePresence, motion, useIsPresent, type MotionProps } from "motion/react";
-import { useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useLocation, useRouter } from "@tanstack/react-router";
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { Panel } from "@/components/assistant/panel";
 import { clampWidth, DOCK_WIDTH, setDock, useDock } from "@/hooks/dock";
 import { useMedia, useNarrow } from "@/hooks/media";
 
 const STEP = 24;
+
+/** Below `md` the open dock is a history entry of its own (`state.ask`, lib/nav.ts), as a note's page is: opening it pushes the
+ *  entry over the screen it covers, and the dock is open exactly while the history is on that entry. So the back gesture leaves
+ *  it, and a note or a task picked in the chat, or another tab, navigates away from it and uncovers what it opened: nothing else
+ *  has to close the dock. Closed in place (the `a` key), it steps back itself. */
+function useAskStep(narrow: boolean, open: boolean) {
+  const router = useRouter();
+  const ask = useLocation({ select: (l) => !!l.state.ask });
+  const was = useRef<{ open: boolean; ask: boolean }>(undefined);
+  useEffect(() => {
+    const before = was.current;
+    was.current = { open, ask };
+    if (!narrow) return;
+    if (open && !ask) {
+      if (before?.open && before.ask) setDock({ open: false });
+      else { const { href, state } = router.state.location; router.history.push(href, { ...state, ask: true }); }
+    } else if (!open && ask && before?.open) router.history.back();
+  }, [narrow, open, ask, router]);
+}
 
 /** The edge between the page and the dock: drag, or arrow keys when focused. */
 function Edge({ width }: { width: number }) {
@@ -49,6 +70,7 @@ function Aside({ width, moves }: { width: number; moves: MotionProps }) {
 export function Dock() {
   const [{ open, width }] = useDock();
   const docked = useMedia("(min-width: 1280px)"), tab = useNarrow(), reduce = useShouldReduceMotion();
+  useAskStep(tab, open);
   const enter = useTempoTransition(transition.sheet), leave = useTempoTransition(transition.dismiss), quick = useTempoTransition(transition.swap);
   // The same transform function at both ends, which Motion can interpolate; under reduced motion the sheet fades in place
   const shown = "translateX(0%)", away = { opacity: 0, transform: reduce ? shown : "translateX(100%)" };
