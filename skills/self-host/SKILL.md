@@ -1,6 +1,6 @@
 ---
 name: self-host
-description: Install, deploy, set up, run or self-host TEF Notes (PocketBase server plus bun chat agent in Docker), put it behind a private reverse proxy, and install the web app on a phone, or point the CLI or the Chrome extension at the server. Use when the user wants to host their own TEF Notes, upgrade it, or connect a device to it.
+description: Install, deploy, set up, run or self-host TEF Notes (PocketBase server, bun chat agent and the speech-to-text service for voice input, in Docker), put it behind a private reverse proxy, and install the web app on a phone, or point the CLI or the Chrome extension at the server. Use when the user wants to host their own TEF Notes, upgrade it, turn voice input on or off, or connect a device to it.
 license: AGPL-3.0
 compatibility: Needs Docker with Compose v2 and network access to ghcr.io (or git, to build from source). Written for Linux hosts; Tailscale or Caddy for the proxy.
 ---
@@ -28,9 +28,11 @@ sh scripts/check.sh      # or by hand:
 docker --version && docker compose version     # Compose must be v2 ("Docker Compose version v2.x")
 docker info >/dev/null && echo ok              # works without sudo, else: sudo usermod -aG docker $USER, re-login
 ss -ltn | grep -E ':(8097|8098)\b'             # no output = ports free
+free -m                                        # voice input wants ~650 MB free while a clip is transcribed
 ```
 
-If a port is taken, set `PB_PORT` / `AGENT_PORT` in `.env` in step 2.
+If a port is taken, set `PB_PORT` / `AGENT_PORT` in `.env` in step 2. Short of memory, turn voice input off there
+(`TEF_NOTES_STT=`) instead of letting the speech model fight the rest of the host.
 
 ## 2. Get the files
 
@@ -56,6 +58,7 @@ directory and `cp .env.example .env`. Every variable has a default; edit `.env` 
 | `TEF_NOTES_VERSION` | The version of the images/builds; see its comment in `.env.example` |
 | `TEF_NOTES_KEY_PUSH`, `TEF_NOTES_VAPID_SUBJECT` | Task reminders as push notifications on the phone: the key directory (default `./keys/push`) and a `mailto:` contact. Empty subject = off. Set `TZ` too. Steps: `server/README.md#push-reminders` |
 | `TEF_NOTES_MCP` | `1` serves the note and task tools at `/agent/mcp` for another agent harness (default `0`) |
+| `TEF_NOTES_STT` | Voice input: where the agent reaches the speech-to-text container (default `http://stt:8099`, on). Set it empty, `TEF_NOTES_STT=`, to turn voice input off (mic hidden, nothing downloaded). Depth: `server/README.md#voice-input` |
 | `TEF_NOTES_CRX_KEY` | Extension signing key path, inside `server/` (step 7). Default `./no-crx-key` = no extension |
 
 `docker compose config` renders the result.
@@ -84,7 +87,9 @@ editor), `chmod 644` it." Keys are re-read on every use: a new key needs no rest
 
 ## 4. Start
 
-Default, pulls the published images `ghcr.io/spyrosbazios/tef-notes` and `ghcr.io/spyrosbazios/tef-notes-agent`:
+Default, pulls the published images `ghcr.io/spyrosbazios/tef-notes`, `ghcr.io/spyrosbazios/tef-notes-agent` and
+`ghcr.io/spyrosbazios/tef-notes-stt` (voice input; its ~460 MB speech model is downloaded from huggingface.co on the first
+dictation, into the `stt_data` volume, never into the image):
 
 ```sh
 docker compose up -d
@@ -101,6 +106,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```sh
 docker compose logs --tail 20 pocketbase    # migrations applied, no hook errors
 docker compose logs --tail 20 agent         # "agent: listening on 8098", no "not saved" lines
+docker compose logs --tail 5 stt            # "stt: listening on 8099" (voice input)
 ```
 
 Optional admin UI login at `/_/` (the owner runs this and chooses the password):
@@ -156,12 +162,15 @@ sh scripts/verify.sh https://<proxy-origin>   # the path clients take
 curl -s http://localhost:8097/api/health
 curl -s http://localhost:8097/ | grep '<title>'
 curl -s http://localhost:8098/agent/models    # "available": true when the model provider's key is read
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary '' http://localhost:8098/agent/transcribe
+                                              # 200: voice input on and the stt container reachable; 404: off; 502: stt down
 docker compose exec -T pocketbase test -s /run/llm/api-key && echo present   # key present, value not printed
 ```
 
 Success: health answers, `/` returns the web app's HTML, and opening the proxy origin in a browser shows the app
 with an empty notes list and no sign-in. Auto-tagging shows a note's `tagged` field filling within a minute or two of a
-typesafe key being present.
+typesafe key being present. Voice: in Settings → Voice, "Try it" with the mic; the first dictation after a start downloads
+the model (a minute or so, once) and `docker compose logs stt` then shows `stt: loaded ... in Ns`.
 
 ## 7. Point the clients
 
@@ -182,6 +191,10 @@ typesafe key being present.
   Keep the key (the extension ID derives from it). Policy install steps: `extension/README.md`. Unpacked: `cd extension
   && bun install && bun run build`, load `extension/dist`, enter the server address in its options page.
 - **Web app**: open `TEF_NOTES_URL`.
+- **Voice input** needs no setup on a device: the mic appears wherever text is typed once the app is opened over HTTPS
+  (browsers allow the microphone only in a secure context: `https://` or `localhost`, so not over a plain `http://` LAN
+  address). English only. The first dictation after the model was unloaded waits a few seconds for it to load; Settings →
+  Voice sets how long it stays loaded (default 5 minutes, about 650 MB of the server's memory while it is).
 
 ## 8. Troubleshooting
 
@@ -195,5 +208,11 @@ typesafe key being present.
 - **Migrations**: PocketBase applies every pending migration on start. Never edit an applied one; schema changes are new
   files. Read `docker compose logs --tail 20 pocketbase` after every upgrade.
 - **Changed `.env`, nothing happened**: variables apply when containers are recreated: `docker compose up -d`, not `restart`.
+- **No mic button in the app**: the page is not a secure context (open the HTTPS origin, not `http://<ip>`), or the
+  device has no microphone. **"Voice input is off on this server"**: `TEF_NOTES_STT` is empty in `.env`, or the agent
+  image predates 0.5.0; set it (or remove the line) and `docker compose up -d`. **"The speech model is unavailable right
+  now"**: the agent cannot reach the `stt` container or it failed: `docker compose ps stt`, `docker compose logs stt`
+  (a download error means huggingface.co is unreachable from the container; a worker that died is usually memory: give
+  it ~650 MB or set a shorter keep time in Settings → Voice).
 - **Upgrade**: `git pull && docker compose pull && docker compose up -d` (from source: re-run the build command).
   An unbacked-up `pb_data/` has no way back after a PocketBase upgrade.

@@ -31,7 +31,8 @@
 ### Capture what you want to keep
 
 Write Markdown notes with checkboxes, tables and code. Add photos, PDFs and Excalidraw drawings. Save pages and
-pictures with the Chrome clipper, and open articles in a distraction-free Reader view.
+pictures with the Chrome clipper, and open articles in a distraction-free Reader view. Or say it: a mic wherever you type
+turns English speech into text on your own server, and keeps no recording.
 
 ### Keep tasks close to their context
 
@@ -73,9 +74,9 @@ Switch the lens to change your focus. A new note or task inherits the lens’s f
 > read, edit and delete its data. Keep its ports on loopback, use a private-network reverse proxy for your devices,
 > and never expose it to the public internet. Read the [security model](SECURITY.md) before deploying.
 
-You need Docker with Compose. `docker compose up -d` pulls the published images (the server with the web app, and the
-agent) for amd64 and arm64; building from source, which is also how the signed clipper is made, is in the
-[server setup](server/README.md). Want an AI agent to do the install for you? Give it the [self-host skill](skills/self-host/SKILL.md).
+You need Docker with Compose. `docker compose up -d` pulls the published images (the server with the web app, the
+agent, and the speech-to-text service for voice input) for amd64 and arm64; building from source, which is also how the
+signed clipper is made, is in the [server setup](server/README.md). Want an AI agent to do the install for you? Give it the [self-host skill](skills/self-host/SKILL.md).
 
 ```sh
 git clone https://github.com/spyrosbazios/tef-notes.git
@@ -124,7 +125,7 @@ it. See the [backup guide](server/README.md#backups).
 
 | Start here | What it covers |
 |---|---|
-| [Server setup](server/README.md) | Installation, private proxy, configuration, upgrades and backups |
+| [Server setup](server/README.md) | Installation, private proxy, configuration, voice input, upgrades and backups |
 | [Security](SECURITY.md) | Network access, AI data handling and vulnerability reports |
 | [AI providers](docs/ai-providers.md) | Optional models and keys, auto-tagging and web search |
 | [Chat agent and MCP](server/agent/README.md) | Assistant context, approval cards, widgets and external harnesses |

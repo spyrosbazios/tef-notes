@@ -33,8 +33,8 @@ services:
       TEF_NOTES_LLM_URL: ${TEF_NOTES_LLM_URL:-}       # empty: the provider's own endpoint
       TEF_NOTES_OLLAMA_URL: ${TEF_NOTES_OLLAMA_URL:-} # Ollama only, e.g. http://host.docker.internal:11434
       TEF_NOTES_MCP: ${TEF_NOTES_MCP:-0}             # 1: serve the note and task tools to other agent harnesses at /agent/mcp
-      TEF_NOTES_VAPID_SUBJECT: ${TEF_NOTES_VAPID_SUBJECT:-}
-      TEF_NOTES_STT: http://stt:8099                 # voice input (the stt service below)   # mailto: or https URL the push services may reach you at; empty: no push reminders
+      TEF_NOTES_VAPID_SUBJECT: ${TEF_NOTES_VAPID_SUBJECT:-}   # mailto: or https URL the push services may reach you at; empty: no push reminders
+      TEF_NOTES_STT: ${TEF_NOTES_STT-http://stt:8099}   # voice input: the stt service below; set empty (TEF_NOTES_STT=) to turn it off
     extra_hosts: ["host.docker.internal:host-gateway"]   # an Ollama on this host
     volumes:   # the keys (an api-key file in each directory), re-read every use; without the provider's the agent is unavailable, without exa its web search, without push its reminders. Runs as uid 1000: the key files must be readable by it
       - ${TEF_NOTES_KEY_LLM:-./keys/${TEF_NOTES_PROVIDER:-deepseek}}:/run/llm:ro
@@ -45,6 +45,7 @@ services:
     restart: unless-stopped
   # Voice input: Parakeet speech to text (English) on the CPU, reached only by the agent (/agent/transcribe), no port on
   # the host. Loads its model (~650 MB of memory) on first use and drops it after the idle time set in the app's Settings.
+  # README.md "Voice input". Not wanted: TEF_NOTES_STT= in .env, and `docker compose stop stt` (or leave it: idle, it is ~60 MB).
   stt:
     image: ghcr.io/spyrosbazios/tef-notes-stt:${TEF_NOTES_VERSION:-latest}
     volumes:

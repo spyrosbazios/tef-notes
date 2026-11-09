@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-06 -->
+<!-- reviewed: 2026-11-09 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -10,13 +10,14 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
 ```
  Android app ─┐                          ┌─ PocketBase (collections, rev hook, jobs, routes) ─ pb_data/
  Web app     ─┼─ reverse proxy ─ HTTP ───┤        also serves the web app and the extension
- CLI         ─┤  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models
- Clipper     ─┘
+ CLI         ─┤  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
+ Clipper     ─┘                                   └─ stt (python): speech to text, reached by the agent only
 ```
 
 - `server/`: PocketBase with JS hooks (`pb_hooks/`) and migrations (`pb_migrations/`). It holds the data, enforces the
   write contract and runs the server-side jobs below. `server/agent/` is the chat agent, a separate bun process because
-  PocketBase hooks cannot stream.
+  PocketBase hooks cannot stream. `server/stt/` is voice input: a Python service running Parakeet on the CPU, on the
+  compose network only, that the agent's `/agent/transcribe` passes a clip to (`server/README.md`, "Voice input").
 - `packages/core/`: dependency-free TypeScript shared by the web app, phone app, CLI, extension and agent, imported as
   `@/core/*`. It holds the note format, the merge, the PocketBase client, task logic, agent card shapes and the theme
   palettes. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
@@ -186,6 +187,10 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - Providers: one model provider per server, `TEF_NOTES_PROVIDER` (DeepSeek by default; `server/agent/src/models.ts`, with
   `server/pb_hooks/lib/llm.js` its plain-HTTP copy for the hooks); `exa` powers web search. Without the provider's key a chat is refused; without
   `exa` the web tools are left out of the prompt.
+- Voice input (`src/transcribe.ts`): `POST /agent/transcribe?keep=S` takes a clip as raw mono 16 kHz float32 samples and
+  answers its text from the `stt` service (`TEF_NOTES_STT`); `/agent/transcribe/warm` loads the model as recording
+  starts; `keep` is how long the model stays loaded once idle, the owner's setting (`packages/core/src/prefs.ts`
+  `voice.keep`). Nothing is stored. Contract: `packages/core/src/voice.ts`; without `TEF_NOTES_STT` both answer 404.
 
 ## Server jobs and routes
 

@@ -26,6 +26,8 @@ on every device would add friction without keeping out anyone the network does n
 - Notes, photos you attach, and pages you clip go to the AI providers you configure (see the README's "AI providers");
   leave a provider's key out to keep that traffic off. Provider keys are files under `server/keys/` or the paths in
   `server/.env`, mounted read-only; keep them out of git and out of backups you share.
+- Voice input stays on your server: the browser posts the recording to your agent, which hands it to the `stt` container
+  on the compose network (no port on the host); neither keeps it, and the text goes only into the field you dictated into.
 - The link-preview and clip-image routes fetch URLs from your server. They refuse private and loopback addresses at every
   redirect hop; report any bypass. The push route posts to a subscribed browser's push-service URL (https, and its name
   resolved and checked as public before every send); it stores at most 20 devices.

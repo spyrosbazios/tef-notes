@@ -33,3 +33,6 @@ matters for the chat; a small local model may not.
 
 Whatever you send to a provider leaves your server: note text, photos the auto-tagger looks at, pages you clip. Leave
 a key out to keep that feature off.
+
+Voice input needs no provider and no key: speech is turned into text by a model on your own server, in the `stt`
+container ([Voice input](../server/README.md#voice-input)), and the recording is not kept.

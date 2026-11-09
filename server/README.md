@@ -29,6 +29,9 @@ of it is the only gate.
 ## Requirements
 
 - Docker with Compose. Only `server/` is needed to run the published images.
+- Memory for voice input: about 650 MB free while a clip is transcribed (the model is unloaded after the idle time set in
+  the app). The model (~460 MB) is downloaded from huggingface.co on first use into the `stt_data` volume, so the host
+  needs to reach it once; without voice input, nothing is downloaded (see Voice input).
 - To build from source, or the extension: BuildKit (the signing key is a build secret) and the whole repository cloned,
   because the build context is the repo root (the web app, extension and agent share `packages/core` and the phone's assets).
 - bun, only to run the tests (see Development).
@@ -40,7 +43,7 @@ cd server
 cp .env.example .env              # then edit it: at least TZ
 mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<TEF_NOTES_PROVIDER> for another model provider
 # put each provider's key, alone, in keys/<provider>/api-key (see AI providers); all optional
-docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes and tef-notes-agent
+docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes, tef-notes-agent and tef-notes-stt
 docker compose exec pocketbase ./pocketbase superuser create you@example.com 'a-long-password'
 ```
 
@@ -76,6 +79,8 @@ result.
 | `TEF_NOTES_MODEL` | the provider's | The model; Ollama has no default. |
 | `TEF_NOTES_LLM_URL` | the provider's | Its API root, e.g. another Qwen region. |
 | `TEF_NOTES_OLLAMA_URL` | | Ollama only: where it serves (`http://host.docker.internal:11434` for one on the Docker host). |
+| `TEF_NOTES_STT` | `http://stt:8099` | Where the agent reaches the speech-to-text service for voice input. Set it empty (`TEF_NOTES_STT=`) to turn voice input off: the apps hide their mic and the routes answer 404. |
+| `TEF_NOTES_MCP` | `0` | `1` serves the note and task tools over MCP at `/agent/mcp` ([agent/README.md](agent/README.md#mcp-the-tools-for-another-agent-harness)). |
 
 Deployment-specific additions (labels for a dashboard, extra networks, resource limits) go in
 `docker-compose.override.yml`, which Compose merges over the base file on its own and git ignores. Copy
@@ -111,6 +116,40 @@ zone: the agent reads it in its own `TZ`, so `TZ` in `.env` must be your own zon
 anywhere else); the agent logs a warning at start when push is on and `TZ` is unset. At most 20 devices are kept (a
 further one is refused with 409), and before every send the push service's name is resolved and must point only at public
 addresses, or the subscription is deleted.
+
+## Voice input
+
+The mic in the apps (the assistant, a new task, a task's notes, a note's header, search, Settings → Voice) records a clip in
+the browser, decodes it to mono 16 kHz samples and posts it to the agent's `POST /agent/transcribe`, which hands it to the
+`stt` container and returns the text. Speech to text is [Parakeet TDT_CTC 110M](https://huggingface.co/OpenVoiceOS/nvidia-parakeet-tdt_ctc-110m-onnx)
+(NVIDIA's model, English only, pinned to one commit) run by [onnx-asr](https://github.com/istupakov/onnx-asr) on the
+CPU, `stt/app.py`. Nothing is stored: not the recording, not the text, only what lands in the field it was dictated into.
+
+- **The model lives in a worker process** that the service starts on the first clip (or when the mic is pressed, which
+  calls `/agent/transcribe/warm` so the clip that follows waits for no load) and kills once it has sat idle for the time
+  set in the app's Settings → Voice (default 5 minutes; "Unload right away" drops it after each clip; up to an hour). A
+  process, because freeing the model in-process left its memory with the allocator. Loaded, it holds about 650 MB; the
+  service idle without it, about 60 MB. On a 4-core N100, 10 s of speech takes about 1 s, with 2 threads per clip (more
+  were slower beside the rest of the host).
+- **First use downloads the model** (~460 MB) from huggingface.co into the `stt_data` volume, so the container needs to
+  reach it once; `docker compose logs stt` then shows `stt: loaded ... in Ns` and, per clip, `stt: 8.2s of audio in
+  0.9s`. Deleting the volume costs one download.
+- **Limits**: a clip is at most ten minutes (the apps stop recording there); clips longer than 25 s are cut at their
+  pauses by a VAD first, since Parakeet takes 20–30 s at a time. One clip is transcribed at a time.
+- **The microphone needs a secure context**: browsers allow `getUserMedia` only on `https://` or `localhost`, so over a
+  plain `http://` LAN address the mic is hidden. The reverse proxy's HTTPS origin (Tailscale Serve, Caddy) gives it.
+- **Turning it off**: `TEF_NOTES_STT=` (empty) in `.env`, then `docker compose up -d`; the apps hide their mic and the
+  routes answer 404. The `stt` container may be stopped too (`docker compose stop stt`). Running without it, nothing is
+  downloaded and no memory is used.
+- **Resource limits**: put them in `docker-compose.override.yml` (`mem_limit: 1g` on `stt`, say); a worker killed for
+  memory fails that clip with "The speech model is unavailable right now" and the next clip starts a fresh one.
+- Check it: `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary ''
+  http://localhost:8098/agent/transcribe` answers `200` with voice input on and the service reachable (an empty clip loads
+  no model), `404` when it is off, `502` when the agent cannot reach the `stt` container.
+
+The image is `ghcr.io/spyrosbazios/tef-notes-stt` (amd64 and arm64), published with the others by `docker.yml`; from
+source it is `stt/Dockerfile`, built by `docker-compose.build.yml` like the rest. Contract: `packages/core/src/voice.ts`;
+the agent's half: `agent/src/transcribe.ts`.
 
 ## The write contract
 
@@ -158,8 +197,10 @@ docker compose pull                         # the release in TEF_NOTES_VERSION (
 docker compose up -d                        # recreates what changed: web, hooks, migrations, the agent
 docker compose logs --tail 20 pocketbase    # migrations applied, no hook errors
 docker compose logs --tail 20 agent         # "agent: listening", no "not saved" lines
+docker compose logs --tail 20 stt           # "stt: listening on 8099"; after a first dictation, "stt: loaded ..."
 curl -s http://localhost:8097/api/health
 curl -s http://localhost:8098/agent/models
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary '' http://localhost:8098/agent/transcribe   # 200: voice input on
 ```
 
 To check a provider key is present without printing it:
