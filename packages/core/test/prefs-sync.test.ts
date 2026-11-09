@@ -40,11 +40,11 @@ describe("prefsSync", () => {
     const { server, remote } = world(DEFAULT_PREFS);
     const phone = device(remote), laptop = device(remote);
     phone.sync.set({ phone: { tabLabels: "never" } });
-    laptop.sync.set({ desktop: { notesPage: true } });
+    laptop.sync.set({ desktop: { hidden: ["logbook"] } });
     await laptop.sync.push();
     await phone.sync.push();
     expect(server.rec?.prefs.phone.tabLabels).toBe("never");
-    expect(server.rec?.prefs.desktop.notesPage).toBe(true);
+    expect(server.rec?.prefs.desktop.hidden).toEqual(["logbook"]);
     await laptop.sync.pull();
     expect(laptop.copy().prefs.phone.tabLabels).toBe("never");
   });

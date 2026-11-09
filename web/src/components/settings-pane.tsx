@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
-import { HIDEABLE, LAYOUT_LABEL, movedTab, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
+import { HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { KEEP_LABEL, KEEPS } from "@/core/voice";
 import { ModelMenu } from "@/components/assistant/model-menu";
@@ -41,6 +41,7 @@ import { useAppearance } from "@/hooks/appearance";
 import { useRowDrag } from "@/hooks/drag";
 import { prefsNow, setPrefs, usePrefs } from "@/hooks/prefs";
 import { TAB_ICON } from "@/components/tab-icons";
+import { RAIL_ICON } from "@/components/task-icons";
 import { useLayout, useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
 import { useSyncStatus } from "@/hooks/sync";
@@ -316,22 +317,34 @@ function PhoneLayout({ here }: { here: boolean }) {
   );
 }
 
-/** The desktop's: Home's list, and whether the sidebar lists Notes. */
+/** The desktop's: Home's list, and the screens the sidebar lists. */
 function DesktopLayout({ here }: { here: boolean }) {
-  const { homeList, notesPage } = usePrefs().desktop;
+  const { homeList, hidden } = usePrefs().desktop;
   return (
     <LayoutCard layout="desktop" here={here}>
       <div className="space-y-2.5 px-3 py-2.5">
         <p className="text-sm font-semibold">Home's task box opens on</p>
         <Choice label="Home's task box opens on, Desktop" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ desktop: { homeList: v } })} />
       </div>
-      <label className="flex items-center gap-3 px-3 py-2.5">
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">Notes in the sidebar</span>
-          <span className="block text-[13px] leading-snug text-dim">A page of only the notes, which Home already lists under its tasks.</span>
-        </span>
-        <Switch checked={notesPage} onCheckedChange={(on) => setPrefs({ desktop: { notesPage: on } })} aria-label="Notes in the sidebar" />
-      </label>
+      <div className="px-3 py-2.5">
+        <p className="text-sm font-semibold">Sidebar</p>
+        <p className="text-[13px] leading-snug text-dim">The screens it lists. A hidden one is still a search away, and can still be where the app opens. Home, Search and Settings always stay.</p>
+      </div>
+      <ul aria-label="Sidebar" className="divide-y divide-line">
+        {RAIL.map((r) => {
+          const shown = !hidden.includes(r), Icon = RAIL_ICON[r];
+          return (
+            <li key={r}>
+              <label className="flex min-h-12 items-center gap-2.5 px-3 py-1">
+                <Icon className={cn("size-4 shrink-0", shown ? "text-brand" : "text-faint")} />
+                <span className={cn("min-w-0 flex-1 text-sm", !shown && "text-faint")}>{RAIL_LABEL[r]}</span>
+                <Switch checked={shown} aria-label={`Show ${RAIL_LABEL[r]} in the sidebar`}
+                  onCheckedChange={(on) => setPrefs({ desktop: { hidden: on ? hidden.filter((h) => h !== r) : [...hidden, r] } })} />
+              </label>
+            </li>
+          );
+        })}
+      </ul>
     </LayoutCard>
   );
 }
@@ -713,7 +726,7 @@ function Maintenance() {
 /** The sections, each its own page picked from the settings sidebar (or the list, below `md`). */
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
-  { id: "layout", label: "Layout", about: "Phone and desktop: start screen, Home's list, tabs, sidebar", icon: LayoutGrid, body: Layouts },
+  { id: "layout", label: "Layout", about: "Phone and desktop: start screen, Home's list, tabs, sidebar screens", icon: LayoutGrid, body: Layouts },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "voice", label: "Voice", about: "Dictation, how long the model stays loaded", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },

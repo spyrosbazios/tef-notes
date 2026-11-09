@@ -4,7 +4,7 @@
 //   1. A choice the owner makes, in Settings or by leaving a view a certain way, is a preference: a field of `Prefs`, kept on
 //      the server (the `prefs` collection: one record keyed `owner`, its `data` this shape) so every device has it.
 //      - The same on every screen (the look, the notes list, the assistant, voice, sharing, the lens on): a key, or a group's field.
-//      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's rail): `phone` or `desktop`. A layout
+//      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar): `phone` or `desktop`. A layout
 //        is what the window draws, not what the device is: the phone's below `md` (768px: tabs at the bottom), the desktop's from
 //        it (the rail). A laptop window made narrow is drawn as a phone's, and follows the phone's preferences.
 //   2. The state of a window rather than a choice (the dock open and how wide, the chat it is on, when it was last seen): kept by
@@ -35,6 +35,14 @@ export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", no
 export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask"];
 /** Tabs off until turned on: Notes, a page of only the notes, which Home already lists under its tasks. */
 const OFF: readonly Tab[] = ["notes"];
+
+/** The desktop's sidebar (the rail): the screens it lists, in its order, each of which can be hidden. Home (the logo), Search, the
+ *  lens and Settings are always there (Settings is where the sidebar is set). */
+export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes"] as const;
+export type RailItem = (typeof RAIL)[number];
+export const RAIL_LABEL: Record<RailItem, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook", notes: "Notes" };
+/** Off until turned on: Notes, as on the phone. */
+const RAIL_OFF: readonly RailItem[] = ["notes"];
 
 /** The task lists Home's box and the Tasks tab open on. */
 export const TASK_LISTS = ["today", "inbox", "upcoming"] as const;
@@ -87,10 +95,10 @@ export type PhonePrefs = LayoutPrefs & {
   tasksList: TaskList;
 };
 
-/** The desktop's, with its rail. */
+/** The desktop's, with its sidebar. */
 export type DesktopPrefs = LayoutPrefs & {
-  /** The rail lists Notes, the page of only the notes (off at first, like the phone's tab). */
-  notesPage: boolean;
+  /** The sidebar's screens it doesn't list (a hidden one is still reached by its link, the palette or the start screen). */
+  hidden: RailItem[];
 };
 
 export type Prefs = {
@@ -120,7 +128,7 @@ export const DEFAULT_PREFS: Prefs = {
   clip: { summary: false },
   lens: null,
   phone: { ...LAYOUT_DEFAULTS, tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
-  desktop: { ...LAYOUT_DEFAULTS, notesPage: false },
+  desktop: { ...LAYOUT_DEFAULTS, hidden: [...RAIL_OFF] },
 };
 
 // ---- reading
@@ -129,6 +137,7 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === "string") : []);
 const one = <T extends string>(of: readonly T[], v: unknown, fallback: T): T => of.find((x) => x === v) ?? fallback;
 const tabsIn = (v: unknown): Tab[] => [...new Set(strings(v).filter((t): t is Tab => (TABS as readonly string[]).includes(t)))];
+const railIn = (v: unknown): RailItem[] => RAIL.filter((r) => strings(v).includes(r));
 
 const layoutOf = (l: Record<string, unknown>): LayoutPrefs => ({
   start: one(STARTS, l.start, LAYOUT_DEFAULTS.start),
@@ -163,7 +172,7 @@ export function prefsOf(raw: unknown): Prefs {
       tabLabels: one(TAB_LABELS, phone.tabLabels, "active"),
       tasksList: one(TASK_LISTS, phone.tasksList, "today"),
     },
-    desktop: { ...layoutOf(desktop), notesPage: desktop.notesPage === true },
+    desktop: { ...layoutOf(desktop), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF] },
   };
 }
 
@@ -217,7 +226,10 @@ export const rebased = (theirs: Prefs, mine: Prefs, paths: readonly string[]): P
 /** Every path `p` has a value at: a copy all of whose fields go up (the first save, before the server has a record). */
 export const everyPath = (p: Prefs): string[] => patchPaths(p);
 
-// ---- the phone's bar
+// ---- the phone's bar and the desktop's sidebar
+
+/** The screens the desktop's sidebar lists, in order. */
+export const shownRail = (p: Pick<DesktopPrefs, "hidden">): RailItem[] => RAIL.filter((r) => !p.hidden.includes(r));
 
 /** The tabs the bar shows, in order. */
 export const shownTabs = (p: Pick<PhonePrefs, "tabs" | "hidden">): Tab[] => p.tabs.filter((t) => !p.hidden.includes(t));

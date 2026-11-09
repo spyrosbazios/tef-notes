@@ -6,7 +6,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 ## Unreleased
 ### Changed
 - Preferences: the phone and the desktop each keep their own start screen and Home list (Settings → Layout shows one card
-  per layout, this screen's first); the desktop sidebar's Notes has its own switch instead of following the phone's tabs.
+  per layout, this screen's first). The desktop sidebar's screens (Inbox, Today, Upcoming, Logbook, Notes) can each be
+  hidden in Settings → Layout; Notes no longer follows the phone's tabs.
   A device sends only the preferences it changed, so two devices no longer undo each other's, and a change reaches the
   others at once over the live feed. "Add a summary" on a shared link is a preference too. The `prefs` record moves to its
   new shape on start (`1794600000_prefs_layouts.js`).

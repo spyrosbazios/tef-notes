@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import { DEFAULT_PREFS, everyPath, isPrefPath, movedTab, NEW_CHAT_IDLE_MS, newChatDue, patchPaths, prefAt, prefsOf, rebased, shownTabs, withPatch } from "../src/prefs";
+import { DEFAULT_PREFS, everyPath, isPrefPath, movedTab, NEW_CHAT_IDLE_MS, newChatDue, patchPaths, prefAt, prefsOf, rebased, shownRail, shownTabs, withPatch } from "../src/prefs";
 
 describe("prefsOf", () => {
   test("nothing is the defaults", () => {
@@ -19,9 +19,9 @@ describe("prefsOf", () => {
     expect(p.agent).toEqual({ effort: "deep", unasked: false, newChat: "app" });
   });
   test("each layout keeps its own", () => {
-    const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", notesPage: true } });
+    const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"] } });
     expect(p.phone).toMatchObject({ start: "inbox", homeList: "upcoming" });
-    expect(p.desktop).toEqual({ start: "notes", homeList: "today", notesPage: true });
+    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"] });
   });
   test("the shape before layouts reads as defaults: the migration moved it (1794600000_prefs_layouts.js)", () => {
     expect(prefsOf({ start: "inbox", tabs: ["ask", "home"] }).phone).toEqual(DEFAULT_PREFS.phone);
@@ -31,11 +31,17 @@ describe("prefsOf", () => {
 test("Notes: off by default, kept once placed", () => {
   expect(prefsOf({}).phone.hidden).toEqual(["notes"]);
   expect(prefsOf({ phone: { tabs: ["notes", "home"], hidden: [] } }).phone.hidden).toEqual([]);
-  expect(prefsOf({}).desktop.notesPage).toBe(false);
+  expect(prefsOf({}).desktop.hidden).toEqual(["notes"]);
+  expect(prefsOf({ desktop: { hidden: [] } }).desktop.hidden).toEqual([]);
 });
 
 test("task lists", () => {
   expect(prefsOf({ phone: { homeList: "inbox", tasksList: "nope" } }).phone).toMatchObject({ homeList: "inbox", tasksList: "today" });
+});
+
+test("shownRail: the sidebar's order, less what is hidden", () => {
+  expect(shownRail({ hidden: ["today", "notes"] })).toEqual(["inbox", "upcoming", "logbook"]);
+  expect(shownRail(DEFAULT_PREFS.desktop)).toEqual(["inbox", "today", "upcoming", "logbook"]);
 });
 
 test("shownTabs and movedTab", () => {
@@ -51,9 +57,9 @@ describe("changes", () => {
       .toEqual(["theme", "notes.sort", "phone.tabs", "phone.start", "lens"]);
   });
   test("a patch sets only the fields it names", () => {
-    const p = withPatch(DEFAULT_PREFS, { notes: { sort: "created" }, desktop: { notesPage: true } });
+    const p = withPatch(DEFAULT_PREFS, { notes: { sort: "created" }, desktop: { hidden: ["logbook"] } });
     expect(p.notes).toEqual({ ...DEFAULT_PREFS.notes, sort: "created" });
-    expect(p.desktop).toEqual({ ...DEFAULT_PREFS.desktop, notesPage: true });
+    expect(p.desktop).toEqual({ ...DEFAULT_PREFS.desktop, hidden: ["logbook"] });
     expect(p.phone).toEqual(DEFAULT_PREFS.phone);
   });
   test("a patch still goes through the reader", () => {
@@ -72,7 +78,7 @@ describe("changes", () => {
     expect(["theme", "lens", "notes.sort", "agent.model", "phone.tabs"].every(isPrefPath)).toBe(true);
     expect(["notes", "theme.x", "nope", "phone.tabs.x", "toString", 3].some(isPrefPath)).toBe(false);
     expect(prefAt(DEFAULT_PREFS, "phone.start")).toBe("home");
-    expect(everyPath(DEFAULT_PREFS)).toContain("desktop.notesPage");
+    expect(everyPath(DEFAULT_PREFS)).toContain("desktop.hidden");
     expect(everyPath(DEFAULT_PREFS).every(isPrefPath)).toBe(true);
   });
 });
