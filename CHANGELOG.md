@@ -5,6 +5,45 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.6.0 - 2026-11-09
+
+### Added
+
+- Web: when a new chat starts is a setting (every open, after leaving the app, 30 minutes away, never), default after
+  leaving the app.
+- Phone: the lens form is a bottom sheet with labelled fields and one scrolling colour row; the colour picker folds to one
+  row. One form sheet for the forms that save (lens, New task): the title and buttons stay put, only the fields scroll.
+- Voice input can be turned off: `TEF_NOTES_STT=` (empty) in `.env` hides the mic and answers the routes with 404; the
+  self-host skill's `verify.sh` probes it.
+- Site: a Voice tile, a Set up once tile (preferences shared by every device) and the speech container under the hood;
+  the feature tiles play their hover once scrolled into view on a phone, the themes scroll sideways there, and the
+  closer peeks read at phone width.
+
+### Changed
+
+- Voice input: Parakeet TDT_CTC 110M replaces TDT 0.6B v2, about 2.5x faster at a third of the memory (~650 MB loaded);
+  the model warms up as it loads, so the first clip is as fast as the rest.
+- Phone: the tab bar floats over the page as liquid glass, hugging its tabs; the assistant's button and the PDF page
+  counter are the same glass; the format tools ride on top of the keyboard in one scrolling row; the task lists slide as
+  panels; Home's lens picker shows "All" and a chevron, so it reads as a control.
+- Launch in the chosen theme: an inline boot layer paints the stored theme before any script, and the server serves the
+  manifest in the owner's theme so Android's splash follows it.
+- Web settings: Server & sync folded into Maintenance; a section's title is read out on the phone only.
+- Site: the mocks match the app (the glass tab bar, the composer with its attach, model, mic and send, the mic in the
+  note header and search, search results as tiles, no tag buttons in Home's heads), the copy says eighteen accents, the
+  lens that is on follows you to every device, and the install commands are the README's.
+- Docs: voice input's deployment and use (memory, the model's download, the secure context the mic needs, turning it
+  off, checks and troubleshooting) in the server README, the self-host skill, the architecture and security notes.
+
+### Fixed
+
+- Closing a task opened from a note's linked tasks returns to the note, not to the task's list.
+- Masonry: no tiles until the columns are measured, so they no longer glide from one column into two on arrival.
+- Phone: a task's long-press menu opens beside the row, not top-left; the notes header stays at the top of its scroller,
+  so the bulk bar is in view after a long press far down; the tab bar's capsule no longer shrinks to a circle as the
+  labels swap, and the bar no longer winks on a page change.
+- Voice input: a worker that dies loading fails the request instead of hanging it.
+
 ## 0.5.0 - 2026-11-08
 
 ### Added
