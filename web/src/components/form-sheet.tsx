@@ -39,7 +39,7 @@ export function SheetForm({ title, description, onSubmit, actions, className, ch
   const sheet = useInDrawer();
   if (!sheet) {
     return (
-      <form onSubmit={onSubmit} className="flex flex-col gap-5">
+      <form onSubmit={onSubmit} className="flex min-w-0 flex-col gap-5">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
