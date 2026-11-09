@@ -49,7 +49,7 @@ export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** The server agent's tools (server/agent/src/tools.ts is the authority; the UI tools the client does itself are assistant.ts's;
  *  `show_*` hand back a widget to draw, widgets.ts); a name not here shows as it is. */
 export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "create_tag" | "update_tag" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
-  | "summarise_links" | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
+  | "summarise_links" | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "list_tagged" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
   | "show_day" | "show_week" | "show_review" | "show_quote" | "show_link" | "show_lens" | "find_free_slots"
   | UiToolName;
 
@@ -62,7 +62,7 @@ const LABEL: Record<ToolName, string> = {
   search_notes: "Searching your notes", list_notes: "Listing your notes", list_tags: "Reading your tags", read_note: "Reading a note",
   create_note: "New note", append_to_note: "Adding to a note", rewrite_note: "Rewriting a note", summarise_links: "Summarising links", set_note_flags: "Changing a note's flags", delete_note: "Deleting a note",
   update_memory: "Memory", web_search: "Searching the web", read_url: "Reading a page",
-  list_tasks: "Reading your tasks", add_task: "Adding a task", add_tasks: "Adding tasks", update_task: "Changing a task", complete_task: "Completing a task",
+  list_tasks: "Reading your tasks", list_tagged: "Gathering by tag", add_task: "Adding a task", add_tasks: "Adding tasks", update_task: "Changing a task", complete_task: "Completing a task",
   delete_task: "Deleting a task",
   open_note: "Opening a note", open_task: "Opening a task", go_view: "Going to a view", ask_choice: "Asking you to choose",
 };
@@ -73,7 +73,7 @@ export type Kind = "think" | "search" | "list" | "read" | "web" | "page" | "writ
 const KIND: Partial<Record<ToolName, Kind>> = {
   search_notes: "search", list_notes: "list", list_tags: "list", read_note: "read", web_search: "web", read_url: "page",
   create_note: "write", append_to_note: "write", rewrite_note: "write", summarise_links: "write", set_note_flags: "write", delete_note: "write", update_memory: "memory",
-  list_tasks: "tasks", find_free_slots: "tasks", add_task: "todo", add_tasks: "todo", update_task: "todo", complete_task: "todo", delete_task: "todo",
+  list_tasks: "tasks", list_tagged: "list", find_free_slots: "tasks", add_task: "todo", add_tasks: "todo", update_task: "todo", complete_task: "todo", delete_task: "todo",
 };
 export const kindOf = (name: string): Kind | undefined => KIND[name as ToolName];
 

@@ -30,7 +30,8 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unknown) => string): string {
   switch (name) {
     case "search_notes": case "web_search": return str(i.query);
-    case "list_notes": return [str(i.filter), str(i.tag)].filter(Boolean).join(" · ");
+    case "list_notes": return str(i.filter);
+    case "list_tagged": return Array.isArray(i.tags) ? i.tags.map(str).join(i.match === "all" ? " + " : " · ") : "";
     case "read_note": case "append_to_note": case "summarise_links": case "delete_note": return titleOf(i.path);
     case "create_tag": case "update_tag": return str(i.name) || str(i.id);
     case "create_note": return str(i.title);

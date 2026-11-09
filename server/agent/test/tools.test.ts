@@ -102,11 +102,30 @@ describe("list_notes", () => {
     pb.put("notes/a.md", file("a", "- x\n", "tags: [Home]\n"), { updated: "2026-10-04 12:00:00.000Z" });
     pb.put("notes/b.md", file("b", "Codes\n", "pinned: true\ncolor: yellow\n"));
     pb.put("notes/c.md", file("c", "- x\n", "tags: [work]\n"));
-    const r = await run(T.list_notes, { filter: "tag", tag: "home" }) as { notes: { path: string }[] };
-    expect(r.notes.map((n) => n.path)).toEqual(["notes/a.md"]);
     const s = await run(T.list_notes, { filter: "pinned" }) as { notes: object[] };
     expect(s.notes).toEqual([{ path: "notes/b.md", title: "b", snippet: "Codes", flags: "pinned", color: "yellow", edited: expect.any(String) }]);
-    expect(await run(T.list_notes, { filter: "tag" })).toEqual({ error: "filter tag needs a tag." });
+  });
+});
+
+describe("list_tagged", () => {
+  it("notes and tasks with any or all of the tags, folded; done tasks only when asked", async () => {
+    pb.put("notes/a.md", file("a", "- x\n", "tags: [Σπίτι, work]\n"), { updated: "2026-10-04 12:00:00.000Z" });
+    pb.put("notes/b.md", file("b", "- x\n", "tags: [work]\n"));
+    pb.put("notes/c.md", file("c"));
+    const task = (title: string, tags: string[], done?: string) => {
+      const t = newTask(title.padEnd(15, "0"), { title, tags, ...(done ? { done } : {}) });
+      pb.tasks.set(t.id, { ...t, rev: 1 });
+    };
+    task("fix tap", ["σπιτι"]); task("old", ["Σπίτι"], "2026-10-01"); task("report", ["work"]);
+    type R = { notes: { path: string }[]; tasks: { title: string }[] };
+    const any = await run(T.list_tagged, { tags: ["ΣΠΊΤΙ"] }) as R;
+    expect(any.notes.map((n) => n.path)).toEqual(["notes/a.md"]);
+    expect(any.tasks.map((t) => t.title)).toEqual(["fix tap"]);
+    const both = await run(T.list_tagged, { tags: ["Σπίτι", "work"], match: "all" }) as R;
+    expect(both.notes.map((n) => n.path)).toEqual(["notes/a.md"]);
+    expect(both.tasks).toEqual([]);
+    const done = await run(T.list_tagged, { tags: ["Σπίτι"], done: true }) as R;
+    expect(done.tasks.map((t) => t.title).sort()).toEqual(["fix tap", "old"]);
   });
 });
 

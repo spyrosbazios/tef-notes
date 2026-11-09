@@ -142,17 +142,13 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     }),
 
     list_notes: tool({
-      description: "Notes from the index by a filter, newest edit first, each with a snippet of its start: pinned, recent, or one tag.",
+      description: "Notes from the index by a filter, newest edit first, each with a snippet of its start: pinned or recent. By tag: list_tagged.",
       inputSchema: z.object({
-        filter: z.enum(["pinned", "recent", "tag"]),
-        tag: z.string().optional().describe("With filter tag: the tag"),
+        filter: z.enum(["pinned", "recent"]),
         limit: z.number().int().min(1).max(LIST).optional().describe(`Default 20, at most ${LIST}`),
       }),
-      execute: async ({ filter, tag, limit = 20 }) => {
-        if (filter === "tag" && !tag) return { error: "filter tag needs a tag." };
-        const t = tag?.toLowerCase();
-        const keep = { pinned: (n: Meta) => n.pinned, recent: () => true,
-          tag: (n: Meta) => n.tags.some((x) => x.toLowerCase() === t) }[filter];
+      execute: async ({ filter, limit = 20 }) => {
+        const keep = { pinned: (n: Meta) => n.pinned, recent: () => true }[filter];
         const now = Date.now(), { list, left_out } = capList(newest((await notes.list()).filter((n) => n.path.startsWith(NOTES) && keep(n))), limit);
         return {
           notes: list.map((n) => ({ path: n.path, title: n.title, snippet: snippetOf(parseNote(n.path, n.text).body), ...(n.tags.length ? { tags: n.tags } : {}),

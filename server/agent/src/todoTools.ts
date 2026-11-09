@@ -5,7 +5,7 @@
 import { tool, type ModelMessage } from "ai";
 import { z } from "zod";
 import { views, newTask, type Task, type TaskPatch } from "@/core/todo";
-import { fold } from "@/core/notes";
+import { fold, NOTES as NOTE_DIR, parseNote, snippetOf } from "@/core/notes";
 import { localDay } from "@/core/time";
 import { capList, clip } from "./guard";
 import { definedTags, TAGS, type Notes } from "./notes";
@@ -171,6 +171,13 @@ export function matches(t: Task, query = "", tag = "") {
   return words.every((w) => hay.includes(w));
 }
 
+/** Whether `have` carries the tags `want` asks for (folded: case and accents ignored): every one with `all`, else any. */
+export function tagged(have: string[], want: string[], all = false) {
+  const h = new Set(have.map((x) => fold(x.trim())));
+  const hit = (t: string) => h.has(fold(t.trim()));
+  return all ? want.every(hit) : want.some(hit);
+}
+
 /** The tools over tasks for one request. `notes`: a linked note is a path here, a record id in its link.
  *  `fromPage`: whether the chat has read the web (tools.ts), so a write marks its record `tainted`. */
 export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMessage[]) => Promise<boolean>) {
@@ -192,6 +199,29 @@ export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMe
         const { list: shown, left_out } = capList(list, limit), paths = new Map(all.map((n) => [n.rec, n.path]));
         const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
         return { today, tasks: await Promise.all(shown.map(async (t) => listed(t, await linked(t)))), ...(left_out ? { left_out } : {}) };
+      },
+    }),
+
+    list_tagged: tool({
+      description: "Notes and tasks carrying tags, in one call: any of `tags`, or every one with `match: all` (case and accents ignored). Notes newest edit first, each with a snippet; tasks open ones only unless `done`, each as list_tasks gives it. Use it for \"everything about X\", or to see what a tag holds.",
+      inputSchema: z.object({
+        tags: z.array(z.string().min(1).max(40)).min(1).max(10).describe("Tag names, as list_tags gives them"),
+        match: z.enum(["any", "all"]).optional().describe("any (default): an item with one of them; all: only those with every one"),
+        done: z.boolean().optional().describe("Also tasks already done"),
+        limit: z.number().int().min(1).max(TASKS).optional().describe(`Of each, notes and tasks; default 30, at most ${TASKS}`),
+      }),
+      execute: async ({ tags, match = "any", done = false, limit = 30 }) => {
+        const all = match === "all", [tasks, list] = [await todo.tasks(), await notes.list()];
+        const ns = list.filter((n) => n.path.startsWith(NOTE_DIR) && tagged(n.tags, tags, all)).sort((a, b) => b.updated - a.updated);
+        const ts = tasks.filter((t) => (done || !t.done) && tagged(t.tags, tags, all));
+        const N = capList(ns, limit), T = capList(ts, limit), paths = new Map(list.map((n) => [n.rec, n.path]));
+        const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
+        return {
+          notes: N.list.map((n) => ({ path: n.path, title: n.title, snippet: snippetOf(parseNote(n.path, n.text).body), tags: n.tags })),
+          ...(N.left_out ? { notes_left_out: N.left_out } : {}),
+          tasks: await Promise.all(T.list.map(async (t) => listed(t, await linked(t)))),
+          ...(T.left_out ? { tasks_left_out: T.left_out } : {}),
+        };
       },
     }),
 
