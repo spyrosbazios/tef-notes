@@ -121,7 +121,8 @@ function LensAccent({ value, onChange }: { value: LensAccentName | null; onChang
 }
 
 /** `header`: Home's header on a phone (mobile/src/ui/lens.tsx), where the app's mark is the control, with the lens's name ("All" while none is on) and a chevron beside it, so it reads as a picker. */
-export function LensSwitcher({ header = false }: { header?: boolean }) {
+/** `folded`: the desktop rail is down to its icons, so the name fades out under the clip and the off button goes. */
+export function LensSwitcher({ header = false, folded = false }: { header?: boolean; folded?: boolean }) {
   const { data: lenses = [] } = useLenses(), active = useActiveLens(), remove = useRemoveLens();
   const [form, setForm] = useState<{ lens?: Lens } | null>(null), [asking, setAsking] = useState<Lens | null>(null);
   const del = (l: Lens) => {
@@ -144,7 +145,7 @@ export function LensSwitcher({ header = false }: { header?: boolean }) {
               className={cn("flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm transition-colors",
                 active ? "bg-brand/15 font-semibold text-brand" : "text-dim hover:bg-muted hover:text-fg")}>
               <Focus className="size-4 shrink-0" />
-              <span className="flex-1 truncate">{active ? active.name : "Lens"}</span>
+              <span className={cn("flex-1 whitespace-nowrap transition-opacity", folded ? "opacity-0" : "truncate")}>{active ? active.name : "Lens"}</span>
             </button>
           )}
         </DropdownMenuTrigger>
@@ -163,7 +164,7 @@ export function LensSwitcher({ header = false }: { header?: boolean }) {
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {active && !header ? (
+      {active && !header && !folded ? (
         <button type="button" onClick={() => setActiveLens(null)} title={`Turn off the lens ${active.name}`} aria-label={`Turn off the lens ${active.name}`}
           className="grid size-8 shrink-0 place-items-center rounded-lg text-brand transition-colors hover:bg-brand/15">
           <X className="size-4" />

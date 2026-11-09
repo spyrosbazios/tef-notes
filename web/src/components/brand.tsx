@@ -10,11 +10,12 @@ export function Mark({ className }: { className?: string }) {
   );
 }
 
-export function Brand() {
+/** `folded`: the desktop rail is down to its icons; the mark stays and the wordmark fades under the clip. */
+export function Brand({ folded = false }: { folded?: boolean }) {
   return (
     <div className="flex items-center gap-2">
-      <Mark className="size-6 text-brand" />
-      <span className="font-extrabold text-xl leading-none tracking-tight">TEF Notes</span>
+      <Mark className="size-6 shrink-0 text-brand" />
+      <span className={`whitespace-nowrap font-extrabold text-xl leading-none tracking-tight transition-opacity duration-200 ${folded ? "opacity-0" : ""}`}>TEF Notes</span>
     </div>
   );
 }

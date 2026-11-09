@@ -11,6 +11,8 @@
 // `lg` the app bar's buttons are the touch way to everything the keys do: Views, Assistant (a), Search (/ and ⌘K), New note or task (n, q).
 import { Command as CommandIcon, Menu, Plus, Sparkles } from "lucide-react";
 import { Outlet } from "@tanstack/react-router";
+import { spring, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AssistantFab } from "@/components/assistant/fab";
 import { Dock } from "@/components/assistant/dock";
@@ -25,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { dockNow, setDock, useDock } from "@/hooks/dock";
 import { useKeyboard } from "@/hooks/keyboard";
+import { useRail, toggleRail } from "@/hooks/rail";
 import { useLive } from "@/hooks/notes";
 import { useNewNote } from "@/hooks/new-note";
 import { INSETS, ShellContext, startOf, type ShellActions } from "@/hooks/shell";
@@ -71,6 +74,7 @@ export function Shell() {
   const onNote = !!note;
   const newNote = useNewNote();
   const [dock] = useDock();
+  const [rail] = useRail(), reduce = useShouldReduceMotion(), railMove = useTempoTransition(spring.reflow);
   const keyboard = useKeyboard();
   const [palette, setPalette] = useState(false), [menu, setMenu] = useState(false), [adding, setAdding] = useState<Start | null>(null);
 
@@ -84,6 +88,7 @@ export function Shell() {
       else if ((e.metaKey || e.ctrlKey) && e.key === "/") { e.preventDefault(); setDock({ open: !dockNow().open }); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "a" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); setDock({ open: !dockNow().open }); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "/" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); setPalette(true); }
+      else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "[" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); toggleRail(); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "n") { e.preventDefault(); newNote(); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "q" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); setAdding(startOf(startKind)); }
     };
@@ -93,7 +98,7 @@ export function Shell() {
 
   const actions = useMemo<ShellActions>(() => ({ newNote, add: setAdding, openMenu: () => setMenu(true) }), [newNote]);
 
-  const rail = <Rail onSearch={() => { setMenu(false); setPalette(true); }} onPick={() => setMenu(false)} />;
+  const search = () => { setMenu(false); setPalette(true); };
   const tasks = isTaskView(view), focus = tasks && !!task;
   // The phone's bottom tabs: on every screen but an open task (a screen of its own, with a Back), and under the keyboard. A note's page
   // is another: its layer covers the tabs, which stay mounted (hidden) under it. The bar floats over the page, which runs on under it
@@ -111,9 +116,11 @@ export function Shell() {
           <div className="relative flex min-w-0 flex-1">
             {/* The screen behind a note's page: hidden and inert, but laid out and mounted, so it keeps its scroll and its pictures */}
             <div className={cn("flex min-w-0 flex-1", onNote && "invisible")} inert={onNote} data-under-note={onNote || undefined}>
-              <aside className="hidden w-60 shrink-0 border-r border-line bg-bg lg:block">{rail}</aside>
+              {/* Its width is the one thing that moves when it folds (rail.tsx): the page beside it reflows on the same spring */}
+              <motion.aside initial={false} animate={{ width: rail.folded ? 60 : 240 }} transition={reduce ? { duration: 0 } : railMove}
+                className="hidden shrink-0 overflow-hidden border-r border-line bg-bg lg:block"><Rail onSearch={search} fold={rail.folded} /></motion.aside>
               <Sheet open={menu} onOpenChange={setMenu}>
-                <SheetContent side="left" className="w-64 p-0"><SheetTitle className="sr-only">Views</SheetTitle>{rail}</SheetContent>
+                <SheetContent side="left" className="w-64 p-0"><SheetTitle className="sr-only">Views</SheetTitle><Rail onSearch={search} onPick={() => setMenu(false)} /></SheetContent>
               </Sheet>
 
               <div className="flex min-w-0 flex-1 flex-col">

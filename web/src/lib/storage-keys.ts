@@ -7,6 +7,8 @@ export const STORAGE = {
   prefs: "tefnotes.prefs",
   /** The assistant's dock: open or not, how wide, the chat it is on (hooks/dock.ts). */
   dock: "tefnotes.dock",
+  /** The desktop rail: folded to its icons or not (hooks/rail.ts). */
+  rail: "tefnotes.rail",
   /** When the dock was last on screen, for the new-chat rule (assistant/provider.tsx). */
   chatSeen: "tefnotes.chat-seen",
 } as const;
