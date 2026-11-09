@@ -6,7 +6,7 @@
 // Below `md` it is the phone's: two columns, a header of icons (tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { ReducedMotionConfig, scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { ArrowDownUp, Check, Hash, LayoutGrid, MapPin, Pin, Plus, Sparkles, Tags, X } from "lucide-react";
+import { ArrowDownUp, Check, LayoutGrid, MapPin, Pin, Plus, Sparkles, Tags } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
@@ -246,13 +246,14 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
             {/* The title and its count sit on one baseline, the controls centred beside them (the wrapper only exists on a phone) */}
             <div className="max-md:mr-auto max-md:flex max-md:items-baseline max-md:gap-2 md:contents">
               <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
-              <span className="text-xs tabular-nums text-faint md:mr-auto md:self-baseline md:pt-1">{shown.length}</span>
+              <span className={cn("text-xs tabular-nums text-faint md:self-baseline md:pt-1", !chips.length && "md:mr-auto")}>{shown.length}</span>
+              {/* The tag filter reads as what it is, the tags themselves beside the count, each taken off on its own */}
+              {chips.length ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 self-center md:mr-auto md:ml-2">
+                  {chips.map((t) => <TagBadge key={t} name={t} className="h-6 text-xs" onRemove={() => setTags(chips.filter((c) => c !== t))} />)}
+                </div>
+              ) : null}
             </div>
-            {chips.length ? (
-              <Button variant="outline" size="sm" aria-label="Clear tag filter" onClick={() => setTags([])} className={cn("max-w-64 text-fg max-sm:max-w-28 max-md:px-3", TOOL)}>
-                <Hash className="max-md:size-5" /><span className="truncate">{chips.join(", ")}</span><X className="max-md:size-5" />
-              </Button>
-            ) : null}
             {narrow ? (
               // The phone's toggle: one button showing the other layout (the animated group's gliding highlight has
               // nothing to sit on when the selected item is hidden, and paints a stray surface)
