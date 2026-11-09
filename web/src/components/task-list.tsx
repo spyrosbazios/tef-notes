@@ -77,11 +77,15 @@ function Heading({ kind, section, today, lit }: { kind: TaskView; section: strin
   return null;
 }
 
-/** A section of rows. When the last of its rows goes the whole section fades out: it is inert from then on and hands the focus to the list. */
-function Section({ day, fade, children }: { day?: string; fade: Transition; children: ReactNode }) {
+/** The pop of the Upcoming day the planner points at: a little past its size and back, like a dock's magnification. */
+const MAGNIFY: Transition = { type: "spring", stiffness: 420, damping: 18 };
+
+/** A section of rows; `lit`, the planner's day, stands out magnified. When the last of its rows goes the whole section fades out: it is inert from then on and hands the focus to the list. */
+function Section({ day, fade, lit = false, children }: { day?: string; fade: Transition; lit?: boolean; children: ReactNode }) {
   const ref = useLeaving<HTMLDivElement>("[data-task-list]", { sibling: false });
   return (
-    <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
+    <motion.div ref={ref} data-section-day={day} initial={{ opacity: 0 }} animate={{ opacity: 1, scale: lit ? 1.035 : 1, transition: { opacity: fade, scale: MAGNIFY } }}
+      exit={{ opacity: 0, transition: fade }} className={cn("origin-left rounded-xl transition-colors duration-300", lit && "bg-brand/8")}>
       {children}
     </motion.div>
   );
@@ -255,7 +259,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, onHoverD
             <div key={of} className="relative">
               <AnimatePresence mode="popLayout" initial={false}>
                 {count ? sections.map(({ key, rows }) => (
-                  <Section key={key} day={kind === "upcoming" ? key : undefined} fade={fade}>
+                  <Section key={key} day={kind === "upcoming" ? key : undefined} fade={fade} lit={key === lit}>
                     <Heading kind={kind} section={key} today={today} lit={key === lit} />
                     <ul className="relative"><AnimatePresence mode="popLayout" initial={false}>{rows.map((t) => row(t, key))}</AnimatePresence></ul>
                   </Section>

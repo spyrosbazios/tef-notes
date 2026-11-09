@@ -87,15 +87,16 @@ export function Home() {
   // The day Upcoming was scrolled to by hand, which the days strip follows (phone)
   const [viewing, setViewing] = useState<string | null>(null);
   const pick = (day: string) => { show(day === today ? "today" : "upcoming"); setFocus(day === today ? null : { day, n: (focus?.n ?? 0) + 1 }); setViewing(null); };
-  // Planner and task box follow each other on hover: a planner day scrolls Upcoming to it (after a short rest, so a pointer
+  // Planner and task box follow each other on hover: a planner day scrolls Upcoming to it (from Today too) and magnifies its day (after a short rest, so a pointer
   // crossing the month doesn't drag the list along), and a row or Upcoming day lights its day in the planner
   const [hot, setHot] = useState<string | null>(null);
   const rest = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(rest.current), []);
   const peek = (day: string | null) => {
     window.clearTimeout(rest.current);
-    if (!day || tab !== "upcoming" || day <= today) return;
-    rest.current = window.setTimeout(() => setFocus((f) => (f?.day === day ? f : { day, n: (f?.n ?? 0) + 1 })), 120);
+    if (!day || (tab !== "upcoming" && tab !== "today") || day <= today) return;
+    // Today's list holds no later day: a later day hovered brings Upcoming in front
+    rest.current = window.setTimeout(() => { show("upcoming"); setFocus((f) => (f?.day === day ? f : { day, n: (f?.n ?? 0) + 1 })); }, 120);
   };
   const add = () => onAdd({ schedule: tab === "inbox" ? null : { when: tab === "today" ? today : addDays(today, 1), evening: false } });
 

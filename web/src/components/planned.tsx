@@ -19,11 +19,10 @@ const SHOWN = 5;
 type PlannedTask = NonNullable<ReturnType<ReturnType<typeof plannedByDay>["get"]>>[number];
 
 
-/** A day's cell: under a mouse a day with tasks (`lift`) pops up like a dock's magnification, its row neighbours a little; holding it (a finger's long press) adds a task for that day, when it can still be planned. */
-function Cell({ onLong, lift, children }: { onLong?: () => void; lift: boolean; children: ReactNode }) {
+/** A day's cell: holding it (a finger's long press) adds a task for that day, when it can still be planned. */
+function Cell({ onLong, children }: { onLong?: () => void; children: ReactNode }) {
   const press = useLongPress(() => onLong?.());
-  return <div {...press} className={cn("group relative min-h-0 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none",
-    lift && "hover:z-10 hover:scale-[1.18] [*:hover+&]:scale-[1.06] [&:has(+_*:hover)]:scale-[1.06] motion-reduce:scale-100")}>{children}</div>;
+  return <div {...press} className="group relative min-h-0">{children}</div>;
 }
 
 /** `lit`: the day of the task hovered in the task box, ringed here (and its month shown); `onHover`: the day under the pointer, null as it leaves. */
@@ -62,14 +61,14 @@ export function Planned({ onPick, onAdd, lit = null, onHover }: { onPick: (day: 
             const tile = (
               <button type="button" onClick={() => onPick(d)} onMouseEnter={onHover ? () => onHover(d) : undefined} onFocus={onHover ? () => onHover(d) : undefined} disabled={past} aria-label={`${at(d).toLocaleDateString(undefined, { day: "numeric", month: "long" })}, ${n} planned`}
                 className={cn("flex size-full items-start justify-end rounded-lg p-1.5 text-[11px] leading-none tabular-nums transition-transform duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-brand/60",
-                  SHADE[shadeOf(n)], n >= 3 ? "text-primary-foreground" : "text-dim", !past && "cursor-pointer group-hover:brightness-110 group-hover:shadow-lg", past && "opacity-40",
+                  SHADE[shadeOf(n)], n >= 3 ? "text-primary-foreground" : "text-dim", !past && "cursor-pointer hover:brightness-110", past && "opacity-40",
                   d === today && "font-semibold text-fg ring-2 ring-brand ring-offset-1 ring-offset-bg",
                   d === lit && "scale-110 font-semibold motion-reduce:scale-100 ring-2 ring-fg/70 ring-offset-1 ring-offset-bg")}>
                 {Number(d.slice(8))}
               </button>
             );
             return (
-              <Cell key={d} lift={!!n && hovers} onLong={past ? undefined : () => onAdd(d)}>
+              <Cell key={d} onLong={past ? undefined : () => onAdd(d)}>
                 {n && hovers ? (
                   <Tooltip side="top" sideOffset={6}>
                     <TooltipTrigger asChild>{tile}</TooltipTrigger>
