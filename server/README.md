@@ -41,7 +41,7 @@ of it is the only gate.
 ```sh
 cd server
 cp .env.example .env              # then edit it: at least TZ
-mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<TEF_NOTES_PROVIDER> for another model provider
+mkdir -p keys/typesafe keys/deepseek keys/exa keys/push keys/maps   # keys/<TEF_NOTES_PROVIDER> for another model provider
 # put each provider's key, alone, in keys/<provider>/api-key (see AI providers); all optional
 docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes, tef-notes-agent and tef-notes-stt
 docker compose exec pocketbase ./pocketbase superuser create you@example.com 'a-long-password'
@@ -72,6 +72,7 @@ result.
 | `TEF_NOTES_KEY_TYPESAFE` | `./keys/typesafe` | Directory holding `api-key`, mounted read-only at `/run/typesafe`. |
 | `TEF_NOTES_KEY_LLM` | `./keys/<TEF_NOTES_PROVIDER>` | Same, for the model provider, mounted into both containers at `/run/llm`. |
 | `TEF_NOTES_KEY_EXA` | `./keys/exa` | Same, for Exa, mounted into the agent at `/run/exa`. |
+| `TEF_NOTES_KEY_MAPS` | `./keys/maps` | Same, for Google Maps Platform, mounted into the agent at `/run/maps`. |
 | `TEF_NOTES_KEY_PUSH` | `./keys/push` | Same, for the VAPID private key of push reminders, mounted into the agent at `/run/push`. |
 | `TEF_NOTES_VAPID_SUBJECT` | | A `mailto:` or https URL the push services may reach you at. Empty: push reminders are off. |
 | `TEF_NOTES_CRX_KEY` | `./no-crx-key` | Path to the extension's signing key, inside `server/`. Extension build only, see the extension section. |
@@ -98,6 +99,12 @@ root-owned. Every provider is optional.
 | `typesafe` | The auto-tagger (a per-minute job tagging notes) and the clip's destination suggestions | Nothing is auto-tagged; clip suggest returns `pick: "new"` and saves still work |
 | the model provider (`llm`) | The chat agent, the clip's tidied note and optional summary, tag descriptions | The chat is refused and models are listed with `available: false`; a clip's note is saved as typed and a requested summary reports `"failed"` |
 | `exa` | The agent's web search and page-reading tools | The agent runs without its web tools |
+| `maps` | A note's place search and its map, the agent's `find_place` (a Google Maps Platform key, below) | A place is typed by name: no search, no map; directions still open Maps by the name |
+
+**The `maps` key.** In Google Cloud, enable **Places API (New)** and **Maps Static API** on a project with billing, and
+create an API key restricted to those two APIs (an application restriction by IP address fits, since only the agent calls
+Google). The picker uses Autocomplete with a session token per pick, so a search typed and picked bills as one Place
+Details; the map picture is cached by the browser for a week.
 
 A failure is logged with its status, never the key. Auto-tagger and clip failures show as `autotag:` and `clip:` lines
 in PocketBase's logs (admin UI, Logs).

@@ -16,6 +16,7 @@ to it. See the security model in [../README.md](../README.md).
 | `GET` | `/agent/models` | The models; `provider` names the server's; `available` is true when its key is read |
 | `GET` | `/agent/push/key` | The VAPID public key for `pushManager.subscribe`; 404 while push is off (`src/push.ts`, [../README.md](../README.md) "Push reminders") |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Store or forget a browser's push subscription (`packages/core/src/push.ts` is the contract) |
+| `GET` | `/agent/places/suggest`, `/agent/places/place`, `/agent/places/map` | A note's place search: suggestions as you type, the place picked, its map picture in the app's theme; 503 without the `maps` key (`src/places.ts`, contract `packages/core/src/places.ts`) |
 | `POST`, `GET`, `DELETE` | `/agent/mcp` | The MCP endpoint, when `TEF_NOTES_MCP=1` (below); a 404 otherwise |
 
 ## Always-on assistant
@@ -51,7 +52,7 @@ stateless), so Claude Code, Codex, Cursor or any MCP client can work on your not
 assistant doesn't use it and needs no change; leave it off if you don't connect anything. `src/mcp.ts` holds it.
 
 - **The same tools as the chat** (`src/tools.ts`, `src/todoTools.ts`): search, list and read notes and tasks; create,
-  append, rewrite, flag; create and update tag definitions; add, update, complete and delete tasks. Note and task writes use the same `rev` compare-and-swap. Tag definitions use the shared Settings API (last save wins, no `rev`); renaming a definition leaves assigned tag names unchanged.
+  append, rewrite, flag, set a note's place (and find one on Google Maps); create and update tag definitions; add, update, complete and delete tasks. Note and task writes use the same `rev` compare-and-swap. Tag definitions use the shared Settings API (last save wins, no `rev`); renaming a definition leaves assigned tag names unchanged.
 - **Left out:** web search and page reading (the harness has its own), the agent's memory, preview cards, the app's UI tools.
 - **No confirm cards.** The harness's own approval prompt stands in for them; each tool is marked read-only, write or
   destructive (`readOnlyHint`, `destructiveHint`) so the harness can ask accordingly.
@@ -75,14 +76,15 @@ Other clients take the same URL as a "Streamable HTTP" server.
 | `TEF_NOTES_PB` | `http://127.0.0.1:8097` | PocketBase's URL (compose sets `http://pocketbase:8090`) |
 | `HOST` | `127.0.0.1` | Listen address (the image sets `0.0.0.0`; compose publishes it on loopback only) |
 | `PORT` | `8098` | Listen port |
-| `TEF_NOTES_KEYS_DIR` | `/run` | Keys are read from `<dir>/llm/api-key` and `<dir>/exa/api-key` on every use |
+| `TEF_NOTES_KEYS_DIR` | `/run` | Keys are read from `<dir>/<name>/api-key` (`llm`, `exa`, `push`, `maps`) on every use |
 | `TEF_NOTES_VAPID_SUBJECT` | | `mailto:` or https URL for push reminders; with the key at `<dir>/push/api-key` they switch `src/reminders.ts` on |
 | `TEF_NOTES_PROVIDER` | `deepseek` | The model provider (`src/models.ts` `PROVIDERS`) |
 | `TEF_NOTES_MODEL` | the provider's | The default model |
 | `TEF_NOTES_MCP` | `0` | `1` serves the MCP endpoint |
 | `TZ` | system zone | The day used in the prompt and for a new note's name |
 
-Without the provider's key (`llm`) a chat is refused; without `exa` the web tools are left out.
+Without the provider's key (`llm`) a chat is refused; without `exa` the web tools are left out; without `maps`, `find_place`
+(a note's place is then set by name only).
 
 ## Development
 

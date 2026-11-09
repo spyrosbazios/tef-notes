@@ -24,7 +24,8 @@ import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, Unavailable } from "./models";
 import { inlinePdfs, preview } from "./pdfs";
-import { SYSTEM, today, WEB } from "./systemPrompt";
+import { PLACE_SEARCH, placeInputProblem } from "./placeTools";
+import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
 import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
 import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type AddManyInput, type UpdateInput } from "./todoTools";
 
@@ -72,6 +73,8 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
     rewrite_note: ({ path, text }: { path: string; text: string }, { messages }: O) => ask(messages, checkWrite(notes, path, text)),
     summarise_links: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     set_note_flags: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
+    set_note_place: (i: { path: string; place_id?: string; name?: string; clear?: boolean }, { messages }: O) =>
+      ask(messages, Promise.resolve(placeInputProblem(i)).then((p) => p ?? checkWrite(notes, i.path))),
     // a delete has no way back: it asks whatever the setting, unless the path is bad
     delete_note: async ({ path }: { path: string }) => ((await checkWrite(notes, path)) ? "not-applicable" as const : "user-approval" as const),
     // tasks are records: the task, note and every value are checked first, like a path
@@ -92,13 +95,14 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = pdfs ? async () => true : read;
-  const web = !!(await key("exa")), all = tools(notes, todo, untrusted);
-  // Out of the prompt: the web tools without an Exa key, and the tools the client does itself unless this page can do them
-  const ui = uiToolsFor(page), off = new Set<string>([...(web ? [] : WEB_TOOLS), ...UI_TOOL_NAMES.filter((n) => !ui.includes(n))]);
+  const web = !!(await key("exa")), maps = !!(await key("maps")), all = tools(notes, todo, untrusted);
+  // Out of the prompt: the web tools without an Exa key, place search without a Maps key, and the tools the client does
+  // itself unless this page can do them
+  const ui = uiToolsFor(page), off = new Set<string>([...(web ? [] : WEB_TOOLS), ...(maps ? [] : [PLACE_SEARCH]), ...UI_TOOL_NAMES.filter((n) => !ui.includes(n))]);
   const base = (Object.keys(all) as (keyof Tools)[]).filter((n) => !off.has(n));
   return new ToolLoopAgent({
     model: m,
-    instructions: `${SYSTEM}${web ? `\n${WEB}` : ""}`,
+    instructions: `${SYSTEM}${maps ? `\n${PLACES}` : ""}${web ? `\n${WEB}` : ""}`,
     tools: all,
     stopWhen: isStepCount(steps),
     reasoning,

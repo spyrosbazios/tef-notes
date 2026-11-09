@@ -203,6 +203,24 @@ describe("writes", () => {
     expect(pb.notes.get("notes/a.md")).toMatchObject({ tags: ["Ταξίδι"], rev: 2 });
   });
 
+  it("set_note_place: a place by name, or none; one of id, name and clear exactly", async () => {
+    pb.put("notes/a.md", file("a"));
+    expect(await run(T.set_note_place, { path: "notes/a.md", name: "Home", clear: true })).toMatchObject({ error: expect.stringContaining("exactly one") });
+    expect(await run(T.set_note_place, { path: "notes/a.md" })).toMatchObject({ error: expect.stringContaining("exactly one") });
+    expect(await run(T.set_note_place, { path: "notes/a.md", name: "Home" })).toMatchObject({ saved: "notes/a.md", rev: 2, where: { name: "Home" } });
+    expect(parseNote("notes/a.md", pb.notes.get("notes/a.md")!.text).where).toEqual({ name: "Home" });
+    await run(T.set_note_place, { path: "notes/a.md", clear: true });
+    expect(pb.notes.get("notes/a.md")!.text).toBe(file("a"));
+  });
+
+  it("set_note_place: the confirm card is skipped only for a bad request, which goes back to the agent", async () => {
+    pb.put("notes/a.md", file("a"));
+    const ask = approvals(notes, todo, false).set_note_place, o = { messages: [] as ModelMessage[] };
+    expect(await ask({ path: "notes/a.md", name: "Home" }, o)).toBe("user-approval");
+    expect(await ask({ path: "notes/a.md" }, o)).toBe("not-applicable");
+    expect(await ask({ path: "notes/nope.md", name: "Home" }, o)).toBe("not-applicable");
+  });
+
   it("update_memory: creates the file the first time, refuses one too long", async () => {
     expect(await run(T.update_memory, { text: "Writes in Greek.", why: "x" })).toEqual({ saved: "agent/memory.md", rev: 1 });
     expect(pb.notes.get("agent/memory.md")!.text).toBe("Writes in Greek.\n");

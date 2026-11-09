@@ -4,7 +4,7 @@
 // the last sync: a note made here has `rec` "" until it first goes up, and cannot be linked to before.
 import { queryOptions, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { isNotePath, newNotePath, parseNote, serializeNote, withFlags, type Color, type Flags } from "@/core/notes";
+import { isNotePath, newNotePath, parseNote, serializeNote, withFlags, type FlagEdit } from "@/core/notes";
 import { inheritTags, inLens } from "@/core/lens";
 import { removeNote, writeNote, type NoteRow } from "@/core/sync";
 import { localDay } from "@/core/time";
@@ -109,8 +109,6 @@ export async function write(qc: QueryClient, r: Rec, edit: (text: string) => str
   if (writeNote(local, path, edit(row.text))) { projectNotes(qc); edited(); }
   return noteOf(local.notes.get(path)!);
 }
-
-export type FlagEdit = Partial<Omit<Flags, "color">> & { color?: Color | null };
 
 export const setFlags = (qc: QueryClient, r: Rec, flags: FlagEdit) => write(qc, r, (text) => withFlags(r.path, text, flags));
 

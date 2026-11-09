@@ -2,7 +2,7 @@
 // from the web app's own copy of the record when it has one (so a tick or an edit shows at once), else from the
 // snapshot the tool returned; one whose record is gone is dimmed and opens nothing.
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Calendar, Flag, ListChecks, Moon, Repeat } from "lucide-react";
+import { Bell, Calendar, Flag, ListChecks, MapPin, Moon, Repeat } from "lucide-react";
 import { useMemo, type KeyboardEvent, type ReactNode } from "react";
 import { Markdown } from "@/components/markdown";
 import { TagBadge } from "@/components/tag-badge";
@@ -55,6 +55,7 @@ function NoteView({ card, gone }: { card: NoteCard; gone: boolean }) {
               {long ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-b from-transparent to-card" /> : null}
             </div>
           ) : null}
+          {card.where ? <span className="flex min-w-0 items-center gap-1 text-xs text-dim"><MapPin className="size-3 shrink-0" /><span className="truncate">{card.where}</span></span> : null}
           {card.tags?.length ? <span className="flex flex-wrap gap-1">{card.tags.map((t) => <TagBadge key={t} name={t} />)}</span> : null}
         </div>
       </div>

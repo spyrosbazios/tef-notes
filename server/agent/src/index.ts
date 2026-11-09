@@ -6,6 +6,7 @@ import { find } from "./find";
 import { mcp } from "./mcp";
 import { catalog } from "./models";
 import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
+import { mapRoute, placeRoute, suggestRoute } from "./places";
 import { Notes } from "./notes";
 import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
 import { startReminders } from "./reminders";
@@ -28,6 +29,9 @@ Bun.serve({
     "/agent/reader": { GET: (req) => reader(req, server) },
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
+    "/agent/places/suggest": { GET: (req) => suggestRoute(req) },
+    "/agent/places/place": { GET: (req) => placeRoute(req) },
+    "/agent/places/map": { GET: (req) => mapRoute(req) },
     "/agent/push/key": { GET: () => keyRoute() },
     "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
     "/agent/transcribe": { POST: (req) => transcribe(req) },

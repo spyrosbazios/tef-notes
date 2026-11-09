@@ -14,6 +14,7 @@ import { capList, clip, fromWeb } from "./guard";
 import { definedTags, TAGS, type Meta, type Notes } from "./notes";
 import { imageData, imagesOf, imageType } from "./images";
 import { pageRange, pages, pdfsOf, READ_CHARS } from "./pdfs";
+import { placeTools } from "./placeTools";
 import { parse } from "./reader";
 import type { Todo } from "./todo";
 import { todoTools } from "./todoTools";
@@ -304,7 +305,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     }),
 
     set_note_flags: tool({
-      description: "Pin or unpin a note, set its colour, or replace its tags. Only the fields you pass change. The user confirms it.",
+      description: "Pin or unpin a note, set its colour, or replace its tags. Only the fields you pass change; its place is set_note_place's. The user confirms it.",
       inputSchema: z.object({
         path: z.string().describe("notes/<file>.md"),
         pinned: z.boolean().optional(),
@@ -329,6 +330,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
       },
     }),
 
+    ...placeTools(notes, fromPage),
     ...todoTools(notes, todo, fromPage),
     ...widgetTools(notes, todo, fromPage),
     ...uiTools,

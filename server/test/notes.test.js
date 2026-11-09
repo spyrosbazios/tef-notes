@@ -20,6 +20,8 @@ const NOTES = {
   unclosed: "---\ntitle: x\nBody.",
   scheduled: "---\ntitle: Shopping\ncreated: 2026-10-05\nwhen: 2026-11-03\nevening: true\ndue: 2026-11-04\nevery: 1w\nremind: \"09:00\"\n---\n- [ ] milk\n- [x] eggs\n- [ ] Call {id:k3f9}\n  - [x] sub\n",
   junk: "---\ntitle: Later\ncreated: 2026-10-05\nwhen: nope\ndone: 2026-10-30\nevery: often\n---\nBody.",
+  where: "---\ntitle: Garage door codes\ncreated: 2026-10-05\nwhere:\n  name: Garage\n  address: \"Main St: 4\"\n  lat: 37.9\n  lng: 23.7\n  place_id: ChIJ8UNwBh-9oRQR\ntags: [home]\n---\nBody.",
+  named: "---\ntitle: Garage door codes\nwhere: Home\n---\nBody.",
   tasks: "---\ntitle: Garage door codes\ncreated: 2026-10-05\n---\n- [ ] Call plumber {id:k3f9 when:2026-11-03 due:2026-11-10 every:1w}\n  - [ ] sub {id:s1}\n## Errands\n- [x] Renew passport {id:p2a1 done:2026-10-30}\n",
 };
 const LISTS = [["Food"], ["Food", "Home"], ["home", "Έργο", "yes", "7", "a: b", "x,y", "#t", "with \"quote\""], []];
@@ -49,6 +51,7 @@ describe("frontmatter", () => {
       { title: "yes", created: "2026-10-05", pinned: true, color: "pink", tags: ["a: b", "x,y"] },
       { title: "Τίτλος: με \"εισαγωγικά\"\nκαι γραμμή", created: "" },
       { title: "#hash", created: "not a date" },
+      { title: "Here", created: "2026-10-05", tags: ["a"], where: { name: "yes", address: "Main St: #4", lat: 37.98, lng: 23.72, place_id: "ChIJ8UNwBh-9oRQR" } },
     ];
     for (const m of metas) for (const body of ["", "Body.\n", "- [ ] one\n"]) expect(lib.serialize(m, body)).toBe(serializeNote(m, body));
   });

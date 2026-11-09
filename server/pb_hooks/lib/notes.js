@@ -1,13 +1,14 @@
 // The note format, for the hooks that write notes themselves (autotag.pb.js, clip.pb.js): goja can't import the
 // clients' TypeScript, so what follows mirrors packages/core/src/notes.ts (front, entries, unquote, flowList, scalar, item,
-// parseNote, serializeNote, withFlags for `tags`, slugify, newNotePath, appendToNote, fold), pocketbase.ts
+// parseNote, serializeNote, withFlags for `tags`, places.ts (placeOf, for the `where:` block), slugify, newNotePath, appendToNote, fold), pocketbase.ts
 // (noteColumns) and photos.ts (photoName, linkPath). The clients and the server must write a note identically, or the
 // phone's 3-way merge sees a change that isn't one: change them together. test/notes.test.js compares the two.
 
 const NOTES = "notes/";
 const MEMORY = "agent/memory.md";
 const COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green", "gray"];
-const KEYS = ["title", "created", "pinned", "color", "tags"];
+const KEYS = ["title", "created", "pinned", "color", "tags", "where"];
+const WHERE_KEYS = ["name", "address", "lat", "lng", "place_id"];
 
 /** Accents and Greek tonos off: the combining marks NFD splits out (goja's regexp: the range, not \p{M}). */
 const unmark = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").normalize("NFC");
@@ -98,6 +99,35 @@ function titleFromId(id) {
 /** A note's id: its path's file name without `.md`, the folder its attachments live under. */
 const idOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 
+const placeText = (v) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 200) : "");
+const coord = (v, max) => (typeof v === "number" && isFinite(v) && Math.abs(v) <= max ? Math.round(v * 1e7) / 1e7 : undefined);
+
+/** A place as placeOf keeps it: null without a name; coordinates only as a pair. */
+function placeOf(o) {
+  const name = placeText(o.name);
+  if (!name) return null;
+  const address = placeText(o.address), lat = coord(o.lat, 90), lng = coord(o.lng, 180);
+  const id = typeof o.place_id === "string" && /^[\w-]{10,300}$/.test(o.place_id) ? o.place_id : undefined;
+  const p = { name };
+  if (address && address !== name) p.address = address;
+  if (lat != null && lng != null) { p.lat = lat; p.lng = lng; }
+  if (id) p.place_id = id;
+  return p;
+}
+
+/** A `where:` entry, as parseNote reads it: a block of keys under it, or a name alone on its line. */
+function whereOf(v, lines) {
+  if (v) return placeOf({ name: unquote(v) });
+  const o = {};
+  for (const l of lines) {
+    const m = /^\s+([A-Za-z_]+)[ \t]*:(.*)$/.exec(l);
+    if (!m) continue;
+    const val = unquote(m[2]);
+    o[m[1]] = m[1] === "lat" || m[1] === "lng" ? (val.trim() ? Number(val) : NaN) : val;
+  }
+  return placeOf(o);
+}
+
 /** A note's frontmatter and body, as parseNote reads them. */
 function parse(path, text) {
   const id = idOf(path), f = front(text), body = f ? text.slice(f.body) : text;
@@ -113,6 +143,7 @@ function parse(path, text) {
         : v ? [unquote(v)].filter(Boolean)
         : e.lines.slice(1).map((l) => unquote(l.replace(/^\s*-\s*/, ""))).filter(Boolean);    // a block list
     }
+    else if (e.key === "where") { const w = whereOf(v, e.lines.slice(1)); if (w) n.where = w; }
   }
   if (!n.title) { const h = /^#[ \t]+(.+?)[ \t#]*$/m.exec(body); n.title = h ? h[1] : titleFromId(id); }
   if (!n.created) { const d = /^(\d{4})(\d{2})(\d{2})-/.exec(id); if (d) n.created = `${d[1]}-${d[2]}-${d[3]}`; }
@@ -127,6 +158,10 @@ function lineFor(k, m) {
     case "pinned": return m.pinned ? "pinned: true" : null;
     case "color": return m.color ? `color: ${m.color}` : null;
     case "tags": return m.tags && m.tags.length ? `tags: [${m.tags.map(item).join(", ")}]` : null;
+    case "where": {
+      const w = m.where && placeOf(m.where);
+      return w ? ["where:", ...WHERE_KEYS.filter((k) => w[k] != null).map((k) => `  ${k}: ${typeof w[k] === "number" ? w[k] : scalar(String(w[k]))}`)].join("\n") : null;
+    }
   }
   return null;
 }

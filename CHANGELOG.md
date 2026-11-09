@@ -5,6 +5,16 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- A note's Where: one place per note, kept in its frontmatter (`where:`). On the web app a "place" button beside the tags
+  searches Google Maps as you type (or keeps a name as typed); the note then shows a card under its title with the place's
+  map in your theme, its address, Directions and Open in Maps (on a phone, the Maps app). Note tiles and the assistant's
+  cards show the place's name.
+- Assistant: `find_place` searches Google Maps and `set_note_place` sets or clears a note's place (also over MCP).
+- Server: a `maps` key (Google Maps Platform: Places API (New) and Maps Static API), `TEF_NOTES_KEY_MAPS`; without it a
+  place is a name, with no search or map.
+
 ## 0.6.0 - 2026-11-09
 
 ### Added

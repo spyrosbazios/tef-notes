@@ -3,8 +3,9 @@
 // a selection can't overwrite what another device just did.
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
-import { deleteNote, NOTES, setFlags, write, type FlagEdit } from "@/hooks/notes";
+import { deleteNote, NOTES, setFlags, write } from "@/hooks/notes";
 import { message } from "@/services/api";
 import type { NoteRec } from "@/services/notes";
 

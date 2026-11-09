@@ -1,7 +1,7 @@
 // The open note, edited as it reads (src/editor: boxes tick in place, photos show), on the page note-page.tsx gives it. The raw
 // markdown, which is what the phone edits, is one toggle away (in ⋮). The title is editable in place, and a note just made
-// ("Untitled", empty) opens with it selected, ready to be typed over; pin, colour and tags are one click
-// each, written as the frontmatter edit the phone makes (withFlags). One top bar holds every tool and option of the
+// ("Untitled", empty) opens with it selected, ready to be typed over; pin, colour, tags and its place (note-where.tsx) are
+// one click each, written as the frontmatter edit the phone makes (withFlags). One top bar holds every tool and option of the
 // note: the format tools, attach, pin and ⋮. A note is pure markdown: tasks are records of their own (task-detail.tsx), and those linked to it show under its title.
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Download, EllipsisVertical, FileCode, FileUp, Paperclip, Link2, Loader2, PenTool, Pin, Sparkles, Trash2, TriangleAlert } from "lucide-react";
@@ -12,10 +12,11 @@ import { FormatTools } from "@/components/format-tools";
 import { MicButton } from "@/components/mic-button";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
-import { COLORS, UNTITLED } from "@/core/notes";
+import { COLORS, UNTITLED, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
+import { AddPlace, WhereCard } from "@/components/note-where";
 import { TagEditor } from "@/components/tag-editor";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -28,7 +29,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { Editor } from "@/editor";
 import { dictateInto } from "@/hooks/dictation";
 import { useDraft, type Status } from "@/hooks/draft";
-import { deleteNote, NOTES, setFlags, write, type FlagEdit } from "@/hooks/notes";
+import { deleteNote, NOTES, setFlags, write } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
 import { useKeyboard } from "@/hooks/keyboard";
 import { useNarrow } from "@/hooks/media";
@@ -197,7 +198,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             <span className="tabular-nums">{note.created}</span>
             <span className="tabular-nums">edited {ago(ms(n.updated), now)}</span>
             <TagEditor tags={note.tags} onAdd={(t) => void retag([t])} onRemove={(t) => void retag([], [t])} onTag={filterTag} />
+            {note.where ? null : <AddPlace onSet={(where) => void flag({ where })} />}
           </div>
+          {note.where ? <WhereCard where={note.where} onSet={(where) => void flag({ where })} /> : null}
           <LinkedTasks n={n} className="mb-6" />
           {raw ? source : (
             <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => setDrawing({ name })} onEditor={setEd} />

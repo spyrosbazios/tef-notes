@@ -82,7 +82,7 @@ signed clipper is made, is in the [server setup](server/README.md). Want an AI a
 git clone https://github.com/spyrosbazios/tef-notes.git
 cd tef-notes/server
 cp .env.example .env
-mkdir -p keys/typesafe keys/deepseek keys/exa keys/push
+mkdir -p keys/typesafe keys/deepseek keys/exa keys/push keys/maps
 # Edit .env: set TEF_NOTES_URL to your private origin and choose TZ.
 docker compose up -d
 ```

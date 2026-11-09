@@ -96,7 +96,8 @@ export function gist(kinds: Kind[]) {
 
 /** A note as a card: its place, title, tags, the opening of its body as markdown (`preview`, a few lines) and its first
  *  photo (`image`: the name in the note's attachments folder). Only what is set. */
-export type NoteCard = { kind: "note"; path: string; title: string; preview: string; tags?: string[]; image?: string };
+/** `where`: the name of the note's place. */
+export type NoteCard = { kind: "note"; path: string; title: string; preview: string; tags?: string[]; image?: string; where?: string };
 
 /** A task as a card: the fields a row shows, only what is set. `checklist`: boxes ticked out of all. */
 export type TaskCard = {
@@ -129,7 +130,7 @@ export function previewOf(body: string, title: string): string {
 export function noteCardOf(path: string, text: string): NoteCard {
   const n = parseNote(path, text), p = picturesOf(n.id, n.body), image = p && "pictures" in p ? p.pictures.find((x) => "image" in x) : undefined;
   return { kind: "note", path, title: n.title, preview: previewOf(n.body, n.title), ...(n.tags.length ? { tags: n.tags } : {}),
-    ...(image && "image" in image ? { image: image.image } : {}) };
+    ...(image && "image" in image ? { image: image.image } : {}), ...(n.where ? { where: n.where.name } : {}) };
 }
 
 /** The card of a task. */

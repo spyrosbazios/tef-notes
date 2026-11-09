@@ -335,3 +335,36 @@ describe("appended", () => {
     expect(appended("- eggs\n", "- one\n- two")).toBe("- eggs\n- one\n- two\n");
   });
 });
+
+describe("where", () => {
+  const CAFE = { name: "Café Central", address: "Herrengasse 14, 1010 Wien, Austria", lat: 48.2104, lng: 16.3655, place_id: "ChIJ0ZqNNH8HbUcR9ZwHPzK9lMg" };
+  const md = serializeNote({ title: "T", created: "2026-10-05" }, "body\n");
+
+  it("is a block under the flags, read back as it was written", () => {
+    const on = withFlags(P, md, { where: CAFE });
+    expect(on).toBe("---\ntitle: T\ncreated: 2026-10-05\nwhere:\n  name: Café Central\n  address: Herrengasse 14, 1010 Wien, Austria\n  lat: 48.2104\n  lng: 16.3655\n  place_id: ChIJ0ZqNNH8HbUcR9ZwHPzK9lMg\n---\nbody\n");
+    expect(parseNote(P, on).where).toEqual(CAFE);
+    expect(on).toBe(serializeNote({ title: "T", created: "2026-10-05", where: CAFE }, "body\n"));
+    expect(withFlags(P, on, { where: null })).toBe(md);
+  });
+
+  it("quotes what YAML would misread, and a hand-written `where: Home` is a name", () => {
+    const odd = { name: "yes", address: "Main St: #4" };
+    expect(parseNote(P, withFlags(P, md, { where: odd })).where).toEqual(odd);
+    expect(parseNote(P, "---\ntitle: T\nwhere: Home\n---\n").where).toEqual({ name: "Home" });
+    expect(parseNote(P, "---\ntitle: T\nwhere:\n  address: no name\n---\n").where).toBeUndefined();
+    expect(parseNote(P, "---\ntitle: T\nwhere:\n  name: X\n  lat: north\n  lng: 2\n---\n").where).toEqual({ name: "X" });
+  });
+
+  it("replaces the whole block in place, other keys and a CRLF file's endings kept", () => {
+    const laptop = "---\r\ntitle: T\r\nwhere:\r\n  name: Old\r\n  lat: 1\r\n  lng: 2\r\nsource: x\r\n---\r\nbody\r\n";
+    expect(withFlags(P, laptop, { where: { name: "New" } })).toBe("---\r\ntitle: T\r\nwhere:\r\n  name: New\r\nsource: x\r\n---\r\nbody\r\n");
+  });
+
+  it("is a flag: both sides set a place, mine wins and the bodies merge", () => {
+    const body = "one\n\ntwo\n", base = serializeNote({ title: "T", created: "2026-10-05" }, body);
+    const mine = withFlags(P, base.replace("one", "ONE"), { where: CAFE }), theirs = withFlags(P, base.replace("two", "TWO"), { where: { name: "Home" } });
+    expect(parseNote(P, reconcile(base, mine, theirs)!).where).toEqual(CAFE);
+    expect(parseNote(P, reconcile(base, mine, theirs)!).body).toBe("ONE\n\nTWO\n");
+  });
+});
