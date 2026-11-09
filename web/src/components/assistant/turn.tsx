@@ -182,7 +182,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
           {shown ? <Cards cards={shown} live={live} /> : null}
         </div>
       );
-    // A widget (day, week, review, quote, link, lens) is drawn by its type; one that came back as an error, or doesn't hold together, keeps its row
+    // A widget (day, week, review, quote, link, lens, tasks, notes) is drawn by its type; one that came back as an error, or doesn't hold together, keeps its row
     const widget = isWidgetTool(name) && p.state === "output-available" ? widgetOf(p.output) : null;
     if (widget) return <WidgetView key={i} widget={widget} />;
     // What it chose to show is the cards alone (a failed call keeps its row)

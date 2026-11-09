@@ -11,6 +11,8 @@
 //   show_quote    { path, quote }                            QuoteWidget: a passage of a note, checked to be in it
 //   show_link     { url }                                    LinkWidget: a page's preview (the server's link-preview route)
 //   show_lens     { tags, exclude?, name?, accent? }         LensWidget: what a lens would show, before it is saved
+//   show_tasks    { ids, title? }                            TasksWidget: chosen tasks as a timeline, by the day each falls on
+//   show_notes    { paths, title? }                          NotesWidget: chosen notes as a gallery of Home's tiles
 //
 // A finished call's output is `{ widget }` or `{ error }`: read it with `widgetOf` (defensive: a chat saved by another version
 // still draws, and anything malformed is simply no widget). `find_free_slots` has no widget: plain data for the model.
@@ -24,7 +26,7 @@ import type { LinkPreview } from "./pocketbase";
 import { ACCENT_NAMES } from "./theme";
 
 /** Task cards a widget lists at most, and how many a lens preview samples of each kind. */
-export const WIDGET_LIMITS = { tasks: 20, top: 3, stalled: 5, tags: 5, sample: 5 } as const;
+export const WIDGET_LIMITS = { tasks: 20, top: 3, stalled: 5, tags: 5, sample: 5, timeline: 40, gallery: 24 } as const;
 
 // ---- the types
 
@@ -69,11 +71,22 @@ export type LensWidget = {
   notes: { count: number; sample: NoteCard[] }; tasks: { count: number; sample: TaskCard[] };
 };
 
-export type Widget = DayWidget | WeekWidget | ReviewWidget | QuoteWidget | LinkWidget | LensWidget;
+/** One stop on a timeline: the day its tasks fall on (a task's `when`, else its `due`), or null for the tasks with neither. */
+export type TimelineDay = { date: string | null; tasks: TaskCard[] };
+
+/** Tasks the model picked, as a vertical timeline: days earliest first, the undated last; in a day, those at an hour first by
+ *  the hour, then as given. `title`: the heading the model gives it ("This week at work"). */
+export type TasksWidget = { type: "tasks"; title: string; days: TimelineDay[] };
+
+/** Notes the model picked, as a gallery of the tiles Home draws, in the order given. A client draws each from its own record
+ *  by `path` where it has one, else from the card. */
+export type NotesWidget = { type: "notes"; title: string; notes: NoteCard[] };
+
+export type Widget = DayWidget | WeekWidget | ReviewWidget | QuoteWidget | LinkWidget | LensWidget | TasksWidget | NotesWidget;
 export type WidgetType = Widget["type"];
 
 /** The tools whose output carries a widget. */
-export const WIDGET_TOOLS = ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens"] as const;
+export const WIDGET_TOOLS = ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens", "show_tasks", "show_notes"] as const;
 export type WidgetTool = (typeof WIDGET_TOOLS)[number];
 export const isWidgetTool = (name: string): name is WidgetTool => (WIDGET_TOOLS as readonly string[]).includes(name);
 
@@ -137,6 +150,19 @@ function readLens(o: Record<string, unknown>): LensWidget | null {
   };
 }
 
+function readTasks(o: Record<string, unknown>): TasksWidget | null {
+  const days = list(o.days).flatMap((d): TimelineDay[] => {
+    const x = obj(d), date = x?.date === null ? null : str(x?.date), tasks = taskCards(x?.tasks);
+    return x && (date === null || isDay(date)) && tasks.length ? [{ date, tasks }] : [];
+  });
+  return days.length ? { type: "tasks", title: str(o.title), days } : null;
+}
+
+function readNotes(o: Record<string, unknown>): NotesWidget | null {
+  const notes = noteCards(o.notes);
+  return notes.length ? { type: "notes", title: str(o.title), notes } : null;
+}
+
 /** The widget a finished `show_*` call's `output` carries, read defensively (every field checked, cards by `cardsOf`'s rule); null
  *  for an error, an unknown `type` or a widget that doesn't hold together. A client draws what it returns and nothing else. */
 export function widgetOf(output: unknown): Widget | null {
@@ -148,6 +174,8 @@ export function widgetOf(output: unknown): Widget | null {
     case "quote": return readQuote(w);
     case "link": return readLink(w);
     case "lens": return readLens(w);
+    case "tasks": return readTasks(w);
+    case "notes": return readNotes(w);
     default: return null;
   }
 }

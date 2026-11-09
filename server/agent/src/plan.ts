@@ -3,13 +3,13 @@
 //
 // A task has no length: its `when` day and `remind` time book it into an hour, and that whole hour is held. It is the unit the
 // double-booking check (todoTools.ts `clash`) counts in, so a clash a widget flags is one that check would refuse.
-import { taskCardOf } from "@/core/agent";
+import { taskCardOf, type TaskCard } from "@/core/agent";
 import { addDays } from "@/core/dates";
 import { fold, parseNote } from "@/core/notes";
 import { plannedByDay } from "@/core/planner";
 import { localDay } from "@/core/time";
 import { dedupeTags, type Task } from "@/core/todo";
-import { WIDGET_LIMITS, type BookedTask, type DayWidget, type ReviewWidget, type WeekWidget } from "@/core/widgets";
+import { WIDGET_LIMITS, type BookedTask, type DayWidget, type ReviewWidget, type TimelineDay, type WeekWidget } from "@/core/widgets";
 import type { Meta } from "./notes";
 
 const DAY = 86_400_000;
@@ -65,6 +65,17 @@ export function weekOfTasks(tasks: readonly Task[], start: string, today: string
 // ---- free time
 
 /** The working day find_free_slots looks within unless told otherwise. */
+/** Picked tasks as a timeline: grouped by the day each falls on (`when`, else `due`), days earliest first and the undated last; in
+ *  a day, those at an hour first by the hour, the rest as given. */
+export function timelineOf(cards: readonly TaskCard[]): TimelineDay[] {
+  const days = new Map<string | null, TaskCard[]>();
+  for (const c of cards) { const d = c.when ?? c.due ?? null; days.set(d, [...(days.get(d) ?? []), c]); }
+  const hour = (c: TaskCard) => (c.when && c.remind ? c.remind : "99:99");   // no hour: after every hour
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...days].sort(([a], [b]) => (a === b ? 0 : a === null ? 1 : b === null ? -1 : cmp(a, b)))
+    .map(([date, tasks]) => ({ date, tasks: tasks.map((t, i) => ({ t, i })).sort((x, y) => cmp(hour(x.t), hour(y.t)) || x.i - y.i).map((x) => x.t) }));
+}
+
 export const WORK = { from: "09:00", to: "18:00" } as const;
 export type FreeSlot = { from: string; to: string; minutes: number };
 

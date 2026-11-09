@@ -5,7 +5,7 @@
 // comes back here (guard.ts READS). The rules they compute by are plan.ts's. find_free_slots is plain data for the model, no widget.
 import { tool, type ModelMessage } from "ai";
 import { z } from "zod";
-import { noteCardOf, taskCardOf } from "@/core/agent";
+import { noteCardOf, taskCardOf, type NoteCard, type TaskCard } from "@/core/agent";
 import { HttpError } from "@/core/http";
 import { inLens, lensProblem, type Lens, type LensAccentName } from "@/core/lens";
 import { isNotePath, NOTES, parseNote } from "@/core/notes";
@@ -13,19 +13,19 @@ import * as pb from "@/core/pocketbase";
 import { isDay, REMIND } from "@/core/todo";
 import { localDay } from "@/core/time";
 import { weekOf } from "@/core/planner";
-import { WIDGET_LIMITS, type DayWidget, type LensWidget, type LinkWidget, type QuoteWidget, type ReviewWidget, type WeekWidget } from "@/core/widgets";
+import { WIDGET_LIMITS, type DayWidget, type LensWidget, type LinkWidget, type NotesWidget, type QuoteWidget, type TasksWidget, type ReviewWidget, type WeekWidget } from "@/core/widgets";
 import { definedTags, type Notes } from "./notes";
-import { freeSlots, quoteIn, reviewOf, dayOfTasks, weekOfTasks, WORK } from "./plan";
+import { freeSlots, quoteIn, reviewOf, dayOfTasks, timelineOf, weekOfTasks, WORK } from "./plan";
 import type { Todo } from "./todo";
 import { DAY_RE } from "./todoTools";
 
-const REVIEW_DAYS = 90, QUOTE = 600;
+const REVIEW_DAYS = 90, QUOTE = 600, HEADING = 60;
 const ACCENTS = ["violet", "blue", "teal", "green", "amber", "orange", "rose", "pink"] as const satisfies readonly LensAccentName[];
 
 const DATE = DAY_RE.describe("YYYY-MM-DD, worked out from today's date in <context>");
 const HM = z.string().regex(REMIND, "HH:MM");
 
-type Shown<W> = { widget: W } | { error: string };
+type Shown<W> = { widget: W; not_found?: string[] } | { error: string };
 const bad = (date: string) => ({ error: `${date} is not a YYYY-MM-DD day.` });
 
 /** A task as the model is told of it: its id and title, never the card. */
@@ -133,6 +133,51 @@ export function widgetTools(notes: Notes, todo: Todo, fromPage: (messages: Model
           shown: "lens", tags: output.widget.tags, exclude: output.widget.exclude,
           notes: { count: output.widget.notes.count, sample: output.widget.notes.sample.map((c) => ({ path: c.path, title: c.title })) },
           tasks: { count: output.widget.tasks.count, sample: output.widget.tasks.sample.map(ref) },
+        } : output,
+      }),
+    }),
+
+    show_tasks: tool({
+      description: `Show the owner several tasks as a timeline in the chat: grouped under the day each falls on (its when, else its deadline), earliest first, those with no date last; each tickable and tappable. For "what do I have to do for X", "what's coming up at work": find them first (list_tasks, list_tagged), then call this with their ids (at most ${WIDGET_LIMITS.timeline}, the open ones unless asked for done) and a short heading. For one day's hours use show_day; for a few found items mixed with notes, show_items. Answer in a line after; don't list them again.`,
+      inputSchema: z.object({
+        ids: z.array(z.string().min(1)).min(1).max(WIDGET_LIMITS.timeline).describe("Task ids, from list_tasks or list_tagged"),
+        title: z.string().min(1).max(HEADING).optional().describe("A short heading, e.g. \"Work this week\""),
+      }),
+      execute: async ({ ids, title }): Promise<Shown<TasksWidget>> => {
+        const cards: TaskCard[] = [], missing: string[] = [];
+        for (const id of new Set(ids)) { const c = await todo.taskCard(id); if (c) cards.push(c); else missing.push(id); }
+        if (!cards.length) return { error: `No task ${missing.join(", ")}. Tasks by id, from list_tasks or list_tagged.` };
+        return { widget: { type: "tasks", title: title ?? "", days: timelineOf(cards) }, ...(missing.length ? { not_found: missing } : {}) };
+      },
+      toModelOutput: ({ output }) => ({
+        type: "json",
+        value: "widget" in output ? {
+          shown: "tasks", days: output.widget.days.map((d) => ({ date: d.date ?? "no date", tasks: d.tasks.map(ref) })),
+          ...(output.not_found ? { not_found: output.not_found } : {}),
+        } : output,
+      }),
+    }),
+
+    show_notes: tool({
+      description: `Show the owner several notes as a gallery of the tiles Home draws (picture, title, opening lines, tags), each tappable. For "show me my notes on X", a collection, a reading list: find them first (search_notes, list_tagged, list_notes), then call this with their paths (at most ${WIDGET_LIMITS.gallery}, the best first) and a short heading. For two or three found items show_items is enough. Answer in a line after; don't list them again.`,
+      inputSchema: z.object({
+        paths: z.array(z.string()).min(1).max(WIDGET_LIMITS.gallery).describe("notes/<file>.md, from the index or the note tools"),
+        title: z.string().min(1).max(HEADING).optional().describe("A short heading, e.g. \"Recipes\""),
+      }),
+      execute: async ({ paths, title }): Promise<Shown<NotesWidget>> => {
+        const cards: NoteCard[] = [], missing: string[] = [];
+        for (const path of new Set(paths)) {
+          const m = isNotePath(path) && path.startsWith(NOTES) ? await notes.meta(path) : undefined;
+          if (m) cards.push(noteCardOf(m.path, m.text)); else missing.push(path);
+        }
+        if (!cards.length) return { error: `No note ${missing.join(", ")}. Notes by path, from the index or search_notes.` };
+        return { widget: { type: "notes", title: title ?? "", notes: cards }, ...(missing.length ? { not_found: missing } : {}) };
+      },
+      toModelOutput: ({ output }) => ({
+        type: "json",
+        value: "widget" in output ? {
+          shown: "notes", notes: output.widget.notes.map((c) => ({ path: c.path, title: c.title })),
+          ...(output.not_found ? { not_found: output.not_found } : {}),
         } : output,
       }),
     }),

@@ -191,6 +191,30 @@ describe("the tools", () => {
     expect(await run(T.show_link, { url: "https://example.com/post" }, [web])).toEqual({ error: expect.stringMatching(/^This chat has read the web/) });
   });
 
+  it("show_tasks: the picked tasks as a timeline, by day (when, else due), the undated last, an hour first in its day", async () => {
+    const a = put(task("Later", { when: "2026-11-20" })), b = put(task("Undated")), c = put(task("Due first", { due: "2026-11-12" }));
+    const d = put(task("Afternoon", { when: "2026-11-20", remind: "15:00" }));
+    const r = await run(T.show_tasks, { ids: [a.id, b.id, c.id, d.id, "nope"], title: "Work" });
+    const w = widgetOf(r);
+    expect(w?.type === "tasks" && w.days.map((x) => [x.date, titles(x.tasks)])).toEqual([
+      ["2026-11-12", ["Due first"]], ["2026-11-20", ["Afternoon", "Later"]], [null, ["Undated"]]]);
+    expect(w).toMatchObject({ title: "Work" });
+    const told = await T.show_tasks.toModelOutput!({ toolCallId: "c", input: {} as never, output: r as never });
+    expect(JSON.stringify(told)).toContain(a.id);
+    expect(JSON.stringify(told)).toContain("nope");
+    expect(await run(T.show_tasks, { ids: ["nope"] })).toEqual({ error: expect.stringMatching(/^No task nope/) });
+  });
+
+  it("show_notes: the picked notes as tiles, in the order given, a missing path said", async () => {
+    pb.put("notes/a.md", file("A")); pb.put("notes/b.md", file("B", "x\n", "tags: [food]\n"));
+    const r = await run(T.show_notes, { paths: ["notes/b.md", "notes/a.md", "notes/gone.md", "agent/memory.md"], title: "Food" });
+    const w = widgetOf(r);
+    expect(w?.type === "notes" && w.notes.map((n) => [n.path, n.title, n.tags ?? []])).toEqual([["notes/b.md", "B", ["food"]], ["notes/a.md", "A", []]]);
+    const told = await T.show_notes.toModelOutput!({ toolCallId: "c", input: {} as never, output: r as never });
+    expect(JSON.stringify(told)).toContain("notes/gone.md");
+    expect(await run(T.show_notes, { paths: ["notes/gone.md"] })).toEqual({ error: expect.stringMatching(/^No note/) });
+  });
+
   it("show_lens: counts the notes and open tasks it would show, a sample of each; nothing is written", async () => {
     for (let i = 0; i < 7; i++) pb.put(`notes/w${i}.md`, file(`Work ${i}`, "x\n", "tags: [work]\n"), { updated: `2026-10-0${i + 1} 12:00:00.000Z` });
     pb.put("notes/old.md", file("Old work", "x\n", "tags: [work, archive]\n"));
@@ -230,7 +254,7 @@ describe("the tools", () => {
     const result: ModelMessage = { role: "tool", content: [{ type: "tool-result", toolCallId: "c", toolName: "show_quote", output: model as never }] };
     expect(fromWeb([result], new Set(["notes/w.md"]))).toBe(true);
     expect(pb.created).toEqual([]);
-    for (const name of ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens", "find_free_slots"] as const)
+    for (const name of ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens", "show_tasks", "show_notes", "find_free_slots"] as const)
       expect("needsApproval" in T[name] && T[name].needsApproval).toBeFalsy();
   });
 });

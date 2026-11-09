@@ -1,9 +1,12 @@
 // What the assistant's show_* tools return, drawn (the contract is `@/core/widgets`: typed data, a fixed component per `type`).
 // Display only: a widget writes nothing, a tick on a task row is the card's own, and saving a lens is the owner's button.
 // Task and note rows are the chat's cards (cards.tsx), drawn live from the app's own records.
-import { CalendarDays, Check, Clock, ExternalLink, FileText, Focus, Plus, TriangleAlert } from "lucide-react";
+import { CalendarDays, Check, Clock, ExternalLink, FileText, Focus, LayoutGrid, ListTodo, Plus, TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { Masonry } from "@/components/masonry";
+import { DeleteDialog, TagsDialog } from "@/components/note-actions";
+import { Tile } from "@/components/note-list";
 import { TagBadge } from "@/components/tag-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,15 +15,16 @@ import { lensProblem, LENS_NAME_MAX } from "@/core/lens";
 import { fold, noteIdOf } from "@/core/notes";
 import { Conflict, previewPictureUrl } from "@/core/pocketbase";
 import { ACCENTS, accentColor, THEMES } from "@/core/theme";
-import type { DayWidget, LensWidget, LinkWidget, QuoteWidget, ReviewWidget, WeekWidget, Widget } from "@/core/widgets";
+import type { DayWidget, LensWidget, LinkWidget, NotesWidget, QuoteWidget, ReviewWidget, TasksWidget, WeekWidget, Widget } from "@/core/widgets";
 import { useAppearance } from "@/hooks/appearance";
 import { setActiveLens, useCreateLens, useLenses } from "@/hooks/lens";
 import { useNotes } from "@/hooks/notes";
+import { useNow } from "@/hooks/now";
 import { useToday } from "@/hooks/todo";
-import { useNav, type TaskView } from "@/lib/nav";
+import { noteLink, useNav, type TaskView } from "@/lib/nav";
 import { message } from "@/services/api";
 import { cn } from "@/lib/utils";
-import { Cards, LiveTask, Shell } from "./cards";
+import { Cards, LiveNote, LiveTask, Shell } from "./cards";
 
 const when = (day: string, o: Intl.DateTimeFormatOptions) => new Date(`${day}T12:00:00`).toLocaleDateString("en-US", o);
 
@@ -122,7 +126,7 @@ function WeekView({ w }: { w: WeekWidget }) {
 
 // ---- review
 
-function Tile({ n, label }: { n: number; label: string }) {
+function Stat({ n, label }: { n: number; label: string }) {
   return (
     <div className="rounded-xl border border-line bg-card px-3 py-2">
       <p className="text-2xl font-semibold tabular-nums leading-tight">{n}</p>
@@ -138,10 +142,10 @@ function ReviewView({ w }: { w: ReviewWidget }) {
       <Heading icon={<Check className="size-4" />} title={`The last ${w.days} days`} detail={range} />
       <div className="@container">
         <div className="grid grid-cols-2 gap-1.5 @md:grid-cols-4">
-          <Tile n={w.done} label="Tasks done" />
-          <Tile n={w.added} label="Tasks added" />
-          <Tile n={w.notesAdded} label="Notes added" />
-          <Tile n={w.notesEdited} label="Notes edited" />
+          <Stat n={w.done} label="Tasks done" />
+          <Stat n={w.added} label="Tasks added" />
+          <Stat n={w.notesAdded} label="Notes added" />
+          <Stat n={w.notesEdited} label="Notes edited" />
         </div>
       </div>
       {w.stalled.length ? (
@@ -249,6 +253,71 @@ function LensView({ w }: { w: LensWidget }) {
   );
 }
 
+// ---- tasks: a timeline
+
+/** Picked tasks down a rail: a dot per day (today's in the accent, a day gone by in the warning colour), the day's name beside it
+ *  and its tasks as live cards under it; the undated at the foot. */
+function TasksView({ w }: { w: TasksWidget }) {
+  const today = useToday();
+  const count = w.days.reduce((n, d) => n + d.tasks.length, 0);
+  return (
+    <section aria-label={w.title || "Tasks"} className="space-y-3">
+      <Heading icon={<ListTodo className="size-4" />} title={w.title || "Tasks"} detail={`${count} ${count === 1 ? "task" : "tasks"}`} />
+      <ol className="relative">
+        {w.days.map((d, i) => {
+          const parts = d.date ? dayParts(d.date, today) : { label: "No date", detail: "" };
+          const now = d.date === today, past = !!d.date && d.date < today, last = i === w.days.length - 1;
+          return (
+            <li key={d.date ?? "none"} className="relative flex gap-3 pb-4 last:pb-0">
+              <div aria-hidden className="relative flex w-3 shrink-0 justify-center">
+                {last ? null : <span className="absolute top-3 -bottom-1 w-px bg-line" />}
+                <span className={cn("relative mt-1.5 size-3 rounded-full border-2 bg-bg",
+                  now ? "border-brand bg-brand" : past ? "border-warn" : d.date ? "border-dim" : "border-dashed border-faint")} />
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="flex items-baseline gap-2 leading-tight">
+                  <span className={cn("text-sm font-semibold", now ? "text-brand" : past ? "text-warn" : "text-fg")}>{parts.label}</span>
+                  {parts.detail ? <span className="text-xs text-faint">{parts.detail}</span> : null}
+                  {past ? <span className="text-xs font-medium text-warn">overdue</span> : null}
+                </p>
+                <div className="space-y-1.5">{d.tasks.map((t) => <LiveTask key={t.id} card={t} />)}</div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+// ---- notes: a gallery
+
+/** Picked notes as Home's tiles in its masonry, each drawn from the app's own record (a note the app no longer has keeps its card,
+ *  marked gone). A tile's tag narrows Home to it; its menu tags or deletes, as on Home. */
+function NotesView({ w }: { w: NotesWidget }) {
+  const { data } = useNotes(), { openNote, filterTag } = useNav(), now = useNow(30_000);
+  const [dialog, setDialog] = useState<"tags" | "delete" | null>(null), [target, setTarget] = useState<string[]>([]);
+  const ask = (kind: "tags" | "delete", path: string) => { setTarget([path]); setDialog(kind); };
+  const recs = new Map(data?.map((n) => [n.path, n]));
+  const n = w.notes.length;
+  return (
+    <section aria-label={w.title || "Notes"} className="space-y-2.5">
+      <Heading icon={<LayoutGrid className="size-4" />} title={w.title || "Notes"} detail={`${n} ${n === 1 ? "note" : "notes"}`} />
+      <Masonry>
+        {w.notes.map((c) => {
+          const r = recs.get(c.path), id = `chat:${c.path}`;
+          return r ? (
+            <Tile key={id} id={id} n={r} link={noteLink(r.note.id, null)} now={now} menuPaths={[r.path]} onPick={() => openNote(r.note.id)}
+              onTag={filterTag} onTags={() => ask("tags", r.path)} onDelete={() => ask("delete", r.path)} />
+          ) : <LiveNote key={id} card={c} />;
+        })}
+      </Masonry>
+      <TagsDialog paths={target} open={dialog === "tags"} onOpenChange={(o) => { if (!o) setDialog(null); }} />
+      <DeleteDialog paths={target} open={dialog === "delete"} onOpenChange={(o) => { if (!o) setDialog(null); }} onDone={() => setDialog(null)} />
+    </section>
+  );
+}
+
 /** The widget a `show_*` call returned, as its fixed component. */
 export function WidgetView({ widget }: { widget: Widget }) {
   switch (widget.type) {
@@ -258,5 +327,7 @@ export function WidgetView({ widget }: { widget: Widget }) {
     case "quote": return <QuoteView w={widget} />;
     case "link": return <LinkView w={widget} />;
     case "lens": return <LensView w={widget} />;
+    case "tasks": return <TasksView w={widget} />;
+    case "notes": return <NotesView w={widget} />;
   }
 }
