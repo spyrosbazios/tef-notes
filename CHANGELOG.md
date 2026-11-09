@@ -5,6 +5,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.7.0 - 2026-11-09
+
 ### Added
 
 - A note's Where: one place per note, kept in its frontmatter (`where:`). On the web app a "place" button beside the tags
@@ -16,6 +18,25 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Assistant: `find_place` searches Google Maps and `set_place` sets or clears a note's or a task's place (also over MCP).
 - Server: a `maps` key (Google Maps Platform: Places API (New) and Maps Static API), `TEF_NOTES_KEY_MAPS`; without it a
   place is a name, with no search or map.
+- Assistant: `list_tagged` lists notes and tasks by several tags (any or all, accents folded) in one call;
+  `create_lens` saves a lens (confirmed, its tags checked first); `show_tasks` lays tasks on a timeline by day and
+  `show_notes` shows notes as a gallery of Home's tiles.
+- Palette: typing a lens's name switches to it, "no lens" turns it off; a previewed note's body is rendered Markdown.
+
+### Changed
+
+- Home: the planner's hovered day pops up magnified like a dock, a later day hovered on Today switches Upcoming, and the
+  task box beside it shows the day (its tooltip is gone).
+- Notes header: the tag filter's tags are removable badges beside the count.
+- PWA: rows reorder by long press and drag; the touch grip is gone.
+- Assistant: `list_notes` loses its tag filter (`list_tagged` replaces it); `update_task`'s `addNotes` links notes, and
+  subtasks stay its checklist; `set_place`'s confirm card shows the place; home and work are set by their address.
+
+### Fixed
+
+- Form dialog: the lens form's colour row scrolls instead of widening the dialog.
+- Where card: fits its own width under a task's Where label.
+- Phone: the Ask tab is a history step, so back leaves it and a note or task picked in the chat shows.
 
 ## 0.6.0 - 2026-11-09
 
