@@ -4,7 +4,7 @@
 // At phone width under a finger the buttons give way to the phone's swipes (hooks/swipe.ts): right asks When (a sheet), left
 // brings out Delete. The row is the list's item: it rises in, and leaves on a fade (a row being deleted slides away instead) while
 // the others close the gap (task-list.tsx's AnimatePresence); a row that is leaving can no longer be tabbed to and hands its focus on.
-import { Bell, Calendar, Check, EllipsisVertical, Flag, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
+import { Bell, Calendar, Check, EllipsisVertical, Flag, ListChecks, MapPin, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Link } from "@tanstack/react-router";
 import { motion, useTransform } from "motion/react";
@@ -82,6 +82,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
           {when ? <span className="inline-flex items-center gap-1">{task.evening ? <Moon className="size-3" /> : <Calendar className="size-3" />}{when}</span> : null}
           {task.every ? <span className="inline-flex items-center gap-1"><Repeat className="size-3" />{everyLabel(task.every)}</span> : null}
           {task.remind ? <span className="inline-flex items-center gap-1"><Bell className="size-3" />{task.remind}</span> : null}
+          {task.where ? <span className="inline-flex min-w-0 items-center gap-1"><MapPin className="size-3 shrink-0" /><span className="truncate">{task.where.name}</span></span> : null}
           {task.tags.map((t) => <TagBadge key={t} name={t} />)}
           {task.done && checked ? <span>Done {dayLabel(task.done, today)}</span> : null}
         </div>

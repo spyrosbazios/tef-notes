@@ -16,7 +16,7 @@ import { Todo } from "./todo";
 import { tools, type Tools } from "./tools";
 
 const READS = ["list_tags", "search_notes", "list_notes", "read_note", "read_attachment", "list_tasks", "list_tagged", "find_place"] as const;
-const WRITES = ["create_tag", "update_tag", "create_lens", "create_note", "append_to_note", "rewrite_note", "summarise_links", "set_note_flags", "set_note_place", "add_task", "add_tasks", "update_task", "complete_task"] as const;
+const WRITES = ["create_tag", "update_tag", "create_lens", "create_note", "append_to_note", "rewrite_note", "summarise_links", "set_note_flags", "set_place", "add_task", "add_tasks", "update_task", "complete_task"] as const;
 const DELETES = ["delete_note", "delete_task"] as const;
 /** What the endpoint offers, of the chat's tools. */
 export const MCP_TOOLS: readonly (keyof Tools)[] = [...READS, ...WRITES, ...DELETES];

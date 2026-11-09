@@ -90,6 +90,7 @@ function TaskView({ card, today, onTick, gone }: { card: TaskCard; today: string
             {when ? <Chip>{card.evening ? <Moon className="size-3" /> : <Calendar className="size-3" />}{when}</Chip> : null}
             {card.every ? <Chip><Repeat className="size-3" />{everyLabel(card.every)}</Chip> : null}
             {card.remind ? <Chip><Bell className="size-3" />{card.remind}</Chip> : null}
+            {card.where ? <Chip><MapPin className="size-3" />{card.where}</Chip> : null}
             {card.tags?.map((t) => <TagBadge key={t} name={t} />)}
             {card.done && checked ? <Chip>Done {dayLabel(card.done, today)}</Chip> : null}
           </div>

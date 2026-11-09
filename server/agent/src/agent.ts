@@ -25,7 +25,7 @@ import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, Unavailable } from "./models";
 import { inlinePdfs, preview } from "./pdfs";
-import { PLACE_SEARCH, placeInputProblem } from "./placeTools";
+import { PLACE_SEARCH, placeProblem, type PlaceInput } from "./placeTools";
 import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
 import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
 import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type AddManyInput, type UpdateInput } from "./todoTools";
@@ -76,8 +76,7 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
     rewrite_note: ({ path, text }: { path: string; text: string }, { messages }: O) => ask(messages, checkWrite(notes, path, text)),
     summarise_links: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     set_note_flags: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
-    set_note_place: (i: { path: string; place_id?: string; name?: string; clear?: boolean }, { messages }: O) =>
-      ask(messages, Promise.resolve(placeInputProblem(i)).then((p) => p ?? checkWrite(notes, i.path))),
+    set_place: (i: PlaceInput, { messages }: O) => ask(messages, placeProblem(notes, todo, i)),
     // a delete has no way back: it asks whatever the setting, unless the path is bad
     delete_note: async ({ path }: { path: string }) => ((await checkWrite(notes, path)) ? "not-applicable" as const : "user-approval" as const),
     // tasks are records: the task, note and every value are checked first, like a path

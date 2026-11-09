@@ -1,10 +1,10 @@
 // The open task, as Things' card: its title and notes, a checklist, and each thing it can say about itself in a row of
-// its own: When, deadline, repeat, reminder, tags, the notes it is about. Every change is one field
+// its own: When, deadline, repeat, reminder, tags, where (where-card.tsx), the notes it is about. Every change is one field
 // written at the task's rev (hooks/todo.ts), redone on the newer record when it moved; the notes are links (hooks/links.ts),
 // outside the rev. Below `md` the card is a bottom sheet over its list (the shadcn drawer), as the phone opens a task, and
 // its pickers (components/pick.tsx) are sheets over it.
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Calendar, ChevronDown, Flag, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
+import { Bell, Calendar, ChevronDown, Flag, MapPin, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { dayLabel, whenLabel } from "@/core/dates";
 import { readsAsMarkdown, withLineBreaks } from "@/core/task-notes";
@@ -17,6 +17,7 @@ import { TagEditor } from "@/components/tag-editor";
 import { InSheet, Pick } from "@/components/pick";
 import { WhenPick } from "@/components/when-picker";
 import { DeleteTask } from "@/components/task-delete";
+import { PlacePick, WhereCard } from "@/components/where-card";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
@@ -161,6 +162,10 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
             <Row icon={Repeat} label="Repeat"><RepeatPicker value={task.every} onChange={(every) => patch({ every })} /></Row>
             <Row icon={Bell} label="Reminder"><RemindPicker value={task.remind} dated={!!task.when} today={today} onChange={patch} /></Row>
             <Row icon={Tag} label="Tags"><TaskTags task={task} /></Row>
+            <Row icon={MapPin} label="Where" top={!!task.where}>
+              {task.where ? <WhereCard where={task.where} onSet={(where) => patch({ where })} className="w-full" />
+                : <PlacePick title="Where" onSet={(where) => patch({ where })} trigger={<button type="button" className={cn(chip, "text-faint")}>None</button>} />}
+            </Row>
             <Row icon={NotebookText} label="Notes"><LinkedNotes task={task} /></Row>
           </div>
         </div>

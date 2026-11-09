@@ -102,7 +102,7 @@ export type NoteCard = { kind: "note"; path: string; title: string; preview: str
 /** A task as a card: the fields a row shows, only what is set. `checklist`: boxes ticked out of all. */
 export type TaskCard = {
   kind: "task"; id: string; title: string; done?: string; when?: string; evening?: true; due?: string; every?: string;
-  remind?: string; checklist?: [number, number]; tags?: string[];
+  remind?: string; checklist?: [number, number]; tags?: string[]; where?: string;
 };
 
 export type Card = NoteCard | TaskCard;
@@ -139,7 +139,7 @@ export function taskCardOf(t: Task): TaskCard {
   return { kind: "task", id: t.id, title: t.title, ...(t.done ? { done: t.done } : {}), ...(t.when ? { when: t.when } : {}),
     ...(t.evening ? { evening: true as const } : {}), ...(t.due ? { due: t.due } : {}),
     ...(t.every ? { every: t.every } : {}), ...(t.remind ? { remind: t.remind } : {}),
-    ...(count ? { checklist: count } : {}), ...(t.tags.length ? { tags: t.tags } : {}) };
+    ...(count ? { checklist: count } : {}), ...(t.tags.length ? { tags: t.tags } : {}), ...(t.where ? { where: t.where.name } : {}) };
 }
 
 const isCard = (c: unknown): c is Card => {

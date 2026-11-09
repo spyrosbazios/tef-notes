@@ -89,7 +89,8 @@ Things-style to-dos, records of their own (`tasks`; schema in
 `server/pb_migrations/1792900000_todo.js`, shape in code in `packages/core/src/todo.ts`).
 
 - `tasks`: `title`, `notes`, `checklist` (`[{id, text, done}]`, ids unique within the task), `when`, `evening`,
-  `due`, `every`, `remind`, `done`, `order`, `tags`. The notes a task is about are links (below), not a field.
+  `due`, `every`, `remind`, `done`, `order`, `tags`, `where` (its place, the shape of a note's `where:`, or null; one value
+  in a merge). The notes a task is about are links (below), not a field.
   Unset text is `""`.
 - Tags (`server/pb_migrations/1793500000_task_tags.js`): `tags` is the one copy of a task's tag names (a task has no
   frontmatter), an ordinary `rev` write; two edits merge as a set (`mergeRecord`). The server never tags a saved task: the
@@ -201,8 +202,8 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - Places (`src/places.ts`, `src/placeTools.ts`): `GET /agent/places/suggest`, `place` and `map` are a note's place search
   over Google Maps Platform with the `maps` key (Autocomplete with a session token per pick, Place Details, and Maps Static
   drawn in the owner's theme); the key never reaches a client. The assistant's `find_place` (Text Search; taints the chat
-  like the web, a business names itself) and `set_note_place`, which writes the `where:` block from Google's own details by
-  `place_id`, or a name alone. Without the key `find_place` is left out of the prompt and the routes answer 503.
+  like the web, a business names itself) and `set_place`, which writes a note's `where:` block or a task's `where` from
+  Google's own details by `place_id`, or a name alone. Without the key `find_place` is left out of the prompt and the routes answer 503.
 - Voice input (`src/transcribe.ts`): `POST /agent/transcribe?keep=S` takes a clip as raw mono 16 kHz float32 samples and
   answers its text from the `stt` service (`TEF_NOTES_STT`); `/agent/transcribe/warm` loads the model as recording
   starts; `keep` is how long the model stays loaded once idle, the owner's setting (`packages/core/src/prefs.ts`

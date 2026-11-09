@@ -161,7 +161,7 @@ export const checkTask = async (todo: Todo, id: string) => ((await todo.task(id)
 function listed(t: Task, linked: string[]) {
   return {
     id: t.id, title: t.title, ...(t.notes ? { notes: clip(t.notes, NOTES_SNIPPET).text } : {}),
-    ...(t.checklist.length ? { checklist: t.checklist } : {}),
+    ...(t.checklist.length ? { checklist: t.checklist } : {}), ...(t.where ? { where: t.where } : {}),
     ...(t.when ? { when: t.when } : {}), ...(t.evening ? { evening: true } : {}),
     ...(t.due ? { due: t.due } : {}), ...(t.every ? { every: t.every } : {}), ...(t.remind ? { remind: t.remind } : {}),
     ...(t.done ? { done: t.done } : {}),

@@ -13,7 +13,7 @@ const task = (title: string, p: Partial<Task> = {}) => newTask(id(), { title, ..
 describe("making and patching", () => {
   it("a new task is open and unset, on one line", () => {
     expect(newTask("abc", { title: " Call\nplumber " })).toEqual({
-      id: "abc", title: "Call plumber", notes: "", checklist: [], when: "", evening: false, due: "", every: "", remind: "", done: "", order: 0, tags: [],
+      id: "abc", title: "Call plumber", notes: "", checklist: [], when: "", evening: false, due: "", every: "", remind: "", done: "", order: 0, tags: [], where: null,
     });
   });
   it("refuses what the server would", () => {
@@ -54,6 +54,29 @@ describe("tags", () => {
     expect(taskOf({ id: "x", title: "t" })).toMatchObject({ tags: [] });
     const r = complete(task("x", { when: T, every: "1d", tags: ["a"] }), T, id);
     expect(r.next).toMatchObject({ tags: ["a"] });
+  });
+});
+
+describe("where", () => {
+  const MUSEUM = { name: "Acropolis Museum", address: "Dionysiou Areopagitou 15, Athens", lat: 37.9684, lng: 23.7285, place_id: "ChIJ8UNwBh-9oRQR3Y1mdkU1Nic" };
+  it("is read off the wire defensively, and set and cleared by a patch", () => {
+    expect(taskOf({ id: "a", title: "x", where: MUSEUM }).where).toEqual(MUSEUM);
+    expect(taskOf({ id: "a", title: "x", where: { address: "no name" } }).where).toBeNull();
+    expect(taskOf({ id: "a", title: "x" }).where).toBeNull();
+    const t = patchTask(task("Dinner"), { where: MUSEUM });
+    expect(t.where).toEqual(MUSEUM);
+    expect(patchTask(t, { where: null }).where).toBeNull();
+  });
+  it("goes on with a repeating task's next round", () => {
+    const { next } = complete(task("Swim", { every: "1w", when: "2026-11-02", where: { name: "Pool" } }), "2026-11-02", id);
+    expect(next!.where).toEqual({ name: "Pool" });
+  });
+  it("merges as one value: theirs when only they moved it, mine when both did", () => {
+    const base = task("Dinner"), mine = { ...base, title: "Dinner!" }, theirs = { ...base, where: MUSEUM };
+    expect(mergeRecord(base, mine, theirs).merged.where).toEqual(MUSEUM);
+    const r = mergeRecord(base, { ...base, where: { name: "Home" } }, theirs);
+    expect(r.merged.where).toEqual({ name: "Home" });
+    expect(r.conflicts).toEqual(["where"]);
   });
 });
 

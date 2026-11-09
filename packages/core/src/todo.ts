@@ -5,6 +5,7 @@
 
 import { addDays, daysBetween, nextOccurrence, type Every } from "./dates";
 import { fold } from "./notes";
+import { placeOf, type Place } from "./places";
 
 const two = (n: number) => String(n).padStart(2, "0");
 /** `YYYY-MM-DD`, and a day the calendar has. */
@@ -46,13 +47,16 @@ export type Task = {
   /** Tag names (the same ones notes carry), each once ignoring case and tonos. Edited by hand and by the server's
    *  auto-tagger, both ordinary `rev` writes; two edits merge as a set. */
   tags: string[];
+  /** The place it happens at (core/places.ts), as a note's `where:`; null for none. A whole value: two edits merge as
+   *  one field, mine kept where both changed it. */
+  where: Place | null;
 };
 
 /** What patchTask changes; a key left out stays. Clearing `when` clears `evening`. */
 export type TaskPatch = Partial<Omit<Task, "id">>;
 
 const TASK: Omit<Task, "id" | "title"> = {
-  notes: "", checklist: [], when: "", evening: false, due: "", every: "", remind: "", done: "", order: 0, tags: [],
+  notes: "", checklist: [], when: "", evening: false, due: "", every: "", remind: "", done: "", order: 0, tags: [], where: null,
 };
 
 /** The longest tag name the server's definitions take (pb_migrations/1792500000_tags.js). */
@@ -71,7 +75,7 @@ const items = (v: unknown): ChecklistItem[] =>
 export const taskOf = (r: any): Task => ({
   id: str(r.id), title: str(r.title), notes: str(r.notes), checklist: items(r.checklist), when: str(r.when), evening: !!r.evening,
   due: str(r.due), every: str(r.every), remind: str(r.remind), done: str(r.done), order: num(r.order),
-  tags: names(r.tags),
+  tags: names(r.tags), where: placeOf(r.where),
 });
 
 // ---- making and changing
@@ -104,7 +108,7 @@ function check(t: Task) {
 }
 
 /** The exclusion kept: `evening` needs a `when`. What a merge of two edits can break, so it is mended after one. */
-export const normalizeTask = (t: Task): Task => ({ ...t, evening: t.evening && !!t.when, tags: dedupeTags(t.tags) });
+export const normalizeTask = (t: Task): Task => ({ ...t, evening: t.evening && !!t.when, tags: dedupeTags(t.tags), where: placeOf(t.where) });
 
 /** A new open task. Throws on a value the server would refuse (an empty title, a day that isn't one). */
 export function newTask(id: string, fields: TaskPatch & { title: string }): Task {

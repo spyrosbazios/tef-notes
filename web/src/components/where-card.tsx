@@ -1,7 +1,8 @@
-// A note's Where (its frontmatter's `where:` block, core/notes.ts), on the note's page: a "place" button beside the tags
-// while it has none, and once it has one a card under the title: the place's map in the app's theme (the agent draws it,
-// services/places.ts; a place with only a name has none), its name and address, and the two things a place is for:
-// directions from where you are, and the place itself in Google Maps. On a phone both open the Maps app.
+// A Where, a note's (its frontmatter's `where:` block, core/notes.ts) or a task's (its `where` field, core/todo.ts): the
+// picker that sets it, and once set a card: the place's map in the app's theme (the agent draws it, services/places.ts; a
+// place with only a name has none), its name and address, and the two things a place is for: directions from where you
+// are, and the place itself in Google Maps. On a phone both open the Maps app. The note's page puts a "place" button
+// beside its tags and the card under its title (note-pane.tsx); the task's card has a Where row (task-detail.tsx).
 import { ExternalLink, MapPin, Navigation, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,7 +25,7 @@ const MAP_W = 640, MAP_H = 220;
 const away = { target: "_blank", rel: "noopener noreferrer" } as const;
 
 /** The picker in a popover (a sheet on a phone) from `trigger`; closes on a pick. */
-function Picker({ trigger, start, title, onSet }: { trigger: React.ReactNode; start?: string; title: string; onSet: (p: Place) => void }) {
+export function PlacePick({ trigger, start, title, onSet }: { trigger: React.ReactNode; start?: string; title: string; onSet: (p: Place) => void }) {
   const [open, setOpen] = useState(false);
   return (
     <Pick open={open} onOpenChange={setOpen} title={title} align="start" width="w-80" trigger={trigger}>
@@ -33,11 +34,11 @@ function Picker({ trigger, start, title, onSet }: { trigger: React.ReactNode; st
   );
 }
 
-/** The meta row's "place" while the note has none. */
+/** The note's meta row's "place" while it has none. */
 export function AddPlace({ onSet }: { onSet: (p: Place) => void }) {
   const narrow = useNarrow();
   return (
-    <Picker title="Where" onSet={onSet} trigger={
+    <PlacePick title="Where" onSet={onSet} trigger={
       <button type="button" className={cn("inline-flex items-center gap-1 rounded-md text-xs text-faint hover:bg-muted hover:text-dim", narrow ? "h-8 px-2" : "h-6 px-1.5")}>
         <MapPin className="size-3" /> place
       </button>
@@ -70,13 +71,13 @@ function Icon({ label, children, ...p }: React.ComponentProps<typeof Button> & {
 }
 
 /** The note's place, once it has one. `onSet(null)` takes it off (with a toast to put it back). */
-export function WhereCard({ where, onSet }: { where: Place; onSet: (p: Place | null) => void }) {
+export function WhereCard({ where, onSet, className }: { where: Place; onSet: (p: Place | null) => void; className?: string }) {
   const remove = () => {
     onSet(null);
     toast(`Removed ${where.name}`, { action: { label: "Undo", onClick: () => onSet(where) } });
   };
   return (
-    <section aria-label="Where" className="mb-6 overflow-hidden rounded-2xl border border-line bg-card">
+    <section aria-label="Where" className={cn("overflow-hidden rounded-2xl border border-line bg-card", className)}>
       <MapPicture where={where} />
       <div className="flex items-start gap-3 px-3 pt-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand/10 text-brand"><MapPin className="size-4" /></span>
@@ -84,7 +85,7 @@ export function WhereCard({ where, onSet }: { where: Place; onSet: (p: Place | n
           <p className="truncate font-semibold text-sm">{where.name}</p>
           {where.address ? <p className="line-clamp-2 text-xs text-dim">{where.address}</p> : <p className="text-xs text-faint">No address: Maps searches by the name</p>}
         </div>
-        <Picker title="Change place" start={where.name} onSet={onSet} trigger={
+        <PlacePick title="Change place" start={where.name} onSet={onSet} trigger={
           <Button variant="ghost" size="icon-sm" aria-label="Change place" title="Change place"><Pencil className="text-dim" /></Button>
         } />
         <Icon label="Remove place" onClick={remove}><X className="text-dim" /></Icon>
