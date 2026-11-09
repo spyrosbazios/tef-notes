@@ -1,10 +1,10 @@
 // One task in a list, as Things draws it: a round box, the title, the notes it is about as a quiet second line,
 // the deadline in the warn colour. The When button and a ⋮ show on hover (always, under a finger); the title opens the task,
-// a right-click or a long press its menu. A row that can be reordered is dragged by a mouse anywhere, by a finger at its handle.
+// a right-click or a long press its menu. A row that can be reordered is dragged by a mouse anywhere, by a finger after a long press.
 // At phone width under a finger the buttons give way to the phone's swipes (hooks/swipe.ts): right asks When (a sheet), left
 // brings out Delete. The row is the list's item: it rises in, and leaves on a fade (a row being deleted slides away instead) while
 // the others close the gap (task-list.tsx's AnimatePresence); a row that is leaving can no longer be tabbed to and hands its focus on.
-import { Bell, Calendar, Check, EllipsisVertical, Flag, GripVertical, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
+import { Bell, Calendar, Check, EllipsisVertical, Flag, ListChecks, Moon, NotebookText, PanelRight, Repeat, Star, Trash2 } from "lucide-react";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Link } from "@tanstack/react-router";
 import { motion, useTransform } from "motion/react";
@@ -70,12 +70,6 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
       <motion.div className={cn("group relative flex items-start gap-3 rounded-xl px-3 py-2 transition-[background-color,opacity] duration-500 hover:bg-muted/60", sw.side && "bg-bg", selected && "bg-muted", leaving && checked && "opacity-35", drag?.dragging && "opacity-40")}
         style={{ x: sw.x }} variants={{ gone: doomed ? { x: "-100%", transition: away } : {} }}>
       {drag?.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", drag.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
-      {drag ? (
-        <span data-drag-handle aria-hidden onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          className="-mx-3 -my-2 hidden w-10 shrink-0 cursor-grab touch-none items-center justify-center self-stretch text-faint any-pointer-coarse:flex">
-          <GripVertical className="size-4" />
-        </span>
-      ) : null}
       <TickBox checked={checked} aria-label={checked ? `Mark "${task.title}" not done` : `Mark "${task.title}" done`} onClick={onTick} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <Link {...link} draggable={false} title="Open the task"

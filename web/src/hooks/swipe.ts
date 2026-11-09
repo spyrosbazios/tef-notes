@@ -1,8 +1,8 @@
 // A row swiped with a finger, as the phone's task rows are (lib/swipe.ts has the geometry): to the right asks `onWhen` and the
 // row snaps back, to the left leaves the Delete button out until it is tapped or anything else is touched. Touch and pen
 // only: a mouse never swipes (it has the hover buttons and the context menu). The row's `touch-action` must be `pan-y`, so the
-// page still scrolls under a vertical drag and only a sideways one comes here; a press on the row's drag handle
-// (`data-drag-handle`, hooks/drag.ts) or on anything marked `data-swipe-skip` is not a swipe. The click that ends a swipe is
+// page still scrolls under a vertical drag and only a sideways one comes here; a press on anything marked `data-swipe-skip`,
+// or one a long press has lifted to reorder (hooks/drag.ts), is not a swipe. The click that ends a swipe is
 // swallowed, so letting go over the title doesn't open the task.
 // The row's offset is a motion value, not React state: a finger moves it with no render, and letting go eases it to where it
 // rests on `spring.slide` (a press that grabs it mid-glide takes over from where it is). `side` is the one thing that does
@@ -60,12 +60,13 @@ export function useSwipe({ when, onWhen }: { when: boolean; onWhen: () => void }
       row.current = e.currentTarget;
       const t = e.target as Element;
       // A portal's press (a sheet over the row) bubbles here through React
-      if (e.pointerType === "mouse" || !e.isPrimary || !e.currentTarget.contains(t) || t.closest("[data-drag-handle],[data-swipe-skip]")) return;
+      if (e.pointerType === "mouse" || !e.isPrimary || !e.currentTarget.contains(t) || t.closest("[data-swipe-skip]")) return;
       g.current = { pointer: e.pointerId, x0: e.clientX, y0: e.clientY, claimed: false, from: x.get() };
     },
     onPointerMove: (e: PointerEvent<HTMLElement>) => {
       const s = g.current;
       if (!s || e.pointerId !== s.pointer) return;
+      if ("rowDrag" in document.body.dataset) { g.current = null; if (s.claimed) rest(at.current); return; }
       const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
       if (!s.claimed) {
         if (Math.abs(dy) > CLAIM && Math.abs(dy) > Math.abs(dx)) { g.current = null; return; }     // the page is scrolling

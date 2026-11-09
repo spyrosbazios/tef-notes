@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Mic, Palette, Pencil, Plus, RefreshCw, Settings, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { COLORS, type Color } from "@/core/notes";
@@ -244,7 +244,7 @@ function TabOptions({ tab }: { tab: Tab }) {
   return null;
 }
 
-/** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger by the grip), shown or
+/** The phone's bottom bar and where the app opens (core/prefs.ts): the tabs dragged into order (a finger after a long press), shown or
  *  hidden, and Home and Tasks tapped open for the list each starts on. */
 function Layout() {
   const { tabs, hidden, start, tabLabels } = usePrefs();
@@ -265,7 +265,7 @@ function Layout() {
         </div>
         <div className="px-3 py-2.5">
           <p className="text-sm font-semibold">Tabs</p>
-          <p className="text-[13px] leading-snug text-dim">Drag to reorder. Tap Home or Tasks to pick the list it opens on. Settings stays, so the bar can always be changed back.</p>
+          <p className="text-[13px] leading-snug text-dim">Drag to reorder (long press on a phone). Tap Home or Tasks to pick the list it opens on. Settings stays, so the bar can always be changed back.</p>
         </div>
         <ul aria-label="Tabs" className="divide-y divide-line">
           {tabs.map((t) => {
@@ -274,7 +274,6 @@ function Layout() {
               <li key={t} {...d.props} className={cn("relative select-none", d.dragging && "opacity-40")}>
                 {d.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", d.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
                 <div className="flex items-center gap-2 px-1.5 py-1">
-                  <span data-drag-handle aria-hidden className="grid size-9 shrink-0 cursor-grab touch-none place-items-center text-faint"><GripVertical className="size-4" /></span>
                   <button type="button" disabled={!opens} aria-expanded={opens ? open === t : undefined} onClick={() => setOpen(open === t ? null : t)}
                     className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-muted">
                     <Icon className={cn("size-4 shrink-0", shown ? "text-brand" : "text-faint")} />
