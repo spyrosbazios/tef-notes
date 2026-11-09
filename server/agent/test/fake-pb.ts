@@ -17,7 +17,7 @@ export function fakePb() {
   const linkKey = (r: Rec) => [...LINK_COLUMNS, "role"].map((c) => r[c] ?? "").join("|");
   /** Links whose column names any of `ids`: what an end's delete takes. */
   const unlink = (ids: Set<string>) => { for (const l of [...links.values()]) if (LINK_COLUMNS.some((c) => ids.has(l[c]))) links.delete(l.id); };
-  const tags: Rec[] = [];
+  const tags: Rec[] = [], lenses: Rec[] = [];
   const attachments = new Map<string, Rec & { bytes: Uint8Array }>();
   const created: { col: string; body: Rec }[] = [];
   let n = 0, before: ((r: Rec) => void) | undefined;
@@ -47,6 +47,11 @@ export function fakePb() {
       const m = /^\/api\/collections\/(\w+)\/records(?:\/([\w-]+))?$/.exec(u.pathname);
       if (!m) return err(404);
       const [, col, id] = m;
+      if (col === "lenses") {                                 // create_lens: open rules, no rev
+        if (req.method === "GET") return Response.json({ items: lenses });
+        const lens = { ...(await req.json() as Rec), id: `lens${lenses.length + 1}` }; lenses.push(lens);
+        return Response.json(lens);
+      }
       if (col === "tags") {
         if (req.method === "GET") return Response.json({ items: tags });
         const body = await req.json() as Rec;
@@ -144,7 +149,7 @@ export function fakePb() {
   };
 
   return {
-    url: `http://127.0.0.1:${srv.port}`, notes, chats, tags, tasks, links, created, put, attach, attachments,
+    url: `http://127.0.0.1:${srv.port}`, notes, chats, tags, lenses, tasks, links, created, put, attach, attachments,
     meanwhile: (f?: (r: Rec) => void) => { before = f; },
     stop: () => srv.stop(true),
   };

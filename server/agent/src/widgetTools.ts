@@ -22,6 +22,26 @@ import { DAY_RE } from "./todoTools";
 const REVIEW_DAYS = 90, QUOTE = 600, HEADING = 60;
 const ACCENTS = ["violet", "blue", "teal", "green", "amber", "orange", "rose", "pink"] as const satisfies readonly LensAccentName[];
 
+/** A lens as create_lens and show_lens take it. */
+export const LENS = z.object({
+  name: z.string().min(1).max(40).describe("Its name, short, in the owner's words"),
+  tags: z.array(z.string().min(1).max(60)).max(20).describe("Tags it shows (an item with any of them); [] to hide only `exclude`"),
+  exclude: z.array(z.string().min(1).max(60)).max(20).optional().describe("Tags it hides"),
+  accent: z.enum(ACCENTS).optional().describe(`The colour the app takes while it is on: ${ACCENTS.join(" ")}`),
+});
+
+export type LensInput = z.infer<typeof LENS>;
+
+/** `i` as a lens's fields, its tags the defined names they match, or why it can't be one. */
+export async function lensFields(notes: Notes, i: z.infer<typeof LENS>): Promise<Omit<Lens, "rec"> | { error: string }> {
+  const problem = lensProblem({ name: i.name, tags: i.tags, exclude: i.exclude ?? [] });
+  if (problem) return { error: problem };
+  const shows = await definedTags(notes, i.tags), hides = await definedTags(notes, i.exclude ?? []);
+  if ("error" in shows) return shows;
+  if ("error" in hides) return hides;
+  return { name: i.name.trim(), tags: shows.tags, exclude: hides.tags, accent: i.accent ?? null };
+}
+
 const DATE = DAY_RE.describe("YYYY-MM-DD, worked out from today's date in <context>");
 const HM = z.string().regex(REMIND, "HH:MM");
 
@@ -103,7 +123,7 @@ export function widgetTools(notes: Notes, todo: Todo, fromPage: (messages: Model
     }),
 
     show_lens: tool({
-      description: "Preview a lens for the owner before they make it: how many notes and open tasks carry any of `tags` (any, when it has none) and none of `exclude`, and up to 5 of each as cards. Tags only those list_tags returns. This only shows: it saves nothing, and the owner makes the lens in the app.",
+      description: "Preview a lens for the owner before they make it: how many notes and open tasks carry any of `tags` (any, when it has none) and none of `exclude`, and up to 5 of each as cards. Tags only those list_tags returns. This only shows: it saves nothing; create_lens saves one.",
       inputSchema: z.object({
         tags: z.array(z.string().min(1).max(60)).max(20).describe("Tags the lens shows; [] to hide only `exclude`"),
         exclude: z.array(z.string().min(1).max(60)).max(20).optional().describe("Tags it hides"),

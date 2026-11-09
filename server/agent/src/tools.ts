@@ -20,7 +20,7 @@ import type { Todo } from "./todo";
 import { todoTools } from "./todoTools";
 import * as pb from "@/core/pocketbase";
 import * as web from "./web";
-import { widgetTools } from "./widgetTools";
+import { lensFields, LENS, widgetTools } from "./widgetTools";
 
 export const CAP = 6000;                    // agent/memory.md rides in every prompt; keep it small
 const SUMMARIES = 10;                       // summarise_links: pages read in one call
@@ -108,6 +108,17 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
       execute: async ({ name, color, description = "" }) => {
         try { return { tag: await createTag(notes.server, { name, color, description }) }; }
         catch (e) { return { error: `Couldn't create tag: ${(e as Error).message}` }; }
+      },
+    }),
+
+    create_lens: tool({
+      description: "Save a lens (a global filter the owner switches on in the app): a name, the tags it shows (any of them) and those it hides, an optional colour. Only when the owner asks for one; tags only those list_tags returns. The owner confirms. It isn't switched on.",
+      inputSchema: LENS,
+      execute: async (i) => {
+        const fields = await lensFields(notes, i);
+        if ("error" in fields) return fields;
+        try { const l = await pb.lenses.create(notes.server, fields); return { saved: l.name, id: l.rec, tags: l.tags, exclude: l.exclude }; }
+        catch (e) { return { error: `Couldn't save the lens: ${(e as Error).message}` }; }
       },
     }),
 

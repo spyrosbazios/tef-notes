@@ -46,7 +46,9 @@ export type AddManyInput = z.infer<typeof ADD_MANY>;
 
 const UPDATE = z.object({
   id: z.string().describe("The task's id from list_tasks"), about: ABOUT,
-  title: z.string().min(1).max(200).optional().describe("A new title"), notes: NOTES.optional(),
+  title: z.string().min(1).max(200).optional().describe("A new title"),
+  notes: NOTES.optional().describe("Replaces all its notes: only after reading them whole; list_tasks shows a cut. To add, addNotes"),
+  addNotes: z.string().min(1).optional().describe("Text added after its notes, on a new paragraph, the rest kept"),
   when: WHEN.nullable().optional(), evening: EVENING.optional(), due: DUE.nullable().optional(),
   every: EVERY.nullable().optional(), remind: REMIND.nullable().optional(), overlap: OVERLAP.optional(),
   link: LINK.optional().describe("Notes to link it to, their paths; one already linked stays"),
@@ -119,12 +121,16 @@ export async function planAddMany(notes: Notes, todo: Todo, i: AddManyInput): Pr
   return { items };
 }
 
+/** `notes` with `more` after them, a blank line between. */
+export const withNotes = (notes: string, more: string) => [notes.trimEnd(), more.trim()].filter(Boolean).join("\n\n");
+
 /** update_task: the edit to apply to the task (its fresh copy, on a retry too) and the notes to link and unlink (record
  *  ids); refused when there is no such task, a note is none, or the edit, tried on it as it is now, is. */
 export async function planUpdate(notes: Notes, todo: Todo, i: UpdateInput): Promise<Plan<{ id: string; edit: Edit<Task>; link: string[]; unlink: string[] }>> {
   const task = await todo.task(i.id);
   if (!task) return { error: `No task ${i.id}. list_tasks has the ids.` };
-  const { id, about: _, checklist, link: toLink = [], unlink: toUnlink = [], addTags, removeTags, overlap, ...rest } = i;
+  const { id, about: _, checklist, link: toLink = [], unlink: toUnlink = [], addTags, removeTags, overlap, addNotes, ...rest } = i;
+  if (addNotes && rest.notes !== undefined) return { error: "Pass notes (to replace them) or addNotes (to add), not both." };
   // a key left out stays; null clears (unset text is "")
   const patch = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined).map(([k, v]) => [k, v === null ? "" : v])) as TaskPatch;
   const link = await noteRecs(notes, toLink), unlink = await noteRecs(notes, toUnlink);
@@ -134,7 +140,9 @@ export async function planUpdate(notes: Notes, todo: Todo, i: UpdateInput): Prom
   if (added && "error" in added) return added;
   const tags: TagOps = { add: added?.tags ?? [], remove: removeTags ?? [] };
   // links alone leave the task as it is: a link moves no rev
-  const edit: Edit<Task> = Object.keys(patch).length || checklist || tags.add.length || tags.remove.length ? taskEdit(patch, checklist, tags) : (t) => t;
+  const changed = Object.keys(patch).length || addNotes || checklist || tags.add.length || tags.remove.length;
+  // added notes join the task's as it is when written, a retry's fresh copy too
+  const edit: Edit<Task> = changed ? (t) => taskEdit(addNotes ? { ...patch, notes: withNotes(t.notes, addNotes) } : patch, checklist, tags)(t) : (t) => t;
   let after: Task;
   try { after = edit(task); } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
   // only a move into a slot is a booking: an edit leaving its slot as it was never refuses
@@ -244,7 +252,7 @@ export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMe
     }),
 
     update_task: tool({
-      description: "Change a task: only the fields you pass change; null clears one. Evening needs a when. `checklist` adds, rewords, ticks or removes boxes by item id. `addTags` and `removeTags` change its tags. `link` and `unlink` add or drop notes it is about (paths). The user confirms. Ids from list_tasks. To tick the task itself use complete_task.",
+      description: "Change a task: only the fields you pass change; null clears one. Evening needs a when. `addNotes` adds to its notes (`notes` replaces them all). `checklist` adds subtasks (boxes), rewords, ticks or removes them by item id. `addTags` and `removeTags` change its tags. `link` and `unlink` add or drop notes it is about (paths). The user confirms. Ids from list_tasks. To tick the task itself use complete_task.",
       inputSchema: UPDATE,
       execute: async (i, { messages }) => {
         const plan = await planUpdate(notes, todo, i);

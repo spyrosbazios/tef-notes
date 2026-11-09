@@ -20,7 +20,7 @@ afterAll(() => pb.stop());
 let notes: Notes, todo: Todo, T: ReturnType<typeof tools>;
 beforeEach(() => {
   pb.notes.clear(); pb.chats.clear(); pb.tasks.clear(); pb.links.clear(); pb.created.length = 0; pb.meanwhile();
-  pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "" }, { id: "t2", name: "work", description: "" });
+  pb.lenses.length = 0; pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "" }, { id: "t2", name: "work", description: "" });
   notes = new Notes({ url: pb.url });
   todo = new Todo({ url: pb.url });
   T = tools(notes, todo);
@@ -104,6 +104,16 @@ describe("list_notes", () => {
     pb.put("notes/c.md", file("c", "- x\n", "tags: [work]\n"));
     const s = await run(T.list_notes, { filter: "pinned" }) as { notes: object[] };
     expect(s.notes).toEqual([{ path: "notes/b.md", title: "b", snippet: "Codes", flags: "pinned", color: "yellow", edited: expect.any(String) }]);
+  });
+});
+
+describe("create_lens", () => {
+  it("saves a lens with its tags spelled as defined; an unknown tag or none at all is refused", async () => {
+    expect(await run(T.create_lens, { name: "Home", tags: ["σπιτι"], exclude: ["WORK"], accent: "teal" })).toMatchObject({ saved: "Home", tags: ["Σπίτι"], exclude: ["work"] });
+    expect(pb.lenses).toEqual([expect.objectContaining({ name: "Home", tags: ["Σπίτι"], exclude: ["work"], accent: "teal" })]);
+    expect(await run(T.create_lens, { name: "X", tags: ["nope"] })).toEqual({ error: expect.stringMatching(/^Not an existing tag: nope/) });
+    expect(await run(T.create_lens, { name: "X", tags: [] })).toEqual({ error: expect.stringMatching(/at least one tag/) });
+    expect(pb.lenses.length).toBe(1);
   });
 });
 
@@ -346,6 +356,13 @@ describe("tasks", () => {
     expect(await run(T.update_task, { id: t.id, checklist: { remove: ["zzzz"] } } as never)).toEqual({ error: expect.stringMatching(/^No checklist item zzzz/) });
     expect(await run(T.update_task, { id: "nope" } as never)).toEqual({ error: expect.stringMatching(/^No task nope/) });
     expect(pb.tasks.get(t.id)!.rev).toBe(4);                                    // the refused ones wrote nothing
+  });
+
+  it("update_task: addNotes adds a paragraph after its notes; with notes it is refused", async () => {
+    const t = task("Call", { notes: "Number: 210\n" });
+    await run(T.update_task, { id: t.id, addNotes: "Ask about Friday." } as never);
+    expect(pb.tasks.get(t.id)!.notes).toBe("Number: 210\n\nAsk about Friday.");
+    expect(await run(T.update_task, { id: t.id, notes: "x", addNotes: "y" } as never)).toEqual({ error: expect.stringMatching(/not both/) });
   });
 
   it("tasks carry tags: only defined ones, spelled as defined; list_tasks says them", async () => {

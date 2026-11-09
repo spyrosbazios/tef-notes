@@ -33,6 +33,7 @@ function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unkn
     case "list_notes": return str(i.filter);
     case "list_tagged": return Array.isArray(i.tags) ? i.tags.map(str).join(i.match === "all" ? " + " : " · ") : "";
     case "read_note": case "append_to_note": case "summarise_links": case "delete_note": return titleOf(i.path);
+    case "create_lens": return str(i.name);
     case "create_tag": case "update_tag": return str(i.name) || str(i.id);
     case "create_note": return str(i.title);
     case "rewrite_note": return str(i.why) || titleOf(i.path);

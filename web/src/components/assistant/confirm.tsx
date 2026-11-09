@@ -7,7 +7,7 @@ import { Check, Minus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
-import { DECLINED, diffLines, flagLine, rowsOf, tagLine, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
+import { DECLINED, diffLines, flagLine, lensLine, rowsOf, tagLine, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
 import { appended, parseNote } from "@/core/notes";
 import { useNotes } from "@/hooks/notes";
 import { cn } from "@/lib/utils";
@@ -93,7 +93,7 @@ function MemoryDiff({ text }: { text: string }) {
 
 /** What an answered card says: what was done, or what was left undone. */
 const VERB: Record<string, [done: string, skipped: string]> = {
-  create_tag: ["Created", "create"], update_tag: ["Updated", "update"],
+  create_tag: ["Created", "create"], create_lens: ["Created", "create"], update_tag: ["Updated", "update"],
   create_note: ["Created", "create"], append_to_note: ["Added to", "add to"], rewrite_note: ["Rewrote", "rewrite"], summarise_links: ["Summarised links in", "summarise links in"],
   set_note_flags: ["Changed flags of", "change flags of"], delete_note: ["Deleted", "delete"], update_memory: ["Updated", "update"],
 };
@@ -107,14 +107,14 @@ export function Confirm({ name, input, id, respond, answer }: {
   const title = (input.path ? data?.find((n) => n.path === input.path)?.note.title : undefined) ?? input.path ?? "the note";
   const todo = todoWords(name, input);
   const head = todo?.head ?? ({
-    create_tag: `Create tag “${input.name ?? ""}”?`, update_tag: `Update tag “${input.name ?? input.id ?? ""}”?`,
+    create_tag: `Create tag “${input.name ?? ""}”?`, create_lens: `Create lens “${input.name ?? ""}”?`, update_tag: `Update tag “${input.name ?? input.id ?? ""}”?`,
     create_note: `Create note “${input.title ?? ""}”?`, append_to_note: `Add to ${title}?`, rewrite_note: `Rewrite ${title}?`, summarise_links: `Summarise the links in ${title}?`,
     set_note_flags: `Change flags of ${title}?`, delete_note: `Delete ${title}?`, update_memory: "Update the agent's memory?",
   } as Record<string, string>)[name] ?? "Go ahead?";
   const yes = todo?.yes ?? (name === "create_note" ? "Create it" : name === "append_to_note" ? "Add it" : name === "delete_note" ? "Delete it" : "Save it");
   const flags = name === "create_note" ? flagLine(input) : "";
   const [done, skipped] = todo ? [todo.done, todo.skipped] : VERB[name] ?? ["Allowed", "allow"];
-  const subject = todo?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "update_memory" ? "memory" : title);
+  const subject = todo?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_lens" ? `lens “${input.name ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "update_memory" ? "memory" : title);
 
   if (answer)
     return (
@@ -135,6 +135,7 @@ export function Confirm({ name, input, id, respond, answer }: {
           : name === "append_to_note" && input.path ? <AppendPreview path={input.path} input={input} />
           : name === "rewrite_note" && input.path ? <RewriteDiff path={input.path} title={title} input={input} />
           : (name === "create_tag" || name === "update_tag") ? <p className="whitespace-pre-wrap text-sm">{tagLine(name, input)}</p>
+          : name === "create_lens" ? <p className="whitespace-pre-wrap text-sm">{lensLine(input)}</p>
           : name === "set_note_flags" ? <p className="text-sm">{flagLine(input, true) || "No change"}</p>
           : name === "summarise_links" ? <p className="text-sm">A summary under each link card without one, as its Summary button writes it</p>
           : name === "delete_note" ? <p className="text-sm">Delete it for good, with its photos and PDFs</p>

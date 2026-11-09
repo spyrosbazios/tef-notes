@@ -10,6 +10,7 @@ import {
   createAgentUIStream, createUIMessageStreamResponse, generateId, readUIMessageStream, isStepCount, smoothStream, ToolLoopAgent,
   type InferUITools, type ModelMessage, type UIMessage,
 } from "ai";
+import { lensFields, type LensInput } from "./widgetTools";
 import { z } from "zod";
 import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
 import { hasAttachment, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
@@ -67,6 +68,8 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
   type O = { messages: ModelMessage[] };
   return {
     create_tag: (_: unknown, { messages }: O) => ask(messages),
+    // a lens is checked first, like a path: a bad tag goes straight back
+    create_lens: (i: LensInput, { messages }: O) => ask(messages, lensFields(notes, i).then((f) => ("error" in f ? f.error : null))),
     update_tag: (_: unknown, { messages }: O) => ask(messages),
     create_note: (_: unknown, { messages }: O) => ask(messages),
     append_to_note: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
