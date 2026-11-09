@@ -4,7 +4,7 @@
 // look for what was meant (core/find.ts); its hits fill the same list, each with why it fits. No chat opens. A note row's
 // actions are its right-click, and under a finger the ⋮ it shows. On a phone the dialog sits at the top, so the keyboard
 // leaves the results room (the list takes what the viewport has left).
-import { EllipsisVertical, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
+import { EllipsisVertical, Focus, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import { useState } from "react";
 import { ago } from "@/core/time";
@@ -17,6 +17,7 @@ import { TagBadge } from "@/components/tag-badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useAssistant } from "@/hooks/assistant";
 import { useNow } from "@/hooks/now";
+import { setActiveLens, useActiveLens, useLenses } from "@/hooks/lens";
 import { useFinder } from "@/hooks/search";
 import { homeOfTask, titleOf, useNav, type View } from "@/lib/nav";
 import { ms } from "@/lib/search";
@@ -48,6 +49,10 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const { hits, taskHits, tags, empty, asked, ask: askAgent, foundNotes, foundTasks } = useFinder(q);
   const destinations: View[] = [{ kind: "home" }, { kind: "today" }, { kind: "inbox" }, { kind: "upcoming" }, { kind: "logbook" }, { kind: "notes" }, { kind: "settings" }];
   const now = useNow();
+  const { data: lenses = [] } = useLenses(), lensOn = useActiveLens();
+  const lensQ = fold(q.replace(/^lens:?\s*/i, "").trim());   // "lens work" or just "work"
+  const lensHits = q.trim() ? lenses.filter((l) => l.rec !== lensOn?.rec && (!lensQ || fold(l.name).includes(lensQ))) : [];
+  const lensOff = !!lensOn && !!q.trim() && (/^lens/i.test(q.trim()) || ["no lens", "lens off", "all"].some((w) => w.startsWith(fold(q.trim()))));
   const [active, setActive] = useState("");
   const previewed = hits.find((n) => n.path === active) ?? foundNotes.find((h) => h.n.path === active)?.n;
   const [menu, setMenu] = useState<{ path: string; x: number; y: number } | null>(null);   // a note row's right-click menu
@@ -57,7 +62,7 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const run = (f: () => void) => { onOpenChange(false); setQ(""); f(); };
 
   return (
-    <PaletteDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags and views. #tag narrows to a tag.">
+    <PaletteDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags, lenses and views. #tag narrows to a tag; a lens's name switches to it.">
       <Command shouldFilter={false} value={active} onValueChange={setActive}>
         <CommandInput value={q} onValueChange={setQ} placeholder="Search notes, tasks, or #tag…" />
         <div className="flex min-h-0">
@@ -98,6 +103,12 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
             </CommandItem>)}
           </CommandGroup> : null}
           {q && <CommandGroup heading="Go">{destinations.filter((v) => fold(titleOf(v)).includes(fold(q))).map((v) => <CommandItem key={v.kind} value={`view:${v.kind}`} onSelect={() => run(() => goView(v))}>{titleOf(v)}</CommandItem>)}</CommandGroup>}
+          {lensHits.length || lensOff ? (
+            <CommandGroup heading="Lens">
+              {lensHits.map((l) => <CommandItem key={l.rec} value={`lens:${l.rec}`} onSelect={() => run(() => setActiveLens(l.rec))}><Focus /> {l.name} <span className="ml-auto text-xs text-faint">turn on</span></CommandItem>)}
+              {lensOff ? <CommandItem value="lens:none" onSelect={() => run(() => setActiveLens(null))}><Focus /> No lens <span className="ml-auto text-xs text-faint">turn {lensOn?.name} off</span></CommandItem> : null}
+            </CommandGroup>
+          ) : null}
           {tags.length ? (
             <CommandGroup heading="Tags">
               {tags.map((t) => <CommandItem key={t} value={`tag:${t}`} onSelect={() => run(() => goView({ kind: "home", tags: [t] }))}><Hash /> {t}</CommandItem>)}
