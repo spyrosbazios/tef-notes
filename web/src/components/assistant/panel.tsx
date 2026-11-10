@@ -8,7 +8,7 @@ import { transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import type { FileUIPart, UIMessage } from "ai";
-import { ArrowUp, Eye, FileText, History, Loader2, Plus, SquarePen, Square, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ArrowUp, Eye, ListPlus, FileText, History, Loader2, Plus, SquarePen, Square, Sparkles, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode, type SyntheticEvent } from "react";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import { ChatList } from "@/components/assistant/chat-list";
 import { Loaded } from "@/components/loaded";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Turn } from "@/components/assistant/turn";
+import { Queue, type Queued } from "@/components/assistant/queue";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,7 +33,7 @@ import { useNotes } from "@/hooks/notes";
 import { useStick } from "@/hooks/stick";
 import { useNarrow } from "@/hooks/media";
 import { useTasks } from "@/hooks/todo";
-import { asking, waiting } from "@/lib/ask";
+import { asking, held, waiting } from "@/lib/ask";
 import { attachment } from "@/lib/attach";
 import { pageContext } from "@/lib/assistant";
 import { titleOf, useNav } from "@/lib/nav";
@@ -123,11 +124,28 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   // Follow the newest line while it is being written, unless the user scrolled up to read
   const { el: scroller, onScroll, follow } = useStick<HTMLDivElement>(messages, status);
 
+  // Typed while a reply runs: queued, sent one at a time once the turn is over (queue.tsx). Stop and a failed turn pause it.
+  const [queue, setQueue] = useState<Queued[]>([]), [paused, setPaused] = useState(false), nextId = useRef(0);
+  const blocked = busy || held(last) || !!error;
+  const draining = useRef(false);
+  useEffect(() => {
+    const first = queue[0];
+    if (blocked || paused || !model || !first || draining.current) return;
+    draining.current = true;
+    follow();
+    // Taken off the queue once the chat has it, so a failed send stays first and pauses the rest
+    void send(first.text, first.files).then((ok) => {
+      draining.current = false;
+      if (ok) setQueue((q) => q.filter((x) => x.id !== first.id)); else setPaused(true);
+    });
+  }, [blocked, paused, model, queue, send, follow]);
+
   const go = async (raw: string) => {
     const text = raw.trim(), sent = files;
-    if ((!text && !sent.length) || !ready || busy) return;
+    if ((!text && !sent.length) || !ready) return;
     setInput("");
     setFiles([]);
+    if (busy || queue.length) { setQueue((q) => [...q, { id: nextId.current++, text, files: sent }]); return; }
     follow();
     if (!(await send(text, sent))) { setInput(text); setFiles(sent); return; }
     // On the phone the answer is read, not typed over: the keyboard closes (the Send button's tap kept the focus so that tap landed)
@@ -190,6 +208,9 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
           </div>
 
           <div className="shrink-0 border-t border-line px-3 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <Queue items={queue} paused={paused || (!!error && !busy)} onResume={() => { setPaused(false); if (error) void regenerate(); }}
+              onRemove={(id) => setQueue((q) => q.filter((x) => x.id !== id))}
+              onEdit={(q) => { setQueue((all) => all.filter((x) => x.id !== q.id)); setInput(q.text); setFiles(q.files); field.current?.focus(); }} />
             <Seeing />
             <div className="rounded-3xl border border-line bg-card p-2 focus-within:border-ring">
               <Attached files={files} remove={(i) => setFiles((fs) => fs.filter((_, j) => j !== i))} />
@@ -203,8 +224,11 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
                 <div className="flex-1" />
                 <ModelMenu disabled={busy} align="end" />
                 <MicButton onText={(t) => dictateInto(field.current, field.current?.value ?? input, t, setInput)} />
+                {busy && (input.trim() || files.length) ? (
+                  <Button size="icon" variant="secondary" className="shrink-0 rounded-full" aria-label="Queue" title="Send when the reply ends" onPointerDown={keep} onMouseDown={keep} disabled={!ready} onClick={() => { void go(input); }}><ListPlus /></Button>
+                ) : null}
                 {busy ? (
-                  <Button size="icon" className="shrink-0 rounded-full" aria-label="Stop" onPointerDown={keep} onMouseDown={keep} onClick={() => { void stop(); }}><Square className="fill-current" /></Button>
+                  <Button size="icon" className="shrink-0 rounded-full" aria-label="Stop" onPointerDown={keep} onMouseDown={keep} onClick={() => { if (queue.length) setPaused(true); void stop(); }}><Square className="fill-current" /></Button>
                 ) : (
                   <Button size="icon" className="shrink-0 rounded-full" aria-label="Send" onPointerDown={keep} onMouseDown={keep} disabled={!ready || (!input.trim() && !files.length)} onClick={() => { void go(input); }}><ArrowUp /></Button>
                 )}

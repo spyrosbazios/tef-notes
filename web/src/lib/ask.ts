@@ -21,3 +21,8 @@ export function waiting(last: UIMessage | undefined, busy: boolean): boolean {
 /** A confirm card waits for the owner's answer on the last message. */
 export const asking = (last: UIMessage | undefined) =>
   last?.role === "assistant" && last.parts.some((p) => isTool(p) && p.state === "approval-requested");
+
+/** The turn waits on the owner or the client: a confirm card, an `ask_choice`, or a UI tool not yet answered. A queued message
+ *  waits too, since sending one then would leave that call unanswered. */
+export const held = (last: UIMessage | undefined) =>
+  last?.role === "assistant" && last.parts.some((p) => isTool(p) && (p.state === "approval-requested" || p.state === "input-available"));
