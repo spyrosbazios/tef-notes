@@ -366,6 +366,14 @@ export const previewPictureUrl = (s: Server, p: Pick<LinkPreview, "picture"> | n
 
 export const agentUrl = (s: Server, p: string) => `${s.url}/agent/${p}`;
 
+/** A drawing's PNG drawn by the server from its scene (server/agent/src/drawing-picture.ts): for a scene made outside the
+ *  web's editor, which exports its own. Throws with the server's reason when it isn't a scene. */
+export async function drawingPicture(s: Server, scene: string): Promise<Blob> {
+  const r = await fetch(agentUrl(s, "drawing-picture"), { method: "POST", headers: { "Content-Type": "application/json" }, body: scene });
+  if (!r.ok) throw new Error(`the server couldn't draw it (${r.status}): ${await r.text()}`);
+  return r.blob();
+}
+
 /** Notes by their words and meaning (`find.ts` `SEARCH_PATH`): the agent's own search, best first. */
 export const searchByMeaning = async (s: Server, q: string, limit = 10): Promise<SearchHit[]> =>
   searchHitsOf(await getJson(agentUrl(s, `${SEARCH_PATH}?q=${encodeURIComponent(q)}&limit=${limit}`), {}, 2));

@@ -41,6 +41,24 @@ Say something isn't in the notes only after `search` with a couple of phrasings.
   newer rev without re-reading.
 - Never `edit` (opens an editor). `rm <id> <rev>` deletes the note and its attachments: only when asked, by name.
 
+## Drawings
+
+A diagram, sketch or wireframe goes into a note as an Excalidraw drawing the user can open and edit in the web app.
+
+1. Write the scene as a file: `{"type":"excalidraw","version":2,"elements":[…]}`. Each element needs `id`, `type`
+   (`rectangle`, `ellipse`, `diamond`, `text`, `arrow`, `line`), `x`, `y`, `width`, `height`. Arrows and lines need
+   `points` (`[[0,0],[dx,dy]]`, relative to `x`, `y`). A label inside a box is a `text` with `containerId` set to the
+   box's id, plus `"boundElements":[{"type":"text","id":"<text id>"}]` on the box. Colours come from Excalidraw's palette:
+   blue `#1971c2` on `#a5d8ff`, green `#2f9e44` on `#b2f2bb`, yellow `#f08c00` on `#ffec99`, red `#e03131` on `#ffc9c9`,
+   gray `#868e96` on `#dee2e6` (`strokeColor` on `backgroundColor`).
+2. `tefnotes draw <id> flow.excalidraw --label "Login flow"`: uploads the scene, the server draws its PNG preview, and a
+   link is appended to the note. It prints the drawing's name.
+3. To change it later: `tefnotes draw <id> flow.excalidraw --replace <name>.excalidraw`. That replaces the scene and its
+   picture and leaves the note's text alone.
+
+Lay a diagram out on a grid, with even gaps and one colour per role. The preview is drawn plainly, and the web app's first
+Save replaces it with Excalidraw's own.
+
 ## Tasks
 
 - `tefnotes add "<title>" [--when <day>] [--evening] [--due <day>] [--every 1w] [--remind 09:00] [--tag <name>]… [--note <id>]… [--notes "<text>"]`

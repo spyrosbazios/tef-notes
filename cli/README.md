@@ -50,6 +50,7 @@ or use a shell alias, `alias tefnotes='bun /path/to/cli/tefnotes.ts'`. The packa
 | `search <words…>` | Notes by their words and meaning, best first: id, title, `words`/`meaning`/`both`, snippet. The agent\'s own search (`GET /agent/search`) |
 | `new <title> [< body]` | A new note, body from stdin; prints its id |
 | `append <id> [< text]` | Adds text at the end (one line becomes a bullet) |
+| `draw <id> <file> [--label …] [--replace <name>]` | Adds an Excalidraw scene to the note as a drawing, with a PNG the server draws of it (needs the server's agent) |
 | `put <id> <rev> [< file]` | Replaces the whole file, if the note is still at `<rev>` |
 | `edit <id>` | Opens `$EDITOR`; edits made meanwhile are merged in |
 | `rm <id> <rev>` | Deletes the note, photos and all, if it is still at `<rev>` |

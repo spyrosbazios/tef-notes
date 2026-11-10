@@ -96,6 +96,20 @@ export function shapesOf(elements: unknown): Shape[] {
   return out;
 }
 
+/** Why `scene` isn't an Excalidraw file the app can keep (an `.excalidraw` file's JSON: `type: "excalidraw"`, an `elements`
+ *  array holding at least one live element with an id and a type), or null when it is. What `tefnotes draw` checks before it
+ *  uploads one and the server's picture route before it draws one. */
+export function sceneProblem(scene: unknown): string | null {
+  const o = obj(scene);
+  if (!o) return "not an Excalidraw scene: a JSON object";
+  if (o.type !== "excalidraw") return 'not an Excalidraw scene: its "type" must be "excalidraw"';
+  if (!Array.isArray(o.elements)) return 'not an Excalidraw scene: no "elements" array';
+  const live = o.elements.map(obj).filter((e) => e && e.isDeleted !== true);
+  if (live.some((e) => typeof e!.id !== "string" || typeof e!.type !== "string")) return "every element needs a string id and type";
+  if (!live.length) return "the scene has nothing on it";
+  return null;
+}
+
 /** A shape out of untrusted input (a context sent by a client), or null: the reader `contextOf` uses. */
 export function shapeOf(raw: unknown): Shape | null {
   const o = obj(raw), id = idOf(o?.id);

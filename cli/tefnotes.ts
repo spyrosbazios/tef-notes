@@ -11,6 +11,8 @@ import { appendToNote, COLORS, isNotePath, MEMORY, newNotePath, parseNote, recon
 import * as pb from "@/core/pocketbase";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
+import { sceneProblem } from "@/core/drawing";
+import { drawingName, drawingPreview, fileMarkdown, isDrawingName } from "@/core/photos";
 import { createTag, describeAllTags, describeError, listTags, updateTag } from "@/core/tags";
 import { localDay } from "@/core/time";
 
@@ -33,6 +35,11 @@ const HELP = `tefnotes — the notes on the server
   tefnotes put <id> <rev> [< file]  the whole file replaced, if still at <rev> (from cat)
   tefnotes edit <id>                in $EDITOR; edits made meanwhile are merged in
   tefnotes rm <id> <rev>            deleted, photos and all, if still at <rev>
+  tefnotes draw <id> <file|-> [options]
+                                   an Excalidraw scene (.excalidraw JSON) added to the note as a drawing, with a PNG
+                                   the server draws of it; prints its name
+      --label <text>               the link's text (default Drawing)   --replace <name.excalidraw>  that drawing's
+                                   scene and picture replaced instead, the note's text left as it is
   tefnotes memory                   the in-app agent's memory file
   tefnotes export <dir>             every note as <dir>/notes/<file>.md, and the photos and PDFs they link as
                                    <dir>/attachments/<note-id>/<name>: the layout the notes' own links expect
@@ -92,6 +99,35 @@ async function change(s: pb.Server, id: string, next: (text: string) => string):
     }
   }
   return die("the note keeps changing under this edit; try again");
+}
+
+/** `tefnotes draw`: the scene and the server's PNG of it uploaded as the note's drawing (core/photos.ts: the scene linked, the
+ *  PNG found beside it by name), then a line linking it appended; or, with --replace, an existing drawing's two files swapped. */
+async function draw(s: pb.Server, a: string[]) {
+  const usage = "tefnotes draw <id> <file.excalidraw|-> [--label <text>] [--replace <name.excalidraw>]";
+  const { words, opt } = options(a, []), [id, file] = words;
+  if (!id || !file) die(usage);
+  const scene = file === "-" ? await stdin() : existsSync(file!) ? readFileSync(file!, "utf8") : die(`no file ${file}`);
+  let json: unknown;
+  try { json = JSON.parse(scene); } catch { die(`${file} isn't JSON`); }
+  const problem = sceneProblem(json);
+  if (problem) die(`${file}: ${problem}`);
+  const note = await need(s, id!), noteId = parseNote(note.path, note.text).id;
+  const png = await pb.drawingPicture(s, scene), blob = new Blob([scene], { type: "application/json" });
+  const have = await pb.photos(s, noteId), replace = opt.get("replace");
+  if (replace !== undefined) {
+    if (!isDrawingName(replace) || !have.some((p) => p.name === replace)) die(`${idOf(note.path)} has no drawing ${replace}; it has: ${have.filter((p) => isDrawingName(p.name)).map((p) => p.name).join(", ") || "none"}`);
+    for (const p of have) if (p.name === replace || p.name === drawingPreview(replace)) await pb.removePhoto(s, p.rec);
+    await pb.upload(s, noteId, replace, blob);
+    await pb.upload(s, noteId, drawingPreview(replace), png);
+    return console.log(replace);
+  }
+  const label = opt.get("label")?.trim() || "Drawing", name = drawingName(label, new Set(have.map((p) => p.name)));
+  const up = await pb.upload(s, noteId, name, blob);
+  try { await pb.upload(s, noteId, drawingPreview(name), png); } catch (e) { await pb.removePhoto(s, up.rec); throw e; }  // never a scene without its picture
+  const r = await change(s, id!, (t) => `${t.trimEnd()}\n\n${fileMarkdown(noteId, name, label)}\n`);
+  console.error(`linked at the end, rev ${r.rev}`);
+  console.log(name);
 }
 
 /** `fn` over `items`, a few at a time: every note is a request, and a notebook is some hundreds. */
@@ -295,6 +331,7 @@ async function main(argv: string[]) {
         }
       }
     }
+    case "draw": return draw(s, a);
     case "append": {
       const id = a[0] ?? die("tefnotes append <id> [< text]"), text = (await stdin()).trim() || die("nothing on stdin to append");
       const r = await change(s, id, (t) => { const n = parseNote(pathOf(id), t); return t.slice(0, t.length - n.body.length) + appendToNote(n.body, text); });
