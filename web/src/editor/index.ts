@@ -20,6 +20,7 @@ import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
 import type { Summarize } from "./link-tools";
 import { ImageView, ListItemView } from "./views";
+import { noteLinkPath } from "@/core/links";
 import { spliced } from "@/core/voice";
 import type { ResolveImage } from "./views";
 
@@ -47,7 +48,7 @@ export type EditorOptions = {
   onFile?: (href: string) => void;
   /** A photo (or a drawing's thumbnail) tapped or clicked: its `src`, and its place among the note's pictures (`gallery()`). The caller opens a viewer. */
   onImage?: (src: string, index: number) => void;
-  /** A link opened with Ctrl or Cmd held, or a link card clicked. Return true when handled; otherwise the link opens in a new tab. */
+  /** A link opened with Ctrl or Cmd held, a link to another note clicked, or a link card clicked. Return true when handled; otherwise the link opens in a new tab. */
   onLink?: (href: string) => boolean;
   /** A link's Reader view button clicked: the page's URL. Every http(s) link in the note gets one (./link-read); the
    *  card under a paragraph that is only a URL gets its own. Without it there are no such buttons. */
@@ -197,7 +198,8 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       if (src && options.onImage) { options.onImage(src, Math.max(0, gallery(v.state.doc).findIndex((i) => i.src === src))); return true; }
       const a = (event.target as HTMLElement).closest("a");
       const href = a?.getAttribute("href");
-      if (!href || !(event.metaKey || event.ctrlKey)) return false;
+      // A link to another note opens on a plain click: it is for moving between notes; any other link needs Ctrl or Cmd
+      if (!href || !(event.metaKey || event.ctrlKey || noteLinkPath(href))) return false;
       open(href);
       return true;
     },

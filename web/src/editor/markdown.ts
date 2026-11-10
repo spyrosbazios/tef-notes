@@ -8,6 +8,7 @@
 // `__x__` becomes `**x**`, indented code becomes a fence, reference links become inline links (an unused
 // `[ref]: url` definition vanishes), ordered lists are renumbered from their first number, trailing spaces go.
 // A second pass changes nothing: serialize(parse(serialize(parse(x)))) === serialize(parse(x)).
+import { noteLinkPath } from "@/core/links";
 import MarkdownIt from "markdown-it";
 import type { Token } from "markdown-it";
 import { MarkdownParser, MarkdownSerializerState } from "prosemirror-markdown";
@@ -92,7 +93,8 @@ export const schema = new Schema({
       attrs: { href: {}, title: { default: null }, markup: { default: null } },
       inclusive: false,
       parseDOM: [{ tag: "a[href]", getAttrs: (dom) => ({ href: (dom as HTMLElement).getAttribute("href"), title: (dom as HTMLElement).getAttribute("title") }) }],
-      toDOM: (m) => ["a", { href: m.attrs.href, title: m.attrs.title }, 0],
+      // A link to another note is marked: a plain click opens it (index.ts), and it shows a pointer
+      toDOM: (m) => ["a", { href: m.attrs.href, title: m.attrs.title, "data-note": noteLinkPath(m.attrs.href) ? "" : null }, 0],
     },
     em: { parseDOM: [{ tag: "i" }, { tag: "em" }, { style: "font-style=italic" }], toDOM: () => ["em", 0] },
     strong: { parseDOM: [{ tag: "strong" }, { tag: "b" }, { style: "font-weight=bold" }], toDOM: () => ["strong", 0] },

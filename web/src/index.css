@@ -235,6 +235,7 @@
   .pm-editor .selectedCell::after { content: ""; @apply pointer-events-none absolute inset-0 bg-brand/15; }
   .pm-editor .tableWrapper { @apply overflow-x-auto; }
   .pm-editor a { @apply cursor-text; }
+  .pm-editor a[data-note] { @apply cursor-pointer hover:decoration-2; }
   /* A link's Read and Summary buttons (src/editor/link-tools.ts), after the link in the prose and on its card: small
      pills, quiet until hovered so a note's prose stays prose. The icon is lucide's (book-open, sparkles) as a mask. */
   .pm-editor .pm-link-tools { @apply mx-1 inline-flex gap-1 align-[1px]; }
