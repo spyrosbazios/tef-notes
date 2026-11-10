@@ -38,6 +38,7 @@ import { attachable, useAddFiles } from "@/hooks/photos";
 import { noteHref, useNav } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { noteScroll } from "@/lib/scroll";
+import { ScrollProgress, ScrollProgressContainer, ScrollProgressProvider } from "@animate-ui/react/primitives/scroll-progress";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
 import type { NoteRec } from "@/services/notes";
@@ -189,7 +190,10 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         </DropdownMenu>
       </header>
 
-      <div data-scroll-restoration-id={noteScroll(note.id)} className="min-h-0 flex-1 overflow-y-auto">
+      <ScrollProgressProvider>
+      <div className="relative min-h-0 flex-1">
+      <ScrollProgress aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 origin-left bg-accent" />
+      <ScrollProgressContainer data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
           <input ref={title} value={d.title} onChange={(e) => d.setTitle(e.target.value)} aria-label="Title" placeholder="Title"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
@@ -206,7 +210,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => setDrawing({ name })} onEditor={setEd} />
           )}
         </div>
+      </ScrollProgressContainer>
       </div>
+      </ScrollProgressProvider>
 
       {narrow && keyboard && tools ? (
         <div className="flex h-11 shrink-0 items-center overflow-x-auto border-t border-line bg-bg px-2">{tools}</div>
