@@ -48,7 +48,7 @@ describe("contextOf", () => {
 describe("the UI tools", () => {
   it("are offered only with a context, and each has a label", () => {
     expect(uiToolsFor(undefined)).toEqual([]);
-    expect(uiToolsFor({ view: { kind: "home" } })).toEqual(UI_TOOL_NAMES.filter((n) => !isSelectionTool(n)));
+    expect(uiToolsFor({ view: { kind: "home" } })).toEqual(UI_TOOL_NAMES.filter((n) => !isSelectionTool(n) && n !== "draw"));
     for (const n of UI_TOOL_NAMES) expect(label(n)).not.toBe(n);
     expect(isUiTool("open_note")).toBe(true);
     expect(isUiTool("read_note")).toBe(false);
@@ -69,7 +69,7 @@ describe("the selection", () => {
     expect(contextOf({ view: { kind: "home" }, note, selection: "x", editable: "yes" })?.editable).toBeUndefined();
   });
   it("offers its tools only then, beside every other UI tool", () => {
-    expect(uiToolsFor({ view: { kind: "home" }, note, selection: "x", editable: true })).toEqual(UI_TOOL_NAMES);
+    expect(uiToolsFor({ client: "web", view: { kind: "home" }, note, selection: "x", editable: true })).toEqual(UI_TOOL_NAMES);
     for (const n of SELECTION_TOOL_NAMES) expect(isUiTool(n) && isSelectionTool(n)).toBe(true);
     expect(isSelectionTool("open_note")).toBe(false);
   });

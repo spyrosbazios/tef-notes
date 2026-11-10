@@ -40,7 +40,7 @@ function look(): Look {
 /** What is on screen now: called by the transport for every request, so it is never the screen a chat began on. */
 export const screenContext = (): AssistantContext => contextFor(pathname, look());
 
-export const isAppTool = (name: string): name is AppTool => isUiTool(name) && !isAskTool(name) && !isSelectionTool(name);
+export const isAppTool = (name: string): name is AppTool => isUiTool(name) && !isAskTool(name) && !isSelectionTool(name) && name !== "draw";
 
 /** Do a UI tool call in the app. Always an answer: a call left without one is closed as an error on the next send. */
 export function runUiTool(name: AppTool, input: unknown): UiOutput {

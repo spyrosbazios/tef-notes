@@ -2,7 +2,8 @@
 // as the `context` every request carries, and the UI tools the agent drives the app with. Pure: the nav, the cache and the
 // dock come in as arguments, so this is what `test/assistant.test.ts` exercises.
 import { getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
-import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type UiOutput, type UiToolName } from "@/core/assistant";
+import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type OpenDrawing, type UiOutput, type UiToolName } from "@/core/assistant";
+import { editWords } from "@/core/drawing";
 import { contextFilter, type Lens } from "@/core/lens";
 import { isNotePath } from "@/core/notes";
 import type { Held } from "@/editor";
@@ -37,8 +38,9 @@ export type Cached = { notes?: NoteRec[]; tasks?: TaskRec[] };
 /** The context for a request: the view, the open note, the open task, the text selected on the page, and the lens that is on
  *  (as the `filter`: the web's lists have no filter chip of their own, and the palette closes before it is used). Read when the
  *  message goes out, so a step resumed after a card is answered sees the screen as it is then. `editable`: the selection is
- *  held in the open note's editor (an ask from the selection bar), so the selection tools are on offer. */
-export function pageContext(at: Where, held: Cached, selection: string, lens?: Lens | null, editable = false): AssistantContext {
+ *  held in the open note's editor (an ask from the selection bar), so the selection tools are on offer. `drawing`: the one open in
+ *  the drawing editor. */
+export function pageContext(at: Where, held: Cached, selection: string, lens?: Lens | null, editable = false, drawing?: OpenDrawing): AssistantContext {
   const out: AssistantContext = { client: "web", view: assistantView(at.view) };
   const note = at.open ? held.notes?.find((n) => n.note.id === at.open) : undefined;
   if (note) out.note = { path: note.path, title: note.note.title, rev: note.rev };
@@ -48,6 +50,7 @@ export function pageContext(at: Where, held: Cached, selection: string, lens?: L
   if (text) out.selection = text;
   // Editable only when sent whole: the agent replaces exactly what it was sent, so a cut selection would lose its tail
   if (text && out.note && editable && words.length <= LIMITS.selection) out.editable = true;
+  if (drawing) out.drawing = drawing;
   const filter = contextFilter(lens);
   if (filter) out.filter = filter;
   return out;
@@ -71,12 +74,15 @@ export type UiHost = {
   showAssistant: () => void;
   /** The words an ask from the selection bar holds, while it does: what the selection tools change. */
   held?: () => Held | null;
+  /** Opens the drawing `draw` names over its note and makes the edit on it (`call`: the call's id, which its picture is kept by). */
+  draw: (input: DrawInput, call: string) => Promise<UiOutput>;
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-/** Do one UI tool call in the app, and say how it went: `{ ok: true }`, or `{ error }` for the model to read. Always answers. */
-export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Promise<UiOutput> {
+/** Do one UI tool call in the app, and say how it went: `{ ok: true }`, or `{ error }` for the model to read. Always answers.
+ *  `call`: the call's id. */
+export async function runUiTool(name: AppTool, input: unknown, host: UiHost, call: string): Promise<UiOutput> {
   const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   switch (name) {
     case "open_note": {
@@ -104,15 +110,23 @@ export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Pr
       const ok = name === "replace_selection" ? held.replace(str(i.text)) : held.insertAfter(str(i.text));
       return ok ? UI_OK : uiError("The selected words changed meanwhile, or there was nothing to add. Nothing was changed.");
     }
+    case "draw": {
+      const path = str(i.path);
+      if (!isNotePath(path)) return uiError(`No note ${path || "(none named)"}.`);
+      return host.draw({ ...(i as Omit<DrawInput, "path">), path }, call);
+    }
   }
 }
 
 const CANT: Record<AppTool, string> = {
   open_note: "Couldn't open the note", open_task: "Couldn't open the task", go_view: "Couldn't go there",
   replace_selection: "Couldn't change the selected text", insert_after_selection: "Couldn't add under the selected text",
+  draw: "Couldn't draw",
 };
-/** A UI tool call that failed, as a line: what it was, and `why` (the app's answer, or the error). */
-export const uiTrouble = (name: AppTool, why: string) => (why ? `${CANT[name]}: ${why}` : CANT[name]);
+/** A UI tool call that failed, as a line: what it was, and `why` (the app's answer, or the error). The SDK's refusal of a call
+ *  whose input didn't fit the tool carries the whole input: the line says only that (the model is told the rest, and retries). */
+export const uiTrouble = (name: AppTool, why: string) =>
+  (why ? `${CANT[name]}: ${/^AI_InvalidToolInputError/.test(why) ? "what the assistant sent didn't fit the tool" : why}` : CANT[name]);
 
 /** The tool call as a line for the chat once it has run: "Opened note “Garage”". `title`: the record's title as the app
  *  has it now, if it still does. */
@@ -128,6 +142,10 @@ export function uiWords(name: AppTool, input: unknown, title: string | undefined
     }
     case "replace_selection": return str(i.text).trim() ? "Changed the selected text" : "Removed the selected text";
     case "insert_after_selection": return "Added under the selected text";
+    case "draw": {
+      const n = (k: string) => (Array.isArray(i[k]) ? i[k] : []);
+      return `${editWords({ add: n("add"), update: n("update"), remove: n("remove") })} in the drawing${quoted ? ` in${quoted}` : ""}`;
+    }
   }
 }
 

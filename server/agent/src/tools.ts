@@ -12,6 +12,7 @@ import { localDay } from "@/core/time";
 import { uiTools } from "./assistant";
 import { capList, clip, fromWeb } from "./guard";
 import { definedTags, TAGS, type Meta, type Notes } from "./notes";
+import { drawingTools } from "./drawings";
 import { imageData, imagesOf, imageType } from "./images";
 import { pageRange, pages, pdfsOf, READ_CHARS } from "./pdfs";
 import { placeTools } from "./placeTools";
@@ -348,6 +349,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     ...placeTools(todo, fromPage),
     ...todoTools(notes, todo, fromPage),
     ...widgetTools(notes, todo, fromPage),
+    ...drawingTools(notes),
     ...uiTools,
 
     show_items: tool({

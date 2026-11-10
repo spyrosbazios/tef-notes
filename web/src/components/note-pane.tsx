@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Archive, ArchiveRestore, Check, Download, EllipsisVertical, FileCode, FileUp, Paperclip, Link2, Loader2, PenTool, Pin, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { DrawingDialog } from "@/components/drawing-dialog";
+import { DrawingLayer } from "@/components/drawing-layer";
 import { FormatTools } from "@/components/format-tools";
 import { Swatches } from "@/components/note-actions";
 import { MicButton } from "@/components/mic-button";
@@ -30,6 +30,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Editor } from "@/editor";
 import { dictateInto } from "@/hooks/dictation";
+import { openDrawing, useOpened } from "@/hooks/drawing";
 import { useDraft, type Status } from "@/hooks/draft";
 import { deleteNote, NOTES, setFlags, write } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
@@ -71,7 +72,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const [ed, setEd] = useState<Editor | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [drawing, setDrawing] = useState<{ name: string | null } | null>(null);     // the drawing dialog: a file to edit, or a new one
+  const drawing = useOpened(n.note.id);     // the drawing open over the note, the owner's or the agent's (hooks/drawing.ts)
   const title = useRef<HTMLInputElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
   const addFiles = useAddFiles(n.note.id);
   const note = n.note;
@@ -162,7 +163,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           </Tooltip>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuItem onSelect={() => file.current?.click()}><FileUp /> Photo or PDF…</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setDrawing({ name: null })}><PenTool /> New drawing</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openDrawing(note.id, null)}><PenTool /> New drawing</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <input ref={file} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
@@ -207,7 +208,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           <LinkedTasks n={n} className="mb-6" />
           {raw ? source : (
             <>
-            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => setDrawing({ name })} onEditor={setEd} />
+            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => openDrawing(note.id, name)} onEditor={setEd} />
             {ed ? <SelectionBar editor={ed} /> : null}
             </>
           )}
@@ -220,7 +221,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         <div className="flex h-11 shrink-0 items-center overflow-x-auto border-t border-line bg-bg px-2">{tools}</div>
       ) : null}
 
-      <DrawingDialog noteId={note.id} name={drawing?.name ?? null} open={drawing !== null} onClose={() => setDrawing(null)} onCreated={place} />
+      {drawing ? <DrawingLayer key={drawing.seq} opened={drawing} onCreated={place} /> : null}
 
       <AlertDialog open={!!d.clash}>
         <AlertDialogContent className="sm:max-w-4xl">

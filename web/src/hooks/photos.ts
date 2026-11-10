@@ -97,9 +97,9 @@ export function useDrawings(noteId: string) {
       return res.text();
     },
 
-    /** A new drawing's two files up; back comes the body line that links it. The scene goes first and goes again if the
-     *  preview fails, so there is never one without the other. */
-    async create(scene: Blob, preview: Blob): Promise<string> {
+    /** A new drawing's two files up; back come its name and the body line that links it. The scene goes first and goes again
+     *  if the preview fails, so there is never one without the other. */
+    async create(scene: Blob, preview: Blob): Promise<{ name: string; markdown: string }> {
       const taken = new Set((await photos.list(noteId)).map((p) => p.name));
       const name = await putUnder(noteId, taken, () => drawingName("drawing", taken), scene);
       try { await photos.upload(noteId, drawingPreview(name), preview); } catch (e) {
@@ -109,7 +109,7 @@ export function useDrawings(noteId: string) {
       }
       await refreshed(qc, noteId);
       const n = /-(\d+)\.excalidraw$/.exec(name)?.[1];
-      return fileMarkdown(noteId, name, n ? `Drawing ${n}` : "Drawing");
+      return { name, markdown: fileMarkdown(noteId, name, n ? `Drawing ${n}` : "Drawing") };
     },
 
     /** An edited drawing's files replace the old ones: an attachment never changes, so they are deleted and uploaded again

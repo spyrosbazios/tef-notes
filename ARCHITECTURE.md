@@ -57,8 +57,10 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   it as `[original name.pdf](../attachments/<note-id>/<name>.pdf)`. The editors draw that link as a file chip and open
   the PDF in a viewer (a pdf.js page).
 - A drawing is an Excalidraw scene, `<name>.excalidraw` (JSON), stored with a `<name>.png` preview beside it. The body
-  links only the scene, as a PDF is linked. The web app opens it in Excalidraw (a lazy chunk; a save replaces both
-  files); the phone shows the PNG, view-only.
+  links only the scene, as a PDF is linked. The web app opens it in Excalidraw on a layer over the note, the assistant's
+  dock beside it (a lazy chunk; a save replaces both files, a new drawing's first save links it into the note); the phone
+  shows the PNG, view-only. The agent draws on the open canvas with the `draw` UI tool: its shapes land unsaved and
+  undoable, and the owner's Save is what writes them, so the server never writes a scene (`packages/core/src/drawing.ts`).
 - The `title`, `day`, flag and `tags` columns are copies of the frontmatter, written by the client beside `text`. Edit the
   text; never set those columns alone (`noteColumns` in `packages/core/src/pocketbase.ts` builds them for every writer).
 - `autotagged` and `tagged` belong to the server's auto-tagger and are never written by a client. The auto-tagger suggests nothing: every tag it judges likelier than not (p >= 0.5) it adds

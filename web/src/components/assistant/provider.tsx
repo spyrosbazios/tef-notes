@@ -15,13 +15,17 @@ import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react
 import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
+import { choiceFrom, isAskTool, isUiTool, uiError, UI_OK, type OpenDrawing } from "@/core/assistant";
+import { DRAWING_LIMITS } from "@/core/drawing";
+import { isDrawing } from "@/core/photos";
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
+import { keepPicture, liveFor, liveNow, openDrawing, openedNow } from "@/hooks/drawing";
+import { photoListQuery } from "@/hooks/photos";
 import { prefsNow } from "@/hooks/prefs";
 import { activeLensOf } from "@/hooks/lens";
 import { NOTES } from "@/hooks/notes";
@@ -45,6 +49,17 @@ async function find<T>(qc: QueryClient, key: QueryKey, is: (r: T) => boolean): P
   if (held()) return held();
   await syncNow();
   return held();
+}
+
+/** The drawing open in the editor, as the context carries it; undefined when none is, or its note isn't in the cache. */
+function openDrawingNow(notes: NoteRec[] | undefined): OpenDrawing | undefined {
+  const l = liveNow(), n = l && notes?.find((x) => x.note.id === l.noteId);
+  if (!l || !n) return undefined;
+  const { shapes, selected } = l.shapes(), shown = shapes.slice(0, DRAWING_LIMITS.shown);
+  return {
+    path: n.path, ...(l.name ? { name: l.name } : {}), shapes: shown, ...(shapes.length > shown.length ? { more: shapes.length - shown.length } : {}),
+    ...(selected.length ? { selected } : {}), ...(l.unsaved() ? { unsaved: true as const } : {}),
+  };
 }
 
 /** Stop the reply, and close the calls it left open (lib/assistant.ts `closeUnfinished` says why). */
@@ -90,6 +105,25 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       goView: (v) => navNow.current.goView(v),
     },
     showAssistant: () => setDock({ open: true }),
+    // The drawing named (else the one open over the note, else a new one) opens over its note, and the edit is made on it, unsaved
+    draw: async ({ path, name, add, update, remove }, call) => {
+      const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path);
+      if (!n) return uiError(`No note ${path}.`);
+      const id = n.note.id;
+      if (name) {
+        const there = (await qc.fetchQuery(photoListQuery(id))).filter((p) => isDrawing(p.name)).map((p) => p.name);
+        if (!there.includes(name)) return uiError(`${path} has no drawing ${name}${there.length ? ` (it has ${there.join(", ")})` : ""}. Leave the name out to start a new one.`);
+      }
+      const o = openedNow(), same = !!o && o.noteId === id && (!name || o.name === name);
+      if (o && !same && liveNow()?.unsaved()) return uiError("Another drawing is open with changes not saved yet: ask the owner to save or close it first. Nothing was drawn.");
+      navNow.current.openNote(id);
+      const live = await liveFor(same ? o.seq : openDrawing(id, name ?? null));
+      if (!live) return uiError("The drawing editor didn't open in time. Nothing was drawn.");
+      const r = await live.apply({ add, update, remove });
+      if ("error" in r) return uiError(`${r.error} Nothing was drawn.`);
+      if (r.picture) keepPicture(call, r.picture);
+      return UI_OK;
+    },
   }), [qc]);
 
   // The dock's chat, for the callbacks of every chat (an ask's included) to tell it apart
@@ -105,7 +139,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           const { view, open, task } = navNow.current, words = held?.();
           const context = pageContext({ view, open, task }, {
             notes: qc.getQueryData<NoteRec[]>(NOTES), tasks: qc.getQueryData<TaskRec[]>(TASKS),
-          }, words ? words.markdown() : selected.current, activeLensOf(qc), !!words);
+          }, words ? words.markdown() : selected.current, activeLensOf(qc), !!words, openDrawingNow(qc.getQueryData<NoteRec[]>(NOTES)));
           return { body: { id, messages, ...settingsNow(qc), context } };
         },
       }),
@@ -119,7 +153,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           return;
         }
         // Not awaited (the SDK's rule); answered once the app has done it, unless a Stop closed the call meanwhile
-        void runUiTool(toolName, toolCall.input, held ? { ...host, held } : host)
+        void runUiTool(toolName, toolCall.input, held ? { ...host, held } : host, toolCallId)
           .catch((e: unknown) => uiError(message(e)))
           .then((output) => {
             const open = chat.lastMessage?.parts.some((p) => isTool(p) && p.toolCallId === toolCallId && p.state === "input-available");

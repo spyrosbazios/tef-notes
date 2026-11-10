@@ -57,9 +57,9 @@ export function contextFor(pathname: string, look: Look): AssistantContext {
   }
 }
 
-/** The UI tools the app does by itself: all but the question the owner answers (ui/chat/choice.tsx), and the selection
- *  tools, which the phone never sends the editable selection for. */
-export type AppTool = Exclude<UiToolName, "ask_choice" | SelectionToolName>;
+/** The UI tools the app does by itself: all but the question the owner answers (ui/chat/choice.tsx), the selection
+ *  tools, which the phone never sends the editable selection for, and `draw`, offered to the web only (it has the editor). */
+export type AppTool = Exclude<UiToolName, "ask_choice" | SelectionToolName | "draw">;
 
 /** Where a UI tool takes the owner: a screen, the full chat, or why the phone can't. */
 export type Destination =

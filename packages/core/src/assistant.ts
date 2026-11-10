@@ -6,10 +6,13 @@
 //  - the UI tools: tools the server declares without an `execute`, so the AI SDK streams the call to the client, which does
 //    it in the app (`onToolCall`) and answers with `addToolOutput` an `UiOutput`. Most change what the owner sees, never
 //    their data: no confirm card. One of them, `ask_choice`, is answered by the owner, not by the app: see "the question".
-//    Two write, into the text the owner selected and asked about: see "the selection".
+//    Two write, into the text the owner selected and asked about: see "the selection". One draws, in the web's drawing editor:
+//    see "the drawing".
 // Pure: no "ai", RN or DOM import, since the sidecar loads this file outside the clients' node_modules.
 
+import { DRAWING_LIMITS, shapeOf, type DrawEdit, type Shape } from "./drawing";
 import { isNotePath } from "./notes";
+import { isDrawingName } from "./photos";
 
 // ---- the page
 
@@ -29,7 +32,8 @@ export type AssistantView = { kind: PlainView } | { kind: "tag"; tag: string };
  *  `note`: the open note; `rev` is the one the client holds.
  *  `task`: the open task. `selection`: text the owner
  *  has selected on the page; `editable`: that text is in the open note's editor, held for the selection tools (an ask made
- *  from it, not the dock's); `filter`: the search text or filter chip applied to the list. */
+ *  from it, not the dock's); `filter`: the search text or filter chip applied to the list. `drawing`: the drawing open in the
+ *  web's editor (see "the drawing"). */
 export type AssistantContext = {
   client?: "web" | "phone";
   view: AssistantView;
@@ -38,6 +42,7 @@ export type AssistantContext = {
   selection?: string;
   editable?: true;
   filter?: string;
+  drawing?: OpenDrawing;
 };
 
 /** How much of each piece the server keeps; a client may send less, never more. A selection asked about may be a whole
@@ -77,6 +82,8 @@ export function contextOf(raw: unknown): AssistantContext | undefined {
   if (selection && out.note && o.editable === true) out.editable = true;
   const filter = line(o.filter, LIMITS.filter);
   if (filter) out.filter = filter;
+  const drawing = drawingOf(o.drawing);
+  if (drawing) out.drawing = drawing;
   return out;
 }
 
@@ -91,13 +98,14 @@ export type UiToolInput = {
   ask_choice: { question: string; options: ChoiceOption[]; multi?: boolean };
   replace_selection: { text: string };
   insert_after_selection: { text: string };
+  draw: DrawInput;
 };
 export type UiToolName = keyof UiToolInput;
 /** Where `go_view` can go: any view. */
 export const GO_VIEWS = VIEW_KINDS;
 export type GoViewKind = ViewKind;
 
-export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice", "replace_selection", "insert_after_selection"] as const satisfies readonly UiToolName[];
+export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice", "replace_selection", "insert_after_selection", "draw"] as const satisfies readonly UiToolName[];
 export const isUiTool = (name: string): name is UiToolName => (UI_TOOL_NAMES as readonly string[]).includes(name);
 
 /** What a client answers a UI tool with (`addToolOutput({ tool, toolCallId, output })`): `{ ok: true }` once the app shows it,
@@ -111,10 +119,11 @@ export const uiError = (error: string): UiOutput => ({ error });
 export const goView = (i: UiToolInput["go_view"]): AssistantView | null => viewFrom(i.view, i);
 
 /** The UI tools a request may use: those the client can do. Without a context there is no assistant to do them (the call
- *  would hang), so none; the selection tools only when it holds an editable selection. */
+ *  would hang), so none; the selection tools only when it holds an editable selection; `draw` only on the web, the one client
+ *  with a drawing editor. */
 export function uiToolsFor(context: AssistantContext | undefined): readonly UiToolName[] {
   if (!context) return [];
-  return context.editable ? UI_TOOL_NAMES : UI_TOOL_NAMES.filter((n) => !isSelectionTool(n));
+  return UI_TOOL_NAMES.filter((n) => (context.editable || !isSelectionTool(n)) && (n !== "draw" || context.client === "web"));
 }
 
 // ---- the selection
@@ -131,6 +140,40 @@ export type SelectionToolName = (typeof SELECTION_TOOL_NAMES)[number];
 export const isSelectionTool = (name: string): name is SelectionToolName => (SELECTION_TOOL_NAMES as readonly string[]).includes(name);
 /** The most markdown one call may write. */
 export const SELECTION_TEXT_MAX = 20_000;
+
+// ---- the drawing
+
+// A note's drawings are Excalidraw scenes attached to it (ARCHITECTURE.md), edited in the web's drawing editor, which opens over
+// the note and leaves the assistant's dock beside it. While one is open, every request's context carries it as shapes
+// (core/drawing.ts `shapesOf`): its note, its file (none while it is new and unsaved), what is on it and what the owner has
+// selected. `draw` opens a drawing in that editor (one named of the note's, else the note's open one, else a new one) and makes
+// an edit on it (`DrawEdit`), in sight, undoable, and unsaved: the owner keeps it with Save, as they keep their own strokes, so
+// a draw never writes by itself and needs no card. Saving a new drawing links it into the note. The resumed request's context
+// shows the drawing as it then is, with the ids to change it by.
+
+/** The drawing open in the editor: `name` its file (`drawing.excalidraw`), absent while new; `shapes` at most
+ *  `DRAWING_LIMITS.shown` of them, `more` how many were left out; `selected` the ids the owner has selected; `unsaved` it holds
+ *  changes not saved yet. */
+export type OpenDrawing = { path: string; name?: string; shapes: Shape[]; more?: number; selected?: string[]; unsaved?: true };
+
+/** `draw`'s input: the note (`path`), which of its drawings (`name`, else the open one, else a new one), and the edit. */
+export type DrawInput = { path: string; name?: string } & DrawEdit;
+
+
+/** The open drawing out of a context's `drawing` (untrusted), or undefined. */
+function drawingOf(raw: unknown): OpenDrawing | undefined {
+  const d = obj(raw);
+  if (!d || typeof d.path !== "string" || !isNotePath(d.path)) return undefined;
+  const all = (Array.isArray(d.shapes) ? d.shapes : []).map(shapeOf).filter((s): s is Shape => !!s);
+  const shapes = all.slice(0, DRAWING_LIMITS.shown);
+  const more = all.length - shapes.length + (typeof d.more === "number" && Number.isSafeInteger(d.more) && d.more > 0 ? d.more : 0);
+  const ids = new Set(shapes.map((s) => s.id));
+  const selected = (Array.isArray(d.selected) ? d.selected : []).filter((x): x is string => typeof x === "string" && ids.has(x));
+  return {
+    path: d.path, ...(isDrawingName(d.name) ? { name: d.name } : {}), shapes, ...(more > 0 ? { more } : {}),
+    ...(selected.length ? { selected } : {}), ...(d.unsaved === true ? { unsaved: true } : {}),
+  };
+}
 
 // ---- the question
 

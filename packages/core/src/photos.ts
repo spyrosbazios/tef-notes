@@ -82,6 +82,8 @@ export const DRAWING = "application/json";
 const DRAWING_EXT = /\.excalidraw$/i;
 
 export const isDrawing = (name: string) => DRAWING_EXT.test(name);
+/** A drawing's file name as a tool, a widget or the assistant's context names one: a single path segment, `.excalidraw`. */
+export const isDrawingName = (v: unknown): v is string => typeof v === "string" && v.length <= 200 && isDrawing(v) && !/[/\\]/.test(v);
 
 /** A drawing's name as the note stores it (`<slug>.excalidraw`, `-2`, `-3` when taken); the label stays as the link's text.
  *  Its preview is `drawingPreview(name)`, so neither name may be taken. */

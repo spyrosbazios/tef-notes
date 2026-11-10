@@ -26,6 +26,7 @@ import { TabBar } from "@/components/tab-bar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { dockNow, setDock, useDock } from "@/hooks/dock";
+import { closeDrawing, openedNow } from "@/hooks/drawing";
 import { useKeyboard } from "@/hooks/keyboard";
 import { useRail, toggleRail } from "@/hooks/rail";
 import { useLive } from "@/hooks/notes";
@@ -77,6 +78,9 @@ export function Shell() {
   const [rail] = useRail(), reduce = useShouldReduceMotion(), railMove = useTempoTransition(spring.reflow);
   const keyboard = useKeyboard();
   const [palette, setPalette] = useState(false), [menu, setMenu] = useState(false), [adding, setAdding] = useState<Start | null>(null);
+
+  // A drawing is open over its note's page: the note left (closed, another opened), the drawing goes too
+  useEffect(() => { if (openedNow() && openedNow()?.noteId !== note) closeDrawing(); }, [note]);
 
   const kind = view.kind;
   // The `q` key on a note's page adds a task as Home's would, not as the list behind the note does

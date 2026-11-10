@@ -51,21 +51,21 @@ export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "create_tag" | "update_tag" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
   | "summarise_links" | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "list_tagged" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
   | "create_lens" | "find_place" | "set_place" | "show_day" | "show_week" | "show_review" | "show_quote" | "show_link" | "show_lens" | "show_tasks" | "show_notes" | "find_free_slots"
-  | UiToolName;
+  | "read_drawing" | "show_drawing" | UiToolName;
 
 /** Tool names as the owner would say them. */
 const LABEL: Record<ToolName, string> = {
   create_tag: "Creating a tag", create_lens: "Creating a lens", update_tag: "Changing a tag",
   show_items: "Showing what it found",
   show_day: "Showing a day", show_week: "Showing a week", show_review: "Reviewing your week", show_quote: "Quoting a note", show_link: "Showing a link",
-  show_lens: "Previewing a lens", show_tasks: "Laying out tasks", show_notes: "Gathering notes", find_free_slots: "Finding free time",
+  show_lens: "Previewing a lens", show_tasks: "Laying out tasks", show_notes: "Gathering notes", show_drawing: "Showing a drawing", read_drawing: "Looking at a drawing", find_free_slots: "Finding free time",
   search_notes: "Searching your notes", list_notes: "Listing your notes", list_tags: "Reading your tags", read_note: "Reading a note",
   create_note: "New note", append_to_note: "Adding to a note", rewrite_note: "Rewriting a note", summarise_links: "Summarising links", set_note_flags: "Changing a note's flags", delete_note: "Deleting a note",
   update_memory: "Memory", web_search: "Searching the web", read_url: "Reading a page",
   list_tasks: "Reading your tasks", list_tagged: "Gathering by tag", add_task: "Adding a task", add_tasks: "Adding tasks", update_task: "Changing a task", complete_task: "Completing a task",
   delete_task: "Deleting a task", find_place: "Searching the map", set_place: "Setting a place",
   open_note: "Opening a note", open_task: "Opening a task", go_view: "Going to a view", ask_choice: "Asking you to choose",
-  replace_selection: "Changing the selected text", insert_after_selection: "Adding under the selected text",
+  replace_selection: "Changing the selected text", insert_after_selection: "Adding under the selected text", draw: "Drawing",
 };
 export const label = (name: string) => LABEL[name as ToolName] ?? name;
 

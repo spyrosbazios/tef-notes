@@ -2,11 +2,14 @@
 // with a message, rendered as the `<screen>` block at the end of the newest user message's `<context>` (agent.ts), and the UI
 // tools the client does itself. Those are declared without an `execute`, so the SDK streams the call to the client and the
 // turn waits for its output (`addToolOutput`); they change what the owner sees, never their data, so no confirm card. The
-// selection tools are the exception: the owner's editor writes them, in sight and undoable (core's "the selection").
+// selection tools are the exception: the owner's editor writes them, in sight and undoable (core's "the selection"); so is
+// `draw`, whose edit lands in the open drawing unsaved, the owner's to keep (core's "the drawing").
 import { tool } from "ai";
 import { z } from "zod";
 import { isNotePath } from "@/core/notes";
+import { isDrawingName } from "@/core/photos";
 import { ASK, contextOf, GO_VIEWS, LIMITS, SELECTION_TEXT_MAX, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
+import { DRAW_COLOR_NAMES, DRAW_KINDS, DRAWING_LIMITS, FONT_SIZES, type DrawColor, type FontSize } from "@/core/drawing";
 
 /** True only when A and B are assignable both ways: a schema that drifts from the contract stops compiling. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -17,6 +20,10 @@ export const Context = z.unknown().transform(contextOf).optional();
 true satisfies Same<z.infer<typeof Context>, AssistantContext | undefined>;
 
 const id = z.string().min(1).max(LIMITS.id);
+const shapeId = z.string().min(1).max(DRAWING_LIMITS.id).regex(/^[\w-]+$/, "letters, digits, - and _");
+const color = z.enum(DRAW_COLOR_NAMES as [DrawColor, ...DrawColor[]]);
+const size = z.enum(Object.keys(FONT_SIZES) as [FontSize, ...FontSize[]]);
+const at = z.number().describe("Canvas pixels"), text = z.string().max(DRAWING_LIMITS.text);
 const input = {
   open_note: z.object({ path: z.string().refine(isNotePath, "notes/<file>.md").describe("notes/<file>.md, from the index, a search or the screen") }),
   open_task: z.object({ id: id.describe("The task's id, as list_tasks or the screen gave it") }),
@@ -35,6 +42,26 @@ const input = {
   }),
   replace_selection: z.object({ text: z.string().max(SELECTION_TEXT_MAX).describe("Markdown that takes the selected text's place; empty removes it") }),
   insert_after_selection: z.object({ text: z.string().min(1).max(SELECTION_TEXT_MAX).describe("Markdown blocks to add under the block the selection ends in") }),
+  draw: z.object({
+    path: z.string().refine(isNotePath, "notes/<file>.md").describe("The note the drawing is in"),
+    name: z.string().refine(isDrawingName, "<name>.excalidraw").optional().describe("One of its drawings, the last part of its link (sketch.excalidraw); leave out for the drawing open on screen, else a new one"),
+    add: z.array(z.object({
+      id: shapeId.describe("Your id for it, new in this drawing: what arrows and later changes name it by"),
+      type: z.enum(DRAW_KINDS),
+      x: at.optional(), y: at.optional(),
+      w: z.number().optional().describe("Width; for a line or an arrow, where it ends from x (may be negative)"),
+      h: z.number().optional().describe("Height; for a line or an arrow, where it ends from y (may be negative)"),
+      text: text.optional().describe("A box's label (centred in it), a text's words, an arrow's label"),
+      from: shapeId.optional().describe("An arrow's start: a shape's id"), to: shapeId.optional().describe("An arrow's end: a shape's id"),
+      stroke: color.optional().describe("Line and text colour; default black"), fill: color.optional().describe("A light fill; default none"),
+      dashed: z.boolean().optional(), size: size.optional().describe("A text's size: s m (default) l xl"),
+    })).max(DRAWING_LIMITS.add).optional(),
+    update: z.array(z.object({
+      id: shapeId, x: at.optional(), y: at.optional(), w: z.number().optional(), h: z.number().optional(), text: text.optional(),
+      stroke: color.optional(), fill: color.or(z.literal("none")).optional(), dashed: z.boolean().optional(), size: size.optional(),
+    })).max(DRAWING_LIMITS.update).optional().describe("Fields to change on shapes there are, by id; moving a box takes its label and arrows along"),
+    remove: z.array(shapeId).max(DRAWING_LIMITS.remove).optional().describe("Ids of shapes to delete"),
+  }),
 };
 true satisfies Same<z.infer<typeof input.open_note>, UiToolInput["open_note"]>;
 true satisfies Same<z.infer<typeof input.open_task>, UiToolInput["open_task"]>;
@@ -42,6 +69,7 @@ true satisfies Same<z.infer<typeof input.go_view>, UiToolInput["go_view"]>;
 true satisfies Same<z.infer<typeof input.ask_choice>, UiToolInput["ask_choice"]>;
 true satisfies Same<z.infer<typeof input.replace_selection>, UiToolInput["replace_selection"]>;
 true satisfies Same<z.infer<typeof input.insert_after_selection>, UiToolInput["insert_after_selection"]>;
+true satisfies Same<z.infer<typeof input.draw>, UiToolInput["draw"]>;
 
 const ANSWER = "The app does it and answers; if it can't (no such note), it says why.";
 /** No `execute`: the client does these (`ask_choice` the owner does, by tapping). Only offered when the request has a context (`uiToolsFor`). */
@@ -60,6 +88,10 @@ export const uiTools = {
   insert_after_selection: tool({
     description: "Add markdown blocks under the block the owner's selected text ends in (only when the screen says it is editable), leaving the selection as it is. Answers `{ ok: true }` or `{ error }`, as replace_selection.",
     inputSchema: input.insert_after_selection,
+  }),
+  draw: tool({
+    description: "Draw in one of a note's Excalidraw drawings, in the web app's drawing editor, which opens over the note beside the chat: sketches, diagrams, flows, wireframes. Names a drawing of the note (`name`), else the one open on screen, else starts a new one; then adds, changes and removes shapes. The owner sees it happen and keeps it with Save (a new drawing is then linked into the note), or undoes it: it is never saved by itself, so it needs no card. Answers `{ ok: true }`, and from then on the <screen> shows the drawing's shapes with their ids, the owner's own strokes and selection too: read it before changing anything. To look at one without opening it, read_drawing. Lay it out yourself: boxes on a grid with room between them (24 px or more), labels short enough for their box, arrows joining shapes by id. A phone screen is 390x844, a laptop's 1440x900.",
+    inputSchema: input.draw,
   }),
 } satisfies Record<UiToolName, unknown>;
 
@@ -82,5 +114,21 @@ export function screen(c: AssistantContext | undefined): string {
   if (c.task) lines.push(`Open task: ${q(c.task.id)} ${q(c.task.title)}`);
   if (c.filter) lines.push(`Filter on the list: ${q(c.filter)}`);
   if (c.selection) lines.push(`Selected text${c.editable ? " (editable: in the open note, replace_selection and insert_after_selection change it)" : ""}: ${q(c.selection)}`);
+  if (c.drawing) lines.push(...drawingLines(c.drawing));
   return `<screen>\n${lines.join("\n")}\n</screen>`;
+}
+
+/** The open drawing: which, and its shapes one to a line, as JSON (the owner's words in them escaped like any). */
+function drawingLines(d: NonNullable<AssistantContext["drawing"]>): string[] {
+  const which = d.name ? q(d.name) : "a new drawing, not saved yet";
+  const state = d.name ? (d.unsaved ? ", with changes not saved yet" : ", everything on it saved") : "";
+  const out = [`Open drawing (in the editor, over the note; draw changes it): ${which} in ${q(d.path)}${state}`];
+  if (!d.shapes.length) out.push("It is empty.");
+  else {
+    out.push("Its shapes, bottom to top (x, y: top-left; w, h: size, or where a line ends):");
+    for (const s of d.shapes) out.push(JSON.stringify(s).replace(/</g, "\\u003c").replace(/>/g, "\\u003e"));
+  }
+  if (d.more) out.push(`(${d.more} more not listed)`);
+  if (d.selected?.length) out.push(`Selected by the owner: ${d.selected.map(q).join(", ")}`);
+  return out;
 }

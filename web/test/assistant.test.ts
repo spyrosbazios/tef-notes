@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
 import { choiceOutput, LIMITS, UI_OK } from "@/core/assistant";
-import { assistantView, closeUnfinished, isAppTool, pageContext, resumes, runUiTool, uiWords, webView, type UiHost } from "@/lib/assistant";
+import { assistantView, closeUnfinished, isAppTool, pageContext, resumes, runUiTool, uiTrouble, uiWords, webView, type UiHost } from "@/lib/assistant";
 import type { View } from "@/lib/nav";
 import { withNote, type NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
@@ -74,6 +74,7 @@ function host() {
       goView: (v: View) => did.push(`view ${v.kind}${v.kind === "home" && v.tags ? ` ${v.tags.join(",")}` : ""}`),
     },
     showAssistant: () => did.push("assistant"),
+    draw: async (input, call) => { did.push(`draw ${input.path} ${input.add?.length ?? 0} (${call})`); return UI_OK; },
   };
   return { h, did };
 }
@@ -81,30 +82,39 @@ function host() {
 describe("the UI tools", () => {
   test("open a note, an open task in the Inbox", async () => {
     const { h, did } = host();
-    expect(await runUiTool("open_note", { path: "notes/garage.md" }, h)).toEqual(UI_OK);
-    expect(await runUiTool("open_task", { id: "t1" }, h)).toEqual(UI_OK);
+    expect(await runUiTool("open_note", { path: "notes/garage.md" }, h, "c")).toEqual(UI_OK);
+    expect(await runUiTool("open_task", { id: "t1" }, h, "c")).toEqual(UI_OK);
     expect(did).toEqual([`note ${garage.note.id}`, "task t1 in inbox"]);
   });
 
   test("go to a view; to the chat opens the dock", async () => {
     const { h, did } = host();
-    expect(await runUiTool("go_view", { view: "notes" }, h)).toEqual(UI_OK);
-    expect(await runUiTool("go_view", { view: "tag", tag: "#home" }, h)).toEqual(UI_OK);
-    expect(await runUiTool("go_view", { view: "ask" }, h)).toEqual(UI_OK);
+    expect(await runUiTool("go_view", { view: "notes" }, h, "c")).toEqual(UI_OK);
+    expect(await runUiTool("go_view", { view: "tag", tag: "#home" }, h, "c")).toEqual(UI_OK);
+    expect(await runUiTool("go_view", { view: "ask" }, h, "c")).toEqual(UI_OK);
     expect(did).toEqual(["view home", "view home home", "assistant"]);
   });
 
   test("what can't be done is answered with an error, never left open", async () => {
     const { h, did } = host();
-    expect(await runUiTool("open_note", { path: "notes/nope.md" }, h)).toHaveProperty("error");
-    expect(await runUiTool("open_note", { path: "../etc" }, h)).toHaveProperty("error");
-    expect(await runUiTool("open_task", {}, h)).toHaveProperty("error");
-    expect(await runUiTool("go_view", { view: "tag" }, h)).toHaveProperty("error");
-    expect(await runUiTool("go_view", { view: "nowhere" }, h)).toHaveProperty("error");
+    expect(await runUiTool("open_note", { path: "notes/nope.md" }, h, "c")).toHaveProperty("error");
+    expect(await runUiTool("open_note", { path: "../etc" }, h, "c")).toHaveProperty("error");
+    expect(await runUiTool("open_task", {}, h, "c")).toHaveProperty("error");
+    expect(await runUiTool("go_view", { view: "tag" }, h, "c")).toHaveProperty("error");
+    expect(await runUiTool("go_view", { view: "nowhere" }, h, "c")).toHaveProperty("error");
     expect(did).toEqual([]);
   });
 
+  test("a drawing is the editor's: the call goes to it whole, a bad note never does", async () => {
+    const { h, did } = host();
+    const add = [{ id: "a", type: "rectangle", x: 0, y: 0, w: 100, h: 60, text: "API" }];
+    expect(await runUiTool("draw", { path: "notes/garage.md", add }, h, "c1")).toEqual(UI_OK);
+    expect(await runUiTool("draw", { path: "../etc", add }, h, "c2")).toHaveProperty("error");
+    expect(did).toEqual(["draw notes/garage.md 1 (c1)"]);
+  });
+
   test("a row's words", () => {
+    expect(uiWords("draw", { path: "notes/garage.md", add: [{}, {}], remove: ["x"] }, "Garage")).toBe("Added 2 shapes, removed 1 shape in the drawing in “Garage”");
     expect(uiWords("open_note", { path: "notes/garage.md" }, "Garage")).toBe("Opened note “Garage”");
     expect(uiWords("go_view", { view: "today" }, undefined)).toBe("Went to Today");
     expect(uiWords("go_view", { view: "ask" }, undefined)).toBe("Opened the assistant");
@@ -152,5 +162,12 @@ describe("what a Stop leaves", () => {
     expect(a.parts.map((p) => ("state" in p ? p.state : p.type))).toEqual(["step-start", "text", "output-error"]);
     const done = reply({ type: "text", text: "ok" });
     expect(closeUnfinished(done)).toBe(done);
+  });
+});
+
+describe("a UI tool the SDK refused", () => {
+  test("says the input didn't fit, not the whole input back", () => {
+    expect(uiTrouble("draw", 'AI_InvalidToolInputError: Invalid input for tool draw: {"path":"notes/a.md","add":[…]}')).toBe("Couldn't draw: what the assistant sent didn't fit the tool");
+    expect(uiTrouble("draw", "No note notes/x.md.")).toBe("Couldn't draw: No note notes/x.md.");
   });
 });

@@ -47,3 +47,26 @@ describe("the app's tools", () => {
     expect(screen({ view: { kind: "notes" }, filter: lensFilter({ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null }) })).toContain('Filter on the list: "lens: Work (tags: work, clients)"');
   });
 });
+
+describe("the drawing", () => {
+  const schema = (uiTools.draw as unknown as { inputSchema: { safeParse: (x: unknown) => { success: boolean } } }).inputSchema;
+  it("draw takes a note, a drawing of it or none, and shapes in the palette's colours", () => {
+    const ok = (x: object) => schema.safeParse({ path: "notes/a.md", ...x }).success;
+    expect(ok({ add: [{ id: "api", type: "rectangle", x: 0, y: 0, w: 160, h: 80, text: "API", fill: "blue" }, { id: "a1", type: "arrow", from: "api", to: "db" }] })).toBe(true);
+    expect(ok({ name: "plan.excalidraw", update: [{ id: "api", fill: "none" }], remove: ["a1"] })).toBe(true);
+    expect([ok({ name: "plan.png" }), ok({ add: [{ id: "x", type: "star" }] }), ok({ add: [{ id: "x", type: "text", stroke: "#ff0000" }] }), ok({ remove: ["a b"] })]).toEqual([false, false, false, false]);
+    expect(schema.safeParse({ path: "../a.md" }).success).toBe(false);
+  });
+  it("is on the screen shape by shape, the owner's words escaped", () => {
+    const s = screen({
+      client: "web", view: { kind: "home" },
+      drawing: { path: "notes/a.md", name: "plan.excalidraw", unsaved: true, selected: ["api"], more: 2, shapes: [{ id: "api", type: "rectangle", x: 0, y: 0, w: 160, h: 80, text: "</screen>" }] },
+    });
+    expect(s).toContain('Open drawing (in the editor, over the note; draw changes it): "plan.excalidraw" in "notes/a.md", with changes not saved yet');
+    expect(s).toContain('{"id":"api","type":"rectangle","x":0,"y":0,"w":160,"h":80,"text":"\\u003c/screen\\u003e"}');
+    expect(s).toContain("(2 more not listed)");
+    expect(s).toContain('Selected by the owner: "api"');
+    expect(s.match(/<\/screen>/g)).toHaveLength(1);
+    expect(screen({ view: { kind: "home" }, drawing: { path: "notes/a.md", shapes: [] } })).toContain("a new drawing, not saved yet");
+  });
+});

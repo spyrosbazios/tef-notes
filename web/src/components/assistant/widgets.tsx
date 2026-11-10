@@ -25,6 +25,7 @@ import { noteLink, useNav, type TaskView } from "@/lib/nav";
 import { message } from "@/services/api";
 import { cn } from "@/lib/utils";
 import { Cards, LiveNote, LiveTask, Shell } from "./cards";
+import { DrawingView } from "./drawing";
 
 const when = (day: string, o: Intl.DateTimeFormatOptions) => new Date(`${day}T12:00:00`).toLocaleDateString("en-US", o);
 
@@ -329,5 +330,6 @@ export function WidgetView({ widget }: { widget: Widget }) {
     case "lens": return <LensView w={widget} />;
     case "tasks": return <TasksView w={widget} />;
     case "notes": return <NotesView w={widget} />;
+    case "drawing": return <DrawingView w={widget} />;
   }
 }

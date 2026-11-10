@@ -56,7 +56,8 @@ async function context(notes: Notes, page: AssistantContext | undefined) {
   const shown = [screen(page), pdfs].filter(Boolean).join("\n\n");
   return {
     text: `<context>\n${today()}\n\n<file path="${MEMORY}">\n${memory}\n</file>\n\n<notes>\n${noteIndex(await notes.list())}\n</notes>${shown && `\n\n${shown}`}\n</context>`,
-    foreign: !!pdfs || (!!page?.selection && !!open?.tainted),
+    // A drawing open in the editor is its note's: shown from a note a chat that read the web wrote, it is that text again
+    foreign: !!pdfs || (!!page?.selection && !!open?.tainted) || (!!page?.drawing && !!(await notes.meta(page.drawing.path))?.tainted),
   };
 }
 

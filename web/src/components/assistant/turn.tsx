@@ -16,6 +16,7 @@ import { isWidgetTool, widgetOf } from "@/core/widgets";
 import { useNotes } from "@/hooks/notes";
 import { useTasks } from "@/hooks/todo";
 import { isAppTool, uiTrouble, uiWords, type AppTool } from "@/lib/assistant";
+import { DrawRow } from "@/components/assistant/drawing";
 import { isTool, toolName, type Part, type ToolPart } from "@/lib/ask";
 import { cn } from "@/lib/utils";
 import { Cards } from "./cards";
@@ -170,6 +171,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
     // The question: buttons while it waits for the owner, then what they chose
     if (isAskTool(name)) return <Choice key={i} p={p} last={last} live={live} answer={choose} />;
     // The app doing what it was asked (open_note …): a quiet line, no fold
+    if (name === "draw") return <DrawRow key={i} p={p} />;
     if (isAppTool(name)) return <UiRow key={i} name={name} p={p} title={recordTitle(name, (p.input ?? {}) as Record<string, unknown>)} />;
     const approval = "approval" in p ? p.approval : undefined;
     // Asked and passed over for a newer message: it never ran

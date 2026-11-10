@@ -13,6 +13,7 @@
 //   show_lens     { tags, exclude?, name?, accent? }         LensWidget: what a lens would show, before it is saved
 //   show_tasks    { ids, title? }                            TasksWidget: chosen tasks as a timeline, by the day each falls on
 //   show_notes    { paths, title? }                          NotesWidget: chosen notes as a gallery of Home's tiles
+//   show_drawing  { path, name }                             DrawingWidget: a note's drawing, its saved picture, opened in the editor on a tap
 //
 // A finished call's output is `{ widget }` or `{ error }`: read it with `widgetOf` (defensive: a chat saved by another version
 // still draws, and anything malformed is simply no widget). `find_free_slots` has no widget: plain data for the model.
@@ -20,6 +21,7 @@
 
 import { cardsOf, type NoteCard, type TaskCard } from "./agent";
 import { isNotePath } from "./notes";
+import { isDrawingName } from "./photos";
 import { isDay } from "./todo";
 import type { LensAccentName } from "./lens";
 import type { LinkPreview } from "./pocketbase";
@@ -82,11 +84,15 @@ export type TasksWidget = { type: "tasks"; title: string; days: TimelineDay[] };
  *  by `path` where it has one, else from the card. */
 export type NotesWidget = { type: "notes"; title: string; notes: NoteCard[] };
 
-export type Widget = DayWidget | WeekWidget | ReviewWidget | QuoteWidget | LinkWidget | LensWidget | TasksWidget | NotesWidget;
+/** A note's drawing (`name`, its `.excalidraw` file), drawn from the picture saved beside it (photos.ts `drawingPreview`); a tap
+ *  opens it in the web's drawing editor. `title`: the note's. */
+export type DrawingWidget = { type: "drawing"; path: string; title: string; name: string };
+
+export type Widget = DayWidget | WeekWidget | ReviewWidget | QuoteWidget | LinkWidget | LensWidget | TasksWidget | NotesWidget | DrawingWidget;
 export type WidgetType = Widget["type"];
 
 /** The tools whose output carries a widget. */
-export const WIDGET_TOOLS = ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens", "show_tasks", "show_notes"] as const;
+export const WIDGET_TOOLS = ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens", "show_tasks", "show_notes", "show_drawing"] as const;
 export type WidgetTool = (typeof WIDGET_TOOLS)[number];
 export const isWidgetTool = (name: string): name is WidgetTool => (WIDGET_TOOLS as readonly string[]).includes(name);
 
@@ -163,6 +169,11 @@ function readNotes(o: Record<string, unknown>): NotesWidget | null {
   return notes.length ? { type: "notes", title: str(o.title), notes } : null;
 }
 
+function readDrawing(o: Record<string, unknown>): DrawingWidget | null {
+  const name = str(o.name);
+  return isNotePath(str(o.path)) && isDrawingName(name) ? { type: "drawing", path: str(o.path), title: str(o.title), name } : null;
+}
+
 /** The widget a finished `show_*` call's `output` carries, read defensively (every field checked, cards by `cardsOf`'s rule); null
  *  for an error, an unknown `type` or a widget that doesn't hold together. A client draws what it returns and nothing else. */
 export function widgetOf(output: unknown): Widget | null {
@@ -176,6 +187,7 @@ export function widgetOf(output: unknown): Widget | null {
     case "lens": return readLens(w);
     case "tasks": return readTasks(w);
     case "notes": return readNotes(w);
+    case "drawing": return readDrawing(w);
     default: return null;
   }
 }
