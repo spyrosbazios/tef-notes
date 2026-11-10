@@ -29,12 +29,13 @@ function useTargets(paths: string[]): NoteRec[] {
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();       // a portal's events bubble to the tile under it
 
 /** The six tile tints; `value` is ringed, and picking it again takes the tint off (`onPick(null)`). */
-function Swatches({ value, onPick }: { value?: Color; onPick: (c: Color | null) => void }) {
+/** The colour swatches: they wrap in a narrow menu, never squeeze. */
+export function Swatches({ value, onPick }: { value?: Color; onPick: (c: Color | null) => void }) {
   return (
-    <div className="flex gap-1.5 px-2 pb-2">
+    <div className="flex flex-wrap gap-1.5 px-2 pb-2">
       {COLORS.map((c) => (
         <button key={c} type="button" data-color={c} aria-label={c} aria-pressed={value === c} onClick={() => onPick(value === c ? null : c)}
-          className={cn("size-6 rounded-full border-2 bg-tile", value === c ? "border-tile-fg" : "border-tile-line")} />
+          className={cn("size-6 shrink-0 rounded-full border-2 bg-tile", value === c ? "border-tile-fg" : "border-tile-line")} />
       ))}
     </div>
   );

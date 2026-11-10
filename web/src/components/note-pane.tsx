@@ -9,10 +9,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { DrawingDialog } from "@/components/drawing-dialog";
 import { FormatTools } from "@/components/format-tools";
+import { Swatches } from "@/components/note-actions";
 import { MicButton } from "@/components/mic-button";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
-import { COLORS, UNTITLED, type FlagEdit } from "@/core/notes";
+import { UNTITLED, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
@@ -145,7 +146,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
     <article className="flex h-full min-h-0 flex-col" aria-label={note.title}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
       onDrop={(e) => { const f = [...e.dataTransfer.files]; if (f.length) { e.preventDefault(); void attach(f); } }}>
-      <header className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 md:px-4">
+      <header className="@container flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 md:px-4">
         {leading}
         {narrow ? null : tools}
         <Turns className={cn("ml-2 shrink-0 place-items-start text-xs", d.status !== "error" && "max-sm:hidden")} aria-live="polite" state={d.status} states={STATUS} />
@@ -172,13 +173,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><EllipsisVertical className="text-dim" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel className="text-faint text-xs">Colour</DropdownMenuLabel>
-            <div className="flex gap-1.5 px-2 pb-2">
-              {COLORS.map((c) => (
-                <button key={c} type="button" data-color={c} aria-label={c} aria-pressed={note.color === c}
-                  onClick={() => flag({ color: note.color === c ? null : c })}
-                  className={cn("size-6 rounded-full border-2 bg-tile", note.color === c ? "border-tile-fg" : "border-tile-line")} />
-              ))}
-            </div>
+            <Swatches value={note.color} onPick={(color) => flag({ color })} />
             <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem checked={raw} onCheckedChange={setRaw}><FileCode /> Markdown source</DropdownMenuCheckboxItem>
             <DropdownMenuItem onSelect={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}>

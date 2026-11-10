@@ -1,4 +1,5 @@
-// The note pane's format tools (bold, italic, checklist, link, and the rest under ⋯), the one set of editing tools:
+// The note pane's format tools, the one set of editing tools: all in a row when the top bar is wide, else bold, italic,
+// checklist, link and the rest under ⋯;
 // they sit in the pane's top bar (on a phone, in a bar on top of the keyboard), driven by the editor instance the body hands up. A mousedown on a tool is
 // prevented, so the editor keeps its selection and focus.
 import {
@@ -13,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CommandName, Editor } from "@/editor";
+import { cn } from "@/lib/utils";
 
 const GROUPS: { name: CommandName; label: string; icon: LucideIcon }[][] = [
   [
@@ -100,10 +102,10 @@ export function FormatTools({ editor, side = "bottom", flat = false }: { editor:
   useEffect(() => editor.subscribe(redraw), [editor]);
   // The bar on top of a phone's keyboard: every tool in one scrolling row. A menu there would take the focus from the
   // editor, which drops the keyboard and the bar with it
-  if (flat) {
+  const row = (className?: string) => {
     const extra = [...(editor.canMove() ? MOVE : []), ...(editor.inTable() ? TABLE : [])];
     return (
-      <div role="toolbar" aria-label="Format" className="flex items-center gap-0.5 text-dim">
+      <div role="toolbar" aria-label="Format" className={cn("flex items-center gap-0.5 text-dim", className)}>
         {GROUPS.map((group, i) => (
           <div key={i} className="flex shrink-0 items-center gap-0.5">
             {i > 0 ? <div className="mx-1 h-5 w-px bg-line" /> : null}
@@ -119,11 +121,15 @@ export function FormatTools({ editor, side = "bottom", flat = false }: { editor:
         ))}
       </div>
     );
-  }
+  };
+  if (flat) return row();
   const primary: CommandName[] = ["bold", "italic", "taskList"];
   const commands = GROUPS.flat();
+  // In the top bar: every tool in a row when the bar is wide enough (a container query on the bar), else the few and ⋯
   return (
-    <div role="toolbar" aria-label="Format" className="flex items-center gap-0.5 text-dim">
+    <>
+    {row("hidden @5xl:flex")}
+    <div role="toolbar" aria-label="Format" className="flex items-center gap-0.5 text-dim @5xl:hidden">
       {commands.filter(({ name }) => primary.includes(name)).map(({ name, label, icon: Icon }) => (
         <Tool key={name} label={label} pressed={editor.isActive(name)} onRun={() => editor.run(name)}><Icon /></Tool>
       ))}
@@ -160,5 +166,6 @@ export function FormatTools({ editor, side = "bottom", flat = false }: { editor:
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+    </>
   );
 }
