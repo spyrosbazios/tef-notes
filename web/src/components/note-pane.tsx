@@ -16,6 +16,7 @@ import { COLORS, UNTITLED, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
+import { SelectionBar } from "@/components/selection-bar";
 import { AddPlace, WhereCard } from "@/components/where-card";
 import { TagEditor } from "@/components/tag-editor";
 import {
@@ -207,7 +208,10 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           {note.where ? <WhereCard where={note.where} onSet={(where) => void flag({ where })} className="mb-6" /> : null}
           <LinkedTasks n={n} className="mb-6" />
           {raw ? source : (
+            <>
             <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => setDrawing({ name })} onEditor={setEd} />
+            {ed ? <SelectionBar editor={ed} /> : null}
+            </>
           )}
         </div>
       </ScrollProgressContainer>

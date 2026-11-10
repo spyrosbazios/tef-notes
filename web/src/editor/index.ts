@@ -7,7 +7,7 @@ import { gapCursor } from "prosemirror-gapcursor";
 import { history } from "prosemirror-history";
 import { Fragment, Slice } from "prosemirror-model";
 import type { Node } from "prosemirror-model";
-import { EditorState, Plugin, Selection } from "prosemirror-state";
+import { EditorState, Plugin, Selection, TextSelection } from "prosemirror-state";
 import { cellAround, tableEditing } from "prosemirror-tables";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { base, commands, isActive, keys, linkAt, setLink, typed } from "./commands";
@@ -82,7 +82,12 @@ export type Editor = {
   canMove(): boolean;
   /** The href of the link under the cursor. */
   linkHref(): string | null;
-  /** Called after every state change (edit or cursor move): redraw what depends on `isActive`. */
+  /** The selected text's box on screen, for a bar floating over it. Null when nothing is selected, the selection isn't
+   *  text (a picture, cells), it sits in code, the editor hasn't the focus, or a mouse is still dragging it out. */
+  selectionBox(): DOMRect | null;
+  /** The editor's element: what a bar floating over the selection tracks the scrolling of. */
+  readonly dom: HTMLElement;
+  /** Called after every state change (edit or cursor move), focus change and the end of a mouse drag: redraw what depends on `isActive`. */
   subscribe(listener: () => void): () => void;
   destroy(): void;
 };
@@ -121,7 +126,7 @@ function textSlice(text: string): Slice {
 
 export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   let resolve: ResolveImage = options.resolveImage ?? ((src) => src);
-  let last = "", touched = false;
+  let last = "", touched = false, dragging = false;
   const images = new Set<ImageView>(), listeners = new Set<() => void>();
 
   /** The note's pictures in order, from the document: what a tap on one pages through. */
@@ -137,6 +142,8 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     return out;
   };
 
+  // Focus lands after the event that reports it: tell the listeners once it has
+  const notify = () => { queueMicrotask(() => listeners.forEach((l) => l())); };
   const open = (href: string) => { if (!options.onLink?.(href)) window.open(href, "_blank", "noopener,noreferrer"); };
 
   const stateFor = (doc: Node) => EditorState.create({
@@ -165,7 +172,15 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       listeners.forEach((l) => l());
     },
     handleDOMEvents: {
-      focus: () => { touched = true; return false; },
+      focus: () => { touched = true; notify(); return false; },
+      blur: () => { notify(); return false; },
+      // A selection being dragged out with the mouse isn't settled yet: what floats over it waits for the button's release
+      mousedown: (_v, e) => {
+        if (e.button !== 0) return false;
+        dragging = true;
+        document.addEventListener("mouseup", () => { dragging = false; notify(); }, { once: true });
+        return false;
+      },
       // A chip is a link's text: its click must not follow the href, which is no address
       click: (_v, e) => { if (chipHref(e.target)) e.preventDefault(); return false; },
     },
@@ -258,6 +273,16 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     inTable: () => cellAround(view.state.selection.$from) !== null,
     canMove: () => commands.moveUp(view.state) || commands.moveDown(view.state),
     linkHref: () => linkAt(view.state),
+    selectionBox() {
+      const sel = view.state.selection;
+      if (dragging || sel.empty || !(sel instanceof TextSelection) || sel.$from.parent.type.spec.code || !view.hasFocus()) return null;
+      const a = view.coordsAtPos(sel.from, 1), b = view.coordsAtPos(sel.to, -1);
+      // Over one line, the selected words; over several, the text's width between the first line's top and the last's foot
+      if (Math.abs(a.top - b.top) < 2) return new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.left - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top));
+      const box = view.dom.getBoundingClientRect();
+      return new DOMRect(box.left, a.top, box.width, b.bottom - a.top);
+    },
+    dom: view.dom,
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     destroy() { listeners.clear(); view.destroy(); },
   };

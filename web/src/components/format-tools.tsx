@@ -53,8 +53,24 @@ function Tool({ label, pressed, onRun, children }: { label: string; pressed?: bo
   );
 }
 
-function LinkTool({ editor, side }: { editor: Editor; side: "top" | "bottom" }) {
-  const [open, setOpen] = useState(false), [href, setHref] = useState("");
+/** The bar's own label: the shadcn tooltip. */
+function defaultLabel(text: string, toggle: React.ReactElement) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{toggle}</TooltipTrigger>
+      <TooltipContent>{text}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Link or unlink the selection: a toggle that opens a field for the address. `onOpenChange`: the field shows or goes
+ *  (the bar over a selection stays up while it has the focus). `label`: wraps the toggle in its label. */
+export function LinkTool({ editor, side, onOpenChange, label = defaultLabel }: {
+  editor: Editor; side: "top" | "bottom"; onOpenChange?: (open: boolean) => void;
+  label?: (text: string, toggle: React.ReactElement) => React.ReactNode;
+}) {
+  const [open, setOpenState] = useState(false), [href, setHref] = useState("");
+  const setOpen = (o: boolean) => { setOpenState(o); onOpenChange?.(o); };
   const on = editor.isActive("link");
   const apply = () => {
     const v = href.trim();
@@ -63,14 +79,11 @@ function LinkTool({ editor, side }: { editor: Editor; side: "top" | "bottom" }) 
   };
   return (
     <Popover open={open} onOpenChange={(o) => { if (o && on) { editor.run("link"); return; } setHref(""); setOpen(o); }}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Toggle size="sm" aria-label={on ? "Remove link" : "Link"} pressed={on} onMouseDown={(e) => e.preventDefault()}><Link2 /></Toggle>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{on ? "Remove link" : "Link"}</TooltipContent>
-      </Tooltip>
+      {label(on ? "Remove link" : "Link", (
+        <PopoverTrigger asChild>
+          <Toggle size="sm" aria-label={on ? "Remove link" : "Link"} pressed={on} onMouseDown={(e) => e.preventDefault()}><Link2 /></Toggle>
+        </PopoverTrigger>
+      ))}
       <PopoverContent side={side} align="start" className="w-72">
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); apply(); }}>
           <Input autoFocus value={href} onChange={(e) => setHref(e.target.value)} placeholder="https://…" aria-label="Link address" />
