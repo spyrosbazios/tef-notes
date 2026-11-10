@@ -273,7 +273,7 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
             )}
             <Button variant="outline" size="icon-sm" className={cn("text-dim", TOOL, shelf && "text-brand hover:text-brand")} aria-pressed={shelf}
               aria-label={shelf ? "Back to the notes" : "Archived notes"} title={shelf ? "Back to the notes" : "Archived notes"} onClick={() => void showArchived(!shelf)}>
-              <Archive className="max-md:size-5" />
+              <Archive className="size-4 max-md:size-5" />
             </Button>
             <Select value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
               <SelectTrigger size="sm" aria-label="Sort notes"
