@@ -102,8 +102,9 @@ export function SelectionBar({ editor }: { editor: Editor }) {
     strategy: "fixed",
     // The ask's reply grows downward, under the words; the bar sits above them under a mouse, below them under a finger
     placement: asking || !hovers ? "bottom" : "top",
-    // Under a finger, past the handles that hang below the selected line; the bigger tools are a fingertip's size
-    middleware: [offset(asking ? 10 : hovers ? 8 : 28), flip({ padding: 8 }), shift({ padding: 8 })],
+    // Under a finger, past the handles that hang below the selected line; the bigger tools are a fingertip's size. Words
+    // taller than the window leave room on neither side: then it slides along them to stay on screen, over the words
+    middleware: [offset(asking ? 10 : hovers ? 8 : 28), flip({ padding: 8 }), shift({ padding: 8, crossAxis: true })],
     whileElementsMounted: autoUpdate,
   });
   useLayoutEffect(() => {
