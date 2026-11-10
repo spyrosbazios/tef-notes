@@ -36,9 +36,9 @@ const list = (v: unknown): string[] | undefined => {
 export type ShellSearch = { note?: string };
 export const shellSearch = (raw: Raw): ShellSearch => ({ note: text(raw.note) });
 
-/** Home: its notes under every one of these tags. */
-export type HomeSearch = { tags?: string[] };
-export const homeSearch = (raw: Raw): HomeSearch => ({ tags: list(raw.tags) });
+/** Home and the Notes page: their notes under every one of these tags; `archived=1` lists the archived notes instead. */
+export type HomeSearch = { tags?: string[]; archived?: "1" };
+export const homeSearch = (raw: Raw): HomeSearch => ({ tags: list(raw.tags), archived: text(raw.archived) === "1" ? "1" : undefined });
 
 /** A task list: the task open beside it (its record id). */
 export type ListSearch = { t?: string };

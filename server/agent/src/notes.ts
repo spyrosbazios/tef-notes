@@ -14,7 +14,7 @@ import { semantic, type Near } from "./semantic";
 
 export type Meta = {
   rec: string; path: string; kind: NoteKind; rev: number; text: string; title: string; tags: string[]; pinned: boolean;
-  color?: string; updated: number; tainted: boolean;
+  archived: boolean; color?: string; updated: number; tainted: boolean;
 };
 
 /** What a write hands back: the path and rev, and (a note, not the memory file) its card as it now reads, which the clients draw. */
@@ -23,14 +23,14 @@ export type Saved = { saved: string; rev: number; card?: NoteCard } | { error: s
 const cardOf = (path: string, text: string) => (isNotePath(path) ? { card: noteCardOf(path, text) } : {});
 
 const PAGE = 500, TRIES = 3, RRF = 60;
-const FIELDS = "id,path,kind,rev,text,title,tags,pinned,color,updated,tainted";
+const FIELDS = "id,path,kind,rev,text,title,tags,pinned,archived,color,updated,tainted";
 
 /** PocketBase's `2026-10-30 12:00:00.000Z` as ms. */
 export const time = (s: string) => Date.parse(s.replace(" ", "T"));
 
 const metaOf = (r: any): Meta => ({
   rec: r.id, path: r.path, kind: noteKindOf(r.kind), rev: r.rev, text: r.text ?? "", title: r.title || parseNote(r.path, r.text ?? "").title, tags: r.tags ?? [],
-  pinned: !!r.pinned, color: r.color || undefined, updated: time(r.updated), tainted: !!r.tainted,
+  pinned: !!r.pinned, archived: !!r.archived, color: r.color || undefined, updated: time(r.updated), tainted: !!r.tainted,
 });
 
 /** A search result; `match`: found by its words, its meaning, or both. */

@@ -28,7 +28,7 @@ describe("pocketbase", () => {
     expect(url).toBe("https://n:8097/api/collections/notes/records");
     expect(init.method).toBe("POST");
     expect(init.headers).toEqual({ "Content-Type": "application/json" });
-    expect(body).toEqual({ path: "notes/a.md", text, title: "Garage", day: "2026-10-05", pinned: true, color: "yellow", tags: ["home"] });
+    expect(body).toEqual({ path: "notes/a.md", text, title: "Garage", day: "2026-10-05", pinned: true, archived: false, color: "yellow", tags: ["home"] });
   });
 
   it("an update names the rev it was based on; a stale one is a Conflict, a gone record null", async () => {

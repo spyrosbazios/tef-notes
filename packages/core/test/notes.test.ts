@@ -11,7 +11,7 @@ const DOC = "---\ntitle: Garage door codes\ncreated: 2026-10-05\npinned: false\n
 describe("parseNote", () => {
   it("reads the root CLAUDE.md example", () => {
     expect(parseNote(P, DOC)).toEqual({
-      id: "20261005-garage-door-codes", title: "Garage door codes", created: "2026-10-05", pinned: false, color: "yellow",
+      id: "20261005-garage-door-codes", title: "Garage door codes", created: "2026-10-05", pinned: false, archived: false, color: "yellow",
       tags: ["home"], body: "Body in GitHub-flavored markdown.\n",
     });
   });
@@ -76,6 +76,11 @@ describe("withFlags", () => {
     const on = withFlags(P, md, { pinned: true, color: "blue", tags: ["a"] });
     expect(on).toBe(serializeNote({ title: "T", created: "2026-10-05", pinned: true, color: "blue", tags: ["a"] }, "body\n"));
     expect(withFlags(P, on, { pinned: false, color: null, tags: [] })).toBe(md);
+    const shelved = withFlags(P, on, { archived: true, pinned: false });
+    expect(shelved).toBe(serializeNote({ title: "T", created: "2026-10-05", archived: true, color: "blue", tags: ["a"] }, "body\n"));
+    expect(shelved).toContain("archived: true\ncolor: blue");
+    expect(parseNote(P, shelved)).toMatchObject({ archived: true, pinned: false });
+    expect(withFlags(P, shelved, { archived: false, color: null, tags: [] })).toBe(md);
     expect(withFlags(P, on, { color: "green" })).toBe(serializeNote({ title: "T", created: "2026-10-05", pinned: true, color: "green", tags: ["a"] }, "body\n"));
   });
 

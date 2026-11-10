@@ -43,7 +43,11 @@ tags: [home]
 Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, code, images.
 ```
 
-- `title` and `created` are always present. `pinned`, `color` and `tags` appear only when set. Notes have no place: only tasks do (`where`, below).
+- `title` and `created` are always present. `pinned`, `archived`, `color` and `tags` appear only when set. Notes have no place: only tasks do (`where`, below).
+- `archived: true` puts a note away: out of the notes lists (the list's archive button shows them, `?archived=1`), the agent's
+  notes index and a clip's choice of where to file, but still found by search, its links and the agent's tools
+  (`list_notes "archived"`). Archiving unpins it (`archivePatch`, `packages/core/src/bulk.ts`). The frozen phone app still
+  lists it, and keeps the line when it saves.
 - There is no `updated` field on purpose: both sides would touch it on every edit and the line merge would conflict every
   time. The server's own `updated` column tracks it.
 - `color` is one of `yellow pink blue green purple gray`: the note card's tint in the list.

@@ -55,6 +55,10 @@ describe("noteIndex", () => {
     expect(lines.slice(0, 5).map((l) => l.split(" · ")[0])).toEqual(["notes/pinned.md", "notes/old-pinned.md", "notes/n0.md", "notes/n1.md", "notes/n2.md"]);
     expect(lines[5]).toBe("(2 older notes not listed: search_notes or list_notes finds them)");
   });
+  it("archived notes are left out, counted on a line of their own", () => {
+    const lines = noteIndex([line("a"), line("old", { archived: true, pinned: true }), line("b", { archived: true })], NOW).split("\n");
+    expect(lines).toEqual(["notes/a.md · a · today", '(2 archived notes not listed: search_notes or list_notes "archived" finds them)']);
+  });
   it("no overflow line when all fit; the memory file isn't a note", () => {
     expect(noteIndex([line("a"), { ...line("m"), path: "agent/memory.md" }], NOW)).toBe("notes/a.md · a · today");
     expect(noteIndex([], NOW)).toBe("(no notes yet)");
@@ -104,6 +108,14 @@ describe("list_notes", () => {
     pb.put("notes/c.md", file("c", "- x\n", "tags: [work]\n"));
     const s = await run(T.list_notes, { filter: "pinned" }) as { notes: object[] };
     expect(s.notes).toEqual([{ path: "notes/b.md", title: "b", snippet: "Codes", flags: "pinned", color: "yellow", edited: expect.any(String) }]);
+  });
+  it("archived notes only under their own filter", async () => {
+    pb.put("notes/a.md", file("a", "- x\n"));
+    pb.put("notes/z.md", file("z", "Old\n", "archived: true\n"));
+    const recent = await run(T.list_notes, { filter: "recent" }) as { notes: { path: string }[] };
+    expect(recent.notes.map((n) => n.path)).toEqual(["notes/a.md"]);
+    const shelf = await run(T.list_notes, { filter: "archived" }) as { notes: { path: string; flags?: string }[] };
+    expect(shelf.notes).toMatchObject([{ path: "notes/z.md", flags: "archived" }]);
   });
 });
 
@@ -204,6 +216,15 @@ describe("writes", () => {
     expect(pb.notes.get("notes/a.md")!.rev).toBe(1);
     await run(T.set_note_flags, { path: "notes/a.md", tags: ["σπιτι", "WORK"], pinned: true });
     expect(pb.notes.get("notes/a.md")).toMatchObject({ tags: ["Σπίτι", "work"], pinned: true, rev: 2 });
+  });
+
+  it("set_note_flags: archiving unpins, and is undone the same way", async () => {
+    pb.put("notes/a.md", file("a", "x\n", "pinned: true\n"));
+    await run(T.set_note_flags, { path: "notes/a.md", archived: true });
+    expect(pb.notes.get("notes/a.md")).toMatchObject({ archived: true, pinned: false, rev: 2 });
+    expect(pb.notes.get("notes/a.md")!.text).toContain("archived: true");
+    await run(T.set_note_flags, { path: "notes/a.md", archived: false });
+    expect(pb.notes.get("notes/a.md")!.text).not.toContain("archived");
   });
 
   it("set_note_flags: a tag typed on another note, never defined, is usable too", async () => {

@@ -98,14 +98,14 @@ export async function read(s: Server, path: string): Promise<Remote | null> {
   return j.items.length ? remote(j.items[0]) : null;
 }
 
-export type Card = { path: string; kind: NoteKind; title: string; tags: string[]; pinned: boolean; updated: string };
+export type Card = { path: string; kind: NoteKind; title: string; tags: string[]; pinned: boolean; archived: boolean; updated: string };
 
 /** Every note's list line, pinned first then newest edit: the CLI's `ls`. */
 export async function index(s: Server): Promise<Card[]> {
   const out: Card[] = [];
   for (let page = 1; ; page++) {
-    const j = await call(s, `collections/notes/records?fields=path,kind,title,tags,pinned,updated&filter=${encodeURIComponent('path ~ "notes/%"')}&sort=-pinned,-updated&perPage=${PAGE}&page=${page}&skipTotal=1`);
-    out.push(...j.items.map((r: any) => ({ path: r.path, kind: noteKindOf(r.kind), title: r.title, tags: r.tags ?? [], pinned: r.pinned, updated: r.updated })));
+    const j = await call(s, `collections/notes/records?fields=path,kind,title,tags,pinned,archived,updated&filter=${encodeURIComponent('path ~ "notes/%"')}&sort=-pinned,-updated&perPage=${PAGE}&page=${page}&skipTotal=1`);
+    out.push(...j.items.map((r: any) => ({ path: r.path, kind: noteKindOf(r.kind), title: r.title, tags: r.tags ?? [], pinned: r.pinned, archived: !!r.archived, updated: r.updated })));
     if (j.items.length < PAGE) return out;
   }
 }
@@ -125,7 +125,7 @@ export async function search(s: Server, query: string, limit = 20): Promise<Remo
 export function noteColumns(path: string, text: string) {
   const n = parseNote(path, text);
   return { path, text, title: n.title, day: /^\d{4}-\d{2}-\d{2}$/.test(n.created) ? n.created : "", pinned: n.pinned,
-    color: n.color ?? "", tags: n.tags };
+    archived: n.archived, color: n.color ?? "", tags: n.tags };
 }
 
 /** A write's marks. `tainted`: written by an outside agent, so the in-app assistant treats it as web text (it asks

@@ -78,7 +78,7 @@ describe("a review", () => {
   const NOW = new Date(2026, 10, 6, 12), at = (day: number, month = 10) => new Date(2026, month, day, 10).getTime();
   const stamp = (created: number, updated = created): Stamp => ({ created, updated });
   const meta = (slug: string, created: string, updated: number, tags: string[]): Meta => ({
-    rec: slug, path: `notes/${slug}.md`, kind: "note", rev: 1, text: `---\ntitle: ${slug}\ncreated: ${created}\n---\nbody\n`, title: slug, tags, pinned: false, updated, tainted: false,
+    rec: slug, path: `notes/${slug}.md`, kind: "note", rev: 1, text: `---\ntitle: ${slug}\ncreated: ${created}\n---\nbody\n`, title: slug, tags, pinned: false, archived: false, updated, tainted: false,
   });
   it("counts what was done, added and touched in the window; stalled is open and unchanged for 14 days; the busiest tags", () => {
     const made = task("Made and done", { done: "2026-11-04", tags: ["work"] }), ticked = task("Old, ticked now", { done: "2026-11-05", tags: ["Work", "home"] });

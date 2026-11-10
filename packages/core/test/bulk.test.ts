@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { between, colorPatch, pinPatch, tagChange, tagState, tagUnion, toggled } from "../src/bulk";
+import { archivePatch, between, colorPatch, pinPatch, tagChange, tagState, tagUnion, toggled } from "../src/bulk";
 
 const n = (pinned: boolean) => ({ pinned });
 
@@ -44,5 +44,10 @@ describe("selection", () => {
     expect(between(o, undefined, "c")).toEqual(["c"]);
     expect(between(o, "x", "c")).toEqual(["c"]);
     expect(between(o, "a", "z")).toEqual([]);
+  });
+  it("unarchives when all are archived, else archives and unpins", () => {
+    const a = (archived: boolean) => ({ archived });
+    expect(archivePatch([a(true), a(true)])).toEqual({ archived: false });
+    expect(archivePatch([a(true), a(false)])).toEqual({ archived: true, pinned: false });
   });
 });

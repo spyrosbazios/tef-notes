@@ -1,12 +1,13 @@
 // Home's notes: every note as a Keep tile in a masonry read by rows, pinned first then by the chosen sort, a page at a time. Search is the
 // palette's (⌘K) and the lens is the filter; a badge clicked anywhere lands here narrowed to its tag (`?tags=`, lib/route-search.ts),
-// shown as a chip that clears it. Ctrl/cmd-click or a tile's checkbox selects, shift-click selects a range, and
+// shown as a chip that clears it. Archived notes are left out, listed alone behind the header's archive button (`?archived=1`).
+// Ctrl/cmd-click or a tile's checkbox selects, shift-click selects a range, and
 // the header becomes the bulk bar until Esc. A toggle groups the notes under a header per tag (this browser's choice,
 // hooks/note-view.ts), as the phone's Notes tab does: a note with several tags shows under each, and a group folds away.
 // Below `md` it is the phone's: two columns, a header of icons (tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { ReducedMotionConfig, scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { ArrowDownUp, Check, LayoutGrid, Pin, Plus, Sparkles, Tags } from "lucide-react";
+import { Archive, ArrowDownUp, Check, LayoutGrid, Pin, Plus, Sparkles, Tags } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
@@ -164,12 +165,14 @@ export const TOOL = "max-md:h-10 max-md:min-w-10 max-md:rounded-xl";
 /** `scrollId`: its page's scroller (Home's or the Notes page's), whose place is put back: by the router for a badge's tag, by `useScrollSwitch` for a lens (lib/scroll.ts). */
 export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: string }) {
   const { isPending } = useNotes();
-  const { view, openNote, filterTag, setTags } = useNav();
+  const { view, openNote, filterTag, setTags, showArchived } = useNav();
   const chips = useMemo(() => (isNotesView(view) ? view.tags ?? [] : []), [view]);
+  const shelf = isNotesView(view) && !!view.archived;
   const place = useSavedScroll(scrollId);
   const [limit, setLimit] = useState(() => startLimit(place));
   const end = useRef<HTMLDivElement>(null);
-  const base = useLensSorted();
+  const lensed = useLensSorted();
+  const base = useMemo(() => lensed.filter((n) => n.note.archived === shelf), [lensed, shelf]);
   const { grouped, collapsed, sort, setGrouped, fold: foldGroup, setSort } = useNoteView();
   const narrow = useNarrow();
   const sorted = useMemo(() => sortNotes(base, sort, recSortable), [base, sort]);
@@ -244,7 +247,7 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
           <div className="flex min-h-8 flex-wrap items-center gap-2 max-md:min-h-10">
             {/* The title and its count sit on one baseline, the controls centred beside them (the wrapper only exists on a phone) */}
             <div className="max-md:mr-auto max-md:flex max-md:items-baseline max-md:gap-2 md:contents">
-              <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">Notes</h2>
+              <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">{shelf ? "Archived" : "Notes"}</h2>
               <span className={cn("text-xs tabular-nums text-faint md:self-baseline md:pt-1", !chips.length && "md:mr-auto")}>{shown.length}</span>
               {/* The tag filter reads as what it is, the tags themselves beside the count, each taken off on its own */}
               {chips.length ? (
@@ -267,6 +270,10 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
                 <ToggleGroupItem value="tags" aria-label="Group notes by tag" title="Group by tag" className="text-dim"><Tags /></ToggleGroupItem>
               </ToggleGroup>
             )}
+            <Button variant="outline" size="icon-sm" className={cn("text-dim", TOOL, shelf && "text-brand hover:text-brand")} aria-pressed={shelf}
+              aria-label={shelf ? "Back to the notes" : "Archived notes"} title={shelf ? "Back to the notes" : "Archived notes"} onClick={() => void showArchived(!shelf)}>
+              <Archive className="max-md:size-5" />
+            </Button>
             <Select value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
               <SelectTrigger size="sm" aria-label="Sort notes"
                 className="text-dim max-md:w-10 max-md:min-w-10 max-md:justify-center max-md:p-0 max-md:data-[size=sm]:h-10 max-md:data-[size=sm]:rounded-xl max-md:[&_[data-slot=select-value]]:hidden max-md:[&>svg:last-child]:hidden">
@@ -295,7 +302,7 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
                 ))
                 : <Masonry animate>{shown.slice(0, limit).map((t) => tile(t, t.path))}</Masonry>}
             </div>
-          ) : <p className="px-3 py-10 text-center text-sm text-faint">{chips.length ? "No note has every tag ticked." : "No notes here yet."}</p>}
+          ) : <p className="px-3 py-10 text-center text-sm text-faint">{chips.length ? "No note has every tag ticked." : shelf ? "Nothing archived. A note's menu has Archive." : "No notes here yet."}</p>}
         </Loaded>
       </div>
       {more ? <div ref={end} className="h-px" aria-hidden /> : null}

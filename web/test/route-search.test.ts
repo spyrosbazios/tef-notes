@@ -38,6 +38,11 @@ describe("the validators", () => {
     expect(homeSearch({})).toEqual({ tags: undefined });
   });
 
+  test("the archive: `archived=1`, anything else dropped", () => {
+    expect(homeSearch({ archived: "1", tags: "a" })).toEqual({ tags: ["a"], archived: "1" });
+    expect(homeSearch({ archived: "yes" })).toEqual({ tags: undefined, archived: undefined });
+  });
+
   test("a task list's open task and the shell's note are ids, a number's digits kept", () => {
     expect(listSearch({ t: "abc" })).toEqual({ t: "abc" });
     expect(listSearch({ t: 123 })).toEqual({ t: "123" });
@@ -67,17 +72,19 @@ describe("places", () => {
     expect(viewOf("/today")).toEqual({ kind: "today" });
     expect(viewOf("/settings", { section: "tags" })).toEqual({ kind: "settings", section: "tags" });
     expect(viewOf("/elsewhere")).toEqual({ kind: "home" });
+    expect(viewOf("/notes", { tags: ["a"], archived: true })).toEqual({ kind: "notes", tags: ["a"], archived: true });
+    expect(linkOf({ kind: "notes", archived: true })).toEqual({ to: "/notes", search: { tags: undefined, archived: "1", note: undefined } });
   });
 
   test("a view is a typed link, with its open task and note", () => {
-    expect(linkOf({ kind: "home", tags: ["a"] })).toEqual({ to: "/", search: { tags: ["a"], note: undefined } });
+    expect(linkOf({ kind: "home", tags: ["a"] })).toEqual({ to: "/", search: { tags: ["a"], archived: undefined, note: undefined } });
     expect(linkOf({ kind: "today" }, { task: "t1" })).toEqual({ to: "/today", search: { t: "t1", note: undefined } });
     expect(linkOf({ kind: "settings", section: "agent" })).toEqual({ to: "/settings", search: { section: "agent", note: undefined } });
   });
 
   test("a note lies over the screen it was opened from, its task kept; from outside the shell, over Home", () => {
     expect(noteLink("n1", { view: { kind: "today" }, task: "t1" })).toEqual({ to: "/today", search: { t: "t1", note: "n1" } });
-    expect(noteLink("n1", { view: { kind: "home", tags: ["a"] } })).toEqual({ to: "/", search: { tags: ["a"], note: "n1" } });
-    expect(noteLink("n1", null)).toEqual({ to: "/", search: { tags: undefined, note: "n1" } });
+    expect(noteLink("n1", { view: { kind: "home", tags: ["a"] } })).toEqual({ to: "/", search: { tags: ["a"], archived: undefined, note: "n1" } });
+    expect(noteLink("n1", null)).toEqual({ to: "/", search: { tags: undefined, archived: undefined, note: "n1" } });
   });
 });

@@ -7,7 +7,7 @@
 const NOTES = "notes/";
 const MEMORY = "agent/memory.md";
 const COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green", "gray"];
-const KEYS = ["title", "created", "pinned", "color", "tags"];
+const KEYS = ["title", "created", "pinned", "archived", "color", "tags"];
 
 /** Accents and Greek tonos off: the combining marks NFD splits out (goja's regexp: the range, not \p{M}). */
 const unmark = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").normalize("NFC");
@@ -101,12 +101,13 @@ const idOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, ""
 /** A note's frontmatter and body, as parseNote reads them. */
 function parse(path, text) {
   const id = idOf(path), f = front(text), body = f ? text.slice(f.body) : text;
-  const n = { id, title: "", created: "", pinned: false, color: undefined, tags: [], body };
+  const n = { id, title: "", created: "", pinned: false, archived: false, color: undefined, tags: [], body };
   for (const e of f ? entries(f.lines) : []) {
     const v = e.lines[0].slice(e.lines[0].indexOf(":") + 1).trim();
     if (e.key === "title") n.title = unquote(v);
     else if (e.key === "created") n.created = unquote(v);
     else if (e.key === "pinned") n.pinned = truthy(v);
+    else if (e.key === "archived") n.archived = truthy(v);
     else if (e.key === "color") { const c = unquote(v).toLowerCase(); if (COLORS.includes(c)) n.color = c; }
     else if (e.key === "tags") {
       n.tags = v.startsWith("[") && v.endsWith("]") ? flowList(v)
@@ -125,6 +126,7 @@ function lineFor(k, m) {
     case "title": return `title: ${scalar(m.title.replace(/\s*\n\s*/g, " "))}`;
     case "created": { const c = m.created || localDay(); return `created: ${/^\d{4}-\d{2}-\d{2}/.test(c) ? c : scalar(c)}`; }
     case "pinned": return m.pinned ? "pinned: true" : null;
+    case "archived": return m.archived ? "archived: true" : null;
     case "color": return m.color ? `color: ${m.color}` : null;
     case "tags": return m.tags && m.tags.length ? `tags: [${m.tags.map(item).join(", ")}]` : null;
   }
@@ -155,7 +157,7 @@ const withBody = (text, n, body) => text.slice(0, text.length - n.body.length) +
 function columns(path, text) {
   const n = parse(path, text);
   return { path, text, title: n.title, day: /^\d{4}-\d{2}-\d{2}$/.test(n.created) ? n.created : "", pinned: n.pinned,
-    color: n.color || "", tags: n.tags };
+    archived: n.archived, color: n.color || "", tags: n.tags };
 }
 
 // ---- ids

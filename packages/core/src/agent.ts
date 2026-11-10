@@ -181,7 +181,7 @@ export type WriteInput = {
   /** create_lens': the tags it hides and its colour (`tags`: those it shows). */
   exclude?: string[]; accent?: string;
   path?: string; title?: string; body?: string; text?: string; why?: string; section?: string;
-  pinned?: boolean; color?: string | null; tags?: string[];
+  pinned?: boolean; archived?: boolean; color?: string | null; tags?: string[];
   /** The task tools': the record's id, its title as the agent read it (`about`: what a card names it by), its dates
    *  (`null` clears one), `done` false to reopen; the notes it is linked to (`link`, and update_task's `unlink`: paths),
    *  its checklist (a list of texts when added, ops by item id when changed). */
@@ -270,7 +270,8 @@ export function todoLines(name: string, i: WriteInput): string[] {
 /** The flags a create sets, or the change a set_note_flags makes, as one line. */
 export function flagLine(i: WriteInput, change = false) {
   const parts = [
-    i.pinned != null && (change ? (i.pinned ? "pin it" : "unpin it") : i.pinned && "pinned"),
+    i.archived != null && change && (i.archived ? "archive it" : "take it out of the archive"),
+    i.pinned != null && !(change && i.archived) && (change ? (i.pinned ? "pin it" : "unpin it") : i.pinned && "pinned"),
     i.color ? `${change ? "colour " : ""}${i.color}` : change && i.color === null && "no colour",
     i.tags && (i.tags.length ? `tags: ${i.tags.join(", ")}` : change && "no tags"),
   ].filter((x): x is string => !!x);

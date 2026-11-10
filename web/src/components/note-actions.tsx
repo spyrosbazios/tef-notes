@@ -1,7 +1,7 @@
 // What the list does to notes without opening them: a tile's ⋮ menu and the bar a selection turns the header into.
 // Both act on `paths` (one note, or the selection) through useBulk, so one note and many go the same way. The
 // tags and delete dialogs are the list's, opened from either; asking the agent and downloading need none.
-import { Download, EllipsisVertical, Palette, Pin, Sparkles, Tag, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, Download, EllipsisVertical, Palette, Pin, Sparkles, Tag, Trash2, X } from "lucide-react";
 import { useMemo } from "react";
 import { colorPatch, pinPatch, tagState, tagUnion } from "@/core/bulk";
 import { COLORS, type Color } from "@/core/notes";
@@ -48,11 +48,13 @@ function useFlagActions(paths: string[]) {
   const color = recs.length === 1 ? notes[0].color : undefined;
   return {
     pinned: notes.length > 0 && notes.every((n) => n.pinned), color,
+    archived: notes.length > 0 && notes.every((n) => n.archived),
     pin: () => bulk.flags(paths, pinPatch(notes)), paint: (c: Color | null) => bulk.flags(paths, colorPatch(c)),
+    archive: () => void bulk.archive(paths),
   };
 }
 
-/** The tile's ⋮ (and a right-click): pin, colour, tags, ask the agent, download, delete. */
+/** The tile's ⋮ (and a right-click): pin, colour, tags, ask the agent, download, archive, delete. */
 export function TileMenu({ paths, open, onOpenChange, onTags, onDelete, className }: {
   paths: string[]; open: boolean; onOpenChange: (o: boolean) => void; onTags: () => void; onDelete: () => void; className?: string;
 }) {
@@ -106,6 +108,7 @@ function MenuItems({ paths, onTags, onDelete }: { paths: string[]; onTags: () =>
       <DropdownMenuItem onSelect={onTags}><Tag /> Tags…</DropdownMenuItem>
       <OutItems paths={paths} />
       <DropdownMenuSeparator />
+      <DropdownMenuItem onSelect={f.archive}>{f.archived ? <><ArchiveRestore /> Unarchive</> : <><Archive /> Archive</>}</DropdownMenuItem>
       <DropdownMenuItem variant="destructive" onSelect={onDelete}><Trash2 /> Delete</DropdownMenuItem>
     </>
   );
@@ -128,6 +131,9 @@ export function BulkBar({ paths, onClear, onAll, onTags, onDelete }: { paths: st
         <DropdownMenuContent align="end"><Swatches value={f.color} onPick={f.paint} /></DropdownMenuContent>
       </DropdownMenu>
       <Button variant="ghost" size="icon-sm" aria-label="Tags" title="Tags" onClick={onTags}><Tag className="text-dim" /></Button>
+      <Button variant="ghost" size="icon-sm" aria-label={f.archived ? "Unarchive" : "Archive"} title={f.archived ? "Unarchive" : "Archive"} onClick={f.archive}>
+        {f.archived ? <ArchiveRestore className="text-dim" /> : <Archive className="text-dim" />}
+      </Button>
       <Button variant="ghost" size="icon-sm" aria-label="Delete" title="Delete" onClick={onDelete}><Trash2 className="text-down" /></Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="More" title="More"><EllipsisVertical className="text-dim" /></Button></DropdownMenuTrigger>

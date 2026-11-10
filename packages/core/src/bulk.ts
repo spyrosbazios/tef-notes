@@ -8,6 +8,11 @@ type Flagged = { pinned: boolean };
 /** All pinned → unpin them all; otherwise pin the ones that aren't. One state for every note, so a mixed set ends up equal. */
 export const pinPatch = (ns: Flagged[]): { pinned: boolean } => ({ pinned: !ns.every((n) => n.pinned) });
 
+/** All archived → bring them all back; otherwise archive the rest, unpinning them: an archived note is out of the list a pin
+ *  would put it on top of. */
+export const archivePatch = (ns: { archived: boolean }[]): { archived: boolean; pinned?: false } =>
+  ns.every((n) => n.archived) ? { archived: false } : { archived: true, pinned: false };
+
 /** The same colour on every note, its card's tint in the list; null takes the tint off. */
 export const colorPatch = (color: Color | null): { color: Color | null } => ({ color });
 

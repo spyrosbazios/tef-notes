@@ -7,7 +7,7 @@ import type { NoteRec } from "@/services/notes";
 
 const about = (id: string, task: string, note: string): Link => ({ id, from: { type: "task", id: task }, to: { type: "note", id: note }, role: "about" });
 const note = (rec: string, title: string): NoteRec =>
-  ({ rec, path: `notes/${rec}.md`, rev: 1, kind: "note", text: "", updated: "", note: { id: rec, title, created: "", body: "", pinned: false, tags: [] } });
+  ({ rec, path: `notes/${rec}.md`, rev: 1, kind: "note", text: "", updated: "", note: { id: rec, title, created: "", body: "", pinned: false, archived: false, tags: [] } });
 
 const links: Link[] = [
   about("l1", "t1", "n1"), about("l2", "t1", "n2"), about("l3", "t1", "gone"), about("l4", "t2", "n1"),

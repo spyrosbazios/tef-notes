@@ -17,7 +17,7 @@ import { localDay } from "@/core/time";
 const HELP = `tefnotes — the notes on the server
 
   tefnotes server <url>             where the notes are (there is no sign-in: the server must only be reachable over a private network)
-  tefnotes ls [tag]                 notes, pinned first then newest: id · title · [tags] · pinned
+  tefnotes ls [tag]                 notes, pinned first then newest: id · title · [tags] · pinned|archived
   tefnotes tags                     the defined tags: name · colour · description
   tefnotes tag <name> [options]     a tag defined, or its definition changed: --color <colour>  --about <text>
                                    colours: ${COLORS.join(" ")}
@@ -249,7 +249,7 @@ async function main(argv: string[]) {
       const tag = a[0]?.toLowerCase();
       for (const c of await pb.index(s)) {
         if (tag && !c.tags.some((t) => t.toLowerCase() === tag)) continue;
-        console.log([idOf(c.path), c.title, c.tags.length ? `[${c.tags.join(", ")}]` : "", c.pinned && "pinned"].filter(Boolean).join(" · "));
+        console.log([idOf(c.path), c.title, c.tags.length ? `[${c.tags.join(", ")}]` : "", c.archived ? "archived" : c.pinned && "pinned"].filter(Boolean).join(" · "));
       }
       return;
     }

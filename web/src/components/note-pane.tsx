@@ -4,7 +4,7 @@
 // one click each, written as the frontmatter edit the phone makes (withFlags). One top bar holds every tool and option of the
 // note: the format tools, attach, pin and ⋮. A note is pure markdown: tasks are records of their own (task-detail.tsx), and those linked to it show under its title.
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Download, EllipsisVertical, FileCode, FileUp, Paperclip, Link2, Loader2, PenTool, Pin, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { Archive, ArchiveRestore, Check, Download, EllipsisVertical, FileCode, FileUp, Paperclip, Link2, Loader2, PenTool, Pin, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { DrawingDialog } from "@/components/drawing-dialog";
@@ -13,6 +13,7 @@ import { Swatches } from "@/components/note-actions";
 import { MicButton } from "@/components/mic-button";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
+import { archivePatch } from "@/core/bulk";
 import { UNTITLED, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
@@ -180,6 +181,10 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { void sendOut("ask"); }}><Sparkles /> Ask about this note</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { void sendOut("save"); }}><Download /> {out.verb} .md</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => { void flag(archivePatch([note])).then(() => toast(note.archived ? "Brought back from the archive" : "Archived")); }}>
+              {note.archived ? <><ArchiveRestore /> Unarchive</> : <><Archive /> Archive</>}
+            </DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onSelect={() => setConfirm(true)}><Trash2 /> Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -194,6 +199,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
             className="w-full bg-transparent font-extrabold text-3xl tracking-tight outline-none placeholder:text-faint" />
           <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-faint">
+            {note.archived ? <span className="flex items-center gap-1"><Archive className="size-3" /> Archived</span> : null}
             <span className="tabular-nums">{note.created}</span>
             <span className="tabular-nums">edited {ago(ms(n.updated), now)}</span>
             <TagEditor tags={note.tags} onAdd={(t) => void retag([t])} onRemove={(t) => void retag([], [t])} onTag={filterTag} />

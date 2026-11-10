@@ -1,4 +1,4 @@
-// The app's places in the router's terms (router.ts, routes/): Home `/` (its tag filter `?tags=a,b`), the task lists `/inbox`
+// The app's places in the router's terms (router.ts, routes/): Home `/` (its tag filter `?tags=a,b`, its archived notes `?archived=1`), the task lists `/inbox`
 // `/today` `/upcoming` `/logbook` (the task open beside one `?t=<id>`), `/notes` (the notes alone, `?tags=` too), `/settings` (`?section=`), and a note laid over any of
 // them as `?note=<id>` (the id is the filename's, which never changes, so a link survives a retitle). `/note/<id>`, the link the
 // phone and "Copy link" use, is a route that redirects to Home with the note open (routes/note.$id.tsx). `View` is the place
@@ -22,7 +22,8 @@ export const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
 export type TaskView = (typeof TASK_VIEWS)[number];
 
 export type View =
-  | { kind: "home"; tags?: string[] } | { kind: TaskView } | { kind: "notes"; tags?: string[] } | { kind: "settings"; section?: SettingsSection };
+  | { kind: "home"; tags?: string[]; archived?: true } | { kind: TaskView } | { kind: "notes"; tags?: string[]; archived?: true }
+  | { kind: "settings"; section?: SettingsSection };
 
 /** A view that lists notes under a tag filter: Home and the Notes page. */
 export type NotesView = Extract<View, { kind: "home" | "notes" }>;
@@ -34,14 +35,13 @@ export const isTaskView = (v: View): v is { kind: TaskView } => (TASK_VIEWS as r
 /** The list a task is opened in when the view it was found from has none of it: the Logbook once done, else the Inbox. */
 export const homeOfTask = (t: { done?: string }): View => (t.done ? { kind: "logbook" } : { kind: "inbox" });
 
-/** The view at a path (anything else is Home); Home's and Notes' tags and Settings' section from its search. */
-export function viewOf(path: string, search: { tags?: readonly string[]; section?: SettingsSection } = {}): View {
+/** The view at a path (anything else is Home); Home's and Notes' tags and archive, and Settings' section, from its search. */
+export function viewOf(path: string, search: { tags?: readonly string[]; archived?: boolean; section?: SettingsSection } = {}): View {
   if (path === "/settings") return search.section ? { kind: "settings", section: search.section } : { kind: "settings" };
-  const tags = search.tags;
-  if (path === "/notes") return tags?.length ? { kind: "notes", tags: [...tags] } : { kind: "notes" };
   const task = TASK_VIEWS.find((k) => path === `/${k}`);
   if (task) return { kind: task };
-  return tags?.length ? { kind: "home", tags: [...tags] } : { kind: "home" };
+  const tags = search.tags;
+  return { kind: path === "/notes" ? "notes" : "home", ...(tags?.length ? { tags: [...tags] } : {}), ...(search.archived ? { archived: true as const } : {}) };
 }
 
 const TITLES: Record<View["kind"], string> = {
@@ -56,8 +56,8 @@ export type Open = { task?: string; note?: string };
 /** Where a view is, as the router's typed link, with what is open on it. */
 export function linkOf(v: View, { task, note }: Open = {}) {
   switch (v.kind) {
-    case "home": return linkOptions({ to: "/", search: { tags: v.tags, note } });
-    case "notes": return linkOptions({ to: "/notes", search: { tags: v.tags, note } });
+    case "home": return linkOptions({ to: "/", search: { tags: v.tags, archived: v.archived ? "1" : undefined, note } });
+    case "notes": return linkOptions({ to: "/notes", search: { tags: v.tags, archived: v.archived ? "1" : undefined, note } });
     case "settings": return linkOptions({ to: "/settings", search: { section: v.section, note } });
     case "inbox": return linkOptions({ to: "/inbox", search: { t: task, note } });
     case "today": return linkOptions({ to: "/today", search: { t: task, note } });
@@ -82,11 +82,10 @@ export function usePlace(): { view: View; note: string | undefined; task: string
   const path = useLocation({ select: (l) => l.pathname });
   // Each route's own validated search: the loose one (`strict: false`) merges the raw query in, a `tags` still a string
   const search = useSearch({ strict: false });
-  const homeTags = useSearch({ from: "/_app/", shouldThrow: false })?.tags?.join(",");
-  const notesTags = useSearch({ from: "/_app/notes", shouldThrow: false })?.tags?.join(",");
-  const tags = homeTags ?? notesTags;
+  const home = useSearch({ from: "/_app/", shouldThrow: false }), notes = useSearch({ from: "/_app/notes", shouldThrow: false });
+  const tags = (home ?? notes)?.tags?.join(","), archived = (home ?? notes)?.archived === "1";
   const section = useSearch({ from: "/_app/settings", shouldThrow: false })?.section;
-  const view = useMemo(() => viewOf(path, { tags: tags?.split(","), section }), [path, tags, section]);
+  const view = useMemo(() => viewOf(path, { tags: tags?.split(","), archived, section }), [path, tags, archived, section]);
   const note = useSearch({ from: "/_app", shouldThrow: false })?.note;
   return { view, note, task: isTaskView(view) && typeof search.t === "string" ? search.t : undefined };
 }
@@ -116,15 +115,20 @@ export function useNav() {
       else void navigate(linkOf(view));
     },
     goView: (v: View) => navigate(linkOf(v)),
-    /** The notes (the Notes page's when on it, else Home's) under exactly these tags. */
-    setTags: (tags: string[]) => navigate(linkOf({ kind: view.kind === "notes" ? "notes" : "home", tags })),
+    /** The notes (the Notes page's when on it, else Home's) under exactly these tags, the archive kept as it is. */
+    setTags: (tags: string[]) => navigate(linkOf({ ...notesPlace(view), tags })),
     /** What clicking a badge does: the tag added to the notes' filter (the Notes page's when on it, else Home's). */
     filterTag: (tag: string) => {
       const now = isNotesView(view) ? view.tags ?? [] : [];
-      return navigate(linkOf({ kind: view.kind === "notes" ? "notes" : "home", tags: now.some((t) => fold(t) === fold(tag)) ? now : [...now, tag] }));
+      return navigate(linkOf({ ...notesPlace(view), tags: now.some((t) => fold(t) === fold(tag)) ? now : [...now, tag] }));
     },
+    /** The archived notes listed instead of the others (false: back to the others), the tag filter kept. */
+    showArchived: (on: boolean) => navigate(linkOf({ ...notesPlace(view), tags: isNotesView(view) ? view.tags : undefined, archived: on || undefined })),
   };
 }
+
+/** The notes view a filter change stays on: the Notes page's when on it, else Home's, with its archive. */
+const notesPlace = (v: View): NotesView => ({ kind: v.kind === "notes" ? "notes" : "home", ...(isNotesView(v) && v.archived ? { archived: true as const } : {}) });
 
 /** A link's intent, for what is not an `<a>` (a note's tile, which holds buttons of its own): the route and its data fetched
  *  ahead on a hover or a focus after the router's preload delay, at once on a touch, as `Link`'s `preload="intent"` does. */

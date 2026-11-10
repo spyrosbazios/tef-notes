@@ -26,7 +26,7 @@ export function NotesPage() {
   const [searching, setSearching] = useState(false);
   const close = useCallback(() => setSearching(false), []);
   const { view } = usePlace();
-  const scrollId = notesScroll(isNotesView(view) ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec);
+  const scrollId = notesScroll(isNotesView(view) ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec, isNotesView(view) && !!view.archived);
   // A lens is switched on the page, not navigated to: the scroller puts its place back (hooks/scroll.ts)
   const page = useRef<HTMLDivElement>(null);
   useScrollSwitch(page, scrollId);

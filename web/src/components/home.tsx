@@ -78,7 +78,7 @@ export function Home() {
   const panels = panel(useTempoTransition(spring.slide), useTempoTransition(spring.selection), useTempoTransition(transition.fade), useShouldReduceMotion());
   // Home's own scroll is the router's, per tag filter and lens: another one is another list (the lens switched on the page is `useScrollSwitch`'s)
   const { view } = usePlace(), lens = useActiveLens();
-  const scrollId = homeScroll(view.kind === "home" ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec);
+  const scrollId = homeScroll(view.kind === "home" ? view.tags ?? NO_TAGS : NO_TAGS, lens?.rec, view.kind === "home" && !!view.archived);
   // A lens is switched on the page, not navigated to: Home's own scroller puts its place back (hooks/scroll.ts)
   const page = useRef<HTMLDivElement>(null);
   useScrollSwitch(page, scrollId);

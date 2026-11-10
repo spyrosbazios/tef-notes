@@ -10,10 +10,10 @@ export const SCROLL_KEY = "app";
 // An id is read back as an attribute selector (`[data-scroll-restoration-id="…"]`), so a quote or a backslash in a tag would break it
 const of = (...parts: (string | null | undefined)[]) => parts.map((p) => (p ?? "").replace(/["\\]/g, "")).join("|");
 
-/** Home's page, per tag filter and lens. */
-export const homeScroll = (tags: readonly string[], lens?: string | null) => of("home", tags.join(","), lens);
-/** The Notes page, per tag filter and lens. */
-export const notesScroll = (tags: readonly string[], lens?: string | null) => of("notes", tags.join(","), lens);
+/** Home's page, per tag filter, archive and lens. */
+export const homeScroll = (tags: readonly string[], lens?: string | null, archived = false) => of("home", tags.join(","), lens, archived ? "archived" : "");
+/** The Notes page, per tag filter, archive and lens. */
+export const notesScroll = (tags: readonly string[], lens?: string | null, archived = false) => of("notes", tags.join(","), lens, archived ? "archived" : "");
 /** A task list on a screen of its own, per lens. */
 export const listScroll = (kind: string, lens?: string | null) => of("list", kind, lens);
 /** One of Home's task box lists, per lens. */

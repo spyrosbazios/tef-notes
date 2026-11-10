@@ -37,7 +37,7 @@ export const READ_RE = new RegExp(`${NOTE_RE.source}|^agent\\/memory\\.md$`);
 type Seen = { error: string } | { path: string; name: string; rec: string; file: string };
 
 /** The index's view of a note: what indexLine and list_notes read. */
-export type Line = Pick<Meta, "path" | "title" | "tags" | "pinned" | "updated"> & { color?: string };
+export type Line = Pick<Meta, "path" | "title" | "tags" | "pinned" | "updated"> & { archived?: boolean; color?: string };
 
 const DAY = 86_400_000;
 /** How long since a note was last edited, in whole days. */
@@ -46,7 +46,7 @@ export const ago = (updated: number, now = Date.now()) => {
   return d <= 0 ? "today" : `${d}d ago`;
 };
 
-const flagsOf = (n: Line) => (n.pinned ? "pinned" : "");
+const flagsOf = (n: Line) => (n.archived ? "archived" : n.pinned ? "pinned" : "");
 
 /** One note as the prompt lists it: `path · title · [tags] · pinned · Nd ago`, empty parts left out. */
 export const indexLine = (n: Line, now = Date.now()) =>
@@ -54,13 +54,15 @@ export const indexLine = (n: Line, now = Date.now()) =>
 
 const newest = <T extends Line>(xs: T[]) => [...xs].sort((a, b) => b.updated - a.updated);
 
-/** The `<notes>` block: every pinned note, then the newest `n` of the rest, then how many more there are. */
+/** The `<notes>` block: every pinned note, then the newest `n` of the rest, then how many more there are, and how many are
+ *  archived (never listed: the owner put them away; search_notes still finds them). */
 export function noteIndex(list: Line[], now = Date.now(), n = RECENT) {
-  const N = newest(list.filter((x) => x.path.startsWith(NOTES)));
+  const all = list.filter((x) => x.path.startsWith(NOTES)), N = newest(all.filter((x) => !x.archived));
   const top = N.filter((x) => x.pinned), rest = N.filter((x) => !x.pinned);
   const lines = [...top, ...rest.slice(0, n)].map((x) => indexLine(x, now));
-  const more = rest.length - n;
+  const more = rest.length - n, shelved = all.length - N.length;
   if (more > 0) lines.push(`(${more} older note${more === 1 ? "" : "s"} not listed: search_notes or list_notes finds them)`);
+  if (shelved > 0) lines.push(`(${shelved} archived note${shelved === 1 ? "" : "s"} not listed: search_notes or list_notes "archived" finds them)`);
   return lines.join("\n") || "(no notes yet)";
 }
 
@@ -154,13 +156,13 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     }),
 
     list_notes: tool({
-      description: "Notes from the index by a filter, newest edit first, each with a snippet of its start: pinned or recent. By tag: list_tagged.",
+      description: "Notes by a filter, newest edit first, each with a snippet of its start: pinned, recent, or archived (put away by the owner, out of the index). By tag: list_tagged.",
       inputSchema: z.object({
-        filter: z.enum(["pinned", "recent"]),
+        filter: z.enum(["pinned", "recent", "archived"]),
         limit: z.number().int().min(1).max(LIST).optional().describe(`Default 20, at most ${LIST}`),
       }),
       execute: async ({ filter, limit = 20 }) => {
-        const keep = { pinned: (n: Meta) => n.pinned, recent: () => true }[filter];
+        const keep = { pinned: (n: Meta) => n.pinned && !n.archived, recent: (n: Meta) => !n.archived, archived: (n: Meta) => n.archived }[filter];
         const now = Date.now(), { list, left_out } = capList(newest((await notes.list()).filter((n) => n.path.startsWith(NOTES) && keep(n))), limit);
         return {
           notes: list.map((n) => ({ path: n.path, title: n.title, snippet: snippetOf(parseNote(n.path, n.text).body), ...(n.tags.length ? { tags: n.tags } : {}),
@@ -316,10 +318,11 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     }),
 
     set_note_flags: tool({
-      description: "Pin or unpin a note, set its colour, or replace its tags. Only the fields you pass change. The user confirms it.",
+      description: "Pin or unpin a note, archive it (out of the lists, still searchable; archiving unpins it) or bring it back, set its colour, or replace its tags. Only the fields you pass change. The user confirms it.",
       inputSchema: z.object({
         path: z.string().describe("notes/<file>.md"),
         pinned: z.boolean().optional(),
+        archived: z.boolean().optional().describe("Put away: out of the lists and the index, still found by search"),
         color: COLOR.nullable().optional().describe("Its card's tint in the list; null clears it"),
         tags: TAGS.optional().describe("The complete new tag list; [] clears it"),
       }),
@@ -328,7 +331,8 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
         if (bad) return { error: bad };
         const t = tags && await definedTags(notes, tags);
         if (t && "error" in t) return t;
-        return notes.change(path, (file) => withFlags(path, file, { ...flags, ...(t ? { tags: t.tags } : {}) }));
+        const pin = flags.archived ? { pinned: false } : {};       // an archived note is never pinned (core/bulk.ts archivePatch)
+        return notes.change(path, (file) => withFlags(path, file, { ...flags, ...pin, ...(t ? { tags: t.tags } : {}) }));
       },
     }),
 

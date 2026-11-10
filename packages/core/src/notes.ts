@@ -13,7 +13,8 @@ export const UNTITLED = "Untitled";
 export const COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green", "gray"] as const;
 export type Color = (typeof COLORS)[number];
 
-export type Flags = { pinned: boolean; color?: Color; tags: string[] };
+/** `archived`: out of the lists, still found by search, links and the agent's tools. Never pinned as well (archivePatch). */
+export type Flags = { pinned: boolean; archived: boolean; color?: Color; tags: string[] };
 /** A one-tap edit of the flags: only what is passed changes; `null` takes a colour off. */
 export type FlagEdit = Partial<Omit<Flags, "color">> & { color?: Color | null };
 export type Note = { id: string; title: string; created: string; body: string } & Flags;
@@ -40,9 +41,9 @@ export function attachmentOf(p: string): { noteId: string; name: string } | null
 
 // ---- frontmatter
 
-const KEYS = ["title", "created", "pinned", "color", "tags"] as const;
+const KEYS = ["title", "created", "pinned", "archived", "color", "tags"] as const;
 /** The keys a one-tap edit sets (withFlags): where both sides changed one, reconcile lets mine win. */
-const FLAG_KEYS: readonly string[] = ["pinned", "color", "tags"];
+const FLAG_KEYS: readonly string[] = ["pinned", "archived", "color", "tags"];
 
 type Front = { head: number; end: number; body: number; lines: string[]; eol: string };
 
@@ -124,12 +125,13 @@ function titleFromId(id: string) {
 
 export function parseNote(path: string, text: string): Note {
   const id = noteIdOf(path), f = front(text), body = f ? text.slice(f.body) : text;
-  const n: Note = { id, title: "", created: "", pinned: false, tags: [], body };
+  const n: Note = { id, title: "", created: "", pinned: false, archived: false, tags: [], body };
   for (const e of f ? entries(f.lines) : []) {
     const v = e.lines[0].slice(e.lines[0].indexOf(":") + 1).trim();
     if (e.key === "title") n.title = unquote(v);
     else if (e.key === "created") n.created = unquote(v);
     else if (e.key === "pinned") n.pinned = truthy(v);
+    else if (e.key === "archived") n.archived = truthy(v);
     else if (e.key === "color") { const c = unquote(v).toLowerCase() as Color; if (COLORS.includes(c)) n.color = c; }
     else if (e.key === "tags")
       n.tags = v.startsWith("[") && v.endsWith("]") ? flowList(v)
@@ -148,6 +150,7 @@ function lineFor(k: (typeof KEYS)[number], m: Meta): string | null {
     // Always there (root CLAUDE.md): a file with no date of its own, in its frontmatter or its name, gets today's
     case "created": { const c = m.created || localDay(); return `created: ${/^\d{4}-\d{2}-\d{2}/.test(c) ? c : scalar(c)}`; }
     case "pinned": return m.pinned ? "pinned: true" : null;
+    case "archived": return m.archived ? "archived: true" : null;
     case "color": return m.color ? `color: ${m.color}` : null;
     case "tags": return m.tags?.length ? `tags: [${m.tags.map(item).join(", ")}]` : null;
   }
@@ -458,7 +461,7 @@ export function mergeDraft(start: string, draft: string, theirs: string): { text
 }
 
 /** Both sides edited a note: mine with theirs folded in, or null when the edits overlap. The flags
- *  (pinned, color, tags) are one-tap toggles: where both sides' flag lines collide, mine win them
+ *  (pinned, archived, color, tags) are one-tap toggles: where both sides' flag lines collide, mine win them
  *  and the rest still merges. Edits that don't collide keep both sides' flags. */
 export function reconcile(base: string | undefined, mine: string, theirs: string): string | null {
   if (theirs === mine) return mine;

@@ -4,7 +4,7 @@ import type { Meta } from "../src/notes";
 import { fakeEmbed } from "./embed";
 
 const note = (path: string, title: string, body: string): Meta =>
-  ({ rec: path, path, kind: "note", rev: 1, text: `---\ntitle: ${title}\n---\n${body}`, title, tags: [], pinned: false, updated: 0, tainted: false });
+  ({ rec: path, path, kind: "note", rev: 1, text: `---\ntitle: ${title}\n---\n${body}`, title, tags: [], pinned: false, archived: false, updated: 0, tainted: false });
 
 describe("chunks", () => {
   it("one chunk for a short note, the title first", () => {

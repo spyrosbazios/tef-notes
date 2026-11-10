@@ -55,7 +55,7 @@ routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
   try {
     const now = Date.now();
     const rows = arrayOf(new DynamicModel({ path: "", title: "", tags: "", pinned: 0, updated: "" }));
-    e.app.db().newQuery("SELECT path, title, CAST(IFNULL(tags, '[]') AS TEXT) AS tags, pinned + 0 AS pinned, updated FROM notes WHERE path LIKE 'notes/%'").all(rows);
+    e.app.db().newQuery("SELECT path, title, CAST(IFNULL(tags, '[]') AS TEXT) AS tags, pinned + 0 AS pinned, updated FROM notes WHERE path LIKE 'notes/%' AND NOT IFNULL(archived, 0)").all(rows);   // never filed into an archived note
     const index = lib.noteIndex(rows.map((r) => lib.row({ path: r.path, title: r.title, tags: r.tags, pinned: r.pinned, updated: r.updated })));
     const open = arrayOf(new DynamicModel({ id: "", title: "", scheduled: "", due: "", updated: "" }));
     e.app.db().newQuery("SELECT t.id AS id, t.title AS title, IFNULL(t.`when`, '') AS scheduled, IFNULL(t.due, '') AS due, t.updated AS updated FROM tasks t WHERE IFNULL(t.done, '') = '' ORDER BY t.updated DESC LIMIT {:n}").bind({ n: lib.TASKS }).all(open);
