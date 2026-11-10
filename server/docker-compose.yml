@@ -32,7 +32,6 @@ services:
       TEF_NOTES_MODEL: ${TEF_NOTES_MODEL:-}           # empty: the provider's default model
       TEF_NOTES_LLM_URL: ${TEF_NOTES_LLM_URL:-}       # empty: the provider's own endpoint
       TEF_NOTES_OLLAMA_URL: ${TEF_NOTES_OLLAMA_URL:-} # Ollama only, e.g. http://host.docker.internal:11434
-      TEF_NOTES_MCP: ${TEF_NOTES_MCP:-0}             # 1: serve the note and task tools to other agent harnesses at /agent/mcp
       TEF_NOTES_VAPID_SUBJECT: ${TEF_NOTES_VAPID_SUBJECT:-}   # mailto: or https URL the push services may reach you at; empty: no push reminders
       TEF_NOTES_STT: ${TEF_NOTES_STT-http://stt:8099}   # voice input: the stt service below; set empty (TEF_NOTES_STT=) to turn it off
     extra_hosts: ["host.docker.internal:host-gateway"]   # an Ollama on this host

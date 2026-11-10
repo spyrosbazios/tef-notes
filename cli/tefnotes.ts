@@ -7,11 +7,11 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { exportPlan, fileNameOf } from "@/core/handoff";
 import { importNotes } from "@/core/import";
-import { appendToNote, isNotePath, MEMORY, newNotePath, parseNote, reconcile, serializeNote } from "@/core/notes";
+import { appendToNote, COLORS, isNotePath, MEMORY, newNotePath, parseNote, reconcile, serializeNote, type Color } from "@/core/notes";
 import * as pb from "@/core/pocketbase";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
-import { complete, nextOrder, newTask, views, type Task, type TaskPatch } from "@/core/todo";
-import { describeAllTags, describeError, listTags, updateTag } from "@/core/tags";
+import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
+import { createTag, describeAllTags, describeError, listTags, updateTag } from "@/core/tags";
 import { localDay } from "@/core/time";
 
 const HELP = `tefnotes — the notes on the server
@@ -19,11 +19,15 @@ const HELP = `tefnotes — the notes on the server
   tefnotes server <url>             where the notes are (there is no sign-in: the server must only be reachable over a private network)
   tefnotes ls [tag]                 notes, pinned first then newest: id · title · [tags] · pinned
   tefnotes tags                     the defined tags: name · colour · description
+  tefnotes tag <name> [options]     a tag defined, or its definition changed: --color <colour>  --about <text>
+                                   colours: ${COLORS.join(" ")}
   tefnotes tags --describe          descriptions the server's model writes from each tag's notes, printed, not saved
       --write                      ... and saved as the tags' descriptions (replaces the ones there)
   tefnotes cat <id>                 a note's whole file; its rev goes to stderr
   tefnotes links <id>               what is linked to or from a note: ← task <task-id> · title · role (a task about it), → note <id> · role
   tefnotes grep <words…>            notes holding every word
+  tefnotes search <words…>          notes by their words and meaning, best first (the agent's search):
+                                   id · title · words|meaning|both · snippet  (needs the server's agent)
   tefnotes new <title> [< body]     a new note, body from stdin; prints its id
   tefnotes append <id> [< text]     text added at the end (one line becomes a bullet)
   tefnotes put <id> <rev> [< file]  the whole file replaced, if still at <rev> (from cat)
@@ -41,15 +45,24 @@ const HELP = `tefnotes — the notes on the server
                                    task id · title · dates · checklist ticked/all · tags · about <note ids>
   tefnotes add <title> [options]    a task, to the Inbox; prints its id
       --when <day>  --evening   --due <day>  --every <1d|2w|1m|1y|+3d|mon,thu>  --remind <HH:MM>
-      --note <id> (repeat for several: the notes it is about)
+      --note <id> (repeat for several: the notes it is about)   --tag <name> (repeat)   --notes <text>
                                    <day>: YYYY-MM-DD, today or tomorrow
+  tefnotes set <task-id> [options]  a task changed: --title <text>, and add's options but --note; "none" clears
+                                   a value (--when none), --tag replaces the tags (--tag none: no tags)
+  tefnotes drop <task-id>           the task deleted (its links go with it)
   tefnotes link <task-id> <id…>     the task made about these notes (already linked ones stay as they are)
   tefnotes unlink <task-id> <id…>   the task is no longer about these notes
   tefnotes done <task-id>           the task ticked (a repeating one gets its next round); an id's first letters do
 
-<id>: 20261005-lidl, notes/20261005-lidl.md, or "memory".`;
+<id>: 20261005-lidl, notes/20261005-lidl.md, or "memory".
+
+TEF_NOTES_AGENT=1: every note and task written is marked as an outside agent's (\`tainted\`): the in-app assistant
+treats it like web text and asks before writing once it has read it. Coding agents run with it (skills/tefnotes).`;
 
 const DIR = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "tefnotes"), SERVER = join(DIR, "server.json");
+
+/** What every note and task write carries (pocketbase.ts `Mark`). */
+const MARK: pb.Mark = process.env.TEF_NOTES_AGENT === "1" ? { tainted: true } : {};
 
 const die = (msg: string): never => { console.error(`tefnotes: ${msg}`); process.exit(1); };
 
@@ -74,7 +87,7 @@ async function need(s: pb.Server, id: string): Promise<pb.Remote> {
 async function change(s: pb.Server, id: string, next: (text: string) => string): Promise<pb.Remote> {
   for (let tries = 0; tries < 3; tries++) {
     const cur = await need(s, id);
-    try { return (await pb.update(s, cur, next(cur.text))) ?? die(`${cur.path} was deleted meanwhile`); } catch (e) {
+    try { return (await pb.update(s, cur, next(cur.text), MARK)) ?? die(`${cur.path} was deleted meanwhile`); } catch (e) {
       if (!(e instanceof pb.Conflict)) throw e;
     }
   }
@@ -183,6 +196,22 @@ function options(a: string[], flags: string[]): { words: string[]; opt: Map<stri
   return { words, opt, all };
 }
 
+/** A colour by name; "none" takes it off. */
+const colorOf = (v: string): Color | undefined => (v === "none" ? undefined : (COLORS as readonly string[]).includes(v) ? (v as Color) : die(`no colour ${v}: ${COLORS.join(", ")}`));
+
+/** A task's fields from `add`'s and `set`'s options; "none" clears one. */
+function taskPatch(opt: Map<string, string>, all: Map<string, string[]>): TaskPatch {
+  const val = (k: string) => (opt.get(k) === "none" ? "" : opt.get(k)!);
+  const dayOf = (k: string) => (opt.get(k) === "none" ? "" : day(opt.get(k)!));
+  const tags = all.get("tag")?.filter((t) => t !== "none");
+  return {
+    ...(opt.has("when") && { when: dayOf("when") }), ...(opt.has("due") && { due: dayOf("due") }),
+    ...(opt.has("every") && { every: val("every") }), ...(opt.has("remind") && { remind: val("remind") }),
+    ...(opt.has("evening") && { evening: true }), ...(opt.has("no-evening") && { evening: false }),
+    ...(opt.has("notes") && { notes: val("notes") }), ...(tags && { tags }),
+  };
+}
+
 const day = (v: string) => (v === "today" ? localDay() : v === "tomorrow" ? localDay(Date.now() + 86_400_000) : v);
 
 async function edit(s: pb.Server, id: string) {
@@ -193,14 +222,14 @@ async function edit(s: pb.Server, id: string) {
   const mine = readFileSync(file, "utf8");
   if (mine === was.text) return console.error("unchanged");
   try {
-    const r = (await pb.update(s, was, mine)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
+    const r = (await pb.update(s, was, mine, MARK)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
     return console.error(`saved, rev ${r.rev}`);
   } catch (e) {
     if (!(e instanceof pb.Conflict)) throw e;
   }
   const theirs = await need(s, id), merged = reconcile(was.text, mine, theirs.text);
   if (merged == null) die(`changed on another device meanwhile, and the edits overlap; yours is in ${file}`);
-  const r = (await pb.update(s, theirs, merged!)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
+  const r = (await pb.update(s, theirs, merged!, MARK)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
   console.error(`merged with an edit made meanwhile, saved, rev ${r.rev}`);
 }
 
@@ -258,7 +287,7 @@ async function main(argv: string[]) {
       for (;;) {
         const path = newNotePath(title, Date.now(), taken);
         try {
-          await pb.create(s, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""));
+          await pb.create(s, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""), MARK);
           return console.log(idOf(path));
         } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
@@ -276,7 +305,7 @@ async function main(argv: string[]) {
       if (!id || !rev || !/^\d+$/.test(rev)) die("tefnotes put <id> <rev> [< file]   (rev: from tefnotes cat)");
       const text = await stdin(), cur = await need(s, id);
       try {
-        const r = (await pb.update(s, { ...cur, rev: Number(rev) }, text)) ?? die(`${cur.path} was deleted meanwhile`);
+        const r = (await pb.update(s, { ...cur, rev: Number(rev) }, text, MARK)) ?? die(`${cur.path} was deleted meanwhile`);
         return console.error(`saved, rev ${r.rev}`);
       } catch (e) {
         if (e instanceof pb.Conflict) die(`${cur.path} is at rev ${cur.rev} now, not ${rev}: cat it again and redo the change`);
@@ -306,18 +335,14 @@ async function main(argv: string[]) {
       return showTasks(s, view);
     }
     case "add": {
-      const { words, opt, all } = options(a, ["evening"]), title = words.join(" ").trim() || die("tefnotes add <title> [--when <day> --due <day> --every … --remind HH:MM --evening --note <id>…]");
-      const fields: TaskPatch & { title: string } = {
-        title, ...(opt.has("when") && { when: day(opt.get("when")!) }), ...(opt.has("due") && { due: day(opt.get("due")!) }),
-        ...(opt.has("every") && { every: opt.get("every")! }), ...(opt.has("remind") && { remind: opt.get("remind")! }),
-        ...(opt.has("evening") && { evening: true }),
-      };
+      const { words, opt, all } = options(a, ["evening"]), title = words.join(" ").trim() || die("tefnotes add <title> [--when <day> --due <day> --every … --remind HH:MM --evening --note <id>… --tag <name>… --notes <text>]");
+      const fields: TaskPatch & { title: string } = { ...taskPatch(opt, all), title };
       const notes = await Promise.all([...new Set(all.get("note") ?? [])].map(async (id) => (await need(s, id)).rec));   // every note must exist before the task is made
       if (fields.evening && !fields.when) die("--evening needs --when");
       fields.order = nextOrder(await pb.tasks.list(s));
       for (let tries = 0; tries < 3; tries++) {
         let id: string;
-        try { id = (await pb.tasks.create(s, newTask(pb.recordId(), fields))).id; } catch (e) {
+        try { id = (await pb.tasks.create(s, newTask(pb.recordId(), fields), MARK)).id; } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
           continue;
         }
@@ -334,9 +359,9 @@ async function main(argv: string[]) {
         const { rev, ...was } = cur, { task, next } = complete(was, localDay(), pb.recordId);
         if (task === was) return console.error("already done");
         try {
-          const r = (await pb.tasks.update(s, cur.id, rev, task)) ?? die(`task ${ref} was deleted meanwhile`);
+          const r = (await pb.tasks.update(s, cur.id, rev, task, MARK)) ?? die(`task ${ref} was deleted meanwhile`);
           if (next) {
-            const made = await pb.tasks.create(s, next);
+            const made = await pb.tasks.create(s, next, MARK);
             for (const l of linksForNextRound(await pb.links.from(s, { type: "task", id: cur.id }), cur.id, made.id, pb.recordId)) await pb.links.add(s, l);
             console.error(`next round ${made.id}`);
           }
@@ -346,6 +371,50 @@ async function main(argv: string[]) {
         }
       }
       return die("the task keeps changing under this edit; try again");
+    }
+    case "set": {
+      const { words, opt, all } = options(a, ["evening", "no-evening"]);
+      const ref = words[0] ?? die("tefnotes set <task-id> [--title … --when <day> --due <day> --every … --remind HH:MM --evening|--no-evening --tag <name>… --notes <text>]");
+      if (all.has("note")) die("a task's notes are links: tefnotes link / unlink");
+      const patch: TaskPatch = { ...taskPatch(opt, all), ...(opt.has("title") && { title: opt.get("title")!.trim() || die("--title can't be empty") }) };
+      if (!Object.keys(patch).length) die("nothing to change: give an option");
+      for (let tries = 0; tries < 3; tries++) {
+        const cur = (await pb.tasks.get(s, (await taskBy(s, ref)).id)) ?? die(`task ${ref} was deleted meanwhile`);
+        const { rev, ...was } = cur;
+        let next: Task;
+        try { next = patchTask(was, patch); } catch (e) { return die((e as Error).message); }
+        try {
+          const r = (await pb.tasks.update(s, cur.id, rev, next, MARK)) ?? die(`task ${ref} was deleted meanwhile`);
+          return console.error(`saved, rev ${r.rev}`);
+        } catch (e) {
+          if (!(e instanceof pb.Conflict)) throw e;
+        }
+      }
+      return die("the task keeps changing under this edit; try again");
+    }
+    case "drop": {
+      const t = await taskBy(s, a[0] ?? die("tefnotes drop <task-id>")), cur = (await pb.tasks.get(s, t.id)) ?? die(`task ${a[0]} was deleted meanwhile`);
+      try { await pb.tasks.remove(s, cur.id, cur.rev); } catch (e) {
+        if (e instanceof pb.Conflict) die(`task ${cur.id} changed just now: look at it again (tefnotes tasks) before deleting`);
+        throw e;
+      }
+      return console.error(`deleted ${cur.id} · ${cur.title}`);
+    }
+    case "search": {
+      const q = a.join(" ").trim() || die("tefnotes search <words…>");
+      for (const h of await pb.searchByMeaning(s, q, 15)) console.log([idOf(h.path), h.title, h.match, h.snippet.replace(/\s+/g, " ")].filter(Boolean).join(" · "));
+      return;
+    }
+    case "tag": {
+      const { words, opt } = options(a, []), name = words.join(" ").trim() || die(`tefnotes tag <name> [--color <${COLORS.join("|")}>] [--about <text>]`);
+      const color = opt.has("color") ? colorOf(opt.get("color")!) : undefined;
+      const had = (await listTags(s)).find((d) => d.name.toLowerCase() === name.toLowerCase());
+      if (had) {
+        await updateTag(s, had.rec, { name: had.name, color: opt.has("color") ? color : had.color, description: opt.get("about") ?? had.description });
+        return console.error(`changed ${had.name}`);
+      }
+      await createTag(s, { name, color, description: opt.get("about") ?? "" });
+      return console.error(`defined ${name}`);
     }
     case "link": case "unlink": {
       const [ref, ...ids] = a;

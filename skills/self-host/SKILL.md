@@ -57,7 +57,6 @@ directory and `cp .env.example .env`. Every variable has a default; edit `.env` 
 | `TEF_NOTES_URL` | The public origin devices use, i.e. the proxy's address (step 5). Not the loopback one |
 | `TEF_NOTES_VERSION` | The version of the images/builds; see its comment in `.env.example` |
 | `TEF_NOTES_KEY_PUSH`, `TEF_NOTES_VAPID_SUBJECT` | Task reminders as push notifications on the phone: the key directory (default `./keys/push`) and a `mailto:` contact. Empty subject = off. Set `TZ` too. Steps: `server/README.md#push-reminders` |
-| `TEF_NOTES_MCP` | `1` serves the note and task tools at `/agent/mcp` for another agent harness (default `0`) |
 | `TEF_NOTES_STT` | Voice input: where the agent reaches the speech-to-text container (default `http://stt:8099`, on). Set it empty, `TEF_NOTES_STT=`, to turn voice input off (mic hidden, nothing downloaded). Depth: `server/README.md#voice-input` |
 | `TEF_NOTES_CRX_KEY` | Extension signing key path, inside `server/` (step 7). Default `./no-crx-key` = no extension |
 

@@ -9,6 +9,7 @@
 // below; their shape: core/record-links.ts).
 import type { AgentModels } from "./agent";
 import { saveBody, suggestBody, type ClipPage, type ClipResult, type Suggestions, type Target } from "./clip";
+import { SEARCH_PATH, searchHitsOf, type SearchHit } from "./find";
 import { getJson, HttpError } from "./http";
 import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
 import { noteKindOf, parseNote, type NoteKind } from "./notes";
@@ -127,13 +128,17 @@ export function noteColumns(path: string, text: string) {
     color: n.color ?? "", tags: n.tags };
 }
 
+/** A write's marks. `tainted`: written by an outside agent, so the in-app assistant treats it as web text (it asks
+ *  before writing once it has read it). Set in the same write, never cleared. */
+export type Mark = { tainted?: true };
+
 /** A new note (kind `note`) at rev 1. Conflict: the path is taken. */
-export const create = async (s: Server, path: string, text: string): Promise<Remote> =>
-  remote(await call(s, "collections/notes/records", json("POST", noteColumns(path, text))));
+export const create = async (s: Server, path: string, text: string, mark: Mark = {}): Promise<Remote> =>
+  remote(await call(s, "collections/notes/records", json("POST", { ...noteColumns(path, text), ...mark })));
 
 /** `rev`: the version this edit was based on. Conflict: it has moved on since. null: the record is gone. */
-export async function update(s: Server, e: Entry, text: string): Promise<Remote | null> {
-  try { return remote(await call(s, `collections/notes/records/${e.rec}`, json("PATCH", { ...noteColumns(e.path, text), rev: e.rev }))); } catch (err) {
+export async function update(s: Server, e: Entry, text: string, mark: Mark = {}): Promise<Remote | null> {
+  try { return remote(await call(s, `collections/notes/records/${e.rec}`, json("PATCH", { ...noteColumns(e.path, text), rev: e.rev, ...mark }))); } catch (err) {
     if (err instanceof HttpError && err.status === 404) return null;
     throw err;
   }
@@ -189,10 +194,10 @@ function revCollection<T extends { id: string }>(name: string, of: (r: any) => T
       return out;
     },
     /** A new record under the client's own id, at rev 1. Conflict: a record has that id (this create landed before). */
-    create: async (s: Server, r: T): Promise<Versioned<T>> => rec(await call(s, records, json("POST", r))),
+    create: async (s: Server, r: T, mark: Mark = {}): Promise<Versioned<T>> => rec(await call(s, records, json("POST", { ...r, ...mark }))),
     /** Some fields changed, from the version `rev`. Conflict: it has moved on since. null: the record is gone. */
-    async update(s: Server, id: string, rev: number, fields: Partial<Omit<T, "id">>): Promise<Versioned<T> | null> {
-      try { return rec(await call(s, `${records}/${id}`, json("PATCH", { ...fields, id: undefined, rev }))); } catch (e) { if (gone(e)) return null; throw e; }
+    async update(s: Server, id: string, rev: number, fields: Partial<Omit<T, "id">>, mark: Mark = {}): Promise<Versioned<T> | null> {
+      try { return rec(await call(s, `${records}/${id}`, json("PATCH", { ...fields, id: undefined, rev, ...mark }))); } catch (e) { if (gone(e)) return null; throw e; }
     },
     /** Gone, unless it moved on since `rev` (Conflict). Already gone is done. */
     async remove(s: Server, id: string, rev: number): Promise<void> {
@@ -403,6 +408,10 @@ export async function clipSave(s: Server, page: ClipPage, line: string | undefin
 // server writes the messages and the title back.
 
 export const agentUrl = (s: Server, p: string) => `${s.url}/agent/${p}`;
+
+/** Notes by their words and meaning (`find.ts` `SEARCH_PATH`): the agent's own search, best first. */
+export const searchByMeaning = async (s: Server, q: string, limit = 10): Promise<SearchHit[]> =>
+  searchHitsOf(await getJson(agentUrl(s, `${SEARCH_PATH}?q=${encodeURIComponent(q)}&limit=${limit}`), {}, 2));
 /** A note's PDF's first page as a JPEG at one of a tile's sizes, rendered by the agent: a tile's picture. */
 export const pdfThumbUrl = (s: Server, note: string, name: string, size: ThumbSize) =>
   agentUrl(s, `pdf-thumb?note=${encodeURIComponent(note)}&name=${encodeURIComponent(name)}&size=${size}`);

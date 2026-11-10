@@ -80,7 +80,6 @@ result.
 | `TEF_NOTES_LLM_URL` | the provider's | Its API root, e.g. another Qwen region. |
 | `TEF_NOTES_OLLAMA_URL` | | Ollama only: where it serves (`http://host.docker.internal:11434` for one on the Docker host). |
 | `TEF_NOTES_STT` | `http://stt:8099` | Where the agent reaches the speech-to-text service for voice input. Set it empty (`TEF_NOTES_STT=`) to turn voice input off: the apps hide their mic and the routes answer 404. |
-| `TEF_NOTES_MCP` | `0` | `1` serves the note and task tools over MCP at `/agent/mcp` ([agent/README.md](agent/README.md#mcp-the-tools-for-another-agent-harness)). |
 
 Deployment-specific additions (labels for a dashboard, extra networks, resource limits) go in
 `docker-compose.override.yml`, which Compose merges over the base file on its own and git ignores. Copy

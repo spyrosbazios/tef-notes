@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-09 -->
+<!-- reviewed: 2026-11-10 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -182,9 +182,6 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   `go_view`) that the client does itself: no server `execute`, no confirm card, answered through `addToolOutput`.
 - A chat is a record in `chats`: a client creates it empty, and the agent writes `messages`, `title` and `model` as the
   reply streams and when it ends.
-- MCP (`src/mcp.ts`, off unless `TEF_NOTES_MCP=1`): `/agent/mcp` serves the note and task tools to another agent harness,
-  stateless over Streamable HTTP. Same tools and `rev` writes; no web, memory, cards or UI tools; no confirm cards (the
-  harness's approval stands in); every write marked `tainted`, since what the harness had in view is unknown.
 - Providers: one model provider per server, `TEF_NOTES_PROVIDER` (DeepSeek by default; `server/agent/src/models.ts`, with
   `server/pb_hooks/lib/llm.js` its plain-HTTP copy for the hooks); `exa` powers web search. Without the provider's key a chat is refused; without
   `exa` the web tools are left out of the prompt.
@@ -213,7 +210,7 @@ JS VM: a handler sees none of its file's top-level scope, so shared code is `req
 | `POST /api/tefnotes/tags/guess` | `autotag.pb.js` | JEV's tags for a task being typed (`{title, notes}` → `{tags}`); writes nothing |
 | `POST /api/tefnotes/tags/describe` | `tags.pb.js` | The model drafts a tag's description; returned, never saved (the hourly job below saves its own) |
 | `GET /api/tefnotes/link-preview?url=` | `link-preview.pb.js` | Page title, description and picture for link cards; cached in `link_previews` |
-| `POST /agent/chat`, `GET /agent/models`, `/agent/mcp` | `server/agent/` | The chat agent and the optional MCP endpoint (a separate process) |
+| `POST /agent/chat`, `GET /agent/models`, `GET /agent/search` | `server/agent/` | The chat agent and its search by meaning (a separate process) |
 
 **Auto-tagger** (`autotag.pb.js`, `lib/autotag.js`). A cron that runs every minute asks JEV about notes not yet
 evaluated at their current `rev` and tag definitions, looking at up to 3 of a note's photos (`lib/images.js`). Every tag it

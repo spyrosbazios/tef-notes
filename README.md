@@ -101,7 +101,7 @@ need a push key and your `TZ`: [Push reminders](server/README.md#push-reminders)
 | **Phone** | Open your server’s HTTPS address in Chrome on Android and choose **Install app**. It works offline, is in the Share sheet of other apps and sends task reminders as notifications. [Web guide](web/README.md#offline) |
 | **Chrome clipper** | Build and sign it with the server, then install from its private HTTPS origin. [Clipper guide](extension/README.md) |
 | **CLI** | Run `tefnotes` with Bun to read, edit and export notes and tasks. [CLI guide](cli/README.md) |
-| **MCP** | Enable the server endpoint to connect another agent harness. [MCP guide](server/agent/README.md#mcp-the-tools-for-another-agent-harness) |
+| **Coding agents** | Claude Code, Codex and others drive the CLI through the `tefnotes` skill. [Skill](skills/tefnotes/SKILL.md) |
 
 The Android app in [`mobile/`](mobile/README.md) is the earlier phone client: it stays in the repository for 0.3.0 and gets no new features. Use the installed web app.
 
@@ -128,7 +128,7 @@ it. See the [backup guide](server/README.md#backups).
 | [Server setup](server/README.md) | Installation, private proxy, configuration, voice input, upgrades and backups |
 | [Security](SECURITY.md) | Network access, AI data handling and vulnerability reports |
 | [AI providers](docs/ai-providers.md) | Optional models and keys, auto-tagging and web search |
-| [Chat agent and MCP](server/agent/README.md) | Assistant context, approval cards, widgets and external harnesses |
+| [Chat agent](server/agent/README.md) | Assistant context, approval cards, widgets and external harnesses |
 | [Architecture](ARCHITECTURE.md) | Repository layout, note format, links, sync and the write contract |
 | [Contributing](CONTRIBUTING.md) | Development setup, module checks and contribution rules |
 

@@ -1,14 +1,13 @@
 # Security
 
-<!-- reviewed: 2026-11-05 -->
+<!-- reviewed: 2026-11-10 -->
 
 ## The model: no sign-in, a private network
 
 TEF Notes has **no authentication**. The migration `server/pb_migrations/1792400000_open.js` opens every collection
 (notes, attachments, tasks, chats and the rest) to unauthenticated requests, and file URLs are public so a
 photo needs no token. Anyone who can reach the server's port can read, write and delete everything, and the chat agent
-(which has tools over your notes) is reachable the same way, as is its optional MCP endpoint (`/agent/mcp`, off
-unless `TEF_NOTES_MCP=1`), which writes without confirm cards and leaves approval to the connected harness. This is deliberate: the network is the only gate. A login
+(which has tools over your notes) is reachable the same way. This is deliberate: the network is the only gate. A login
 on every device would add friction without keeping out anyone the network does not already.
 
 ## What "private network" means in practice
@@ -43,5 +42,5 @@ vulnerability** (a security advisory). Please do not open a public issue for a v
 for reports.
 
 In scope: bypasses of the loopback-only binding or the link-preview address check, ways a web page can make the chat agent
-write without confirmation, ways an MCP write escapes the `tainted` mark, key disclosure, and flaws in the `rev` write contract that lose data. Out of scope: the
+write without confirmation, ways a CLI write made with `TEF_NOTES_AGENT=1` escapes the `tainted` mark, key disclosure, and flaws in the `rev` write contract that lose data. Out of scope: the
 absence of sign-in, which is the documented model.

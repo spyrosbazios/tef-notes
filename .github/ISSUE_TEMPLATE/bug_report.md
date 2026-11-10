@@ -8,7 +8,7 @@ labels: bug
 <!-- Do not paste note contents, tasks, chat transcripts, provider keys or your server's address. Describe, or use a throwaway note. -->
 
 **Which client**
-<!-- Android app, web app, CLI, browser extension, or the chat agent (including MCP) -->
+<!-- Android app, web app, CLI, browser extension, or the chat agent -->
 
 **Server version**
 <!-- The git tag or commit you deployed: `git describe --tags` in your checkout -->

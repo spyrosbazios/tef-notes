@@ -88,7 +88,7 @@ export const readWeb = (notes: Notes, todo: Todo) => async (messages: ModelMessa
   fromWeb(messages, new Set([...(await notes.tainted()), ...(await todo.tainted())]));
 
 /** The tools for one request: `notes` is its view of the server. `fromPage`: whether a write is marked `tainted`
- *  (web text in view): for a chat, whether it has read the web; the MCP endpoint passes always (mcp.ts). */
+ *  (web text in view): for a chat, whether it has read the web. */
 export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo)) {
 
   return {

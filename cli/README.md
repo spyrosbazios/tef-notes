@@ -1,6 +1,6 @@
 # TEF Notes CLI
 
-<!-- reviewed: 2026-11-06 -->
+<!-- reviewed: 2026-11-10 -->
 
 TEF Notes from a terminal: notes and tasks, for you and for coding agents. It is the same client the phone
 uses (`packages/core/src/pocketbase.ts`), so every write is a compare-and-swap on the record's `rev`: nothing here
@@ -43,10 +43,12 @@ or use a shell alias, `alias tefnotes='bun /path/to/cli/tefnotes.ts'`. The packa
 | `server <url>` | Where the notes are |
 | `ls [tag]` | Notes, pinned first then newest: id, title, tags, pinned |
 | `tags` | The defined tags: name, colour, description |
+| `tag <name> [--color <c>] [--about <text>]` | Defines a tag, or changes its definition |
 | `tags --describe [--write]` | Descriptions the server writes from each tag's notes; printed, or with `--write` saved over the existing ones |
 | `cat <id>` | A note's whole file; its `rev` goes to stderr |
 | `links <id>` | What is linked to a note and from it: `← task <task-id> · title · about` for a task about it, `→ <type> <id> · role` for what it points at |
 | `grep <words…>` | Notes holding every word |
+| `search <words…>` | Notes by their words and meaning, best first: id, title, `words`/`meaning`/`both`, snippet. The agent\'s own search (`GET /agent/search`) |
 | `new <title> [< body]` | A new note, body from stdin; prints its id |
 | `append <id> [< text]` | Adds text at the end (one line becomes a bullet) |
 | `put <id> <rev> [< file]` | Replaces the whole file, if the note is still at `<rev>` |
@@ -59,16 +61,24 @@ or use a shell alias, `alias tefnotes='bun /path/to/cli/tefnotes.ts'`. The packa
 | `tasks [view]` | `inbox` (default), `today`, `upcoming`, or `logbook`; each task line ends `about <note ids>` when it is linked to notes |
 | `add <title> [options]` | A task, to the Inbox; prints its id |
 | `done <task-id>` | Ticks a task (a repeating one gets its next round, linked to the same notes); the first letters of an id do |
+| `set <task-id> [options]` | Changes a task: `--title` and `add`\'s options but `--note`; `none` clears a value, `--tag` replaces the tags, `--no-evening` |
+| `drop <task-id>` | Deletes a task, if nobody changed it meanwhile |
 | `link <task-id> <id…>` | Makes a task about these notes |
 | `unlink <task-id> <id…>` | The task is no longer about them |
 
 `add` takes `--when <day>`, `--evening`, `--due <day>`, `--every <1d|2w|1m|1y|+3d|mon,thu>`,
-`--remind <HH:MM>` and `--note <id>`, which can be repeated: the task is about every note given
+`--remind <HH:MM>`, `--notes <text>`, `--tag <name>` and `--note <id>`, which can be repeated: the task is about every note given
 (a link per note, see Links in [`../ARCHITECTURE.md`](../ARCHITECTURE.md)); a `<day>` is `YYYY-MM-DD`,
 `today` or `tomorrow`.
 
 Links carry no `rev` (making or removing one changes neither end), so `add --note`, `link` and `unlink` need none, and
 each is safe to repeat: a link already there stays, and one already gone is done.
+
+## Coding agents
+
+Agents drive the CLI through the [`tefnotes` skill](../skills/tefnotes/SKILL.md). They run it with `TEF_NOTES_AGENT=1`:
+every note and task they write is then marked `tainted`, so the in-app assistant treats it like web text and asks
+before writing once it has read it. Links and tag definitions carry no mark.
 
 ## Concurrency: the rev rules
 

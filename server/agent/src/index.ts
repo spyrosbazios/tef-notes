@@ -3,7 +3,6 @@
 // a tunnel such as `tailscale serve`); no sign-in, like PocketBase: that network is the gate, so it listens on loopback only on the host.
 import { chat } from "./agent";
 import { find } from "./find";
-import { mcp } from "./mcp";
 import { catalog } from "./models";
 import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
 import { mapRoute, placeRoute, suggestRoute } from "./places";
@@ -11,13 +10,12 @@ import { Notes } from "./notes";
 import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
 import { startReminders } from "./reminders";
 import { reader } from "./reader";
+import { search } from "./search";
 import { semantic } from "./semantic";
 import { transcribe, warmSpeech } from "./transcribe";
 
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
 const port = Number(process.env.PORT ?? 8098);
-/** The MCP endpoint (mcp.ts): off unless asked for. */
-const withMcp = process.env.TEF_NOTES_MCP === "1";
 
 Bun.serve({
   port,
@@ -26,6 +24,7 @@ Bun.serve({
   routes: {
     "/agent/chat": { POST: (req) => chat(req, server) },
     "/agent/find": { POST: (req) => find(req, server) },
+    "/agent/search": { GET: (req) => search(req, server) },
     "/agent/reader": { GET: (req) => reader(req, server) },
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
@@ -37,7 +36,6 @@ Bun.serve({
     "/agent/transcribe": { POST: (req) => transcribe(req) },
     "/agent/transcribe/warm": { POST: (req) => warmSpeech(req) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
-    "/agent/mcp": (req) => (withMcp ? mcp(req, server) : new Response("Not found", { status: 404 })),
   },
   fetch: () => new Response("Not found", { status: 404 }),
   error: (e) => {
@@ -56,4 +54,4 @@ setInterval(warm, WARM);
 
 startReminders(server);
 
-console.error(`agent: listening on ${port}, notes at ${server.url}${withMcp ? ", MCP at /agent/mcp" : ""}`);
+console.error(`agent: listening on ${port}, notes at ${server.url}`);

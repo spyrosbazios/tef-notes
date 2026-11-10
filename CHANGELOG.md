@@ -5,6 +5,16 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- CLI: `search` (words and meaning, over the agent's new `GET /agent/search`), `set` and `drop` for tasks, `tag` to
+  define a tag, and `--tag` / `--notes` on `add`. With `TEF_NOTES_AGENT=1` every write is marked `tainted`.
+- `skills/tefnotes`: a skill that drives the CLI, for Claude Code, Codex and other coding agents.
+
+### Removed
+
+- The MCP endpoint (`/agent/mcp`, `TEF_NOTES_MCP`). Coding agents use the CLI through the `tefnotes` skill instead.
+
 ## 0.8.0 - 2026-11-09
 
 ### Added

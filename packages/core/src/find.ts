@@ -26,3 +26,25 @@ export function foundOf(x: unknown): Found {
   const tasks = once(list(o.tasks).map((h) => ({ key: str(h.id), why: str(h.why) }))).slice(0, FOUND_MAX);
   return { notes: notes.map((h) => ({ path: h.key, why: h.why })), tasks: tasks.map((h) => ({ id: h.key, why: h.why })) };
 }
+
+// Search by words and meaning, no model loop: `GET /agent/search?q=&limit=` (server/agent/src/search.ts), the agent's
+// own `search_notes` (words fused with the local embedding model's nearest notes). The CLI's `search`.
+
+/** One note it found; `match`: by its words, its meaning, or both. A meaning-only match may be loose. */
+export type SearchHit = { path: string; title: string; snippet: string; match: "words" | "meaning" | "both" };
+
+export const SEARCH_PATH = "search";
+export const SEARCH_MAX = 30;
+
+const MATCHES = new Set(["words", "meaning", "both"]);
+
+/** The server's answer as hits; one without a note path dropped. */
+export function searchHitsOf(x: unknown): SearchHit[] {
+  const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+  return list(o.results).flatMap((h) => {
+    const path = str(h.path);
+    if (!path.startsWith("notes/")) return [];
+    const match = MATCHES.has(str(h.match)) ? (str(h.match) as SearchHit["match"]) : "words";
+    return [{ path, title: str(h.title) || path, snippet: str(h.snippet), match }];
+  }).slice(0, SEARCH_MAX);
+}

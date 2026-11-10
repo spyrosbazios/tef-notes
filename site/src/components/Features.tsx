@@ -258,8 +258,8 @@ const FEATURES: Feature[] = [
     art: <Drawing />,
   },
   {
-    title: "Terminal and agents", text: "A CLI, and MCP if you want it.",
-    art: <Term lines={[["tefnotes today"], ["", "○ Book Sintra train tickets   due Wed"], ["", "○ Water the plants            every 3d"], ["claude mcp add tefnotes …/agent/mcp"]]} />,
+    title: "Terminal and agents", text: "A CLI, and a skill that hands it to your coding agent.",
+    art: <Term lines={[["tefnotes today"], ["", "○ Book Sintra train tickets   due Wed"], ["", "○ Water the plants            every 3d"], ["tefnotes search \"winter tyres\""]]} />,
   },
   {
     title: "Reader view", text: "The linked article, clutter gone.",
