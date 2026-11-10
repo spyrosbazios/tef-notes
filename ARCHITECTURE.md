@@ -39,22 +39,11 @@ created: 2026-10-05
 pinned: false
 color: yellow
 tags: [home]
-where:
-  name: Garage
-  address: 12 Example St, Athens
-  lat: 37.9838
-  lng: 23.7275
-  place_id: N9675835944
 ---
 Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, code, images.
 ```
 
-- `title` and `created` are always present. `pinned`, `color`, `tags` and `where` appear only when set.
-- `where` is the one place a note is about (`packages/core/src/places.ts`): a block of `name` (required), `address`,
-  `lat`/`lng` (a pair) and its OpenStreetMap id `place_id` (`N`, `W` or `R` and a number), or a plain `where: Home`, a name alone. It is a flag like `pinned`: set in
-  one edit (`withFlags`), and where both sides changed it, the merge keeps mine. The web app shows it under the title with
-  the place's map, Directions and Open in Maps (Google Maps URLs, no key; a phone opens the Maps app). Picking one searches
-  OpenStreetMap through the agent (`/agent/places/*`, no key); a place a map can't know is typed by name.
+- `title` and `created` are always present. `pinned`, `color` and `tags` appear only when set. Notes have no place: only tasks do (`where`, below).
 - There is no `updated` field on purpose: both sides would touch it on every edit and the line merge would conflict every
   time. The server's own `updated` column tracks it.
 - `color` is one of `yellow pink blue green purple gray`: the note card's tint in the list.
@@ -89,7 +78,7 @@ Things-style to-dos, records of their own (`tasks`; schema in
 `server/pb_migrations/1792900000_todo.js`, shape in code in `packages/core/src/todo.ts`).
 
 - `tasks`: `title`, `notes`, `checklist` (`[{id, text, done}]`, ids unique within the task), `when`, `evening`,
-  `due`, `every`, `remind`, `done`, `order`, `tags`, `where` (its place, the shape of a note's `where:`, or null; one value
+  `due`, `every`, `remind`, `done`, `order`, `tags`, `where` (its place, `packages/core/src/places.ts` `Place`: name, address, lat/lng, place_id, or null; picked over OpenStreetMap through the agent, or typed by name; shown with its map, Directions and Open in Maps; one value
   in a merge). The notes a task is about are links (below), not a field.
   Unset text is `""`.
 - Tags (`server/pb_migrations/1793500000_task_tags.js`): `tags` is the one copy of a task's tag names (a task has no
@@ -199,11 +188,11 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - Providers: one model provider per server, `TEF_NOTES_PROVIDER` (DeepSeek by default; `server/agent/src/models.ts`, with
   `server/pb_hooks/lib/llm.js` its plain-HTTP copy for the hooks); `exa` powers web search. Without the provider's key a chat is refused; without
   `exa` the web tools are left out of the prompt.
-- Places (`src/places.ts`, `src/placeTools.ts`): `GET /agent/places/suggest`, `place` and `map` are a note's place search
+- Places (`src/places.ts`, `src/placeTools.ts`): `GET /agent/places/suggest`, `place` and `map` are a task's place search
   over OpenStreetMap's free services, no key: Photon for suggestions (each a whole place) and the assistant's `find_place`
   (taints the chat like the web, a business names itself), Nominatim for a place by its OSM id, and OSM's tiles composed
   into an SVG in the owner's theme (tiles cached in memory). Their policies ask for an identifying User-Agent, light use
-  and the credit shown. `set_place` writes a note's `where:` block or a task's `where` from the details by `place_id`, or
+  and the credit shown. `set_place` writes a task's `where` from the details by `place_id`, or
   a name alone.
 - Voice input (`src/transcribe.ts`): `POST /agent/transcribe?keep=S` takes a clip as raw mono 16 kHz float32 samples and
   answers its text from the `stt` service (`TEF_NOTES_STT`); `/agent/transcribe/warm` loads the model as recording

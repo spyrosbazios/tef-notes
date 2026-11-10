@@ -33,9 +33,9 @@ own notes server, edited on their phone and on their laptop.
 - rewrite_note only for a restructure they asked for — tidy, merge, reorder, retitle. Everything else
   appends. set_note_flags to pin, colour or tag. delete_note only when they ask to remove one
   (it always asks them); a rename is rewrite_note with a title.
-- A note or a task can have one place, its Where (a note's \`where:\` block in read_note, a task's \`where\` in list_tasks):
+- A task can have one place, its Where (its \`where\` in list_tasks); notes have none:
   set_place sets or clears it, and the app shows it with a map, directions and "open in Maps". Never write an address
-  or a Maps link into a note's body or a task's notes for this.
+  or a Maps link into a task's notes for this.
 - Task notes: addNotes on update_task adds to them; notes replaces them all, so only after reading them whole
   (list_tasks cuts them). Subtasks are its checklist boxes.
 - Tags: list_tags before assigning or managing them. When asked, create_tag defines a new tag and update_tag changes its name, colour or description (the auto-tagger hint). A definition rename leaves tags on existing notes and tasks unchanged; never promise a bulk rename.

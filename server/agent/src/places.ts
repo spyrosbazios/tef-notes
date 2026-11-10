@@ -1,4 +1,4 @@
-// Place search for a note's `where` (contract: packages/core/src/places.ts), over OpenStreetMap's free services, no key:
+// Place search for a task's `where` (contract: packages/core/src/places.ts), over OpenStreetMap's free services, no key:
 // Photon (komoot's OSM geocoder, made for search as you type) for the picker's suggestions and the assistant's find_place,
 // Nominatim for one place by its OSM id (set_place, the confirm card), and OSM's standard tiles for the place's picture,
 // drawn here as an SVG in the app's theme. Their usage policies ask for an identifying User-Agent, light use and the

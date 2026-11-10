@@ -16,7 +16,7 @@ to it. See the security model in [../README.md](../README.md).
 | `GET` | `/agent/models` | The models; `provider` names the server's; `available` is true when its key is read |
 | `GET` | `/agent/push/key` | The VAPID public key for `pushManager.subscribe`; 404 while push is off (`src/push.ts`, [../README.md](../README.md) "Push reminders") |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Store or forget a browser's push subscription (`packages/core/src/push.ts` is the contract) |
-| `GET` | `/agent/places/suggest`, `/agent/places/place`, `/agent/places/map` | A note's place search: suggestions as you type, the place picked, its map picture in the app's theme, over OpenStreetMap with no key (`src/places.ts`, contract `packages/core/src/places.ts`) |
+| `GET` | `/agent/places/suggest`, `/agent/places/place`, `/agent/places/map` | A task's place search: suggestions as you type, the place picked, its map picture in the app's theme, over OpenStreetMap with no key (`src/places.ts`, contract `packages/core/src/places.ts`) |
 | `POST`, `GET`, `DELETE` | `/agent/mcp` | The MCP endpoint, when `TEF_NOTES_MCP=1` (below); a 404 otherwise |
 
 ## Always-on assistant

@@ -6,7 +6,7 @@
 // Below `md` it is the phone's: two columns, a header of icons (tiles or grouped, sort, +), a tile shows two tags, and
 // holding one selects it (the laptop's menu is the bulk bar's then) where a finger on a wider screen opens the menu.
 import { ReducedMotionConfig, scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { ArrowDownUp, Check, LayoutGrid, MapPin, Pin, Plus, Sparkles, Tags } from "lucide-react";
+import { ArrowDownUp, Check, LayoutGrid, Pin, Plus, Sparkles, Tags } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { between, toggled } from "@/core/bulk";
@@ -120,7 +120,6 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
         <span className={cn("flex items-center gap-1.5 text-[11px] tabular-nums", tint ? "text-tile-line" : "text-faint")}>
           {n.note.pinned ? <Pin className="size-3" /> : null}
           <span className="shrink-0">{ago(ms(n.updated), now)}</span>
-          {n.note.where ? <span className="inline-flex min-w-0 items-center gap-0.5"><MapPin className="size-3 shrink-0" /><span className="truncate">{n.note.where.name}</span></span> : null}
         </span>
       </div>
     </motion.div>

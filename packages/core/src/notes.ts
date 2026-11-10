@@ -3,7 +3,6 @@
 // parsed by hand: a YAML library would rewrite what it doesn't understand.
 
 import { firstUrl } from "./links";
-import { placeOf, type Place } from "./places";
 import { localDay } from "./time";
 
 export const NOTES = "notes/";
@@ -14,10 +13,9 @@ export const UNTITLED = "Untitled";
 export const COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green", "gray"] as const;
 export type Color = (typeof COLORS)[number];
 
-/** `where`: the place the note is about (places.ts), its frontmatter's `where:` block. */
-export type Flags = { pinned: boolean; color?: Color; tags: string[]; where?: Place };
-/** A one-tap edit of the flags: only what is passed changes; `null` takes a colour or a place off. */
-export type FlagEdit = Partial<Omit<Flags, "color" | "where">> & { color?: Color | null; where?: Place | null };
+export type Flags = { pinned: boolean; color?: Color; tags: string[] };
+/** A one-tap edit of the flags: only what is passed changes; `null` takes a colour off. */
+export type FlagEdit = Partial<Omit<Flags, "color">> & { color?: Color | null };
 export type Note = { id: string; title: string; created: string; body: string } & Flags;
 /** What serializeNote writes: title and created always, the flags only when set. */
 export type Meta = { title: string; created: string } & Partial<Flags>;
@@ -42,11 +40,9 @@ export function attachmentOf(p: string): { noteId: string; name: string } | null
 
 // ---- frontmatter
 
-const KEYS = ["title", "created", "pinned", "color", "tags", "where"] as const;
+const KEYS = ["title", "created", "pinned", "color", "tags"] as const;
 /** The keys a one-tap edit sets (withFlags): where both sides changed one, reconcile lets mine win. */
-const FLAG_KEYS: readonly string[] = ["pinned", "color", "tags", "where"];
-/** The `where:` block's keys, in the order serializeNote writes them. */
-const WHERE_KEYS = ["name", "address", "lat", "lng", "place_id"] as const;
+const FLAG_KEYS: readonly string[] = ["pinned", "color", "tags"];
 
 type Front = { head: number; end: number; body: number; lines: string[]; eol: string };
 
@@ -139,25 +135,10 @@ export function parseNote(path: string, text: string): Note {
       n.tags = v.startsWith("[") && v.endsWith("]") ? flowList(v)
         : v ? [unquote(v)].filter(Boolean)
         : e.lines.slice(1).map((l) => unquote(l.replace(/^\s*-\s*/, ""))).filter(Boolean);    // a block list
-    else if (e.key === "where") { const w = whereOf(v, e.lines.slice(1)); if (w) n.where = w; }
   }
   if (!n.title) n.title = /^#[ \t]+(.+?)[ \t#]*$/m.exec(body)?.[1] ?? titleFromId(id);
   if (!n.created) { const d = /^(\d{4})(\d{2})(\d{2})-/.exec(id); if (d) n.created = `${d[1]}-${d[2]}-${d[3]}`; }
   return n;
-}
-
-/** A `where:` entry as a Place: a block of `name:`, `address:`, `lat:`, `lng:`, `place_id:` lines under it, or a plain
- *  `where: Café Central` (a name alone). null when it holds no name. */
-function whereOf(v: string, lines: string[]): Place | null {
-  if (v) return placeOf({ name: unquote(v) });
-  const o: Record<string, unknown> = {};
-  for (const l of lines) {
-    const m = /^\s+([A-Za-z_]+)[ \t]*:(.*)$/.exec(l);
-    if (!m) continue;
-    const val = unquote(m[2]);
-    o[m[1]] = m[1] === "lat" || m[1] === "lng" ? (val.trim() ? Number(val) : NaN) : val;
-  }
-  return placeOf(o);
 }
 
 /** The frontmatter lines serializeNote writes for one key, `\n`-joined; null when it leaves the key out. */
@@ -169,10 +150,6 @@ function lineFor(k: (typeof KEYS)[number], m: Meta): string | null {
     case "pinned": return m.pinned ? "pinned: true" : null;
     case "color": return m.color ? `color: ${m.color}` : null;
     case "tags": return m.tags?.length ? `tags: [${m.tags.map(item).join(", ")}]` : null;
-    case "where": {
-      const w = m.where && placeOf(m.where);
-      return w ? ["where:", ...WHERE_KEYS.flatMap((k) => (w[k] == null ? [] : [`  ${k}: ${typeof w[k] === "number" ? w[k] : scalar(String(w[k]))}`]))].join("\n") : null;
-    }
   }
 }
 
@@ -189,7 +166,7 @@ export const withBody = (text: string, n: Note, body: string, title?: string) =>
 export function withFlags(path: string, text: string, flags: FlagEdit): string {
   const set = Object.fromEntries(Object.entries(flags).filter(([, v]) => v !== undefined));
   const n = parseNote(path, text), next: Note = {
-    ...n, ...set, color: flags.color === null ? undefined : (flags.color ?? n.color), where: flags.where === null ? undefined : (flags.where ?? n.where),
+    ...n, ...set, color: flags.color === null ? undefined : (flags.color ?? n.color)
   };
   return withKeys(text, next, Object.keys(set));
 }

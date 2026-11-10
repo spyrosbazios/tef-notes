@@ -1,8 +1,8 @@
-// A Where, a note's (its frontmatter's `where:` block, core/notes.ts) or a task's (its `where` field, core/todo.ts): the
+// A task's Where (its `where` field, core/todo.ts; notes have no place): the
 // picker that sets it, and once set a card: the place's map in the app's theme (the agent draws it, services/places.ts; a
 // place with only a name has none), its name and address, and the two things a place is for: directions from where you
-// are, and the place itself in Google Maps. On a phone both open the Maps app. The note's page puts a "place" button
-// beside its tags and the card under its title (note-pane.tsx); the task's card has a Where row (task-detail.tsx).
+// are, and the place itself in Google Maps. On a phone both open the Maps app. The task's card has a Where row
+// (task-detail.tsx).
 import { ExternalLink, MapPin, Navigation, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,11 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppearance } from "@/hooks/appearance";
 import { useActiveLens } from "@/hooks/lens";
-import { useNarrow } from "@/hooks/media";
 import { cn } from "@/lib/utils";
 import { mapSrc } from "@/services/places";
 
-/** The map picture's size as asked for, in CSS pixels: wide enough for the note's column, cropped to the card's height. */
+/** The map picture's size as asked for, in CSS pixels: wide enough for the card's column, cropped to the card's height. */
 const MAP_W = 640, MAP_H = 220;
 
 /** Off the page, in a new tab or the Maps app. */
@@ -31,18 +30,6 @@ export function PlacePick({ trigger, start, title, onSet }: { trigger: React.Rea
     <Pick open={open} onOpenChange={setOpen} title={title} align="start" width="w-80" trigger={trigger}>
       {open ? <PlacePicker start={start} onPick={(p) => { setOpen(false); onSet(p); }} /> : null}
     </Pick>
-  );
-}
-
-/** The note's meta row's "place" while it has none. */
-export function AddPlace({ onSet }: { onSet: (p: Place) => void }) {
-  const narrow = useNarrow();
-  return (
-    <PlacePick title="Where" onSet={onSet} trigger={
-      <button type="button" className={cn("inline-flex items-center gap-1 rounded-md text-xs text-faint hover:bg-muted hover:text-dim", narrow ? "h-8 px-2" : "h-6 px-1.5")}>
-        <MapPin className="size-3" /> place
-      </button>
-    } />
   );
 }
 
@@ -70,7 +57,7 @@ function Icon({ label, children, ...p }: React.ComponentProps<typeof Button> & {
   );
 }
 
-/** A note's or task's place, once it has one. `onSet(null)` takes it off (with a toast to put it back). Without `onSet` it
+/** A task's place, once it has one. `onSet(null)` takes it off (with a toast to put it back). Without `onSet` it
  *  is a preview (the assistant's confirm card): nothing to change, and only Open in Maps, to check it is the place meant. */
 export function WhereCard({ where, onSet, className }: { where: Place; onSet?: (p: Place | null) => void; className?: string }) {
   const remove = () => {

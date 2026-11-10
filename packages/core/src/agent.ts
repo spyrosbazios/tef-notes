@@ -99,8 +99,7 @@ export function gist(kinds: Kind[]) {
 
 /** A note as a card: its place, title, tags, the opening of its body as markdown (`preview`, a few lines) and its first
  *  photo (`image`: the name in the note's attachments folder). Only what is set. */
-/** `where`: the name of the note's place. */
-export type NoteCard = { kind: "note"; path: string; title: string; preview: string; tags?: string[]; image?: string; where?: string };
+export type NoteCard = { kind: "note"; path: string; title: string; preview: string; tags?: string[]; image?: string };
 
 /** A task as a card: the fields a row shows, only what is set. `checklist`: boxes ticked out of all. */
 export type TaskCard = {
@@ -133,7 +132,7 @@ export function previewOf(body: string, title: string): string {
 export function noteCardOf(path: string, text: string): NoteCard {
   const n = parseNote(path, text), p = picturesOf(n.id, n.body), image = p && "pictures" in p ? p.pictures.find((x) => "image" in x) : undefined;
   return { kind: "note", path, title: n.title, preview: previewOf(n.body, n.title), ...(n.tags.length ? { tags: n.tags } : {}),
-    ...(image && "image" in image ? { image: image.image } : {}), ...(n.where ? { where: n.where.name } : {}) };
+    ...(image && "image" in image ? { image: image.image } : {}) };
 }
 
 /** The card of a task. */
@@ -187,7 +186,7 @@ export type WriteInput = {
    *  (`null` clears one), `done` false to reopen; the notes it is linked to (`link`, and update_task's `unlink`: paths),
    *  its checklist (a list of texts when added, ops by item id when changed). */
   id?: string; about?: string; done?: boolean; notes?: string;
-  /** set_place's: the task (its id; a note is `path`), and the place: its OpenStreetMap id, a name alone, or `clear`. */
+  /** set_place's: the task (its id), and the place: its OpenStreetMap id, a name alone, or `clear`. */
   task?: string; place_id?: string; clear?: boolean;
   /** update_task's text added after its notes. */
   addNotes?: string;

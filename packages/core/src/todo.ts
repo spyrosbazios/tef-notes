@@ -47,7 +47,7 @@ export type Task = {
   /** Tag names (the same ones notes carry), each once ignoring case and tonos. Edited by hand and by the server's
    *  auto-tagger, both ordinary `rev` writes; two edits merge as a set. */
   tags: string[];
-  /** The place it happens at (core/places.ts), as a note's `where:`; null for none. A whole value: two edits merge as
+  /** The place it happens at (core/places.ts); null for none. A whole value: two edits merge as
    *  one field, mine kept where both changed it. */
   where: Place | null;
 };

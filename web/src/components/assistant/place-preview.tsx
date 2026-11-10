@@ -1,5 +1,5 @@
-// What the assistant's set_place would write, on its confirm card: the record it goes on (a note by path, a task by id,
-// named as the web app holds them), and the place itself as its card will show it. A place picked by its OpenStreetMap id is
+// What the assistant's set_place would write, on its confirm card: the task it goes on (named as the
+// web app holds it), and the place itself as its card will show it. A place picked by its OpenStreetMap id is
 // looked up here (the agent's places/place route, the same details set_place writes), so the owner sees the address and
 // map before saying yes, never just an id; the place it replaces is named, and a clear says what goes.
 import { useQuery } from "@tanstack/react-query";

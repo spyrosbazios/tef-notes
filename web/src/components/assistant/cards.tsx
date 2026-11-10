@@ -55,7 +55,6 @@ function NoteView({ card, gone }: { card: NoteCard; gone: boolean }) {
               {long ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-b from-transparent to-card" /> : null}
             </div>
           ) : null}
-          {card.where ? <span className="flex min-w-0 items-center gap-1 text-xs text-dim"><MapPin className="size-3 shrink-0" /><span className="truncate">{card.where}</span></span> : null}
           {card.tags?.length ? <span className="flex flex-wrap gap-1">{card.tags.map((t) => <TagBadge key={t} name={t} />)}</span> : null}
         </div>
       </div>

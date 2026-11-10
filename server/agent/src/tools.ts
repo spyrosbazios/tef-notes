@@ -316,7 +316,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     }),
 
     set_note_flags: tool({
-      description: "Pin or unpin a note, set its colour, or replace its tags. Only the fields you pass change; its place is set_place's. The user confirms it.",
+      description: "Pin or unpin a note, set its colour, or replace its tags. Only the fields you pass change. The user confirms it.",
       inputSchema: z.object({
         path: z.string().describe("notes/<file>.md"),
         pinned: z.boolean().optional(),
@@ -341,7 +341,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
       },
     }),
 
-    ...placeTools(notes, todo, fromPage),
+    ...placeTools(todo, fromPage),
     ...todoTools(notes, todo, fromPage),
     ...widgetTools(notes, todo, fromPage),
     ...uiTools,

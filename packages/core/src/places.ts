@@ -1,10 +1,10 @@
-// A note's place (its frontmatter's `where:` block, notes.ts) and the place search behind it, over OpenStreetMap with no
+// A task's place (its `where` field, todo.ts) and the place search behind it, over OpenStreetMap with no
 // key: the agent answers the clients' routes (server/agent/src/places.ts): `places/suggest` as the owner types (each
 // suggestion a whole place), `places/place` for one by its OSM id (the assistant's set_place), `places/map` for its
 // picture (OSM's tiles in the app's theme). Directions and "open in Maps" are plain Google Maps URLs: no key, and on a
 // phone they open the Maps app.
 
-/** Where a note is about. `name` is all a hand-written `where: Home` has; a picked place also has its address, its
+/** Where a task is. `name` is all a place set by name has; a picked place also has its address, its
  *  coordinates and its OpenStreetMap id (`place_id`: N, W or R and a number), which set_place looks it up by. */
 export type Place = { name: string; address?: string; lat?: number; lng?: number; place_id?: string };
 
