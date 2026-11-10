@@ -1,7 +1,7 @@
 // A WYSIWYG markdown editor in plain DOM: `createEditor(element, { markdown, onChange })`. It edits a note's body
 // (the frontmatter is the caller's) and hands back the body as markdown. Nothing here knows React, the page, or
 // the server, so the same module can sit in an Android WebView. The note format lives in ./markdown, the keys and
-// shortcuts in ./commands, the node views in ./views.
+// shortcuts in ./commands, the `/` menu in ./slash, the node views in ./views.
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { history } from "prosemirror-history";
@@ -19,6 +19,7 @@ import { linkCards } from "./link-cards";
 import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
 import type { Summarize } from "./link-tools";
+import { slashMenu } from "./slash";
 import { ImageView, ListItemView } from "./views";
 import { noteLinkPath } from "@/core/links";
 import { spliced } from "@/core/voice";
@@ -156,7 +157,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   const stateFor = (doc: Node) => EditorState.create({
     doc,
     plugins: [
-      history(), typed, keys, base, heldMark, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
+      history(), slashMenu, typed, keys, base, heldMark, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
       placeholder(options.placeholder ?? ""), trailingParagraph, fileChips(() => resolve, options.pdfPage, options.pdfPages),
       ...(options.onRead ? [readLinks(options.onRead, options.summarize)] : []),
       ...(options.resolveLink ? [linkCards(options.resolveLink, open, options.onRead, options.summarize, options.inlineVideo ?? true)] : []),
