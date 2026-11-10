@@ -1,7 +1,7 @@
 // The bar over selected words in a note: the text's style (text, headings), bold, italic, strikethrough, code, link, and
 // the assistant. It shows once a selection settles (a mouse released, a finger's handles let go, Shift and the arrows) and
 // goes when it collapses, the editor loses the focus, or the words are in code. Over a mouse it floats above the words,
-// and its labels are Animate UI's own Tooltip: one popup that glides from button to button. Under a finger it sits below,
+// and its labels are Animate UI's own Tooltip: one popup that glides from button to button. Under a finger it is the assistant's button alone (the bar over the keyboard has the format tools), below,
 // clear of the selection's handles and of Android's own Copy and Paste menu above them, with no labels. A mousedown on a
 // tool is prevented, so the editor keeps its selection and focus; the link's field and the style menu take the focus, so
 // the bar stays while they are open. The assistant's button opens an ask about the words (selection-ask.tsx): on a laptop
@@ -140,6 +140,8 @@ export function SelectionBar({ editor }: { editor: Editor }) {
                   ) : (
                     <motion.div key="bar" role="toolbar" aria-label="Format selection" {...pop} className={`${surface} flex items-center gap-0.5 p-1`}>
                       <TooltipProvider openDelay={400}>
+                        {/* On a phone the bar over the keyboard has every format tool: here, only the assistant */}
+                        {narrow ? null : (<>
                         <StyleTool editor={editor} hovers={hovers} below={below} onOpenChange={setStyling} />
                         <div className="mx-0.5 h-5 w-px bg-line" />
                         {TOOLS.map(({ name, label, keys, icon: Icon }) => (
@@ -151,6 +153,7 @@ export function SelectionBar({ editor }: { editor: Editor }) {
                         ))}
                         <LinkTool editor={editor} side={below ? "bottom" : "top"} onOpenChange={setLinking} label={(text, toggle) => <Label hovers={hovers} text={text}>{toggle}</Label>} />
                         <div className="mx-0.5 h-5 w-px bg-line" />
+                        </>)}
                         <Label hovers={hovers} text={model ? "Ask the assistant" : "The assistant is off: no model key"}>
                           <Button variant="ghost" size={hovers ? "icon-sm" : "icon-lg"} aria-label="Ask the assistant about this" className="text-brand"
                             disabled={!model} onMouseDown={(e) => e.preventDefault()} onClick={() => ask.start()}>
