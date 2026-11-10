@@ -37,12 +37,14 @@ turns English speech into text on your own server, and keeps no recording.
 ### Keep tasks close to their context
 
 Work through Inbox, Today, This Evening, Upcoming and Logbook. Add checklists, deadlines, reminders and repeating
-tasks. Link a task to the notes it belongs with, and find those tasks again from the note.
+tasks. Give a task a place, with its map and directions. Link a task to the notes it belongs with, and find those
+tasks again from the note.
 
 ### Ask an assistant that knows what is open
 
-Search and discuss your notes, or ask the assistant to add a task or edit a note. It sees the page you are on and
-shows changes for approval before saving by default. Choose your model provider, including a local model through
+Search and discuss your notes, or ask the assistant to add a task or edit a note. Select words in a note to ask about
+them, or have them rewritten in place as an edit you can undo. It sees the page you are on and shows changes for approval
+before saving by default. Choose your model provider, including a local model through
 Ollama. Auto-tagging and web search are optional too.
 
 ### Keep control of your data

@@ -196,7 +196,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: "Tasks with a rhythm", text: "Today, This Evening, Upcoming. Repeats roll over.",
+    title: "Tasks with a rhythm", text: "Today, This Evening, Upcoming. Repeats roll over. A place, with directions.",
     art: (
       <div className="-mx-2 space-y-0.5">
         <div className="hov-tick"><TaskRow task={{ title: "Book Sintra train tickets", due: "Wednesday", tags: ["travel"] }} /></div>
@@ -210,7 +210,7 @@ const FEATURES: Feature[] = [
     art: <Dictation />,
   },
   {
-    title: "An assistant that asks first", text: "Each write is a card you approve, until you say it needn't.",
+    title: "An assistant that asks first", text: "Each write is a card you approve, until you say it needn't. Or select words and ask about them.",
     art: (
       <div className="relative">
         <div className="hov-card space-y-2.5 rounded-2xl border border-brand/40 bg-card p-3.5 text-sm">
