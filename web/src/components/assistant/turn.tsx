@@ -38,6 +38,7 @@ function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unkn
     case "create_lens": return str(i.name);
     case "create_tag": case "update_tag": return str(i.name) || str(i.id);
     case "create_note": return str(i.title);
+    case "attach_file": return [str(i.file), i.path ? titleOf(i.path) : str(i.title)].filter(Boolean).join(" · ");
     case "rewrite_note": return str(i.why) || titleOf(i.path);
     case "set_note_flags": return `${titleOf(i.path)} · ${flagLine(i as WriteInput, true)}`;
     case "add_task": return str(i.title);

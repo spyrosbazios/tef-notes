@@ -65,6 +65,14 @@ export function fakePb() {
         Object.assign(tag, body);
         return Response.json(tag);
       }
+      if (col === "attachments" && req.method === "POST") {   // an upload: the name unique per note, as the server's index makes it
+        const form = await req.formData(), note = String(form.get("note")), name = String(form.get("name")), f = form.get("file") as Blob;
+        if ([...attachments.values()].some((x) => x.note === note && x.name === name)) return err(400, { data: { name: { code: "validation_not_unique" } } });
+        const rec = attach(note, name, new Uint8Array(await f.arrayBuffer()));
+        const { bytes: _, ...a } = attachments.get(rec)!;
+        return Response.json(a);
+      }
+      if (col === "attachments" && req.method === "DELETE") return attachments.delete(id ?? "") ? new Response(null, { status: 204 }) : err(404);
       if (col === "attachments") {
         const note = /^note = "(.*)"$/.exec(u.searchParams.get("filter") ?? "")?.[1];
         return Response.json({ items: [...attachments.values()].filter((a) => !note || a.note === note).map(({ bytes: _, ...a }) => a) });

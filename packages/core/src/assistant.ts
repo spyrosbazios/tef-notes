@@ -12,7 +12,7 @@
 
 import { DRAWING_LIMITS, shapeOf, type DrawEdit, type Shape } from "./drawing";
 import { isNotePath } from "./notes";
-import { isDrawingName } from "./photos";
+import { isDrawingName, PDF } from "./photos";
 
 // ---- the page
 
@@ -260,3 +260,27 @@ export const hasAttachment = (messages: readonly { role?: unknown; parts?: reado
 export const STEER_MAX = 4000;
 export type SteerBody = { text: string };
 export type SteerResult = { delivered: boolean };
+
+/** One file the owner attached, as the agent's attach_file finds it: its name as the message gave it, its type, the data URL. */
+export type Attached = { name: string; mediaType: string; url: string };
+
+/** Every file the owner attached in the chat, oldest first, a name taken twice kept by its newest (what the owner means by it). */
+export function attachedFiles(messages: readonly { role?: unknown; parts?: readonly unknown[] }[]): Attached[] {
+  const out = new Map<string, Attached>();
+  let n = 0;
+  for (const m of messages) {
+    if (m.role !== "user") continue;
+    for (const p of m.parts ?? []) {
+      const f = obj(p);
+      if (f?.type !== "file" || typeof f.url !== "string" || typeof f.mediaType !== "string") continue;
+      const name = typeof f.filename === "string" && f.filename.trim() ? f.filename.trim() : `attachment-${++n}`;
+      out.delete(name);
+      out.set(name, { name, mediaType: f.mediaType, url: f.url });
+    }
+  }
+  return [...out.values()];
+}
+
+/** The context's line on them, so the agent can name one to attach_file; empty when there are none. */
+export const attachedBlock = (files: readonly Attached[]) => files.length
+  ? `<attached>\n${files.map((f) => `${f.name} (${f.mediaType === PDF ? "PDF" : "picture"})`).join("\n")}\n</attached>` : "";

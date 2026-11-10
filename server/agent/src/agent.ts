@@ -14,7 +14,7 @@ import {
 import { lensFields, type LensInput } from "./widgetTools";
 import { z } from "zod";
 import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
-import { hasAttachment, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
+import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
 import { MEMORY, parseNote } from "@/core/notes";
 import type { Server } from "@/core/pocketbase";
 import { exists, saver } from "./chats";
@@ -28,6 +28,7 @@ import { Todo } from "./todo";
 import { model, sees, Unavailable } from "./models";
 import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
+import { attachProblem, type AttachInput } from "./fileTools";
 import { placeProblem, type PlaceInput } from "./placeTools";
 import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
 import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
@@ -52,11 +53,11 @@ const Body = z.object({
  *  instructions — those stay byte for byte the same, the prompt cache's prefix. The live screen comes last: it changes
  *  most. `foreign`: whether someone else's text is in it, which taints the turn (approvals): a PDF's, or words selected
  *  in an open note a chat that read the web wrote (its `tainted` column: the selection is that note's text, read back). */
-async function context(notes: Notes, page: AssistantContext | undefined) {
+async function context(notes: Notes, page: AssistantContext | undefined, files: readonly Attached[] = []) {
   const memory = (await notes.meta(MEMORY))?.text.trim() || "(empty)";
   const open = page?.note && await notes.meta(page.note.path);
   const pdfs = open ? await preview(notes.server, { id: parseNote(open.path, open.text).id, path: open.path }) : "";
-  const shown = [screen(page), pdfs].filter(Boolean).join("\n\n");
+  const shown = [screen(page), pdfs, attachedBlock(files)].filter(Boolean).join("\n\n");
   return {
     text: `<context>\n${today()}\n\n<file path="${MEMORY}">\n${memory}\n</file>\n\n<notes>\n${noteIndex(await notes.list())}\n</notes>${shown && `\n\n${shown}`}\n</context>`,
     // A drawing open in the editor is its note's: shown from a note a chat that read the web wrote, it is that text again
@@ -67,7 +68,7 @@ async function context(notes: Notes, page: AssistantContext | undefined) {
 /** Notes are the user's: a write shows a confirm card, unless they turned that off in Settings — and even then once
  *  the chat has read the web or a PDF (`web`), where a page can carry instructions aimed at the agent. A bad path skips
  *  the card: the tool's error goes straight back to the agent. */
-export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean, web = readWeb(notes, todo)) {
+export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean, web = readWeb(notes, todo), files: readonly Attached[] = []) {
   const ask = async (messages: ModelMessage[], bad: Promise<string | null> | null = null) =>
     (await bad) || (writesWithoutAsking && !(await web(messages))) ? "not-applicable" as const : "user-approval" as const;
   type O = { messages: ModelMessage[] };
@@ -81,6 +82,8 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
     rewrite_note: ({ path, text }: { path: string; text: string }, { messages }: O) => ask(messages, checkWrite(notes, path, text)),
     summarise_links: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
     set_note_flags: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
+    // someone else's file into a note: it always asks, unless the call is bad
+    attach_file: async (i: AttachInput) => ((await attachProblem(notes, files, i)) ? "not-applicable" as const : "user-approval" as const),
     set_place: (i: PlaceInput, { messages }: O) => ask(messages, placeProblem(todo, i)),
     // a delete has no way back: it asks whatever the setting, unless the path is bad
     delete_note: async ({ path }: { path: string }) => ((await checkWrite(notes, path)) ? "not-applicable" as const : "user-approval" as const),
@@ -98,11 +101,11 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
 }
 
 /** `foreign`: someone else's text is in this turn's context (`context`), or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
-async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean) {
+async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[]) {
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = foreign ? async () => true : read;
-  const web = !!(await key("exa")), all = tools(notes, todo, untrusted);
+  const web = !!(await key("exa")), all = tools(notes, todo, untrusted, files);
   // Out of the prompt: the web tools without an Exa key, and the tools the client does
   // itself unless this page can do them
   const ui = uiToolsFor(page), off = new Set<string>([...(web ? [] : WEB_TOOLS), ...UI_TOOL_NAMES.filter((n) => !ui.includes(n))]);
@@ -119,7 +122,7 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
       ...(stepNumber === 0 && { messages: trim(messages) }),
       ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages)) } : { toolChoice: "none" as const }),
     }),
-    toolApproval: approvals(notes, todo, writesWithoutAsking, untrusted),
+    toolApproval: approvals(notes, todo, writesWithoutAsking, untrusted, files),
     providerOptions,
   });
 }
@@ -133,9 +136,10 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   const { id, model: picked, writesWithoutAsking, effort, context: page } = parsed.data;
   if (!(await exists(server, id))) return fail(404, `No chat ${id}: create it in chats first.`);
 
-  const notes = new Notes(server), todo = new Todo(server), ctx = await context(notes, page);
+  const files = attachedFiles(parsed.data.messages as AgentMessage[]);
+  const notes = new Notes(server), todo = new Todo(server), ctx = await context(notes, page, files);
   let agent: ToolLoopAgent<never, Tools>;
-  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.foreign || hasAttachment(parsed.data.messages as AgentMessage[])); } catch (e) {
+  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.foreign || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }

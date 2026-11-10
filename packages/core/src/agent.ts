@@ -51,7 +51,7 @@ export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "create_tag" | "update_tag" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
   | "summarise_links" | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "list_tagged" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
   | "create_lens" | "find_place" | "set_place" | "show_day" | "show_week" | "show_review" | "show_quote" | "show_link" | "show_lens" | "show_tasks" | "show_notes" | "find_free_slots"
-  | "read_drawing" | "show_drawing" | UiToolName;
+  | "read_drawing" | "show_drawing" | "attach_file" | UiToolName;
 
 /** Tool names as the owner would say them. */
 const LABEL: Record<ToolName, string> = {
@@ -61,7 +61,7 @@ const LABEL: Record<ToolName, string> = {
   show_lens: "Previewing a lens", show_tasks: "Laying out tasks", show_notes: "Gathering notes", show_drawing: "Showing a drawing", read_drawing: "Looking at a drawing", find_free_slots: "Finding free time",
   search_notes: "Searching your notes", list_notes: "Listing your notes", list_tags: "Reading your tags", read_note: "Reading a note",
   create_note: "New note", append_to_note: "Adding to a note", rewrite_note: "Rewriting a note", summarise_links: "Summarising links", set_note_flags: "Changing a note's flags", delete_note: "Deleting a note",
-  update_memory: "Memory", web_search: "Searching the web", read_url: "Reading a page",
+  attach_file: "Filing an attachment", update_memory: "Memory", web_search: "Searching the web", read_url: "Reading a page",
   list_tasks: "Reading your tasks", list_tagged: "Gathering by tag", add_task: "Adding a task", add_tasks: "Adding tasks", update_task: "Changing a task", complete_task: "Completing a task",
   delete_task: "Deleting a task", find_place: "Searching the map", set_place: "Setting a place",
   open_note: "Opening a note", open_task: "Opening a task", go_view: "Going to a view", ask_choice: "Asking you to choose",
@@ -73,7 +73,7 @@ export const label = (name: string) => LABEL[name as ToolName] ?? name;
 export type Kind = "think" | "search" | "list" | "read" | "web" | "page" | "write" | "memory" | "tasks" | "todo" | "maps" | "place";
 const KIND: Partial<Record<ToolName, Kind>> = {
   search_notes: "search", list_notes: "list", list_tags: "list", read_note: "read", web_search: "web", read_url: "page",
-  create_note: "write", append_to_note: "write", rewrite_note: "write", summarise_links: "write", set_note_flags: "write", delete_note: "write", update_memory: "memory",
+  create_note: "write", append_to_note: "write", rewrite_note: "write", summarise_links: "write", set_note_flags: "write", delete_note: "write", attach_file: "write", update_memory: "memory",
   find_place: "maps", set_place: "place",
   list_tasks: "tasks", list_tagged: "list", find_free_slots: "tasks", add_task: "todo", add_tasks: "todo", update_task: "todo", complete_task: "todo", delete_task: "todo",
 };
@@ -181,6 +181,8 @@ export type WriteInput = {
   /** create_lens': the tags it hides and its colour (`tags`: those it shows). */
   exclude?: string[]; accent?: string;
   path?: string; title?: string; body?: string; text?: string; why?: string; section?: string;
+  /** attach_file's: the attached file's name. */
+  file?: string;
   pinned?: boolean; archived?: boolean; color?: string | null; tags?: string[];
   /** The task tools': the record's id, its title as the agent read it (`about`: what a card names it by), its dates
    *  (`null` clears one), `done` false to reopen; the notes it is linked to (`link`, and update_task's `unlink`: paths),

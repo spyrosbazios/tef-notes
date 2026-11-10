@@ -13,6 +13,8 @@ import { uiTools } from "./assistant";
 import { capList, clip, fromWeb } from "./guard";
 import { definedTags, TAGS, type Meta, type Notes } from "./notes";
 import { drawingTools } from "./drawings";
+import { fileTools } from "./fileTools";
+import type { Attached } from "@/core/assistant";
 import { imageData, imagesOf, imageType } from "./images";
 import { pageRange, pages, pdfsOf, READ_CHARS } from "./pdfs";
 import { placeTools } from "./placeTools";
@@ -91,8 +93,8 @@ export const readWeb = (notes: Notes, todo: Todo) => async (messages: ModelMessa
   fromWeb(messages, new Set([...(await notes.tainted()), ...(await todo.tainted())]));
 
 /** The tools for one request: `notes` is its view of the server. `fromPage`: whether a write is marked `tainted`
- *  (web text in view): for a chat, whether it has read the web. */
-export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo)) {
+ *  (web text in view): for a chat, whether it has read the web. `files`: what the owner attached in the chat (attach_file). */
+export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo), files: readonly Attached[] = []) {
 
   return {
     list_tags: tool({
@@ -350,6 +352,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo))
     ...todoTools(notes, todo, fromPage),
     ...widgetTools(notes, todo, fromPage),
     ...drawingTools(notes),
+    ...fileTools(notes, files),
     ...uiTools,
 
     show_items: tool({
