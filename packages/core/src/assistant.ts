@@ -253,3 +253,10 @@ export const ATTACH_MAX = 6, ATTACH_PDF_MAX = 8 * 1024 * 1024;
 /** Whether a message history holds a file the owner attached (the server's taint check). */
 export const hasAttachment = (messages: readonly { role?: unknown; parts?: readonly { type?: unknown }[] }[]) =>
   messages.some((m) => m.role === "user" && m.parts?.some((p) => p.type === "file"));
+
+/** Steering: a message the owner sends into the turn that is running (`POST /agent/chat/:id/steer`). The model reads it
+ *  at the next step boundary and it shows in the reply as a `steering-message` part; `delivered: false` when the turn
+ *  ended first (finished, stopped, or waiting on a card), and the client sends it as an ordinary message instead. */
+export const STEER_MAX = 4000;
+export type SteerBody = { text: string };
+export type SteerResult = { delivered: boolean };

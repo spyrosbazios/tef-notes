@@ -37,6 +37,8 @@ import { asking, held, waiting } from "@/lib/ask";
 import { attachment } from "@/lib/attach";
 import { pageContext } from "@/lib/assistant";
 import { titleOf, useNav } from "@/lib/nav";
+import { steer } from "@/services/agent";
+import { message as errorText } from "@/services/api";
 import { chatScroll } from "@/lib/scroll";
 
 /** Pressing Send or Stop must not move the focus off the field: on the phone that closes the keyboard (hooks/keyboard.ts), the layout
@@ -127,10 +129,20 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   // Typed while a reply runs: queued, sent one at a time once the turn is over (queue.tsx). Stop and a failed turn pause it.
   const [queue, setQueue] = useState<Queued[]>([]), [paused, setPaused] = useState(false), nextId = useRef(0);
   const blocked = busy || held(last) || !!error;
+  // Send now: into the running reply. Taken off the queue once the agent has it; if the reply ended first it stays, and goes next
+  const [sending, setSending] = useState<ReadonlySet<number>>(new Set());
+  const mark = (id: number, on: boolean) => setSending((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; });
+  const steerNow = (q: Queued) => {
+    mark(q.id, true);
+    steer(chat.id, q.text)
+      .then((delivered) => { if (delivered) setQueue((all) => all.filter((x) => x.id !== q.id)); })
+      .catch((e: unknown) => toast.error(errorText(e)))
+      .finally(() => mark(q.id, false));
+  };
   const draining = useRef(false);
   useEffect(() => {
     const first = queue[0];
-    if (blocked || paused || !model || !first || draining.current) return;
+    if (blocked || paused || !model || !first || sending.has(first.id) || draining.current) return;   // one being steered holds its place
     draining.current = true;
     follow();
     // Taken off the queue once the chat has it, so a failed send stays first and pauses the rest
@@ -138,7 +150,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
       draining.current = false;
       if (ok) setQueue((q) => q.filter((x) => x.id !== first.id)); else setPaused(true);
     });
-  }, [blocked, paused, model, queue, send, follow]);
+  }, [blocked, paused, model, queue, sending, send, follow]);
 
   const go = async (raw: string) => {
     const text = raw.trim(), sent = files;
@@ -208,7 +220,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
           </div>
 
           <div className="shrink-0 border-t border-line px-3 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <Queue items={queue} paused={paused || (!!error && !busy)} onResume={() => { setPaused(false); if (error) void regenerate(); }}
+            <Queue items={queue} paused={paused || (!!error && !busy)} live={busy} sending={sending} onSteer={steerNow} onResume={() => { setPaused(false); if (error) void regenerate(); }}
               onRemove={(id) => setQueue((q) => q.filter((x) => x.id !== id))}
               onEdit={(q) => { setQueue((all) => all.filter((x) => x.id !== q.id)); setInput(q.text); setFiles(q.files); field.current?.focus(); }} />
             <Seeing />

@@ -89,7 +89,7 @@ function stepsOf(parts: Part[]) {
   const steps: Step[] = [];
   parts.forEach((p, i) => {
     if (p.type === "reasoning" && parts[i - 1]?.type === "reasoning") steps[steps.length - 1].end = i;
-    else if (p.type === "reasoning" || p.type === "text" || isTool(p)) steps.push({ i, end: i });
+    else if (p.type === "reasoning" || p.type === "text" || p.type === "steering-message" || isTool(p)) steps.push({ i, end: i });
   });
   return steps;
 }
@@ -105,6 +105,25 @@ function UiRow({ name, p, title }: { name: AppTool; p: ToolPart; title: string |
       <span className="min-w-0 flex-1 break-words">
         {running ? `${label(name)}…` : failed ? uiTrouble(name, refused ?? (p.state === "output-error" ? p.errorText : "")) : uiWords(name, p.input, title)}
       </span>
+    </div>
+  );
+}
+
+/** The owner's own words: a message, or one sent into a running reply (a steering message). Photos as thumbnails, PDFs by name. */
+function Said({ parts }: { parts: Part[] }) {
+  // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
+  const text = plainShared(parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
+  const files = parts.filter((p) => p.type === "file");
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      {files.length ? (
+        <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+          {files.map((f, i) => f.mediaType.startsWith("image/")
+            ? <img key={i} src={f.url} alt={f.filename ?? "Photo"} className="max-h-40 max-w-48 rounded-xl border border-line object-cover" />
+            : <span key={i} className="flex max-w-56 items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-xs"><FileText className="size-4 shrink-0 text-dim" /><span className="truncate">{f.filename ?? "PDF"}</span></span>)}
+        </div>
+      ) : null}
+      {text ? <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-raised px-3.5 py-2 text-sm">{text}</p> : null}
     </div>
   );
 }
@@ -131,25 +150,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
 
   const cards = useMemo(() => cardsByPart(m.parts), [m.parts]);
 
-  if (m.role === "user") {
-    // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
-    const text = plainShared(m.parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
-    const files = m.parts.filter((p) => p.type === "file");
-    return (
-      <Rise live={live}>
-        <div className="flex flex-col items-end gap-1.5">
-          {files.length ? (
-            <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
-              {files.map((f, i) => f.mediaType.startsWith("image/")
-                ? <img key={i} src={f.url} alt={f.filename ?? "Photo"} className="max-h-40 max-w-48 rounded-xl border border-line object-cover" />
-                : <span key={i} className="flex max-w-56 items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-xs"><FileText className="size-4 shrink-0 text-dim" /><span className="truncate">{f.filename ?? "PDF"}</span></span>)}
-            </div>
-          ) : null}
-          {text ? <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-raised px-3.5 py-2 text-sm">{text}</p> : null}
-        </div>
-      </Rise>
-    );
-  }
+  if (m.role === "user") return <Rise live={live}><Said parts={m.parts} /></Rise>;
   const { parts } = m;
   const answer = parts.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n\n").trim();
 
@@ -165,6 +166,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
         </Fold>
       );
     }
+    if (p.type === "steering-message") return <Said key={i} parts={p.parts} />;
     if (p.type === "text") return <Markdown key={i} body={streaming && i === parts.length - 1 ? remend(p.text) : p.text} />;
     if (!isTool(p)) return null;
     const name = toolName(p), shown = cards.get(i);

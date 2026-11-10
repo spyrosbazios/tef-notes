@@ -3,6 +3,7 @@
 // server writes the messages and the title back as it goes (so a chat opens the same on every device).
 import type { UIMessage } from "ai";
 import type { AgentModels } from "@/core/agent";
+import type { SteerBody, SteerResult } from "@/core/assistant";
 import { api, orNull } from "./api";
 
 export const models = async (): Promise<AgentModels> => (await api.get("/agent/models", { baseURL: "" })).data;
@@ -30,3 +31,7 @@ export const createChat = async (id: string, title: string): Promise<ChatRec> =>
   (await api.post("collections/chats/records", { id, title, messages: [] }, { params: { fields: LIST } })).data;
 
 export const removeChat = async (id: string): Promise<void> => { await orNull(api.delete(`collections/chats/records/${id}`)); };
+
+/** Sends `text` into chat `id`'s running reply (steering); false when the reply ended first, and it goes as a message instead. */
+export const steer = async (id: string, text: string): Promise<boolean> =>
+  ((await api.post(`/agent/chat/${id}/steer`, { text } satisfies SteerBody, { baseURL: "" })).data as SteerResult).delivered;

@@ -6,6 +6,7 @@
 // An assistant client sends `context` (what is on screen, packages/core/src/assistant.ts): it ends the newest message's
 // <context>, and the tools the app does itself (open_note …, no `execute`) are offered. Such a call ends the turn
 // until the client answers it with addToolOutput and resends.
+// While a turn runs, the owner can steer it (steer.ts): their message joins the turn at the next step boundary.
 import {
   createAgentUIStream, createUIMessageStreamResponse, generateId, readUIMessageStream, isStepCount, smoothStream, ToolLoopAgent,
   type InferUITools, type ModelMessage, type UIMessage,
@@ -21,6 +22,7 @@ import { Context, screen } from "./assistant";
 import { repair, settle, WEB_TOOLS, withContext } from "./guard";
 import { key } from "./keys";
 import { stepTools, trim } from "./loop";
+import { steeringFor } from "./steer";
 import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, sees, Unavailable } from "./models";
@@ -148,6 +150,7 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
 
   // A saved chat holds no picture bytes: a draw's picture is for the turn it was drawn in (drawings.ts)
   const keep = saver(server, id, picked), save = (ms: AgentMessage[]) => keep(withoutPictures(ms));
+  const { steering, done } = steeringFor(id);
   let stream: ReadableStream<any>;
   try {
     stream = await createAgentUIStream({
@@ -155,13 +158,15 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
       uiMessages: withContext(await inlinePdfs(messages), ctx.text),
       originalMessages: messages,
       generateMessageId: generateId,
-      abortSignal: req.signal,              // the client's Stop (or a dropped connection) ends the turn
+      abortSignal: req.signal,
+      experimental_steering: steering,              // the client's Stop (or a dropped connection) ends the turn
       // Providers send text in bursts; re-chunk it word by word so the answer arrives at an even pace (~50 words/s)
       experimental_transform: smoothStream({ delayInMs: 20 }),
       onEnd: ({ messages: all }) => save(all),
       onError: (e) => (e instanceof Error ? e.message : String(e)),
     });
   } catch (e) {
+    done();
     return fail(400, `Bad messages: ${(e as Error).message}`);
   }
 
@@ -177,7 +182,7 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
         at = Date.now();
         save([...before, m]);
       }
-    } catch { /* the final save (onEnd) has it */ }
+    } catch { /* the final save (onEnd) has it */ } finally { done(); }
   })();
   return createUIMessageStreamResponse({ stream: out, keepAliveMs: 15_000 });
 }

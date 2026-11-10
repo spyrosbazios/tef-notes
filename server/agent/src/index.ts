@@ -11,6 +11,7 @@ import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
 import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { search } from "./search";
+import { steerRoute } from "./steer";
 import { semantic } from "./semantic";
 import { transcribe, warmSpeech } from "./transcribe";
 
@@ -23,6 +24,7 @@ Bun.serve({
   idleTimeout: 255,                          // a reply can think for a while between chunks; keep-alives come every 15 s
   routes: {
     "/agent/chat": { POST: (req) => chat(req, server) },
+    "/agent/chat/:id/steer": { POST: (req) => steerRoute(req, req.params.id) },
     "/agent/find": { POST: (req) => find(req, server) },
     "/agent/search": { GET: (req) => search(req, server) },
     "/agent/reader": { GET: (req) => reader(req, server) },
