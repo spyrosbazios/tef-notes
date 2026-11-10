@@ -3,7 +3,7 @@
 // notes and tasks panes keep their widths, and are not squeezed. Closed, it is gone from the layout, but the chat is not:
 // that is the provider's (provider.tsx). Under a finger it is opened by the app bar's Assistant button (or the corner button
 // while closed) and closed by the panel's X: there is no edge to drag and no scrim, the page is behind it, not beside it.
-// Below `md` it is the Ask tab: the whole page above the tab bar (`--dock-bottom`, set by the shell), and a step in the history
+// Below `md` it is the Ask tab: the whole screen, padded clear of the floating tab bar (`--dock-bottom`, set by the shell) so no page shows around the pill, and a step in the history
 // (`useAskStep`): the back gesture leaves it, and so does any navigation from inside it (a note or a task picked in the chat, another tab).
 // How it comes and goes follows that: the sheet slides in from the right and speeds off it (Animate UI's sheet), the tab only fades
 // quickly (a tab switch is not a place to travel to), and the docked one does not move at all, as the page beside it would have to
@@ -60,7 +60,7 @@ function Aside({ width, moves }: { width: number; moves: MotionProps }) {
   return (
     <motion.aside ref={ref} data-assistant aria-label="Assistant" style={{ "--dock-w": `${width}px` } as CSSProperties} {...moves}
       // The rail (240px) and a list with its pane (660px) keep their room: the dock takes what is left, up to its own width
-      className="fixed inset-0 z-40 bg-bg max-md:bottom-(--dock-bottom) md:left-auto md:w-(--dock-w) md:max-w-full md:border-l md:border-line md:shadow-xl xl:relative xl:inset-auto xl:z-auto xl:max-w-[calc(100vw-900px)] xl:min-w-80 xl:shrink-0 xl:shadow-none">
+      className="fixed inset-0 z-40 bg-bg max-md:pb-(--dock-bottom) md:left-auto md:w-(--dock-w) md:max-w-full md:border-l md:border-line md:shadow-xl xl:relative xl:inset-auto xl:z-auto xl:max-w-[calc(100vw-900px)] xl:min-w-80 xl:shrink-0 xl:shadow-none">
       <Edge width={width} />
       <Panel />
     </motion.aside>
