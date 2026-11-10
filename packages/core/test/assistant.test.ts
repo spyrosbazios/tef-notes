@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ASK, choiceFrom, choiceOutput, chosenOf, contextOf, goView, isAskTool, isUiTool, LIMITS, UI_TOOL_NAMES, uiToolsFor, viewFrom } from "../src/assistant";
+import { ASK, choiceFrom, choiceOutput, chosenOf, contextOf, goView, isAskTool, isSelectionTool, isUiTool, LIMITS, SELECTION_TOOL_NAMES, UI_TOOL_NAMES, uiToolsFor, viewFrom } from "../src/assistant";
 import { label } from "../src/agent";
 
 describe("viewFrom", () => {
@@ -37,7 +37,7 @@ describe("contextOf", () => {
     expect(contextOf({ view: { kind: "notes" }, note: { path: "notes/a.md", rev: 1.5 } })?.note).toEqual({ path: "notes/a.md", title: "" });
   });
   it("bounds every text, and keeps the selection's newlines", () => {
-    const c = contextOf({ view: { kind: "notes" }, selection: `a\nb${"x".repeat(5000)}`, filter: "y".repeat(500), task: { id: "t", title: "z".repeat(500) } })!;
+    const c = contextOf({ view: { kind: "notes" }, selection: `a\nb${"x".repeat(LIMITS.selection)}`, filter: "y".repeat(500), task: { id: "t", title: "z".repeat(500) } })!;
     expect(c.selection!.length).toBe(LIMITS.selection);
     expect(c.selection!.startsWith("a\nb")).toBe(true);
     expect(c.filter!.length).toBe(LIMITS.filter);
@@ -48,7 +48,7 @@ describe("contextOf", () => {
 describe("the UI tools", () => {
   it("are offered only with a context, and each has a label", () => {
     expect(uiToolsFor(undefined)).toEqual([]);
-    expect(uiToolsFor({ view: { kind: "home" } })).toEqual(UI_TOOL_NAMES);
+    expect(uiToolsFor({ view: { kind: "home" } })).toEqual(UI_TOOL_NAMES.filter((n) => !isSelectionTool(n)));
     for (const n of UI_TOOL_NAMES) expect(label(n)).not.toBe(n);
     expect(isUiTool("open_note")).toBe(true);
     expect(isUiTool("read_note")).toBe(false);
@@ -57,6 +57,21 @@ describe("the UI tools", () => {
     expect(goView({ view: "inbox" })).toEqual({ kind: "inbox" });
     expect(goView({ view: "tag", tag: "home" })).toEqual({ kind: "tag", tag: "home" });
     expect(goView({ view: "tag" })).toBeNull();
+  });
+});
+
+describe("the selection", () => {
+  const note = { path: "notes/20261101-a.md", title: "A" };
+  it("is editable only with words selected in an open note", () => {
+    expect(contextOf({ view: { kind: "home" }, note, selection: "some words", editable: true })?.editable).toBe(true);
+    expect(contextOf({ view: { kind: "home" }, selection: "some words", editable: true })?.editable).toBeUndefined();
+    expect(contextOf({ view: { kind: "home" }, note, selection: "  ", editable: true })?.editable).toBeUndefined();
+    expect(contextOf({ view: { kind: "home" }, note, selection: "x", editable: "yes" })?.editable).toBeUndefined();
+  });
+  it("offers its tools only then, beside every other UI tool", () => {
+    expect(uiToolsFor({ view: { kind: "home" }, note, selection: "x", editable: true })).toEqual(UI_TOOL_NAMES);
+    for (const n of SELECTION_TOOL_NAMES) expect(isUiTool(n) && isSelectionTool(n)).toBe(true);
+    expect(isSelectionTool("open_note")).toBe(false);
   });
 });
 

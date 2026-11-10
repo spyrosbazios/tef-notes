@@ -5,7 +5,10 @@
 //    an answered card sees the screen as it is then), from the URL's nav, the query cache and the selected text;
 //  - the UI tools (core/assistant.ts): a call to open a note, a task or a view is done in the app through the nav
 //    and answered with `addToolOutput`, always, even when it fails;
-//  - `sendAutomaticallyWhen` (`resumes`): the turn resumes after a card's answer and after a UI tool's answer.
+//  - `sendAutomaticallyWhen` (`resumes`): the turn resumes after a card's answer and after a UI tool's answer;
+//  - asks from the selection bar (`ask`): each a chat of its own beside the dock's, saved and listed like any, whose
+//    context is the words it holds in the note (the selection tools change them); `adopt` hands one to the dock. The
+//    dock's own doings (its badge, opening for a card) are for the dock's chat only: an ask shows its reply where it was made.
 // The writes the agent makes reach the screen through `useLive` (realtime), as any other client's do.
 import { Chat } from "@ai-sdk/react";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
@@ -24,6 +27,7 @@ import { activeLensOf } from "@/hooks/lens";
 import { NOTES } from "@/hooks/notes";
 import { persisted } from "@/hooks/store";
 import { TASKS } from "@/hooks/todo";
+import type { Held } from "@/editor";
 import { closeUnfinished, pageContext, resumes, runUiTool, type UiHost } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
 import { useNav } from "@/lib/nav";
@@ -88,16 +92,20 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     showAssistant: () => setDock({ open: true }),
   }), [qc]);
 
-  const build = useCallback((id: string, messages: UIMessage[]): Chat<UIMessage> => {
+  // The dock's chat, for the callbacks of every chat (an ask's included) to tell it apart
+  const docked = useRef<Chat<UIMessage> | null>(null);
+
+  /** A chat; `held`: an ask's, the words it holds while it does (null once let go: a plain chat from then on). */
+  const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null): Chat<UIMessage> => {
     const chat: Chat<UIMessage> = new Chat<UIMessage>({
       id, messages,
       transport: new DefaultChatTransport<UIMessage>({
         api: "/agent/chat",
         prepareSendMessagesRequest: ({ id, messages }) => {
-          const { view, open, task } = navNow.current;
+          const { view, open, task } = navNow.current, words = held?.();
           const context = pageContext({ view, open, task }, {
             notes: qc.getQueryData<NoteRec[]>(NOTES), tasks: qc.getQueryData<TaskRec[]>(TASKS),
-          }, selected.current, activeLensOf(qc));
+          }, words ? words.markdown() : selected.current, activeLensOf(qc), !!words);
           return { body: { id, messages, ...settingsNow(qc), context } };
         },
       }),
@@ -111,7 +119,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           return;
         }
         // Not awaited (the SDK's rule); answered once the app has done it, unless a Stop closed the call meanwhile
-        void runUiTool(toolName, toolCall.input, host)
+        void runUiTool(toolName, toolCall.input, held ? { ...host, held } : host)
           .catch((e: unknown) => uiError(message(e)))
           .then((output) => {
             const open = chat.lastMessage?.parts.some((p) => isTool(p) && p.toolCallId === toolCallId && p.state === "input-available");
@@ -120,6 +128,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       },
       onFinish: ({ message: m, isAbort, isError, isDisconnect }) => {
         void qc.invalidateQueries({ queryKey: CHATS });
+        if (docked.current !== chat) return;
         if (!isAbort) answered();
         // A card waits for its answer: a closed dock would leave the write waiting with nobody to see it
         if (!isAbort && !isError && !isDisconnect && m.parts.some((p) => isTool(p) && p.state === "approval-requested")) setDock({ open: true });
@@ -129,6 +138,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [qc, host]);
 
   const [chat, setChat] = useState<Chat<UIMessage> | null>(null);
+  useEffect(() => { docked.current = chat; }, [chat]);
   const made = useRef(new Set<string>());                    // the chats the server has a record of
   const opening = useRef(0);                                  // which openChat is the latest, so a slow one can't land late
 
@@ -158,7 +168,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   // The dock back on screen (opened, or the app come back to with it open) starts a new chat when the owner's setting says
   // it is due (core/prefs.ts `newChatDue`); the last one stays in the list. Not while a reply runs or a card waits: then the
-  // dock was opened for that conversation (a card, a UI tool), not by the owner for a new one
+  // dock was opened for that conversation (a card, a UI tool), not by the owner for a new one; nor when it opens on a
+  // chat handed to it (`handed`, `adopt`)
+  const handed = useRef(false);
   const latest = useRef({ chat, newChat });
   useEffect(() => { latest.current = { chat, newChat }; });
   useEffect(() => {
@@ -166,6 +178,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     const enter = () => {
       const { chat: c, newChat: fresh } = latest.current, left = seen.left;
       seen.left = false;
+      if (handed.current) { handed.current = false; return; }
       if (!c?.messages.length || c.status === "submitted" || c.status === "streaming") return;
       if (c.lastMessage?.parts.some((p) => isTool(p) && p.state === "approval-requested")) return;
       if (newChatDue(prefsNow().agent.newChat, left, seen.at(), Date.now())) fresh();
@@ -217,7 +230,25 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const stop = useCallback(async () => { if (chat) await halt(chat); }, [chat]);
 
-  const value = useMemo<Assistant>(() => ({ chat, input, setInput, focusKey, show, send, stop, newChat, openChat }),
-    [chat, input, focusKey, show, send, stop, newChat, openChat]);
+  const ask = useCallback(async (text: string, held: () => Held | null) => {
+    const id = newChatId();
+    try { await createChat(id, chatTitle(text)); } catch (e) { toast.error(message(e)); return null; }
+    made.current.add(id);
+    void qc.invalidateQueries({ queryKey: CHATS });
+    const c = build(id, [], held);
+    void c.sendMessage({ text });
+    return c;
+  }, [build, qc]);
+
+  const adopt = useCallback((c: Chat<UIMessage>) => {
+    opening.current++;
+    if (!dockNow().open) handed.current = true;
+    setChat(c);
+    setDock({ open: true, chat: c.id });
+    setFocusKey((k) => k + 1);
+  }, []);
+
+  const value = useMemo<Assistant>(() => ({ chat, input, setInput, focusKey, show, send, stop, newChat, openChat, ask, adopt, halt }),
+    [chat, input, focusKey, show, send, stop, newChat, openChat, ask, adopt]);
   return <AssistantContext value={value}>{children}</AssistantContext>;
 }

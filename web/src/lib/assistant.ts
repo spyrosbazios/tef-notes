@@ -5,6 +5,7 @@ import { getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalRe
 import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type UiOutput, type UiToolName } from "@/core/assistant";
 import { contextFilter, type Lens } from "@/core/lens";
 import { isNotePath } from "@/core/notes";
+import type { Held } from "@/editor";
 import { homeOfTask, isTaskView, titleOf, type View } from "@/lib/nav";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
@@ -31,19 +32,22 @@ export function webView(v: AssistantView): View | null {
 export type Where = { view: View; open?: string; task?: string };
 
 /** What the cache holds. */
-export type Held = { notes?: NoteRec[]; tasks?: TaskRec[] };
+export type Cached = { notes?: NoteRec[]; tasks?: TaskRec[] };
 
 /** The context for a request: the view, the open note, the open task, the text selected on the page, and the lens that is on
  *  (as the `filter`: the web's lists have no filter chip of their own, and the palette closes before it is used). Read when the
- *  message goes out, so a step resumed after a card is answered sees the screen as it is then. */
-export function pageContext(at: Where, held: Held, selection: string, lens?: Lens | null): AssistantContext {
+ *  message goes out, so a step resumed after a card is answered sees the screen as it is then. `editable`: the selection is
+ *  held in the open note's editor (an ask from the selection bar), so the selection tools are on offer. */
+export function pageContext(at: Where, held: Cached, selection: string, lens?: Lens | null, editable = false): AssistantContext {
   const out: AssistantContext = { client: "web", view: assistantView(at.view) };
   const note = at.open ? held.notes?.find((n) => n.note.id === at.open) : undefined;
   if (note) out.note = { path: note.path, title: note.note.title, rev: note.rev };
   const task = at.task && !at.open && isTaskView(at.view) ? held.tasks?.find((t) => t.id === at.task) : undefined;   // an open note hides the task
   if (task) out.task = { id: task.id, title: task.title };
-  const text = selection.trim().slice(0, LIMITS.selection);
+  const words = selection.trim(), text = words.slice(0, LIMITS.selection);
   if (text) out.selection = text;
+  // Editable only when sent whole: the agent replaces exactly what it was sent, so a cut selection would lose its tail
+  if (text && out.note && editable && words.length <= LIMITS.selection) out.editable = true;
   const filter = contextFilter(lens);
   if (filter) out.filter = filter;
   return out;
@@ -65,6 +69,8 @@ export type UiHost = {
   };
   /** `go_view` to the chat: the dock is there already, open it. */
   showAssistant: () => void;
+  /** The words an ask from the selection bar holds, while it does: what the selection tools change. */
+  held?: () => Held | null;
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -92,10 +98,19 @@ export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Pr
       if (v) host.nav.goView(v); else host.showAssistant();
       return UI_OK;
     }
+    case "replace_selection": case "insert_after_selection": {
+      const held = host.held?.();
+      if (!held) return uiError("The selection is gone: the owner closed it or left the note. Nothing was changed.");
+      const ok = name === "replace_selection" ? held.replace(str(i.text)) : held.insertAfter(str(i.text));
+      return ok ? UI_OK : uiError("The selected words changed meanwhile, or there was nothing to add. Nothing was changed.");
+    }
   }
 }
 
-const CANT: Record<AppTool, string> = { open_note: "Couldn't open the note", open_task: "Couldn't open the task", go_view: "Couldn't go there" };
+const CANT: Record<AppTool, string> = {
+  open_note: "Couldn't open the note", open_task: "Couldn't open the task", go_view: "Couldn't go there",
+  replace_selection: "Couldn't change the selected text", insert_after_selection: "Couldn't add under the selected text",
+};
 /** A UI tool call that failed, as a line: what it was, and `why` (the app's answer, or the error). */
 export const uiTrouble = (name: AppTool, why: string) => (why ? `${CANT[name]}: ${why}` : CANT[name]);
 
@@ -111,6 +126,8 @@ export function uiWords(name: AppTool, input: unknown, title: string | undefined
       const to = viewFrom(i.view, { tag: i.tag }), v = to && webView(to);
       return v ? `Went to ${titleOf(v)}` : to ? "Opened the assistant" : "Went to a view";
     }
+    case "replace_selection": return str(i.text).trim() ? "Changed the selected text" : "Removed the selected text";
+    case "insert_after_selection": return "Added under the selected text";
   }
 }
 

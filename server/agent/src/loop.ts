@@ -1,6 +1,7 @@
 // What the agent loop changes between steps (prepareStep): earlier turns' bulky tool results trimmed, and the tools a
 // step is offered.
 import type { ModelMessage, ToolResultPart } from "ai";
+import { SELECTION_TOOL_NAMES } from "@/core/assistant";
 
 /** A tool result from an earlier turn longer than this (as JSON) is replaced by a line saying so. */
 export const TRIM_OVER = 2000;
@@ -25,8 +26,9 @@ function stub(p: ToolResultPart): ToolResultPart {
 }
 
 /** Never offered once the turn has read someone else's text: memory rides on every later chat, the place a page's
- *  instructions would last longest. */
-export const NOT_WHEN_TAINTED = new Set(["update_memory"]);
+ *  instructions would last longest; the selection tools write into a note with no card (core/assistant.ts "the
+ *  selection"), so a page's instructions would too. The note tools stay, and ask. */
+export const NOT_WHEN_TAINTED = new Set(["update_memory", ...SELECTION_TOOL_NAMES]);
 
 /** The tools one step is offered: `base` (the request's), less the ones a tainted turn loses. */
 export const stepTools = <T extends string>(base: readonly T[], tainted: boolean): T[] =>

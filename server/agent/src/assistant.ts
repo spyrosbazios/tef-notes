@@ -1,11 +1,12 @@
 // The always-on assistant on the server's side (contract: packages/core/src/assistant.ts): the page context a client sends
 // with a message, rendered as the `<screen>` block at the end of the newest user message's `<context>` (agent.ts), and the UI
 // tools the client does itself. Those are declared without an `execute`, so the SDK streams the call to the client and the
-// turn waits for its output (`addToolOutput`); they change what the owner sees, never their data, so no confirm card.
+// turn waits for its output (`addToolOutput`); they change what the owner sees, never their data, so no confirm card. The
+// selection tools are the exception: the owner's editor writes them, in sight and undoable (core's "the selection").
 import { tool } from "ai";
 import { z } from "zod";
 import { isNotePath } from "@/core/notes";
-import { ASK, contextOf, GO_VIEWS, LIMITS, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
+import { ASK, contextOf, GO_VIEWS, LIMITS, SELECTION_TEXT_MAX, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
 
 /** True only when A and B are assignable both ways: a schema that drifts from the contract stops compiling. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -32,11 +33,15 @@ const input = {
     })).min(ASK.min).max(ASK.max).refine((os) => new Set(os.map((o) => o.id)).size === os.length, "Each option needs an id of its own"),
     multi: z.boolean().optional().describe("The owner may choose several (tags, tasks); default one"),
   }),
+  replace_selection: z.object({ text: z.string().max(SELECTION_TEXT_MAX).describe("Markdown that takes the selected text's place; empty removes it") }),
+  insert_after_selection: z.object({ text: z.string().min(1).max(SELECTION_TEXT_MAX).describe("Markdown blocks to add under the block the selection ends in") }),
 };
 true satisfies Same<z.infer<typeof input.open_note>, UiToolInput["open_note"]>;
 true satisfies Same<z.infer<typeof input.open_task>, UiToolInput["open_task"]>;
 true satisfies Same<z.infer<typeof input.go_view>, UiToolInput["go_view"]>;
 true satisfies Same<z.infer<typeof input.ask_choice>, UiToolInput["ask_choice"]>;
+true satisfies Same<z.infer<typeof input.replace_selection>, UiToolInput["replace_selection"]>;
+true satisfies Same<z.infer<typeof input.insert_after_selection>, UiToolInput["insert_after_selection"]>;
 
 const ANSWER = "The app does it and answers; if it can't (no such note), it says why.";
 /** No `execute`: the client does these (`ask_choice` the owner does, by tapping). Only offered when the request has a context (`uiToolsFor`). */
@@ -47,6 +52,14 @@ export const uiTools = {
   ask_choice: tool({
     description: "Put a question with 2 to 6 buttons in the chat and wait for the owner's tap: a free slot to book, when to move a task (Today, Tomorrow, Next week), which tags, what to do with a list of overdue tasks. The answer is `{ chosen: [the ids] }` (one id unless `multi`), or `{ error }` if it can't be shown. It changes nothing by itself: make the change with the usual tool afterwards, which asks as it always does. Ask once and stop: the turn goes on with their tap.",
     inputSchema: input.ask_choice,
+  }),
+  replace_selection: tool({
+    description: "Put new markdown where the owner's selected text is (only when the screen says it is editable): their editor makes the change, which they can undo. Answers `{ ok: true }`, or `{ error }` when the words changed meanwhile or the note was closed: then say so, don't retry.",
+    inputSchema: input.replace_selection,
+  }),
+  insert_after_selection: tool({
+    description: "Add markdown blocks under the block the owner's selected text ends in (only when the screen says it is editable), leaving the selection as it is. Answers `{ ok: true }` or `{ error }`, as replace_selection.",
+    inputSchema: input.insert_after_selection,
   }),
 } satisfies Record<UiToolName, unknown>;
 
@@ -68,6 +81,6 @@ export function screen(c: AssistantContext | undefined): string {
   if (c.note) lines.push(`Open note: ${q(c.note.path)} ${q(c.note.title)}${c.note.rev != null ? ` (rev ${c.note.rev})` : ""}`);
   if (c.task) lines.push(`Open task: ${q(c.task.id)} ${q(c.task.title)}`);
   if (c.filter) lines.push(`Filter on the list: ${q(c.filter)}`);
-  if (c.selection) lines.push(`Selected text: ${q(c.selection)}`);
+  if (c.selection) lines.push(`Selected text${c.editable ? " (editable: in the open note, replace_selection and insert_after_selection change it)" : ""}: ${q(c.selection)}`);
   return `<screen>\n${lines.join("\n")}\n</screen>`;
 }

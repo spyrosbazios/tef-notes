@@ -2,7 +2,7 @@
 // resumes by itself, and what a Stop leaves. The contract's own reading of the context is tested in packages/core.
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
-import { choiceOutput, UI_OK } from "@/core/assistant";
+import { choiceOutput, LIMITS, UI_OK } from "@/core/assistant";
 import { assistantView, closeUnfinished, isAppTool, pageContext, resumes, runUiTool, uiWords, webView, type UiHost } from "@/lib/assistant";
 import type { View } from "@/lib/nav";
 import { withNote, type NoteRec } from "@/services/notes";
@@ -50,6 +50,16 @@ describe("the page context", () => {
     expect(pageContext({ view: { kind: "home" }, open: "gone" }, held, "").note).toBeUndefined();
     expect(pageContext({ view: { kind: "home" } }, held, "  some text  ").selection).toBe("some text");
     expect(pageContext({ view: { kind: "home" } }, held, "   ").selection).toBeUndefined();
+  });
+
+  test("a held selection is editable in an open note, and only when it goes whole", () => {
+    const at = { view: { kind: "home" } as const, open: garage.note.id };
+    expect(pageContext(at, held, "words", null, true).editable).toBe(true);
+    expect(pageContext(at, held, "words").editable).toBeUndefined();
+    expect(pageContext({ view: { kind: "home" } }, held, "words", null, true).editable).toBeUndefined();
+    const long = pageContext(at, held, "x".repeat(LIMITS.selection + 1), null, true);
+    expect(long.selection).toHaveLength(LIMITS.selection);
+    expect(long.editable).toBeUndefined();
   });
 });
 

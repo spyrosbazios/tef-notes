@@ -1,7 +1,7 @@
 // The assistant's phone half of `@/core/assistant`, the parts with no React Native in them: what is on screen as an `AssistantContext`, and where a UI tool asks to go. The
 // chat itself stays `useChats`' (store/chats.ts) and the transport's (store/agent.ts); the Ask tab (src/app/(tabs)/ask.tsx) draws it and src/agent/ui-tools.ts navigates.
 import { create } from "zustand";
-import { goView, LIMITS, TASK_LISTS, type AssistantContext, type AssistantView, type TaskList, type UiOutput, type UiToolInput, type UiToolName, uiError } from "@/core/assistant";
+import { goView, LIMITS, TASK_LISTS, type AssistantContext, type AssistantView, type TaskList, type UiOutput, type UiToolInput, type SelectionToolName, type UiToolName, uiError } from "@/core/assistant";
 import { contextFilter, type Lens } from "@/core/lens";
 import { NO_TAG } from "@/core/note-groups";
 import { isNotePath, NOTES } from "@/core/notes";
@@ -57,8 +57,9 @@ export function contextFor(pathname: string, look: Look): AssistantContext {
   }
 }
 
-/** The UI tools the app does by itself: all but the question the owner answers (ui/chat/choice.tsx). */
-export type AppTool = Exclude<UiToolName, "ask_choice">;
+/** The UI tools the app does by itself: all but the question the owner answers (ui/chat/choice.tsx), and the selection
+ *  tools, which the phone never sends the editable selection for. */
+export type AppTool = Exclude<UiToolName, "ask_choice" | SelectionToolName>;
 
 /** Where a UI tool takes the owner: a screen, the full chat, or why the phone can't. */
 export type Destination =

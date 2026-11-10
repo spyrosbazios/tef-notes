@@ -185,6 +185,8 @@
   .pm-editor > :first-child { @apply mt-0; }
   .pm-editor p.is-empty::before { @apply pointer-events-none float-left h-0 text-faint; content: attr(data-placeholder); }
   .pm-editor .ProseMirror-selectednode { @apply outline-2 outline-brand/60; }
+  /* Words held for an ask about them (editor/held.ts): marked like a selection while the focus is in the ask's field */
+  .pm-editor .pm-held { @apply rounded-[2px] bg-brand/20; box-decoration-break: clone; }
   .pm-editor img.ProseMirror-separator { display: inline !important; border: none !important; margin: 0 !important; width: 0 !important; height: 0 !important; }
   .pm-editor li.task-list-item { @apply list-none -ml-5; }
   .pm-editor li.task-list-item > .task-content { @apply min-w-0 flex-1; }

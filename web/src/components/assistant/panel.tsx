@@ -32,14 +32,11 @@ import { useNotes } from "@/hooks/notes";
 import { useStick } from "@/hooks/stick";
 import { useNarrow } from "@/hooks/media";
 import { useTasks } from "@/hooks/todo";
-import { isTool, type Part } from "@/lib/ask";
+import { asking, waiting } from "@/lib/ask";
 import { attachment } from "@/lib/attach";
 import { pageContext } from "@/lib/assistant";
 import { titleOf, useNav } from "@/lib/nav";
 import { chatScroll } from "@/lib/scroll";
-
-const shown = (p: Part) => p.type === "reasoning" || isTool(p) || (p.type === "text" && !!p.text);
-const settled = (p: Part) => isTool(p) && (p.state === "output-available" || p.state === "output-error" || p.state === "output-denied");
 
 /** Pressing Send or Stop must not move the focus off the field: on the phone that closes the keyboard (hooks/keyboard.ts), the layout
  *  shifts under the finger and the tap misses. */
@@ -106,7 +103,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   const field = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { field.current?.focus(); }, [focusKey]);
   const last = messages[messages.length - 1];
-  const asked = last?.role === "assistant" && last.parts.some((p) => isTool(p) && p.state === "approval-requested");   // a card waits for its answer
+  const asked = asking(last);
   const ready = !!model && !asked;
 
   // Files for the next message: here, not in the provider, since a draft carried to another chat would carry them too
@@ -142,9 +139,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !matchMedia("(pointer: coarse)").matches) { e.preventDefault(); void go(input); }
   };
 
-  // Nothing on screen is moving yet: no reply, or the last thing shown is a finished tool call
-  const tail = last?.role === "assistant" ? last.parts.filter(shown).at(-1) : undefined;
-  const waiting = busy && (!tail || settled(tail));
+  const thinking = waiting(last, busy);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -174,9 +169,9 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
                 <Turn key={m.id} m={m} streaming={status === "streaming" && m === last} live={busy && m === last} last={m === last} respond={addToolApprovalResponse} choose={answer} />
               ))}
               {/* Its box follows its content, so the line opens and closes the space it takes instead of blinking in and out */}
-              <AutoHeight aria-hidden={!waiting} deps={[waiting]}>
+              <AutoHeight aria-hidden={!thinking} deps={[thinking]}>
                 <AnimatePresence initial={false}>
-                  {waiting ? (
+                  {thinking ? (
                     <motion.p key="thinking" className="flex items-center gap-2 text-sm text-dim"
                       initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: fade }}>
                       <Loader2 className="size-4 animate-spin" /><ShimmeringText text="Thinking…" color="var(--tf-dim)" shimmeringColor="var(--tf-fg)" />

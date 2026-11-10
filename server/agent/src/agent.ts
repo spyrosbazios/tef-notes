@@ -47,7 +47,8 @@ const Body = z.object({
 /** The date, memory, the notes index and what is on the owner's screen (and the first pages of the open note's PDFs):
  *  they change from one message to the next, so they ride on the newest user message (withContext), not in the
  *  instructions — those stay byte for byte the same, the prompt cache's prefix. The live screen comes last: it changes
- *  most. `pdfs`: whether a PDF's text is in it, which taints the turn (approvals). */
+ *  most. `foreign`: whether someone else's text is in it, which taints the turn (approvals): a PDF's, or words selected
+ *  in an open note a chat that read the web wrote (its `tainted` column: the selection is that note's text, read back). */
 async function context(notes: Notes, page: AssistantContext | undefined) {
   const memory = (await notes.meta(MEMORY))?.text.trim() || "(empty)";
   const open = page?.note && await notes.meta(page.note.path);
@@ -55,7 +56,7 @@ async function context(notes: Notes, page: AssistantContext | undefined) {
   const shown = [screen(page), pdfs].filter(Boolean).join("\n\n");
   return {
     text: `<context>\n${today()}\n\n<file path="${MEMORY}">\n${memory}\n</file>\n\n<notes>\n${noteIndex(await notes.list())}\n</notes>${shown && `\n\n${shown}`}\n</context>`,
-    pdfs: !!pdfs,
+    foreign: !!pdfs || (!!page?.selection && !!open?.tainted),
   };
 }
 
@@ -92,11 +93,11 @@ export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean
   };
 }
 
-/** `pdfs`: a PDF's text is in this turn's context, or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
-async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, pdfs: boolean) {
+/** `foreign`: someone else's text is in this turn's context (`context`), or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
+async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean) {
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
-  const read = readWeb(notes, todo), untrusted = pdfs ? async () => true : read;
+  const read = readWeb(notes, todo), untrusted = foreign ? async () => true : read;
   const web = !!(await key("exa")), all = tools(notes, todo, untrusted);
   // Out of the prompt: the web tools without an Exa key, and the tools the client does
   // itself unless this page can do them
@@ -130,7 +131,7 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
 
   const notes = new Notes(server), todo = new Todo(server), ctx = await context(notes, page);
   let agent: ToolLoopAgent<never, Tools>;
-  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.pdfs || hasAttachment(parsed.data.messages as AgentMessage[])); } catch (e) {
+  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.foreign || hasAttachment(parsed.data.messages as AgentMessage[])); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }

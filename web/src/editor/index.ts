@@ -5,7 +5,7 @@
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { history } from "prosemirror-history";
-import { Fragment, Slice } from "prosemirror-model";
+import { Slice } from "prosemirror-model";
 import type { Node } from "prosemirror-model";
 import { EditorState, Plugin, Selection, TextSelection } from "prosemirror-state";
 import { cellAround, tableEditing } from "prosemirror-tables";
@@ -13,7 +13,8 @@ import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { base, commands, isActive, keys, linkAt, setLink, typed } from "./commands";
 import type { CommandName } from "./commands";
 import { chipHref, drawingPreviewSrc, fileChips, isDrawingLink, type PdfPage, type PdfPages } from "./files";
-import { normalizeBody, parse, schema, serialize } from "./markdown";
+import { heldMark, heldRange, hold, type Held } from "./held";
+import { markdownSlice, normalizeBody, parse, schema, serialize, sliceMarkdown } from "./markdown";
 import { linkCards } from "./link-cards";
 import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
@@ -24,7 +25,7 @@ import type { ResolveImage } from "./views";
 
 export { normalizeBody };
 export { drawingPreviewSrc, isDrawingLink } from "./files";
-export type { CommandName, PdfPage, PdfPages, ResolveImage, ResolveLink, Summarize };
+export type { CommandName, Held, PdfPage, PdfPages, ResolveImage, ResolveLink, Summarize };
 
 /** A picture the note shows, for the viewer: an image, or a drawing's preview. `src` is the file's own path (`../attachments/<id>/<name>`). */
 export type GalleryItem = { src: string; alt: string };
@@ -85,6 +86,11 @@ export type Editor = {
   /** The selected text's box on screen, for a bar floating over it. Null when nothing is selected, the selection isn't
    *  text (a picture, cells), it sits in code, the editor hasn't the focus, or a mouse is still dragging it out. */
   selectionBox(): DOMRect | null;
+  /** Hold the selected words for an ask about them (./held): marked while the focus is elsewhere, changed only while
+   *  unchanged. Null without a text selection. */
+  hold(): Held | null;
+  /** The held words' box on screen (they may have changed since: an answer replaced them), for what is anchored to them. */
+  heldBox(): DOMRect | null;
   /** The editor's element: what a bar floating over the selection tracks the scrolling of. */
   readonly dom: HTMLElement;
   /** Called after every state change (edit or cursor move), focus change and the end of a mouse drag: redraw what depends on `isActive`. */
@@ -116,14 +122,6 @@ const trailingParagraph = new Plugin({
   },
 });
 
-/** Pasted plain text is markdown: a pasted list is a list. A lone paragraph merges into the text at the cursor. */
-function textSlice(text: string): Slice {
-  const doc = parse(text);
-  return doc.childCount === 1 && doc.firstChild?.type === schema.nodes.paragraph
-    ? new Slice(Fragment.from(doc.firstChild), 1, 1)
-    : new Slice(doc.content, 0, 0);
-}
-
 export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   let resolve: ResolveImage = options.resolveImage ?? ((src) => src);
   let last = "", touched = false, dragging = false;
@@ -142,6 +140,14 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     return out;
   };
 
+  /** A range's box on screen: over one line, its words; over several, the text's width from the first line's top to the last's foot. */
+  const boxOf = (from: number, to: number): DOMRect => {
+    const a = view.coordsAtPos(from, 1), b = view.coordsAtPos(to, -1);
+    if (Math.abs(a.top - b.top) < 2) return new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.left - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top));
+    const box = view.dom.getBoundingClientRect();
+    return new DOMRect(box.left, a.top, box.width, b.bottom - a.top);
+  };
+
   // Focus lands after the event that reports it: tell the listeners once it has
   const notify = () => { queueMicrotask(() => listeners.forEach((l) => l())); };
   const open = (href: string) => { if (!options.onLink?.(href)) window.open(href, "_blank", "noopener,noreferrer"); };
@@ -149,7 +155,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   const stateFor = (doc: Node) => EditorState.create({
     doc,
     plugins: [
-      history(), typed, keys, base, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
+      history(), typed, keys, base, heldMark, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
       placeholder(options.placeholder ?? ""), trailingParagraph, fileChips(() => resolve, options.pdfPage, options.pdfPages),
       ...(options.onRead ? [readLinks(options.onRead, options.summarize)] : []),
       ...(options.resolveLink ? [linkCards(options.resolveLink, open, options.onRead, options.summarize, options.inlineVideo ?? true)] : []),
@@ -213,11 +219,9 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       options.onFiles?.(files);
       return true;
     },
-    clipboardTextParser: (text) => textSlice(text),
-    clipboardTextSerializer(slice) {
-      const blocks = slice.content.firstChild?.isBlock ? slice.content : Fragment.from(schema.nodes.paragraph.create(null, slice.content));
-      return serialize(schema.topNodeType.create(null, blocks)).replace(/\n$/, "");
-    },
+    // Pasted plain text is markdown: a pasted list is a list
+    clipboardTextParser: (text) => markdownSlice(text),
+    clipboardTextSerializer: (slice) => sliceMarkdown(slice),
   });
   last = serialize(view.state.doc);
 
@@ -276,12 +280,13 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     selectionBox() {
       const sel = view.state.selection;
       if (dragging || sel.empty || !(sel instanceof TextSelection) || sel.$from.parent.type.spec.code || !view.hasFocus()) return null;
-      const a = view.coordsAtPos(sel.from, 1), b = view.coordsAtPos(sel.to, -1);
-      // Over one line, the selected words; over several, the text's width between the first line's top and the last's foot
-      if (Math.abs(a.top - b.top) < 2) return new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.abs(b.left - a.left), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top));
-      const box = view.dom.getBoundingClientRect();
-      return new DOMRect(box.left, a.top, box.width, b.bottom - a.top);
+      return boxOf(sel.from, sel.to);
     },
+    heldBox() {
+      const r = heldRange(view.state);
+      return r && r.to > r.from ? boxOf(r.from, r.to) : null;
+    },
+    hold: () => hold(view),
     dom: view.dom,
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     destroy() { listeners.clear(); view.destroy(); },

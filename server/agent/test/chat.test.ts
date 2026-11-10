@@ -155,6 +155,22 @@ describe("POST /agent/chat as the always-on assistant", () => {
     expect(done.parts.find(isToolUIPart)).toMatchObject({ state: "output-available" });
   });
 
+  it("offers the selection tools only for an editable selection, and says so on the screen", async () => {
+    replies = [text("a"), text("b")];
+    await send([user], false, page);
+    await send([user], false, { ...page, editable: true });
+    expect(offered[0]).not.toContain("replace_selection");
+    expect(offered[1]).toEqual(expect.arrayContaining(["replace_selection", "insert_after_selection", "add_task", "open_note"]));
+    expect(JSON.stringify(prompts[0])).not.toContain("Selected text (editable");
+    expect(JSON.stringify(prompts[1])).toContain("Selected text (editable");
+  });
+
+  it("streams a selection edit to the client like an app tool, with no card even with the cards on", async () => {
+    replies = [toolCall("replace_selection", { text: "**eggs**" })];
+    const asked = await send([user], false, { ...page, editable: true });
+    expect(asked.parts.find(isToolUIPart)).toMatchObject({ type: "tool-replace_selection", state: "input-available", input: { text: "**eggs**" } });
+  });
+
   it("closes an app tool nobody answered when the owner types on, so the next send doesn't throw", async () => {
     replies = [toolCall("go_view", { view: "inbox" })];
     const asked = await send([user], false, page);
@@ -184,15 +200,30 @@ describe("POST /agent/chat between steps", () => {
     expect(JSON.stringify(pb.chats.get("chat1")!.messages)).toContain(big.trim());        // the saved chat keeps it
   });
 
-  it("offers update_memory until the turn reads someone else's text", async () => {
+  it("offers update_memory and the selection tools until the turn reads someone else's text", async () => {
     replies = [text("a")];
     await send([ask("u1", "hi")]);
     expect(offered[0]).toContain("update_memory");
 
     pb.attach(parseNote("notes/20261001-shopping.md", "").id, "list.pdf", makePdf(["Flour"]));
-    replies = [text("b")];
+    replies = [text("b"), text("c")];
     await send([ask("u1", "hi")], false, { client: "web", view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 } });
+    await send([ask("u1", "hi")], false, { client: "web", view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 }, selection: "Flour", editable: true });
     expect(offered[1]).not.toContain("update_memory");
     expect(offered[1]).toContain("read_note");
+    expect(offered[2]).not.toContain("replace_selection");
+    expect(offered[2]).toContain("open_note");
+  });
+
+  it("withdraws the selection tools when the words are a note's that a chat which read the web wrote", async () => {
+    const page = { client: "web", view: { kind: "today" }, note: { path: "notes/20261002-clip.md", title: "Clip" }, selection: "words", editable: true };
+    pb.put("notes/20261002-clip.md", "---\ntitle: Clip\ncreated: 2026-10-02\n---\nwords\n", { tainted: true });
+    pb.put("notes/20261003-mine.md", "---\ntitle: Mine\ncreated: 2026-10-03\n---\nwords\n");
+    replies = [text("a"), text("b")];
+    await send([ask("u1", "shorten")], false, page);
+    await send([ask("u1", "shorten")], false, { ...page, note: { path: "notes/20261003-mine.md", title: "Mine" } });
+    expect(offered[0]).not.toContain("replace_selection");
+    expect(offered[0]).toContain("read_note");
+    expect(offered[1]).toContain("replace_selection");
   });
 });

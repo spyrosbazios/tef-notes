@@ -2,6 +2,7 @@
 // which survives navigating and closing the dock, the message field, and what the rest of the app asks of it.
 import type { Chat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
+import type { Held } from "@/editor";
 import { createContext, useContext } from "react";
 
 export type Assistant = {
@@ -21,6 +22,13 @@ export type Assistant = {
   /** A chat with nothing in it yet. */
   newChat: () => void;
   openChat: (id: string) => void;
+  /** Ask about words held in a note (the selection bar): `text` goes as the first message of a chat of its own, beside the
+   *  dock's, whose context is `held()`'s words while it returns them. Null when the chat's record could not be made. */
+  ask: (text: string, held: () => Held | null) => Promise<Chat<UIMessage> | null>;
+  /** Make `chat` the dock's and open the dock on it: an ask carried on in the full chat. */
+  adopt: (chat: Chat<UIMessage>) => void;
+  /** Stop any chat's reply, and close the tool calls it left unfinished (`stop` is the dock's). */
+  halt: (chat: Chat<UIMessage>) => Promise<void>;
 };
 
 export const AssistantContext = createContext<Assistant | null>(null);

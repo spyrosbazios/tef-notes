@@ -4,8 +4,9 @@
 //    open, so "this note" and "this task" mean something. The server reads it with `contextOf` (untrusted input) and renders
 //    it into the newest user message's `<context>`, never into the instructions.
 //  - the UI tools: tools the server declares without an `execute`, so the AI SDK streams the call to the client, which does
-//    it in the app (`onToolCall`) and answers with `addToolOutput` an `UiOutput`. They change what the owner sees, never
+//    it in the app (`onToolCall`) and answers with `addToolOutput` an `UiOutput`. Most change what the owner sees, never
 //    their data: no confirm card. One of them, `ask_choice`, is answered by the owner, not by the app: see "the question".
+//    Two write, into the text the owner selected and asked about: see "the selection".
 // Pure: no "ai", RN or DOM import, since the sidecar loads this file outside the clients' node_modules.
 
 import { isNotePath } from "./notes";
@@ -27,18 +28,21 @@ export type AssistantView = { kind: PlainView } | { kind: "tag"; tag: string };
 /** What is on screen, sent with every message. Only what is set: a client leaves out what it doesn't have.
  *  `note`: the open note; `rev` is the one the client holds.
  *  `task`: the open task. `selection`: text the owner
- *  has selected on the page; `filter`: the search text or filter chip applied to the list. */
+ *  has selected on the page; `editable`: that text is in the open note's editor, held for the selection tools (an ask made
+ *  from it, not the dock's); `filter`: the search text or filter chip applied to the list. */
 export type AssistantContext = {
   client?: "web" | "phone";
   view: AssistantView;
   note?: { path: string; title: string; rev?: number };
   task?: { id: string; title: string };
   selection?: string;
+  editable?: true;
   filter?: string;
 };
 
-/** How much of each piece the server keeps; a client may send less, never more. */
-export const LIMITS = { id: 64, tag: 60, title: 200, selection: 2000, filter: 400 } as const;
+/** How much of each piece the server keeps; a client may send less, never more. A selection asked about may be a whole
+ *  section to summarise or rewrite: a client holds back an editable one longer than this rather than send it cut. */
+export const LIMITS = { id: 64, tag: 60, title: 200, selection: 8000, filter: 400 } as const;
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 /** One line, whitespace collapsed, cut at `max`; "" for anything but a string. */
@@ -70,6 +74,7 @@ export function contextOf(raw: unknown): AssistantContext | undefined {
   if (t && id) out.task = { id, title: line(t.title, LIMITS.title) };
   const selection = typeof o.selection === "string" ? o.selection.trim().slice(0, LIMITS.selection) : "";
   if (selection) out.selection = selection;
+  if (selection && out.note && o.editable === true) out.editable = true;
   const filter = line(o.filter, LIMITS.filter);
   if (filter) out.filter = filter;
   return out;
@@ -84,13 +89,15 @@ export type UiToolInput = {
   open_task: { id: string };
   go_view: { view: GoViewKind; tag?: string };
   ask_choice: { question: string; options: ChoiceOption[]; multi?: boolean };
+  replace_selection: { text: string };
+  insert_after_selection: { text: string };
 };
 export type UiToolName = keyof UiToolInput;
 /** Where `go_view` can go: any view. */
 export const GO_VIEWS = VIEW_KINDS;
 export type GoViewKind = ViewKind;
 
-export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice"] as const satisfies readonly UiToolName[];
+export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice", "replace_selection", "insert_after_selection"] as const satisfies readonly UiToolName[];
 export const isUiTool = (name: string): name is UiToolName => (UI_TOOL_NAMES as readonly string[]).includes(name);
 
 /** What a client answers a UI tool with (`addToolOutput({ tool, toolCallId, output })`): `{ ok: true }` once the app shows it,
@@ -104,10 +111,26 @@ export const uiError = (error: string): UiOutput => ({ error });
 export const goView = (i: UiToolInput["go_view"]): AssistantView | null => viewFrom(i.view, i);
 
 /** The UI tools a request may use: those the client can do. Without a context there is no assistant to do them (the call
- *  would hang), so none; a page that can't do one narrows the list here. */
+ *  would hang), so none; the selection tools only when it holds an editable selection. */
 export function uiToolsFor(context: AssistantContext | undefined): readonly UiToolName[] {
-  return context ? UI_TOOL_NAMES : [];
+  if (!context) return [];
+  return context.editable ? UI_TOOL_NAMES : UI_TOOL_NAMES.filter((n) => !isSelectionTool(n));
 }
+
+// ---- the selection
+
+// An ask made from selected words in a note (the web's selection bar) carries them as an `editable` selection, and the agent
+// may then change those words in place: `replace_selection` puts its markdown where they are, `insert_after_selection` adds
+// its markdown under the block they end in. The client's editor does it, as the owner's own edit: saved like their typing,
+// undone with Undo; refused (`{ error }`) when the words changed meanwhile or the note was closed. Every other tool stays
+// on offer (a task made of the words, a note linked), with its card as ever. Withdrawn once the turn has read someone
+// else's text, like memory (server/agent/src/loop.ts): a page's instructions would otherwise write with no card.
+
+export const SELECTION_TOOL_NAMES = ["replace_selection", "insert_after_selection"] as const satisfies readonly UiToolName[];
+export type SelectionToolName = (typeof SELECTION_TOOL_NAMES)[number];
+export const isSelectionTool = (name: string): name is SelectionToolName => (SELECTION_TOOL_NAMES as readonly string[]).includes(name);
+/** The most markdown one call may write. */
+export const SELECTION_TEXT_MAX = 20_000;
 
 // ---- the question
 

@@ -12,7 +12,7 @@ import MarkdownIt from "markdown-it";
 import type { Token } from "markdown-it";
 import { MarkdownParser, MarkdownSerializerState } from "prosemirror-markdown";
 import type { ParseSpec } from "prosemirror-markdown";
-import { Schema } from "prosemirror-model";
+import { Fragment, Schema, Slice } from "prosemirror-model";
 import type { Mark, Node, NodeSpec } from "prosemirror-model";
 import { tableNodes } from "prosemirror-tables";
 
@@ -386,3 +386,18 @@ export function serialize(doc: Node): string {
 
 /** `md` as the editor would write it back after opening and closing the note: the one-off cleanup of a body. */
 export const normalizeBody = (md: string): string => serialize(parse(md));
+
+/** Markdown as a piece to put in the text (pasted, or the agent's answer to a selection): a lone paragraph merges into the
+ *  text around it, so pasted words stay in the line; blocks stay blocks. */
+export function markdownSlice(markdown: string): Slice {
+  const doc = parse(markdown);
+  return doc.childCount === 1 && doc.firstChild?.type === schema.nodes.paragraph
+    ? new Slice(Fragment.from(doc.firstChild), 1, 1)
+    : new Slice(doc.content, 0, 0);
+}
+
+/** A piece of the text as markdown (copied, or selected words sent to the agent): inline content is a paragraph's. */
+export function sliceMarkdown(slice: Slice): string {
+  const blocks = slice.content.firstChild?.isBlock ? slice.content : Fragment.from(schema.nodes.paragraph.create(null, slice.content));
+  return serialize(schema.topNodeType.create(null, blocks)).replace(/\n$/, "");
+}

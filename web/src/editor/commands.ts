@@ -18,7 +18,7 @@ const { strong, em, strike, code, link } = schema.marks;
 
 export type CommandName =
   | "bold" | "italic" | "strike" | "code" | "link"
-  | "heading1" | "heading2" | "heading3" | "bulletList" | "orderedList" | "taskList" | "blockquote" | "codeBlock" | "rule" | "table"
+  | "paragraph" | "heading1" | "heading2" | "heading3" | "bulletList" | "orderedList" | "taskList" | "blockquote" | "codeBlock" | "rule" | "table"
   | "moveUp" | "moveDown" | "undo" | "redo" | "addRow" | "addColumn" | "deleteRow" | "deleteColumn" | "deleteTable";
 
 // ---- where the selection is
@@ -58,6 +58,7 @@ export function isActive(state: EditorState, name: CommandName): boolean {
     case "strike": return markActive(state, strike);
     case "code": return markActive(state, code);
     case "link": return linkAt(state) !== null;
+    case "paragraph": return parent.type === paragraph;
     case "heading1": case "heading2": case "heading3": return parent.type === heading && parent.attrs.level === Number(name.slice(-1));
     case "bulletList": return !!up(state, bullet_list) && !inTask(state);
     case "orderedList": return !!up(state, ordered_list);
@@ -159,7 +160,7 @@ export function setLink(href: string | null): Command {
 
 export const commands: Record<Exclude<CommandName, "link">, Command> = {
   bold: toggleMark(strong), italic: toggleMark(em), strike: toggleMark(strike), code: toggleMark(code),
-  heading1: toggleBlock(heading, { level: 1 }), heading2: toggleBlock(heading, { level: 2 }), heading3: toggleBlock(heading, { level: 3 }),
+  paragraph: setBlockType(paragraph), heading1: toggleBlock(heading, { level: 1 }), heading2: toggleBlock(heading, { level: 2 }), heading3: toggleBlock(heading, { level: 3 }),
   bulletList: toggleBullets, orderedList: toggleList(ordered_list), taskList: toggleTask,
   blockquote: toggleWrap(blockquote), codeBlock: toggleBlock(code_block), rule: insertRule, table: insertTable,
   moveUp: moveItem(-1), moveDown: moveItem(1), undo, redo,
@@ -196,11 +197,10 @@ const tab = (dir: 1 | -1): Command => chainCommands(
   goToNextCell(dir),
 );
 
-const heading0: Command = setBlockType(paragraph);
 
 export const keys = keymap({
   "Mod-b": commands.bold, "Mod-i": commands.italic, "Mod-e": commands.code, "Mod-Shift-x": commands.strike,
-  "Mod-Alt-0": heading0, "Mod-Alt-1": commands.heading1, "Mod-Alt-2": commands.heading2, "Mod-Alt-3": commands.heading3,
+  "Mod-Alt-0": commands.paragraph, "Mod-Alt-1": commands.heading1, "Mod-Alt-2": commands.heading2, "Mod-Alt-3": commands.heading3,
   "Mod-Shift-7": commands.orderedList, "Mod-Shift-8": commands.bulletList, "Mod-Shift-9": commands.taskList,
   "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo,
   Enter: chainCommands(enterInCell, fenceOnEnter, splitListItem(list_item), newlineInCode, createParagraphNear, liftEmptyBlock, splitBlock),
