@@ -42,13 +42,13 @@ services:
       - agent_data:/data   # search by meaning: the model and the notes' vectors, derived (deleting it costs one re-embed)
     depends_on: [pocketbase]
     restart: unless-stopped
-  # Voice input: Parakeet speech to text (English) on the CPU, reached only by the agent (/agent/transcribe), no port on
+  # Voice input: Parakeet speech to text (25 European languages) on the CPU, reached only by the agent (/agent/transcribe), no port on
   # the host. Loads its model (~650 MB of memory) on first use and drops it after the idle time set in the app's Settings.
   # README.md "Voice input". Not wanted: TEF_NOTES_STT= in .env, and `docker compose stop stt` (or leave it: idle, it is ~60 MB).
   stt:
     image: ghcr.io/spyrosbazios/tef-notes-stt:${TEF_NOTES_VERSION:-latest}
     volumes:
-      - stt_data:/data   # the model, downloaded once (~460 MB)
+      - stt_data:/data   # the model, downloaded once (~670 MB)
     restart: unless-stopped
 volumes:
   agent_data:

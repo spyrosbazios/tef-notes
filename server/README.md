@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-11 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -121,23 +121,24 @@ addresses, or the subscription is deleted.
 
 ## Voice input
 
-The mic in the apps (the assistant, a new task, a task's notes, a note's header, search, Settings → Voice) records a clip in
-the browser, decodes it to mono 16 kHz samples and posts it to the agent's `POST /agent/transcribe`, which hands it to the
-`stt` container and returns the text. Speech to text is [Parakeet TDT_CTC 110M](https://huggingface.co/OpenVoiceOS/nvidia-parakeet-tdt_ctc-110m-onnx)
-(NVIDIA's model, English only, pinned to one commit) run by [onnx-asr](https://github.com/istupakov/onnx-asr) on the
+The mic in the apps (the assistant, a new task, a task's notes, a note's header, search, Settings → Voice) records mono
+16 kHz samples in the browser and, while you talk, cuts them at pauses into pieces of 6–20 s, each posted to the agent's
+`POST /agent/transcribe` as it is cut, which hands it to the `stt` container and returns its text; stopping waits only for
+the last piece. Speech to text is [Parakeet TDT 0.6B v3](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)
+(NVIDIA's model, int8, 25 European languages including Greek and English, pinned to one commit) run by [onnx-asr](https://github.com/istupakov/onnx-asr) on the
 CPU, `stt/app.py`. Nothing is stored: not the recording, not the text, only what lands in the field it was dictated into.
 
 - **The model lives in a worker process** that the service starts on the first clip (or when the mic is pressed, which
   calls `/agent/transcribe/warm` so the clip that follows waits for no load) and kills once it has sat idle for the time
   set in the app's Settings → Voice (default 5 minutes; "Unload right away" drops it after each clip; up to an hour). A
-  process, because freeing the model in-process left its memory with the allocator. Loaded, it holds about 650 MB; the
-  service idle without it, about 60 MB. On a 4-core N100, 10 s of speech takes about 1 s, with 2 threads per clip (more
+  process, because freeing the model in-process left its memory with the allocator. Loaded, it holds about 1.4 GB; the
+  service idle without it, about 60 MB. On a 4-core N100, 10 s of speech takes about 2 s, with 2 threads per clip (more
   were slower beside the rest of the host).
-- **First use downloads the model** (~460 MB) from huggingface.co into the `stt_data` volume, so the container needs to
+- **First use downloads the model** (~670 MB) from huggingface.co into the `stt_data` volume, so the container needs to
   reach it once; `docker compose logs stt` then shows `stt: loaded ... in Ns` and, per clip, `stt: 8.2s of audio in
-  0.9s`. Deleting the volume costs one download.
-- **Limits**: a clip is at most ten minutes (the apps stop recording there); clips longer than 25 s are cut at their
-  pauses by a VAD first, since Parakeet takes 20–30 s at a time. One clip is transcribed at a time.
+  1.8s`. Deleting the volume costs one download.
+- **Limits**: a clip is at most ten minutes (the apps stop recording there); a clip longer than 25 s (one the app
+  didn't cut) is cut at its pauses by a VAD first, since Parakeet takes 20–30 s at a time. One clip is transcribed at a time.
 - **The microphone needs a secure context**: browsers allow `getUserMedia` only on `https://` or `localhost`, so over a
   plain `http://` LAN address the mic is hidden. The reverse proxy's HTTPS origin (Tailscale Serve, Caddy) gives it.
 - **Turning it off**: `TEF_NOTES_STT=` (empty) in `.env`, then `docker compose up -d`; the apps hide their mic and the

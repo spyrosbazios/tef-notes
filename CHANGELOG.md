@@ -3,6 +3,14 @@
 All notable changes to TEF Notes. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 version is one semver number for the whole repository, set by the git tag (see [CONTRIBUTING.md](CONTRIBUTING.md#versioning)).
 
+## Unreleased
+
+### Changed
+
+- Voice input: Parakeet TDT 0.6B v3 (int8) replaces TDT_CTC 110M: fewer misheard words, and Greek with 24 other European
+  languages besides English, at the same speed. The app sends a recording in pieces cut at pauses while you talk, so
+  stopping waits only for the last few seconds. The model needs ~1.4 GB loaded (was ~650 MB).
+
 ## 0.9.0 - 2026-11-10
 
 ### Added

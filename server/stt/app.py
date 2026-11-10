@@ -1,7 +1,9 @@
-"""Speech to text: NVIDIA Parakeet TDT_CTC 110M (English) on the CPU, through onnx-asr.
+"""Speech to text: NVIDIA Parakeet TDT 0.6B v3 (25 European languages, Greek and English among them), int8, on the CPU,
+through onnx-asr.
 
 Reached only by the agent (server/agent/src/transcribe.ts) on the compose network; never published. Holds nothing: a
-clip is transcribed in memory and dropped. The model (~460 MB on disk, ~650 MB resident) is loaded on the first request
+clip is transcribed in memory and dropped. The clients send a recording in pieces cut at pauses as it is spoken
+(packages/core/src/voice.ts `cutOf`), so a clip is rarely over 20 s. The model (~670 MB on disk, ~1.4 GB resident) is loaded on the first request
 in a worker process, and unloaded (the process ended) once it has sat idle for the `keep` seconds the last request asked for (the owner's setting, prefs.ts
 `voice.keep`): 0 unloads it as soon as the clip is done.
 
@@ -23,12 +25,12 @@ import onnx_asr
 import onnxruntime as ort
 from huggingface_hub import snapshot_download
 
-#: Parakeet TDT_CTC 110M as onnx-asr loads it, pinned to a commit. Chosen over TDT 0.6B v2 for speed: on the N100 it is
-#: ~2.5x faster (10 s of speech in ~1 s) at ~a third of the memory, for slightly more misheard words. fp32: its int8
-#: export is no faster here.
-MODEL = "OpenVoiceOS/nvidia-parakeet-tdt_ctc-110m-onnx"
-REVISION = "40cd0e28e787fc8a2635abf5258e0f886b5304a9"
-FILES = ["config.json", "vocab.txt", "encoder-model.onnx", "encoder-model.onnx_data", "decoder_joint-model.onnx", "decoder_joint-model.onnx_data"]
+#: Parakeet TDT 0.6B v3 as onnx-asr loads it, int8, pinned to a commit. Measured on the N100 (2026-11-11) against the
+#: TDT_CTC 110M it replaced: as fast at 2 threads (real-time factor ~0.22: 10 s of speech in ~2.2 s), fewer dropped
+#: words, multilingual; ~1.4 GB resident against ~1.1 GB.
+MODEL = "istupakov/parakeet-tdt-0.6b-v3-onnx"
+REVISION = "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce"
+FILES = ["config.json", "vocab.txt", "nemo128.onnx", "encoder-model.int8.onnx", "decoder_joint-model.int8.onnx"]
 #: Threads per clip: measured on the 4-core N100, 2 beat 4 (and 1, and 3), since the other cores are busy with the rest of
 #: the host.
 THREADS = 2
@@ -57,10 +59,10 @@ def serve(conn):
     """The worker: loads the model (downloaded once into the data volume), then transcribes what it is sent. A process of
     its own because freeing a model inside one leaves its memory with the allocator: killing the process gives it back."""
     t = time.monotonic()
-    path = snapshot_download(MODEL, revision=REVISION, allow_patterns=FILES, local_dir=os.path.join(DATA, "parakeet-110m"))
+    path = snapshot_download(MODEL, revision=REVISION, allow_patterns=FILES, local_dir=os.path.join(DATA, "parakeet-0.6b-v3"))
     opts = ort.SessionOptions()
     opts.intra_op_num_threads = THREADS
-    asr = onnx_asr.load_model("nemo-conformer-tdt", path, sess_options=opts)
+    asr = onnx_asr.load_model("nemo-conformer-tdt", path, quantization="int8", sess_options=opts)
     vad = onnx_asr.load_vad("silero", os.path.join(DATA, "silero"))
     long = asr.with_vad(vad)
     # The first runs set onnxruntime up for a clip's length (~2-4 s): do them now, on 10 s of faint noise (silence is cut

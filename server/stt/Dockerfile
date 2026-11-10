@@ -1,4 +1,4 @@
-# Speech to text (app.py): Parakeet TDT_CTC 110M on the CPU. Context: the repo root, like the agent's; allowlist:
+# Speech to text (app.py): Parakeet TDT 0.6B v3 (int8) on the CPU. Context: the repo root, like the agent's; allowlist:
 # Dockerfile.dockerignore beside this file. The model downloads into /data (a volume) on first use, not into the image.
 FROM python:3.13-slim
 WORKDIR /app

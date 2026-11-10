@@ -32,7 +32,7 @@
 
 Write Markdown notes with checkboxes, tables and code. Add photos, PDFs and Excalidraw drawings. Save pages and
 pictures with the Chrome clipper, and open articles in a distraction-free Reader view. Or say it: a mic wherever you type
-turns English speech into text on your own server, and keeps no recording.
+turns speech (English, Greek and 23 more European languages) into text on your own server, and keeps no recording.
 
 ### Keep tasks close to their context
 
