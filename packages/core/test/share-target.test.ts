@@ -37,7 +37,7 @@ describe("Android's form as a share", () => {
 });
 
 describe("what a lens gives a clip", () => {
-  const work: Lens = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null };
+  const work: Lens = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null };
   it("its first tag to what is made, nothing to what is appended to", () => {
     expect(clipTags(NEW, work)).toEqual(["work"]);
     expect(clipTags(NEW_TASK, work)).toEqual(["work"]);

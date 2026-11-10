@@ -245,7 +245,7 @@ function LensView({ w }: { w: LensWidget }) {
   const kept = useLenses((s) => s.lenses.some((l) => fold(l.name) === fold(name.trim()) && same(l.tags, w.tags) && same(l.exclude, w.exclude)));
   const { accent } = w;
   const swatch = accentColor(THEMES[theme.name], accent ?? own);
-  const fields = { name: name.trim(), tags: w.tags, exclude: w.exclude, accent: accent ?? null };
+  const fields = { name: name.trim(), tags: w.tags, exclude: w.exclude, accent: accent ?? null, theme: w.theme ?? null };
   const save = async () => {
     const problem = lensProblem(fields);
     if (problem) { setErr(problem); return; }

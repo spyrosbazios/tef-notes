@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { LENS_NAME_MAX, lensProblem, type Lens, type LensAccentName } from "@/core/lens";
-import { ACCENT_NAMES, ACCENTS, accentColor, THEMES } from "@/core/theme";
+import { ACCENT_NAMES, ACCENTS, accentColor, THEMES, type ThemeName } from "@/core/theme";
 import { usePrefs } from "@/store/prefs";
 import { fold } from "@/core/notes";
 import { serverOf } from "@/store/keys";
@@ -19,10 +19,10 @@ import { TagDialog } from "./tag-dialog";
 import { listTagTarget } from "./tag-targets";
 import { useTheme } from "./use-theme";
 
-type Form = { rec: string | null; name: string; tags: string[]; exclude: string[]; accent: LensAccentName | null };
+type Form = { rec: string | null; name: string; tags: string[]; exclude: string[]; accent: LensAccentName | null; theme: ThemeName | null };
 type Field = "tags" | "exclude";
-const BLANK: Form = { rec: null, name: "", tags: [], exclude: [], accent: null };
-const formOf = (l: Lens): Form => ({ rec: l.rec, name: l.name, tags: l.tags, exclude: l.exclude, accent: l.accent });
+const BLANK: Form = { rec: null, name: "", tags: [], exclude: [], accent: null, theme: null };
+const formOf = (l: Lens): Form => ({ rec: l.rec, name: l.name, tags: l.tags, exclude: l.exclude, accent: l.accent, theme: l.theme });
 
 /** The colour the app takes while the lens is on: the first dot (dashed) is none, the phone's own primary colour. */
 function LensAccent({ value, onChange }: { value: LensAccentName | null; onChange: (a: LensAccentName | null) => void }) {

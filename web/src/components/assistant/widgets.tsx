@@ -220,11 +220,11 @@ function LensView({ w }: { w: LensWidget }) {
   const [typed, setTyped] = useState("");
   const name = (w.name ?? typed).trim(), problem = lensProblem({ name, tags: w.tags, exclude: w.exclude });
   const found = all.find((l) => fold(l.name) === fold(name));
-  const saved = !!found && same(found.tags, w.tags) && same(found.exclude, w.exclude) && (found.accent ?? null) === (w.accent ?? null);
+  const saved = !!found && same(found.tags, w.tags) && same(found.exclude, w.exclude) && (found.accent ?? null) === (w.accent ?? null) && (found.theme ?? null) === (w.theme ?? null);
   const taken = !!found && !saved;
   const save = async () => {
     if (problem || taken || saved) return;
-    try { setActiveLens((await create.mutateAsync({ name, tags: w.tags, exclude: w.exclude, accent: w.accent ?? null })).rec); }
+    try { setActiveLens((await create.mutateAsync({ name, tags: w.tags, exclude: w.exclude, accent: w.accent ?? null, theme: w.theme ?? null })).rec); }
     catch (e) { toast.error(e instanceof Conflict ? "A lens by that name exists." : message(e)); }
   };
   return (

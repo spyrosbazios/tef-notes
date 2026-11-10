@@ -44,7 +44,7 @@ describe("the app's tools", () => {
   });
   it("are told what a lens is, in the words the clients send it with", () => {
     expect(SYSTEM).toContain(`\`${LENS_FILTER.trim()}\``);
-    expect(screen({ view: { kind: "notes" }, filter: lensFilter({ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null }) })).toContain('Filter on the list: "lens: Work (tags: work, clients)"');
+    expect(screen({ view: { kind: "notes" }, filter: lensFilter({ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null }) })).toContain('Filter on the list: "lens: Work (tags: work, clients)"');
   });
 });
 

@@ -162,7 +162,7 @@ describe("writes go to the copy first", () => {
   });
 
   test("under a lens a new task carries its first tag, once", async () => {
-    qc.setQueryData(LENSES, [{ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null }]);
+    qc.setQueryData(LENSES, [{ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null }]);
     setActiveLens("w");
     expect((await addTask(qc, { title: "a" })).tags).toEqual(["work"]);
     expect((await addTask(qc, { title: "b", tags: ["Work", "home"] })).tags).toEqual(["Work", "home"]);
@@ -174,7 +174,7 @@ describe("writes go to the copy first", () => {
 
   test("under a lens a new note carries its first tag; under none or a deleted one, none", async () => {
     const tagsOf = (path: string) => parseNote(path, seen().find((n) => n.path === path)!.text).tags;
-    qc.setQueryData(LENSES, [{ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null }]);
+    qc.setQueryData(LENSES, [{ rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null }]);
     expect(tagsOf((await createNote(qc, "Plan")).path)).toEqual([]);
     setActiveLens("w");
     expect(tagsOf((await createNote(qc, "Quarterly plan")).path)).toEqual(["work"]);

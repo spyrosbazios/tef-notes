@@ -10,7 +10,7 @@
 //   show_review   { days? }                                  ReviewWidget: what got done, added and stalled
 //   show_quote    { path, quote }                            QuoteWidget: a passage of a note, checked to be in it
 //   show_link     { url }                                    LinkWidget: a page's preview (the server's link-preview route)
-//   show_lens     { tags, exclude?, name?, accent? }         LensWidget: what a lens would show, before it is saved
+//   show_lens     { tags, exclude?, name?, accent?, theme? }     LensWidget: what a lens would show, before it is saved
 //   show_tasks    { ids, title? }                            TasksWidget: chosen tasks as a timeline, by the day each falls on
 //   show_notes    { paths, title? }                          NotesWidget: chosen notes as a gallery of Home's tiles
 //   show_drawing  { path, name }                             DrawingWidget: a note's drawing, its saved picture, opened in the editor on a tap
@@ -25,7 +25,7 @@ import { isDrawingName } from "./photos";
 import { isDay } from "./todo";
 import type { LensAccentName } from "./lens";
 import type { LinkPreview } from "./pocketbase";
-import { ACCENT_NAMES } from "./theme";
+import { ACCENT_NAMES, THEME_NAMES, type ThemeName } from "./theme";
 
 /** Task cards a widget lists at most, and how many a lens preview samples of each kind. */
 export const WIDGET_LIMITS = { tasks: 20, top: 3, stalled: 5, tags: 5, sample: 5, timeline: 40, gallery: 24 } as const;
@@ -66,10 +66,10 @@ export type QuoteWidget = { type: "quote"; path: string; title: string; quote: s
 export type LinkWidget = { type: "link"; preview: LinkPreview };
 
 /** What a lens would show, from the tags alone, before anything is saved: how many notes and (open) tasks pass `inLens`, and up
- *  to `WIDGET_LIMITS.sample` of each as cards, newest note first and tasks by order. `name` and `accent` are the model's proposal
+ *  to `WIDGET_LIMITS.sample` of each as cards, newest note first and tasks by order. `name`, `accent` and `theme` are the model's proposal
  *  for it, if any. Nothing is written: saving is the owner's step in the app (core/lens.ts `lensProblem`, pocketbase `lenses`). */
 export type LensWidget = {
-  type: "lens"; tags: string[]; exclude: string[]; name?: string; accent?: LensAccentName;
+  type: "lens"; tags: string[]; exclude: string[]; name?: string; accent?: LensAccentName; theme?: ThemeName;
   notes: { count: number; sample: NoteCard[] }; tasks: { count: number; sample: TaskCard[] };
 };
 
@@ -149,9 +149,10 @@ function readLink(o: Record<string, unknown>): LinkWidget | null {
 
 function readLens(o: Record<string, unknown>): LensWidget | null {
   const n = obj(o.notes), t = obj(o.tasks), accent = ACCENT_NAMES.find((a): a is LensAccentName => a === o.accent && a !== "theme");
+  const theme = THEME_NAMES.find((x) => x === o.theme);
   if (!n || !t) return null;
   return {
-    type: "lens", tags: strings(o.tags), exclude: strings(o.exclude), ...(str(o.name) ? { name: str(o.name) } : {}), ...(accent ? { accent } : {}),
+    type: "lens", tags: strings(o.tags), exclude: strings(o.exclude), ...(str(o.name) ? { name: str(o.name) } : {}), ...(accent ? { accent } : {}), ...(theme ? { theme } : {}),
     notes: { count: count(n.count), sample: noteCards(n.sample) }, tasks: { count: count(t.count), sample: taskCards(t.sample) },
   };
 }

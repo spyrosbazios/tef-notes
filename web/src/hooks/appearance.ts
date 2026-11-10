@@ -3,7 +3,7 @@
 import { useCallback, useLayoutEffect } from "react";
 import { flushSync } from "react-dom";
 import { pageTheme, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
-import { lensAccent } from "@/core/lens";
+import { lensAccent, lensTheme } from "@/core/lens";
 import { applyPageTheme } from "@/page-theme";
 import { useActiveLens } from "./lens";
 import { calm, typedTransitions } from "./media";
@@ -26,12 +26,19 @@ export function useAppearance() {
   return { theme, accent, scheme: THEMES[theme].scheme, set };
 }
 
+/** The look in force: the active lens's theme and accent where it has them (core/lens.ts `lensTheme`, `lensAccent`), else
+ *  the owner's. What surfaces paint with; the settings pane edits the owner's own (`useAppearance`). */
+export function useShownLook() {
+  const { theme: own, accent: ownAccent } = useAppearance(), lens = useActiveLens();
+  const theme = lensTheme(lens, own);
+  return { theme, accent: lensAccent(lens, ownAccent), scheme: THEMES[theme].scheme };
+}
+
 /** Puts the look on the page: the `--tf-*` variables, `color-scheme`, the `dark` class tailwind's variant reads, and
- *  `data-scheme`. The primary colour is the active lens's when it has one (core/lens.ts `lensAccent`), else the chosen one.
+ *  `data-scheme`, of the look in force (`useShownLook`).
  *  Mounted once, in root.tsx's `Look`. */
 export function useApplyAppearance() {
-  const { theme, accent, scheme } = useAppearance();
-  const shown = lensAccent(useActiveLens(), accent);
+  const { theme, accent: shown, scheme } = useShownLook();
   // Before paint: a stored light theme doesn't flash the dark default.
   useLayoutEffect(() => {
     applyPageTheme(pageTheme(withAccent(THEMES[theme], shown)));

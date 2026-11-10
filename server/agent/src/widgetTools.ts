@@ -11,6 +11,7 @@ import { inLens, lensProblem, type Lens, type LensAccentName } from "@/core/lens
 import { isNotePath, NOTES, parseNote } from "@/core/notes";
 import * as pb from "@/core/pocketbase";
 import { isDay, REMIND } from "@/core/todo";
+import { THEME_NAMES } from "@/core/theme";
 import { localDay } from "@/core/time";
 import { weekOf } from "@/core/planner";
 import { WIDGET_LIMITS, type DayWidget, type LensWidget, type LinkWidget, type NotesWidget, type QuoteWidget, type TasksWidget, type ReviewWidget, type WeekWidget } from "@/core/widgets";
@@ -28,6 +29,7 @@ export const LENS = z.object({
   tags: z.array(z.string().min(1).max(60)).max(20).describe("Tags it shows (an item with any of them); [] to hide only `exclude`"),
   exclude: z.array(z.string().min(1).max(60)).max(20).optional().describe("Tags it hides"),
   accent: z.enum(ACCENTS).optional().describe(`The colour the app takes while it is on: ${ACCENTS.join(" ")}`),
+  theme: z.enum(THEME_NAMES).optional().describe(`The theme the app takes while it is on: ${THEME_NAMES.join(" ")}`),
 });
 
 export type LensInput = z.infer<typeof LENS>;
@@ -39,7 +41,7 @@ export async function lensFields(notes: Notes, i: z.infer<typeof LENS>): Promise
   const shows = await definedTags(notes, i.tags), hides = await definedTags(notes, i.exclude ?? []);
   if ("error" in shows) return shows;
   if ("error" in hides) return hides;
-  return { name: i.name.trim(), tags: shows.tags, exclude: hides.tags, accent: i.accent ?? null };
+  return { name: i.name.trim(), tags: shows.tags, exclude: hides.tags, accent: i.accent ?? null, theme: i.theme ?? null };
 }
 
 const DATE = DAY_RE.describe("YYYY-MM-DD, worked out from today's date in <context>");
@@ -129,19 +131,20 @@ export function widgetTools(notes: Notes, todo: Todo, fromPage: (messages: Model
         exclude: z.array(z.string().min(1).max(60)).max(20).optional().describe("Tags it hides"),
         name: z.string().min(1).max(40).optional().describe("A name to propose for it"),
         accent: z.enum(ACCENTS).optional().describe(`A colour to propose: ${ACCENTS.join(" ")}`),
+        theme: z.enum(THEME_NAMES).optional().describe(`A theme to propose: ${THEME_NAMES.join(" ")}`),
       }),
-      execute: async ({ tags, exclude = [], name, accent }): Promise<Shown<LensWidget>> => {
+      execute: async ({ tags, exclude = [], name, accent, theme }): Promise<Shown<LensWidget>> => {
         const problem = lensProblem({ name: name ?? "Preview", tags, exclude });
         if (problem) return { error: problem };
         const shows = await definedTags(notes, tags), hides = await definedTags(notes, exclude);
         if ("error" in shows) return shows;
         if ("error" in hides) return hides;
-        const lens: Lens = { rec: "", name: name ?? "", tags: shows.tags, exclude: hides.tags, accent: null };
+        const lens: Lens = { rec: "", name: name ?? "", tags: shows.tags, exclude: hides.tags, accent: null, theme: null };
         const mine = (await notes.list()).filter((n) => n.path.startsWith(NOTES) && inLens(lens, n)).sort((a, b) => b.updated - a.updated);
         const tasks = (await todo.tasks()).filter((t) => !t.done && inLens(lens, t)).sort((a, b) => a.order - b.order);
         return {
           widget: {
-            type: "lens", tags: lens.tags, exclude: lens.exclude, ...(name ? { name } : {}), ...(accent ? { accent } : {}),
+            type: "lens", tags: lens.tags, exclude: lens.exclude, ...(name ? { name } : {}), ...(accent ? { accent } : {}), ...(theme ? { theme } : {}),
             notes: { count: mine.length, sample: mine.slice(0, WIDGET_LIMITS.sample).map((n) => noteCardOf(n.path, n.text)) },
             tasks: { count: tasks.length, sample: tasks.slice(0, WIDGET_LIMITS.sample).map(taskCardOf) },
           },

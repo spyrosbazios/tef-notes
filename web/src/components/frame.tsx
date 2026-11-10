@@ -7,7 +7,7 @@ import { lazy, Suspense } from "react";
 import { AssistantProvider } from "@/components/assistant/provider";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateToast } from "@/components/update-toast";
-import { useAppearance } from "@/hooks/appearance";
+import { useShownLook } from "@/hooks/appearance";
 import { useNarrow } from "@/hooks/media";
 
 const Devtools = import.meta.env.DEV
@@ -15,7 +15,7 @@ const Devtools = import.meta.env.DEV
   : () => null;
 
 export function Frame() {
-  const { scheme } = useAppearance();
+  const { scheme } = useShownLook();
   const narrow = useNarrow();
   const clear = narrow ? { top: "calc(env(safe-area-inset-top) + 0.5rem)" } : undefined;
   return (

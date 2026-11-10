@@ -5,11 +5,12 @@
 // is on is one of the owner's preferences (prefs.ts), shared by every device, and none is the unfiltered app.
 // Pure and platform-neutral: the clients, the CLI and the agent's context all read it from here.
 import { fold } from "./notes";
-import { ACCENT_NAMES, type AccentName } from "./theme";
+import { ACCENT_NAMES, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 import { dedupeTags } from "./todo";
 
-/** `accent`: the primary colour the app takes while the lens is on (theme.ts `ACCENTS`), or null to keep the device's own. */
-export type Lens = { rec: string; name: string; tags: string[]; exclude: string[]; accent: LensAccentName | null };
+/** `accent`: the primary colour the app takes while the lens is on (theme.ts `ACCENTS`), or null to keep the owner's own;
+ *  `theme`: likewise the theme (theme.ts `THEMES`). */
+export type Lens = { rec: string; name: string; tags: string[]; exclude: string[]; accent: LensAccentName | null; theme: ThemeName | null };
 /** A lens names a colour of its own, never "theme" (none is the device's pick). */
 export type LensAccentName = Exclude<AccentName, "theme">;
 /** What a form edits: everything but the record id. */
@@ -28,20 +29,27 @@ export const lensOf = (r: any): Lens => ({
   tags: tagsOf(r?.tags),
   exclude: tagsOf(r?.exclude),
   accent: accentOf(r?.accent),
+  theme: themeOf(r?.theme),
 });
 
 /** A stored accent, or null for none (empty, unknown, or "theme", which is the device's own pick anyway). */
 const accentOf = (v: unknown): LensAccentName | null =>
   ACCENT_NAMES.find((a): a is LensAccentName => a === v && a !== "theme") ?? null;
 
+/** A stored theme, or null for none (empty or unknown). */
+const themeOf = (v: unknown): ThemeName | null => THEME_NAMES.find((t) => t === v) ?? null;
+
 const tagsOf = (v: unknown): string[] => (Array.isArray(v) ? dedupeTags(v.filter((t: unknown): t is string => typeof t === "string")) : []);
 
 /** A Lens's columns, as the server stores them. */
 export const lensColumns = (l: LensFields) =>
-  ({ name: l.name.trim(), tags: dedupeTags(l.tags), exclude: dedupeTags(l.exclude), accent: accentOf(l.accent) ?? "" });
+  ({ name: l.name.trim(), tags: dedupeTags(l.tags), exclude: dedupeTags(l.exclude), accent: accentOf(l.accent) ?? "", theme: themeOf(l.theme) ?? "" });
 
 /** The primary colour on screen: the lens's when one is on and has one, else the device's own pick. */
 export const lensAccent = (lens: Lens | null | undefined, own: AccentName): AccentName => lens?.accent ?? own;
+
+/** The theme on screen: the lens's when one is on and has one, else the owner's own pick. */
+export const lensTheme = (lens: Lens | null | undefined, own: ThemeName): ThemeName => lens?.theme ?? own;
 
 /** Why `l` can't be saved as a lens, or null: a name, and at least one tag to include or exclude (a lens of neither would
  *  filter nothing), never one tag both. */

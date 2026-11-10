@@ -6,14 +6,12 @@
 import { ExternalLink, MapPin, Navigation, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { lensAccent } from "@/core/lens";
 import { directionsUrl, mapsUrl, type Place } from "@/core/places";
 import { Pick } from "@/components/pick";
 import { PlacePicker } from "@/components/place-picker";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAppearance } from "@/hooks/appearance";
-import { useActiveLens } from "@/hooks/lens";
+import { useShownLook } from "@/hooks/appearance";
 import { cn } from "@/lib/utils";
 import { mapSrc } from "@/services/places";
 
@@ -35,7 +33,7 @@ export function PlacePick({ trigger, start, title, onSet }: { trigger: React.Rea
 
 /** The map, a link to the place; gone when the server can't draw it (no coordinates, offline). */
 function MapPicture({ where }: { where: Place }) {
-  const { theme, accent } = useAppearance(), shown = lensAccent(useActiveLens(), accent);
+  const { theme, accent: shown } = useShownLook();
   const src = mapSrc(where, MAP_W, MAP_H, theme, shown);
   const [state, setState] = useState<"loading" | "shown" | "broken">("loading");
   if (!src || state === "broken") return null;

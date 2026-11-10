@@ -27,8 +27,8 @@ vi.mock("@/core/pocketbase", async (orig) => ({
   lenses: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
 }));
 
-const WORK: Lens = { rec: "l1", name: "Work", tags: ["work", "clients"], exclude: [], accent: null };
-const HOME: Lens = { rec: "l2", name: "Home", tags: ["home"], exclude: [], accent: null };
+const WORK: Lens = { rec: "l1", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null };
+const HOME: Lens = { rec: "l2", name: "Home", tags: ["home"], exclude: [], accent: null, theme: null };
 const lenses = vi.mocked(pb.lenses);
 
 const task = (id: string, tags: string[], fields: Partial<Task> = {}): Task => ({ ...newTask(id, { title: id, tags }), ...fields });
@@ -75,10 +75,10 @@ describe("the definitions", () => {
 
   it("make, change and remove a lens on the server, then re-read", async () => {
     lenses.list.mockResolvedValue([WORK]);
-    await saveLens(null, { name: "Work", tags: ["work"], exclude: [], accent: null });
-    expect(lenses.create).toHaveBeenCalledWith({ url: "https://n" }, { name: "Work", tags: ["work"], exclude: [], accent: null });
-    await saveLens("l1", { name: "Work", tags: ["work", "clients"], exclude: [], accent: null });
-    expect(lenses.update).toHaveBeenCalledWith({ url: "https://n" }, "l1", { name: "Work", tags: ["work", "clients"], exclude: [], accent: null });
+    await saveLens(null, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null });
+    expect(lenses.create).toHaveBeenCalledWith({ url: "https://n" }, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null });
+    await saveLens("l1", { name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null });
+    expect(lenses.update).toHaveBeenCalledWith({ url: "https://n" }, "l1", { name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null });
     expect(useLenses.getState().lenses).toEqual([WORK]);
   });
 
@@ -94,7 +94,7 @@ describe("the definitions", () => {
 
   it("are not saved without a server", async () => {
     useKeys.setState({ keys: {} });
-    await expect(saveLens(null, { name: "Work", tags: ["work"], exclude: [], accent: null })).rejects.toThrow("No server");
+    await expect(saveLens(null, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null })).rejects.toThrow("No server");
   });
 });
 

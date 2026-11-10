@@ -29,7 +29,7 @@ describe("the page context", () => {
   });
 
   test("a lens that is on goes as the filter, and none sets none", () => {
-    const work = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null };
+    const work = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null };
     expect(pageContext({ view: { kind: "home" } }, held, "", work).filter).toBe("lens: Work (tags: work, clients)");
     expect(pageContext({ view: { kind: "home" } }, held, "", null).filter).toBeUndefined();
     expect(pageContext({ view: { kind: "home" } }, held, "").filter).toBeUndefined();

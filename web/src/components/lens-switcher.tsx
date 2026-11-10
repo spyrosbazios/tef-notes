@@ -6,7 +6,7 @@ import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
 import { fold } from "@/core/notes";
-import { ACCENT_NAMES, ACCENTS, accentColor, THEMES } from "@/core/theme";
+import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, type ThemeName } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
 import { Mark } from "@/components/brand";
 import { Turns } from "@/components/swap";
@@ -38,6 +38,7 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
   const [name, setName] = useState(lens?.name ?? ""), [tags, setTags] = useState<string[]>(lens?.tags ?? []);
   const [exclude, setExclude] = useState<string[]>(lens?.exclude ?? []);
   const [accent, setAccent] = useState<LensAccentName | null>(lens?.accent ?? null);
+  const [theme, setTheme] = useState<ThemeName | null>(lens?.theme ?? null);
   const problem = lensProblem({ name, tags, exclude }), taken = all.some((l) => l.rec !== lens?.rec && fold(l.name) === fold(name.trim()));
   const [field, shake] = useShake<HTMLInputElement>(), takenId = useId(), nameId = useId();
   useEffect(() => { if (taken) shake(); }, [taken, shake]);   // once, as the name becomes one that exists
@@ -45,8 +46,8 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
     e.preventDefault();
     if (problem || taken) return;
     try {
-      if (lens) await update.mutateAsync({ rec: lens.rec, fields: { name, tags, exclude, accent } });
-      else setActiveLens((await create.mutateAsync({ name, tags, exclude, accent })).rec);
+      if (lens) await update.mutateAsync({ rec: lens.rec, fields: { name, tags, exclude, accent, theme } });
+      else setActiveLens((await create.mutateAsync({ name, tags, exclude, accent, theme })).rec);
       onDone();
     } catch (x) {
       if (x instanceof Conflict) shake();
@@ -73,7 +74,8 @@ function LensForm({ lens, onDone }: { lens?: Lens; onDone: () => void }) {
           <TagEditor tags={exclude} onAdd={(t) => setExclude((c) => add(c, t))} onRemove={(t) => setExclude((c) => c.filter((x) => x !== t))} />
         </div>
       </Field>
-      <LensAccent value={accent} onChange={setAccent} />
+      <LensTheme value={theme} onChange={setTheme} />
+      <LensAccent value={accent} theme={theme} onChange={setAccent} />
       {problem && (tags.length || exclude.length) ? <p className="text-xs text-down">{problem}</p> : null}
     </SheetForm>
   );
@@ -93,8 +95,8 @@ function Field({ label, hint, htmlFor, children }: { label: string; hint?: strin
 }
 
 /** The primary colour the app takes while the lens is on: none (this browser's own accent) or one of the accents, in one row that scrolls sideways. */
-function LensAccent({ value, onChange }: { value: LensAccentName | null; onChange: (a: LensAccentName | null) => void }) {
-  const { theme, accent: own } = useAppearance(), headId = useId();
+function LensAccent({ value, theme: picked, onChange }: { value: LensAccentName | null; theme: ThemeName | null; onChange: (a: LensAccentName | null) => void }) {
+  const { theme: ownTheme, accent: own } = useAppearance(), theme = picked ?? ownTheme, headId = useId();
   const label = (a: LensAccentName | null) => (a ? ACCENTS[a].label : "This browser's own");
   return (
     <div className="space-y-2">
@@ -111,6 +113,36 @@ function LensAccent({ value, onChange }: { value: LensAccentName | null; onChang
               style={{ borderColor: on ? colour : "transparent" }}>
               <span className={cn("grid size-6 place-items-center rounded-full", a === "theme" && "border-2 border-dashed border-bg")} style={{ backgroundColor: colour }}>
                 {on ? <Check className="size-3.5 text-bg" strokeWidth={3} /> : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The theme the app takes while the lens is on: none (the owner's own) or one of the themes, each a swatch of its ground and
+ *  brand, in one row that scrolls sideways. */
+function LensTheme({ value, onChange }: { value: ThemeName | null; onChange: (t: ThemeName | null) => void }) {
+  const { theme: own } = useAppearance(), headId = useId();
+  const label = (t: ThemeName | null) => (t ? THEMES[t].label : "Your own");
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <p id={headId} className="text-sm font-semibold">Theme</p>
+        <span className="text-xs text-dim">{label(value)}</span>
+      </div>
+      <div role="radiogroup" aria-labelledby={headId} className="-mx-1 flex gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none]">
+        {[null, ...THEME_NAMES].map((t) => {
+          const on = t === value, { C } = THEMES[t ?? own];
+          return (
+            <button key={t ?? "own"} type="button" role="radio" aria-checked={on} aria-label={label(t)} title={label(t)} onClick={() => onChange(t)}
+              className="grid size-9 shrink-0 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+              style={{ borderColor: on ? C.brand : "transparent" }}>
+              <span className={cn("grid size-6 place-items-center overflow-hidden rounded-full border border-line", t === null && "border-2 border-dashed")}
+                style={{ background: `linear-gradient(135deg, ${C.bg} 50%, ${C.brand} 50%)` }}>
+                {on ? <Check className="size-3.5" style={{ color: C.fg }} strokeWidth={3} /> : null}
               </span>
             </button>
           );

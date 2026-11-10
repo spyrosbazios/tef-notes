@@ -2,18 +2,18 @@ import { describe, expect, it } from "bun:test";
 import { activeLens, contextFilter, inheritTags, inLens, lensColumns, lensAccent, lensFilter, lensOf, lensProblem, lensTag, withinLens, type Lens } from "../src/lens";
 import { lenses } from "../src/pocketbase";
 
-const work: Lens = { rec: "w", name: "Work", tags: ["work", "Clients"], exclude: [], accent: null };
+const work: Lens = { rec: "w", name: "Work", tags: ["work", "Clients"], exclude: [], accent: null, theme: null };
 
 describe("lensOf", () => {
   it("reads a record, cleaning its tags", () => {
-    expect(lensOf({ id: "a", name: " Work ", tags: ["work", "#Work", " ", 3, "clients"] })).toEqual({ rec: "a", name: "Work", tags: ["work", "clients"], exclude: [], accent: null });
+    expect(lensOf({ id: "a", name: " Work ", tags: ["work", "#Work", " ", 3, "clients"] })).toEqual({ rec: "a", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null });
   });
   it("is empty where a column has the wrong shape", () => {
-    expect(lensOf({ id: "a", name: 5, tags: "work" })).toEqual({ rec: "a", name: "", tags: [], exclude: [], accent: null });
-    expect(lensOf(null)).toEqual({ rec: "", name: "", tags: [], exclude: [], accent: null });
+    expect(lensOf({ id: "a", name: 5, tags: "work" })).toEqual({ rec: "a", name: "", tags: [], exclude: [], accent: null, theme: null });
+    expect(lensOf(null)).toEqual({ rec: "", name: "", tags: [], exclude: [], accent: null, theme: null });
   });
   it("writes trimmed columns", () => {
-    expect(lensColumns({ name: " Work ", tags: ["a", "A", "b"], exclude: ["x", "X"], accent: null })).toEqual({ name: "Work", tags: ["a", "b"], exclude: ["x"], accent: "" });
+    expect(lensColumns({ name: " Work ", tags: ["a", "A", "b"], exclude: ["x", "X"], accent: null, theme: null })).toEqual({ name: "Work", tags: ["a", "b"], exclude: ["x"], accent: "", theme: "" });
   });
 });
 
@@ -47,7 +47,7 @@ describe("inLens", () => {
     expect(inLens(work, { tags: ["home", "clients"] })).toBe(true);
     expect(inLens(work, { tags: ["home"] })).toBe(false);
     expect(inLens(work, { tags: [] })).toBe(false);
-    expect(inLens({ rec: "g", name: "G", tags: ["δουλειά"], exclude: [], accent: null }, { tags: ["ΔΟΥΛΕΙΑ"] })).toBe(true);
+    expect(inLens({ rec: "g", name: "G", tags: ["δουλειά"], exclude: [], accent: null, theme: null }, { tags: ["ΔΟΥΛΕΙΑ"] })).toBe(true);
   });
   it("is no filter without a lens", () => {
     expect(inLens(null, { tags: [] })).toBe(true);
@@ -59,10 +59,10 @@ describe("inLens", () => {
     expect(withinLens(work, [a, b])).toEqual([a]);
   });
   it("leaves out anything with an excluded tag", () => {
-    const hide: Lens = { rec: "h", name: "H", tags: [], exclude: ["archive"], accent: null };
+    const hide: Lens = { rec: "h", name: "H", tags: [], exclude: ["archive"], accent: null, theme: null };
     expect(inLens(hide, { tags: [] })).toBe(true);
     expect(inLens(hide, { tags: ["work", "Archive"] })).toBe(false);
-    const both: Lens = { ...work, exclude: ["done"], accent: null };
+    const both: Lens = { ...work, exclude: ["done"], accent: null, theme: null };
     expect(inLens(both, { tags: ["work"] })).toBe(true);
     expect(inLens(both, { tags: ["work", "done"] })).toBe(false);
     expect(lensFilter(both)).toBe("lens: Work (tags: work, Clients; not: done)");
@@ -103,14 +103,14 @@ describe("lenses calls", () => {
   it("lists, creates, updates and removes", async () => {
     const f = fake((url, init) => (init?.method === "DELETE" ? {} : url.includes("?") ? { items: [{ id: "a", name: "Work", tags: ["work"] }] } : { id: "a", name: "Work", tags: ["work"] }));
     try {
-      expect(await lenses.list(s)).toEqual([{ rec: "a", name: "Work", tags: ["work"], exclude: [], accent: null }]);
-      expect((await lenses.create(s, { name: "Work", tags: ["work"], exclude: [], accent: null })).rec).toBe("a");
-      await lenses.update(s, "a", { name: "Work", tags: ["work"], exclude: [], accent: null });
+      expect(await lenses.list(s)).toEqual([{ rec: "a", name: "Work", tags: ["work"], exclude: [], accent: null, theme: null }]);
+      expect((await lenses.create(s, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null })).rec).toBe("a");
+      await lenses.update(s, "a", { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null });
       await lenses.remove(s, "a");
       expect(f.calls.map((c) => `${c.init?.method ?? "GET"} ${c.url.replace("http://pb/api/", "").split("?")[0]}`)).toEqual([
         "GET collections/lenses/records", "POST collections/lenses/records", "PATCH collections/lenses/records/a", "DELETE collections/lenses/records/a",
       ]);
-      expect(JSON.parse(String(f.calls[1].init!.body))).toEqual({ name: "Work", tags: ["work"], exclude: [], accent: "" });
+      expect(JSON.parse(String(f.calls[1].init!.body))).toEqual({ name: "Work", tags: ["work"], exclude: [], accent: "", theme: "" });
     } finally { f.restore(); }
   });
 });

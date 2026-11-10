@@ -6,7 +6,7 @@ import { activeLensOf, LENSES, setActiveLens } from "@/hooks/lens";
 
 let qc: QueryClient;
 beforeEach(() => { qc = new QueryClient(); setActiveLens(null); });
-const work = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null };
+const work = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null };
 
 describe("the active lens", () => {
   test("is none until one is chosen, and none again when the chosen one is gone", () => {
