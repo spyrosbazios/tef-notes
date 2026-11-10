@@ -23,6 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 
-# the phone's editor build (vite.editor.config.ts); its page is written to mobile/src/ui/editor-html.ts
-dist-editor
-dist-pdf

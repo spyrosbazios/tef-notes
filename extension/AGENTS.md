@@ -2,21 +2,21 @@
 
 Manifest V3 extension, TypeScript, built by Vite into `dist/` (gitignored). Sends the current page, or a picture on it,
 to the server, which suggests the notes and open tasks it fits (JEV); the user picks, optionally adds a note, and only then is it written.
-The phone's Share screen calls the same routes: the shapes are one file, `packages/core/src/clip.ts`, imported by both.
+The web app's Share page (`web/src/components/share-page.tsx`) calls the same routes: the shapes are one file, `packages/core/src/clip.ts`, imported by both.
 Root `AGENTS.md` has the server and the note format; this file only what is the extension's. How to build, install and
 release it is in `README.md`, not repeated here.
 
-<!-- reviewed: 2026-11-06 -->
+<!-- reviewed: 2026-11-10 -->
 
 ## Contract
 
-Two steps; the server side is `server/pb_hooks/clip.pb.js`, `src/clip.ts` the extension's only caller (the phone's is
-`mobile/src/store/clip.ts`). Shapes: `packages/core/src/clip.ts`. Errors are `{error}`. A target is `{kind: "new", title?}` (`title` the owner's own for the new note, at most 200 chars; else the server titles it),
+Two steps; the server side is `server/pb_hooks/clip.pb.js`, `src/clip.ts` the extension's caller (the web app's is
+`web/src/services/clip.ts`). Shapes: `packages/core/src/clip.ts`. Errors are `{error}`. A target is `{kind: "new", title?}` (`title` the owner's own for the new note, at most 200 chars; else the server titles it),
 `{kind: "note", path}` or `{kind: "task", id}`, both ways; on save also `{kind: "newtask", title?}` (a new task, titled the
 same way; never suggested, always offered last).
 
 1. `POST {server}/api/tefnotes/clip/suggest`, JSON `{url?, title, selection?, text?, note?, image?: {src, alt?, caption?,
-   look}}` (`url` is absent only for what the phone shares as text or a photo, which then carries a selection or a picture; `text` is `document.body.innerText`, capped at 50000 chars; `note` the user's words, at most 2000, context
+   look}}` (`url` is absent only for what the web app's Share page sends as text or a photo, which then carries a selection or a picture; `text` is `document.body.innerText`, capped at 50000 chars; `note` the user's words, at most 2000, context
    for where it goes; `image` the picture the menu was opened on: its address, its alt text or title, its figure's
    caption, and `look`, a base64 JPEG of it, long edge 768, padded to 280 a side, that JEV sees) answers
    `200 {suggestions: [{kind: "note", path, title, p} | {kind: "task", id, title, p}], pick, line?}` and writes nothing.
@@ -29,21 +29,21 @@ same way; never suggested, always offered last).
 2. `POST {server}/api/tefnotes/clip`, multipart: `@jsonPayload` = `{url?, title, selection?, line?, note?, image?: {src,
    alt?, caption?}, target, summary?: true, text?}` (`target` as above, `line` passed back from step 1; `summary` only
    when the user ticked "Add a summary", and `text` the page's text then, the same 50000 chars as in step 1) and, with `image` and a note, a new
-   note or a new task as target, the `file` part: the JPEG to store (long edge 1600, quality 0.82, as the phone's `photos.ts`;
+   note or a new task as target, the `file` part: the JPEG to store (long edge 1600, quality 0.82, `packages/core/src/photos.ts`;
    an existing task takes none: `sendsFile` in core). Answers `200 {kind: "note", path, title, action: "created" | "appended", summary?}` or `{kind: "task", id, title,
    action: "created" | "appended", note?, summary?}`; no JEV. The body: `![caption or alt](../attachments/<note-id>/<YYYYMMDD-HHMMSS>.jpg)`,
    the page link, the summary (below), the note written up by the server's model (tidied, its language kept, nothing added; as typed
    when that fails), `line` (left out when there is a summary), the selection.
    The summary is the one thing the model writes of its own, and only when asked: a blockquote under a bold "Summary"
    label, 3 to 5 sentences or bullets in the content's language, nothing the content does not say. A page's is written from
-   `text`; for a link that came with none (the phone's) the server fetches the page through the link-preview guard
+   `text`; for a link that came with none (a share's) the server fetches the page through the link-preview guard
    (`lib/link-preview.js` `textOf`, never `$http.send`). A picture's only from the words it came with (caption, alt text,
    text shared with it: the model cannot see it); the page it was on is context. `summary` in the answer: `"added"`;
    `"skipped"` (nothing to write it from: a picture with no words, a page with no text); `"failed"` (no model key, the
    page could not be fetched, the model failed: a `clip:` log line says why). The clip is saved in every case, and the
    clients say so when it is not `"added"` (`summaryNotice` in core). No `summary` in the answer: none was asked for. Into a task the same text is added to its `notes` after a blank line, in a rev-bumping
    transaction as a note's append is; a task has no attachments (`attachments.note` relates to notes only), so a picture
-   there is an image line `![<caption or alt>](<src>)` (the phone and the web draw it; plain text when `src` is no http address) and its bytes are not kept. `404` if the target no longer
+   there is an image line `![<caption or alt>](<src>)` (the web app draws it; plain text when `src` is no http address) and its bytes are not kept. `404` if the target no longer
    exists, `413` if a task's notes would overflow, `400` for a malformed target or an `image` without its `file` (or the
    reverse; for an existing task, any `file`).
    A new task (`created`): titled by the owner's `title`, else as a new note would be; its `notes` the same text without the

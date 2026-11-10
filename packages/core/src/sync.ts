@@ -1,6 +1,5 @@
-// The offline-first sync engine: the logic the phone's two stores (mobile/src/store/notes.ts `syncNotes`, todo.ts
-// `syncTodo`) hold, ported over a `Store` and a `Transport` so any client with a local copy can run it, and a bun test
-// can run it against a fake server. The web app is its second user (web/src/lib/sync.ts); the phone still holds its own.
+// The offline-first sync engine, over a `Store` and a `Transport` so any client with a local copy can run it (the web app:
+// web/src/lib/sync.ts), and a bun test can run it against a fake server.
 //
 // The server is the source of truth; a client holds a copy plus unsent edits. Every write is made on the copy first
 // (the `edit` helpers below), marks the row unsent, and a push sends it later, naming the `rev` it was based on (the write
@@ -115,7 +114,7 @@ export type Want = (path: string) => boolean;
 /** A function that runs `run` one at a time: a call while it runs sets a flag and gets the running promise back, and when
  *  the run ends it runs once more. `running()` says whether one is out. The flag is cleared in `.finally()` on the stored
  *  promise: an async function that never awaits finishes before the line storing its promise does, so a `finally` inside it
- *  would clear nothing and every later call would return early (mobile/src/store/attachments.ts bit on this). */
+ *  would clear nothing and every later call would return early (the phone app this was ported from bit on this). */
 export function coalesced(run: () => Promise<void>): (() => Promise<void>) & { running: () => boolean } {
   let current: Promise<void> | null = null, again = false;
   const go = (): Promise<void> => {

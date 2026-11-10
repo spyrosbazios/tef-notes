@@ -41,7 +41,7 @@ export type Cached = { notes?: NoteRec[]; tasks?: TaskRec[] };
  *  held in the open note's editor (an ask from the selection bar), so the selection tools are on offer. `drawing`: the one open in
  *  the drawing editor. */
 export function pageContext(at: Where, held: Cached, selection: string, lens?: Lens | null, editable = false, drawing?: OpenDrawing): AssistantContext {
-  const out: AssistantContext = { client: "web", view: assistantView(at.view) };
+  const out: AssistantContext = { view: assistantView(at.view) };
   const note = at.open ? held.notes?.find((n) => n.note.id === at.open) : undefined;
   if (note) out.note = { path: note.path, title: note.note.title, rev: note.rev };
   const task = at.task && !at.open && isTaskView(at.view) ? held.tasks?.find((t) => t.id === at.task) : undefined;   // an open note hides the task

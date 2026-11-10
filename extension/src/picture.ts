@@ -1,4 +1,4 @@
-// A picture's bytes, and the two JPEGs made from them on a canvas: the one stored in the note, downscaled as the phone
+// A picture's bytes, and the two JPEGs made from them on a canvas: the one stored in the note, downscaled as the web app
 // downscales a photo (packages/core/src/photos.ts: long edge 1600, JPEG 0.82), and the smaller one JEV looks at
 // (TypeSafe takes 280 to 1568 px a side: long edge 768, padded up to 280).
 //

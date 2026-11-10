@@ -21,7 +21,7 @@ type Plugin = {
 };
 
 export const CORE_SRC = fileURLToPath(new URL("./src/", import.meta.url));
-const ICON = fileURLToPath(new URL("../../mobile/assets/images/icon.png", import.meta.url));
+const ICON = fileURLToPath(new URL("../../assets/icon.png", import.meta.url));
 
 /** The default theme's palette (src/theme.ts) as `--tf-*` variables on `:root`, imported as `virtual:tefnotes-theme.css`.
  *  `extra` adds a client's own washes of it (the site's glow and glass), made from the theme's colours. The web app

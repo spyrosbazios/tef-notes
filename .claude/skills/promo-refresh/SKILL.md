@@ -28,8 +28,8 @@ Check each user-visible claim against the code. Don't trust the README or the si
 
 - **Missing:** a shipped feature worth a line that neither the README's feature list nor the site's `Features.tsx`,
   `Showcase.tsx` or `Fits.tsx` mentions.
-- **Stale:** a claim about something removed or renamed. Example: the screenshot captures were removed, and the frozen
-  Android app is no longer the phone client (the PWA is).
+- **Stale:** a claim about something removed or renamed. Example: the screenshot captures were removed, so no claim
+  may mention them.
 - **Wrong numbers or names:** versions, install commands, module names. Check these against the repo.
 
 Rank what you find. Promo shows the strongest few features. It is not a changelog: never list every commit.

@@ -1,8 +1,7 @@
 // The local copy this browser keeps of the notes, tasks and links (the rows of packages/core/src/sync.ts): everything the app
-// shows is read from it, every edit is written to it first, and the sync engine reconciles it with the server. The phone keeps
-// the same in SQLite (mobile/src/store/db.ts).
+// shows is read from it, every edit is written to it first, and the sync engine reconciles it with the server.
 //
-// Held whole in memory, as the phone holds its tasks and the web already held every note in the query cache: a personal
+// Held whole in memory, as the web already held every note in the query cache: a personal
 // notebook is small, and the engine reads and writes rows synchronously. IndexedDB is the copy that survives the page, written
 // behind the memory (one atomic batch a moment after the last change, at once when the page is hidden) and read back on the next
 // visit. It is keyval, not a database of indexes: nothing is ever looked up in it but "every row", and idb-keyval is already

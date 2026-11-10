@@ -130,7 +130,7 @@ const place = (v: AssistantView) => (v.kind === "tag" ? `Notes tagged ${q(v.tag)
 /** What is on screen as lines for the model, or "" for a plain chat. Last in the `<context>`: it changes with every message. */
 export function screen(c: AssistantContext | undefined): string {
   if (!c) return "";
-  const lines = [`Showing: ${place(c.view)}${c.client ? ` (${c.client === "web" ? "web app" : "phone app"})` : ""}`];
+  const lines = [`Showing: ${place(c.view)}`];
   if (c.note) lines.push(`Open note: ${q(c.note.path)} ${q(c.note.title)}${c.note.rev != null ? ` (rev ${c.note.rev})` : ""}`);
   if (c.task) lines.push(`Open task: ${q(c.task.id)} ${q(c.task.title)}`);
   if (c.filter) lines.push(`Filter on the list: ${q(c.filter)}`);

@@ -2,7 +2,8 @@
 *
 !site
 !packages/core/src
-!mobile/assets/fonts
-!mobile/assets/images/icon.png
+!packages/core/vite.ts
+!assets/fonts
+!assets/icon.png
 site/node_modules
 site/dist

@@ -83,7 +83,7 @@ describe("the drawing on screen", () => {
 
   test("read from a context, its shapes checked and bounded, the selection only of shapes it has", () => {
     const many = Array.from({ length: DRAWING_LIMITS.shown + 3 }, (_, i) => ({ id: `s${i}`, type: "rectangle", x: i, y: 0, w: 10, h: 10 }));
-    const c = contextOf({ client: "web", view, drawing: { path: "notes/garage.md", name: "plan.excalidraw", shapes: [{ id: "bad id", type: "rectangle" }, ...many], selected: ["s1", "nope"], unsaved: true } });
+    const c = contextOf({ view, drawing: { path: "notes/garage.md", name: "plan.excalidraw", shapes: [{ id: "bad id", type: "rectangle" }, ...many], selected: ["s1", "nope"], unsaved: true } });
     expect(c?.drawing?.name).toBe("plan.excalidraw");
     expect(c?.drawing?.shapes).toHaveLength(DRAWING_LIMITS.shown);
     expect(c?.drawing?.more).toBe(3);
@@ -96,11 +96,10 @@ describe("the drawing on screen", () => {
     expect(contextOf({ view, drawing: { path: "notes/a.md", name: "../b.excalidraw", shapes: [] } })?.drawing).toEqual({ path: "notes/a.md", shapes: [] });
   });
 
-  test("draw is offered only on the web", () => {
-    expect(uiToolsFor({ client: "web", view: { kind: "home" } })).toContain("draw");
-    expect(uiToolsFor({ client: "phone", view: { kind: "home" } })).not.toContain("draw");
-    expect(uiToolsFor({ client: "phone", view: { kind: "home" } })).not.toContain("save_drawing");
-    expect(uiToolsFor({ view: { kind: "home" } })).not.toContain("draw");
+  test("draw is offered with a context, as the app's other tools are", () => {
+    expect(uiToolsFor({ view: { kind: "home" } })).toContain("draw");
+    expect(uiToolsFor({ view: { kind: "home" } })).toContain("save_drawing");
+    expect(uiToolsFor(undefined)).not.toContain("draw");
   });
 });
 

@@ -1,23 +1,9 @@
 // A share from another app, shaped for a note or for the agent (src/share.ts).
 import { describe, expect, it } from "bun:test";
-import { askText, bodyFor, chatTitle, fromIntent, plainShared, titleFor, type Shared } from "../src/share";
+import { askText, bodyFor, chatTitle, plainShared, titleFor, type Shared } from "../src/share";
 
 const S = (p: Partial<Shared>): Shared => ({ text: "", url: null, images: [], pdfs: [], title: null, ...p });
 const U = "https://example.com/a?b=1";
-
-describe("fromIntent", () => {
-  it("keeps images only, drops the text when it's just the URL, null for nothing usable", () => {
-    expect(fromIntent({ text: U, webUrl: U, files: [{ path: "file:///v.mp4", mimeType: "video/mp4", width: null, height: null }] }))
-      .toEqual({ text: "", url: U, images: [], pdfs: [], title: null });
-    expect(fromIntent({ files: [{ path: "file:///a.jpg", mimeType: "image/jpeg", width: 10, height: 20 }] }))
-      .toMatchObject({ images: [{ uri: "file:///a.jpg", width: 10, height: 20 }] });
-    expect(fromIntent({ text: "  " })).toBeNull();
-    expect(fromIntent({ files: [{ path: "file:///cache/Tax%20form.pdf", mimeType: "application/pdf", fileName: "Tax form.pdf", width: null, height: null }] }))
-      .toMatchObject({ images: [], pdfs: [{ uri: "file:///cache/Tax%20form.pdf", name: "Tax form.pdf" }] });
-    expect(fromIntent({ files: [{ path: "file:///cache/Tax%20form.pdf", mimeType: "application/pdf", width: null, height: null }] })?.pdfs[0].name).toBe("Tax form.pdf");
-    expect(fromIntent({ text: `Look: ${U}`, webUrl: U, meta: { title: "A page" } })).toMatchObject({ text: `Look: ${U}`, title: "A page" });
-  });
-});
 
 describe("a note of its own", () => {
   it("titles by the page, the first line, the site, or the day", () => {

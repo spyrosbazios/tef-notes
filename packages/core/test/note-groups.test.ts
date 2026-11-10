@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { flipped, groupNotes, inGroup, NO_TAG } from "../src/note-groups";
+import { flipped, groupNotes, NO_TAG } from "../src/note-groups";
 
 const n = (path: string, ...tags: string[]) => ({ path, tags });
 
@@ -16,15 +16,7 @@ describe("groupNotes", () => {
   });
 });
 
-describe("inGroup / flipped", () => {
-  it("matches all, the untagged, or any chosen tag ignoring case", () => {
-    expect(inGroup(["Home"], [])).toBe(true);
-    expect(inGroup([], [NO_TAG])).toBe(true);
-    expect(inGroup(["home"], [NO_TAG])).toBe(false);
-    expect(inGroup(["Home"], ["home"])).toBe(true);
-    expect(inGroup(["ideas"], ["home", "ideas"])).toBe(true);
-    expect(inGroup(["other"], ["home", "ideas"])).toBe(false);
-  });
+describe("flipped", () => {
   it("flips a name in a set", () => {
     expect(flipped(["a"], "A")).toEqual([]);
     expect(flipped(["a"], "b")).toEqual(["a", "b"]);

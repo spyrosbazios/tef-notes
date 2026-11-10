@@ -1,7 +1,7 @@
 ## What changed and why
 
 ## Modules touched
-<!-- packages/core, server, server/agent, web, mobile, cli, extension, site, docs -->
+<!-- packages/core, server, server/agent, web, cli, extension, site, docs -->
 
 ## Checklist
 

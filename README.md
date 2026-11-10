@@ -105,8 +105,6 @@ need a push key and your `TZ`: [Push reminders](server/README.md#push-reminders)
 | **CLI** | Run `tefnotes` with Bun to read, edit and export notes and tasks. [CLI guide](cli/README.md) |
 | **Coding agents** | Claude Code, Codex and others drive the CLI through the `tefnotes` skill. [Skill](skills/tefnotes/SKILL.md) |
 
-The Android app in [`mobile/`](mobile/README.md) is the earlier phone client: it stays in the repository for 0.3.0 and gets no new features. Use the installed web app.
-
 The UI is in English. Notes can be in any language.
 
 ## AI providers
@@ -143,4 +141,4 @@ Report security issues through the process in [SECURITY.md](SECURITY.md).
 ## License
 
 [GNU AGPL-3.0](LICENSE). Contributions require a one-time [Contributor License Agreement](CLA.md).
-The Atkinson Hyperlegible fonts use the [SIL Open Font License](mobile/assets/fonts/OFL.txt).
+The Atkinson Hyperlegible fonts use the [SIL Open Font License](assets/fonts/OFL.txt).

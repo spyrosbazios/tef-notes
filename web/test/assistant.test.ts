@@ -37,11 +37,11 @@ describe("the page context", () => {
 
   test("the open note, with the rev held", () => {
     const c = pageContext({ view: { kind: "home" }, open: garage.note.id }, held, "");
-    expect(c).toEqual({ client: "web", view: { kind: "home" }, note: { path: "notes/garage.md", title: "Garage", rev: 7 } });
+    expect(c).toEqual({ view: { kind: "home" }, note: { path: "notes/garage.md", title: "Garage", rev: 7 } });
   });
 
   test("the open task, in a task list; an open note hides it", () => {
-    expect(pageContext({ view: { kind: "today" }, task: "t1" }, held, "")).toEqual({ client: "web", view: { kind: "today" }, task: { id: "t1", title: "Fix the door" } });
+    expect(pageContext({ view: { kind: "today" }, task: "t1" }, held, "")).toEqual({ view: { kind: "today" }, task: { id: "t1", title: "Fix the door" } });
     expect(pageContext({ view: { kind: "today" }, task: "t1", open: garage.note.id }, held, "").task).toBeUndefined();
   });
 

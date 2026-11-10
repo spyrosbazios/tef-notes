@@ -45,34 +45,6 @@ export function linkify(entry: string, url: string, text: string) {
   return t ? entry.replace(url, () => `[${t}](${url})`) : entry;   // a function: no $& / $$ patterns in a title
 }
 
-const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
-
-async function get(url: string, ms: number, json: boolean): Promise<any> {
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), ms);
-  try {
-    const r = await fetch(url, { signal: ctl.signal, headers: json ? { Accept: "application/json" } : { Accept: "text/html" } });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return json ? r.json() : (await r.text()).slice(0, 400_000);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/** X posts and YouTube have oEmbed (their pages are scripts or a consent wall); the rest, the page's head. */
-export async function linkTitle(url: string, ms = 6000): Promise<string | null> {
-  const h = host(url);
-  if (/^(x|twitter|mobile\.twitter)\.com$/.test(h)) {
-    const o = await get(`https://publish.twitter.com/oembed?omit_script=1&url=${encodeURIComponent(url)}`, ms, true);
-    const text = clean(/<p[^>]*>([\s\S]*?)<\/p>/i.exec(o.html ?? "")?.[1] ?? "", 100);
-    return o.author_name ? (text ? `${o.author_name}: ${text}` : `${o.author_name} on X`) : null;
-  }
-  if (/^(youtube\.com|m\.youtube\.com|youtu\.be)$/.test(h)) {
-    const o = await get(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, ms, true);
-    return o.title ? clean(o.title) : null;
-  }
-  return titleFromHtml(await get(url, ms, false));
-}
-
 /** The note a link in a note or an answer points at, as `notes/<file>.md`: a relative link the laptop wrote
  *  (`20261001-foo.md`, `notes/foo.md`, `../notes/foo.md`), its `#section` dropped. null for anything with a
  *  scheme (`https:`, `mailto:`), which the OS opens. */

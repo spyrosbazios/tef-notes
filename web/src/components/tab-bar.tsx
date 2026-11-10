@@ -1,4 +1,4 @@
-// The phone's bottom bar (mobile/src/app/(tabs)/_layout.tsx): a floating pill with Home, Tasks, Notes, Ask and Settings (in the owner's order; Tasks, Notes and Ask hideable, Notes off at first: core/prefs.ts `phone`), on Animate UI's
+// The bottom bar below `md`: a floating pill with Home, Tasks, Notes, Ask and Settings (in the owner's order; Tasks, Notes and Ask hideable, Notes off at first: core/prefs.ts `phone`), on Animate UI's
 // Bottom Navigation. The tab in front shows its label (`show="active"`) on a capsule tinted by the brand that glides to the next
 // one, the others are icons; a press scales them. The pill is liquid glass (quick-liquid's `LiquidGlass`, its optics only: the
 // motion stays Animate UI's; the glass is the app's one, hooks/glass.ts): the page scrolling under it is refracted through its rim,

@@ -18,7 +18,7 @@
 //
 // Photos: a note's first PHOTOS embedded pictures (attachments records, JPEG or PNG) go to JEV beside its text, which
 // is how a receipt, a whiteboard or a product shot gets its tags. TypeSafe rejects a whole request over one picture
-// outside 280 to 1568 px a side, and the phone keeps up to 1600: a picture too big is shrunk to fit with PocketBase's
+// outside 280 to 1568 px a side, and the clients keep up to 1600: a picture too big is shrunk to fit with PocketBase's
 // own thumbnailer (a temporary file beside the original, deleted at once), one too small, or that cannot be read, is
 // left out (lib/images.js). If TypeSafe still answers 400 or 413 the note is asked again without them. A task has none.
 //

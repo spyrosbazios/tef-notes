@@ -177,8 +177,7 @@ the model (a minute or so, once) and `docker compose logs stt` then shows `stt: 
   Chrome's prompt). Installing needs HTTPS, which the Tailscale Serve or Caddy step 5 gives; an `http://` address only opens in
   the browser. The app then works offline, is in the Share sheet of other apps, and can ring task reminders once the
   owner has set up push (`server/README.md#push-reminders`: a VAPID key in `keys/push/api-key` made by the owner, never by
-  the agent; `TEF_NOTES_VAPID_SUBJECT`; `TZ`), then turns them on in Settings, Reminders, per device. The older Android
-  app (`mobile/README.md`) is kept for 0.3.0 but gets no new features; do not install it for a new setup.
+  the agent; `TEF_NOTES_VAPID_SUBJECT`; `TZ`), then turns them on in Settings, Reminders, per device.
 - **CLI** (needs [bun](https://bun.sh) and the cloned repo):
   ```sh
   cd cli && bun install

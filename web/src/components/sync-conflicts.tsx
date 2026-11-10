@@ -1,5 +1,5 @@
 // Settings > Server & sync > Conflicts: notes edited here and on another device on the same lines, which the sync could not merge
-// (packages/core/src/sync.ts), so neither was sent. As on the phone (mobile/src/ui/conflicts.tsx) the owner picks a side: keep the
+// (packages/core/src/sync.ts), so neither was sent. The owner picks a side: keep the
 // text made here, which then goes up over the server's, or use the server's, which keeps the text made here to restore until it is
 // restored or dismissed. Tasks never get here: their edits merge field by field.
 import { useQueryClient } from "@tanstack/react-query";

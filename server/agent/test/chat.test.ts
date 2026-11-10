@@ -98,7 +98,7 @@ describe("POST /agent/chat", () => {
 
 describe("POST /agent/chat as the always-on assistant", () => {
   const user: UIMessage = { id: "u1", role: "user", parts: [{ type: "text", text: "tidy this note" }] };
-  const page = { client: "web", view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 }, selection: "eggs" };
+  const page = { view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 }, selection: "eggs" };
   const sent = () => JSON.stringify(prompts[0]);
 
   it("puts the screen last in the newest message's context, and keeps it out of the saved chat", async () => {
@@ -106,7 +106,7 @@ describe("POST /agent/chat as the always-on assistant", () => {
     await send([user], false, page);
     const p = sent();
     expect(p).toContain("<screen>");
-    expect(p).toContain("Showing: Today (task list) (web app)");
+    expect(p).toContain("Showing: Today (task list)");
     expect(p).toContain("Open note: \\\"notes/20261001-shopping.md\\\" \\\"Shopping\\\" (rev 1)");
     expect(p.lastIndexOf("<screen>")).toBeGreaterThan(p.indexOf("<notes>\\n"));
     expect(p.lastIndexOf("</screen>")).toBeGreaterThan(p.lastIndexOf("</notes>"));
@@ -207,8 +207,8 @@ describe("POST /agent/chat between steps", () => {
 
     pb.attach(parseNote("notes/20261001-shopping.md", "").id, "list.pdf", makePdf(["Flour"]));
     replies = [text("b"), text("c")];
-    await send([ask("u1", "hi")], false, { client: "web", view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 } });
-    await send([ask("u1", "hi")], false, { client: "web", view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 }, selection: "Flour", editable: true });
+    await send([ask("u1", "hi")], false, { view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 } });
+    await send([ask("u1", "hi")], false, { view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 }, selection: "Flour", editable: true });
     expect(offered[1]).not.toContain("update_memory");
     expect(offered[1]).toContain("read_note");
     expect(offered[2]).not.toContain("replace_selection");
@@ -216,7 +216,7 @@ describe("POST /agent/chat between steps", () => {
   });
 
   it("withdraws the selection tools when the words are a note's that a chat which read the web wrote", async () => {
-    const page = { client: "web", view: { kind: "today" }, note: { path: "notes/20261002-clip.md", title: "Clip" }, selection: "words", editable: true };
+    const page = { view: { kind: "today" }, note: { path: "notes/20261002-clip.md", title: "Clip" }, selection: "words", editable: true };
     pb.put("notes/20261002-clip.md", "---\ntitle: Clip\ncreated: 2026-10-02\n---\nwords\n", { tainted: true });
     pb.put("notes/20261003-mine.md", "---\ntitle: Mine\ncreated: 2026-10-03\n---\nwords\n");
     replies = [text("a"), text("b")];

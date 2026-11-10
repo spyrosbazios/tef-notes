@@ -1,4 +1,4 @@
-// The geometry of a task row's swipe, as the phone's (mobile/src/ui/tasks.tsx, ReanimatedSwipeable): the row follows the
+// The geometry of a task row's swipe on a touch screen: the row follows the
 // finger at half speed (friction 2), never past the width of what it uncovers; let go past `WHEN_AT` to the right and When
 // is asked (the row snaps back), past `DELETE_AT` to the left and the Delete button stays out until it is tapped or the
 // row is touched elsewhere. Pure: the hook (hooks/swipe.ts) feeds it pixels.

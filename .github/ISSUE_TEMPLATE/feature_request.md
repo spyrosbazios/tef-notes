@@ -10,7 +10,7 @@ labels: enhancement
 **What you would like**
 
 **Which part it touches**
-<!-- Android app, web app, CLI, browser extension, chat agent, server -->
+<!-- Web app (including the installed one on a phone), CLI, browser extension, chat agent, server -->
 
 **Alternatives you considered**
 

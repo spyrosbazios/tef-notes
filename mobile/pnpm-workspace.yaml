@@ -1,5 +1,0 @@
-allowBuilds:
-  react-native-enriched-markdown: false # postinstall only downloads math + code-highlight assets, both off in package.json
-  unrs-resolver: true
-patchedDependencies:
-  react-native-enriched-markdown@1.1.0: patches/react-native-enriched-markdown@1.1.0.patch

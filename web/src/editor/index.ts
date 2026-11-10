@@ -1,6 +1,6 @@
 // A WYSIWYG markdown editor in plain DOM: `createEditor(element, { markdown, onChange })`. It edits a note's body
 // (the frontmatter is the caller's) and hands back the body as markdown. Nothing here knows React, the page, or
-// the server, so the same module can sit in an Android WebView. The note format lives in ./markdown, the keys and
+// the server: the caller wires those in. The note format lives in ./markdown, the keys and
 // shortcuts in ./commands, the `/` menu in ./slash, the node views in ./views.
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
@@ -26,7 +26,7 @@ import { spliced } from "@/core/voice";
 import type { ResolveImage } from "./views";
 
 export { normalizeBody };
-export { drawingPreviewSrc, isDrawingLink } from "./files";
+export { isDrawingLink } from "./files";
 export type { CommandName, Held, PdfPage, PdfPages, ResolveImage, ResolveLink, Summarize };
 
 /** A picture the note shows, for the viewer: an image, or a drawing's preview. `src` is the file's own path (`../attachments/<id>/<name>`). */
@@ -59,8 +59,6 @@ export type EditorOptions = {
   summarize?: Summarize;
   /** The preview of a URL, for the card under a paragraph that is only that URL. Without it there are no cards. */
   resolveLink?: ResolveLink;
-  /** A YouTube link on a line of its own plays in the note when clicked (default); false: the click opens the link. */
-  inlineVideo?: boolean;
   placeholder?: string;
 };
 
@@ -160,7 +158,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       history(), slashMenu, typed, keys, base, heldMark, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
       placeholder(options.placeholder ?? ""), trailingParagraph, fileChips(() => resolve, options.pdfPage, options.pdfPages),
       ...(options.onRead ? [readLinks(options.onRead, options.summarize)] : []),
-      ...(options.resolveLink ? [linkCards(options.resolveLink, open, options.onRead, options.summarize, options.inlineVideo ?? true)] : []),
+      ...(options.resolveLink ? [linkCards(options.resolveLink, open, options.onRead, options.summarize)] : []),
     ],
   });
 

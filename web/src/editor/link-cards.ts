@@ -1,8 +1,7 @@
 // A paragraph that is only a URL (bare, or one labelled link) is drawn as a card, its own line hidden until the caret is on it, always (the URL alone until the page answers): picture, title, description, site, as Notion and
 // Outline unfurl a pasted link. The card is a widget decoration, not a node: the note stays the one line of markdown
 // it was, a `[text](url)` link inside a sentence stays a link, and delete the line and the card is gone.
-// Where the page's metadata comes from is the caller's (`resolve`): the server reads it (CORS keeps a browser out), and
-// a WebView asks the app.
+// Where the page's metadata comes from is the caller's (`resolve`): the server reads it (CORS keeps a browser out).
 import type { Node } from "prosemirror-model";
 import { Plugin } from "prosemirror-state";
 import type { EditorState } from "prosemirror-state";
@@ -123,9 +122,8 @@ function card(url: string, p: LinkPreview | null, open: (url: string) => void, t
 }
 
 /** A YouTube link's player: its thumbnail and a play button until clicked, so a note with videos loads no player (nor
- *  YouTube's scripts) until one is wanted. `inline`: the click plays it here; otherwise it opens the link (the phone's
- *  editor is a file:// page, which YouTube refuses to embed in: the app plays it on a screen of its own, ui/video.tsx). */
-function video(url: string, v: { id: string; start: number }, open: (url: string) => void, inline: boolean): HTMLElement {
+ *  YouTube's scripts) until one is wanted; the click plays it in the note. */
+function video(url: string, v: { id: string; start: number }): HTMLElement {
   const root = el("div", "pm-video");
   root.contentEditable = "false";
   root.title = url;
@@ -135,7 +133,6 @@ function video(url: string, v: { id: string; start: number }, open: (url: string
   play.append(picture("pm-video-thumb", `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`), el("span", "pm-video-icon"));
   play.addEventListener("click", (e) => {
     e.preventDefault();
-    if (!inline) { open(url); return; }
     const frame = el("iframe", "pm-video-frame");
     frame.src = youtubeEmbed(v);
     frame.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
@@ -151,9 +148,8 @@ function video(url: string, v: { id: string; start: number }, open: (url: string
 
 /** The plugin. `resolve`: where previews come from; `open`: what a click on a card does; `read`: its Read button and
  *  `summarize`: its Summary button (none without them; Summary shown done once the link has one under it, and that
- *  summary drawn as the card's lower half);
- *  `inlineVideo`: a YouTube link's player plays in the note (see `video`). */
-export function linkCards(resolve: ResolveLink, open: (url: string) => void, read?: (url: string) => void, summarize?: Summarize, inlineVideo = true): Plugin {
+ *  summary drawn as the card's lower half). A YouTube link's card is its player (see `video`). */
+export function linkCards(resolve: ResolveLink, open: (url: string) => void, read?: (url: string) => void, summarize?: Summarize): Plugin {
   const known = new Map<string, LinkPreview | null>();      // looked up: a preview, or null for nothing to show
   const asked = new Map<string, number>();                  // in flight (0) or failed (when to try again)
   const queued = new Set<string>();                         // waiting to be looked up (a tick, or the typing pause)
@@ -203,7 +199,7 @@ export function linkCards(resolve: ResolveLink, open: (url: string) => void, rea
           if (selTo < from || selFrom > end) out.push(Decoration.node(from, end, { class: "pm-card-line" }));
           const v = youtubeVideo(url);
           if (v) {
-            out.push(Decoration.widget(end, () => video(url, v, open, inlineVideo), { key: `video:${url}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
+            out.push(Decoration.widget(end, () => video(url, v), { key: `video:${url}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
             continue;
           }
           const p = known.get(url) ?? null;

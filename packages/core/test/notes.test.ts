@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
-  appendToNote, appended, attachmentOf, isNotePath, matchQuery, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
-  picturesOf, mosaicCells, slugify, plainText, snippetOf, snippetParts, withFlags, HIT,
+  appendToNote, appended, attachmentOf, isNotePath, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
+  picturesOf, mosaicCells, slugify, snippetOf, withFlags,
 } from "../src/notes";
 import { localDay } from "../src/time";
 
@@ -153,16 +153,6 @@ describe("snippetOf", () => {
   });
 });
 
-describe("plainText", () => {
-  it("keeps headings and code but drops the syntax, for a search snippet", () => {
-    expect(plainText("# Door\n```\ncode()\n```\n- [ ] [the \\] docs](https://x.io) ![a](b.jpg)\n\n> q\n---\n")).toBe("Door code() the ] docs q");
-  });
-
-  it("passes the match marks through", () => {
-    expect(plainText(`- [x] **${HIT[0]}milk${HIT[1]}** and snake_case`)).toBe(`${HIT[0]}milk${HIT[1]} and snake_case`);
-  });
-});
-
 describe("appendToNote", () => {
   it("adds a bullet at the end of the body, after a list or after a blank line", () => {
     expect(appendToNote("- a\n", "b")).toBe("- a\n- b\n");
@@ -281,22 +271,6 @@ describe("rewriteImagePaths", () => {
   it("leaves what it can't resolve, other notes' and other sites' paths alone", () => {
     const md = `![x](../attachments/${id}/missing.jpg) ![y](../attachments/other/a.jpg) https://x.io/attachments/${id}/a.jpg ![z](../attachments/${id}x/a.jpg)`;
     expect(rewriteImagePaths(md, id, uri)).toBe(md);
-  });
-});
-
-describe("search text", () => {
-  it("quotes each word, the last one a prefix, folded", () => {
-    expect(matchQuery("Πόρτα  γκαρ")).toBe('"πορτα" "γκαρ"*');
-    expect(matchQuery('say "hi" OR -x')).toBe('"say" "hi" "or" "-x"*');
-    expect(matchQuery("?? -- !")).toBeNull();
-    expect(matchQuery("")).toBeNull();
-  });
-
-  it("splits a snippet at the marks", () => {
-    expect(snippetParts(`…the ${HIT[0]}door${HIT[1]} code ${HIT[0]}1234${HIT[1]}`)).toEqual([
-      { text: "…the ", hit: false }, { text: "door", hit: true }, { text: " code ", hit: false }, { text: "1234", hit: true },
-    ]);
-    expect(snippetParts("plain")).toEqual([{ text: "plain", hit: false }]);
   });
 });
 

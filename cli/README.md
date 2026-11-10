@@ -2,8 +2,7 @@
 
 <!-- reviewed: 2026-11-10 -->
 
-TEF Notes from a terminal: notes and tasks, for you and for coding agents. It is the same client the phone
-uses (`packages/core/src/pocketbase.ts`), so every write is a compare-and-swap on the record's `rev`: nothing here
+TEF Notes from a terminal: notes and tasks, for you and for coding agents. It is the same client the web app uses (`packages/core/src/pocketbase.ts`), so every write is a compare-and-swap on the record's `rev`: nothing here
 overwrites an edit it has not seen. The note format and the write contract are in
 [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 
@@ -85,7 +84,7 @@ before writing once it has read it. Links and tag definitions carry no mark.
 - `cat` prints the note's `rev` on stderr. `put` and `rm` take it back and refuse if the note moved since. That
   refusal is the point: read the note again and redo the change; never retry with the newer `rev` without looking.
 - `append` re-reads and retries, since adding at the end cannot clash. `edit` merges an edit made meanwhile the way
-  the phone does, and refuses on overlap, leaving your text in a temp file.
+  the web app does, and refuses on overlap, leaving your text in a temp file.
 - `grep` is the server's case-insensitive `LIKE`; Greek accents (tonos) must match.
 - Notes are yours: append or edit what you mean to, and do not reorganise unasked, least of all from an agent.
 

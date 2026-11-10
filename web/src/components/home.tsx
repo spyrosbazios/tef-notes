@@ -4,7 +4,7 @@
 // list, a note over Home (which stays mounted under it). The route is routes/_app/index.tsx; a badge's tag is `?tags=`, and the task
 // box's list is kept here for as long as the app is open (not in the URL: the rail's and the tabs' Home finds the
 // box as it was left). The page's scroll is the router's (`data-scroll-restoration-id`, lib/scroll.ts).
-// Below `md` it is the phone's Home (mobile/src/ui/home.tsx): one header row (the app's mark, which is the lens control, and the
+// Below `md` it is a phone's Home: one header row (the app's mark, which is the lens control, and the
 // search button, whose drawer takes the page's place: search-drawer.tsx), the days as a strip (days.tsx) where the desktop has the
 // month, the same task box at a fixed height, then the notes. The date is the desktop's; the phone's strip says the month.
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";

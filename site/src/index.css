@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 /* The phone's faces, from its own assets. */
-@font-face { font-family: "Atkinson Next"; font-weight: 400; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_400Regular.ttf"); }
-@font-face { font-family: "Atkinson Next"; font-weight: 500; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_500Medium.ttf"); }
-@font-face { font-family: "Atkinson Next"; font-weight: 600; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_600SemiBold.ttf"); }
-@font-face { font-family: "Atkinson Next"; font-weight: 700; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_700Bold.ttf"); }
-@font-face { font-family: "Atkinson Next"; font-weight: 800; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleNext_800ExtraBold.ttf"); }
-@font-face { font-family: "Atkinson Mono"; font-weight: 400; font-display: swap; src: url("../../mobile/assets/fonts/AtkinsonHyperlegibleMono_400Regular.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 400; font-display: swap; src: url("../../assets/fonts/AtkinsonHyperlegibleNext_400Regular.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 500; font-display: swap; src: url("../../assets/fonts/AtkinsonHyperlegibleNext_500Medium.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 600; font-display: swap; src: url("../../assets/fonts/AtkinsonHyperlegibleNext_600SemiBold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 700; font-display: swap; src: url("../../assets/fonts/AtkinsonHyperlegibleNext_700Bold.ttf"); }
+@font-face { font-family: "Atkinson Next"; font-weight: 800; font-display: swap; src: url("../../assets/fonts/AtkinsonHyperlegibleNext_800ExtraBold.ttf"); }
+@font-face { font-family: "Atkinson Mono"; font-weight: 400; font-display: swap; src: url("../../assets/fonts/AtkinsonHyperlegibleMono_400Regular.ttf"); }
 
 @theme inline {
   --font-sans: "Atkinson Next", system-ui, sans-serif;

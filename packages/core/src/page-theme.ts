@@ -1,4 +1,4 @@
-// The theme a WebView page (the editor, the PDF viewer) draws in, sent over its bridge: the palette as CSS variable
-// values (`--tf-<name>`, the names web/src/index.css maps its tokens onto) and the scheme for `color-scheme`.
-// Sent on load and again whenever the owner switches theme, so an open page follows without reloading.
+// The theme the web app paints itself in (web/src/page-theme.ts): the palette as CSS variable values (`--tf-<name>`, the
+// names web/src/index.css maps its tokens onto) and the scheme for `color-scheme`. Applied on load and again whenever the
+// owner switches theme, so the page follows without reloading.
 export type PageTheme = { scheme: "dark" | "light"; vars: Record<string, string> };

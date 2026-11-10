@@ -1,14 +1,14 @@
 name: Pages
 
 # The marketing page (site/) at https://spyrosbazios.github.io/tef-notes/. The repo's Pages source must be "GitHub Actions"
-# (Settings > Pages). The page imports the palette and fonts from packages/core and mobile/assets, so those trigger it too.
+# (Settings > Pages). The page imports the palette and fonts from packages/core and assets/, so those trigger it too.
 on:
   push:
     branches: [main]
     paths:
       - "site/**"
       - "packages/core/**"
-      - "mobile/assets/**"
+      - "assets/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

@@ -1,4 +1,4 @@
-// Home's days on a phone (mobile/src/ui/days.tsx): the month planner (planned.tsx) as a strip of days scrolled sideways past
+// Home's days on a phone: the month planner (planned.tsx) as a strip of days scrolled sideways past
 // one fixed slot in the middle, a week behind today to half a year ahead. Whatever day sits in the slot is the day the task box
 // shows (Today's list for today, Upcoming's day for a later one): drag the strip to put a day there, or tap one and it slides
 // in; the box's own `day` slides the strip to it, so the two stay in step. Each day is shaded by how many open tasks are planned

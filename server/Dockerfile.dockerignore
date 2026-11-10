@@ -6,8 +6,8 @@ web/node_modules
 web/dist
 !packages/core/src
 !packages/core/vite.ts
-!mobile/assets/fonts
-!mobile/assets/images/icon.png
+!assets/fonts
+!assets/icon.png
 !extension
 extension/node_modules
 extension/dist

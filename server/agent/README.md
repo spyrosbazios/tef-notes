@@ -21,7 +21,7 @@ to it. See the security model in [../README.md](../README.md).
 
 ## Always-on assistant
 
-A client that stays with the owner through the app (the web's docked panel, the phone's overlay) sends `context` with every
+A client that stays with the owner through the app (the web's docked panel) sends `context` with every
 message: what is on screen, as `AssistantContext` (`packages/core/src/assistant.ts` is the contract; `contextOf` reads it, and
 a context that can't be read is ignored: the chat is a plain one). The server renders it as a `<screen>` block, last in the
 `<context>` of the newest user message (`src/assistant.ts`, `src/agent.ts`), so the instructions stay one fixed prefix for the

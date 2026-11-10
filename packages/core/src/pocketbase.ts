@@ -7,8 +7,6 @@
 // every listing. Tasks are records of their own under the same compare-and-swap
 // (`tasks` below; their shape: core/todo.ts); links between records are records too, outside it (`links`
 // below; their shape: core/record-links.ts).
-import type { AgentModels } from "./agent";
-import { saveBody, suggestBody, type ClipPage, type ClipResult, type Suggestions, type Target } from "./clip";
 import { SEARCH_PATH, searchHitsOf, type SearchHit } from "./find";
 import { getJson, HttpError } from "./http";
 import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
@@ -206,8 +204,6 @@ function revCollection<T extends { id: string }>(name: string, of: (r: any) => T
   };
 }
 
-export type RevCollection<T extends { id: string }> = ReturnType<typeof revCollection<T>>;
-
 export const tasks = revCollection<Task>("tasks", taskOf);
 
 // ---- links
@@ -309,8 +305,7 @@ export const photoUrl = (s: Server, p: Pick<Photo, "rec" | "file">) => `${s.url}
 /** A photo at one of a tile's sizes, drawn and kept by the server. */
 export const photoThumbUrl = (s: Server, p: Pick<Photo, "rec" | "file">, size: ThumbSize) => `${photoUrl(s, p)}?thumb=${THUMB_SIZES[size]}`;
 
-/** Where a photo goes up, as a multipart POST: the file under `file`, these fields beside it. Split from the sending so
- *  the phone can stream it from disk natively (expo-file-system's File.upload) and bun can post a Blob (upload). */
+/** Where a photo goes up, as a multipart POST: the file under `file`, these fields beside it (`upload` sends it). */
 export const uploadTo = (s: Server, note: string, name: string) =>
   ({ url: api(s, "collections/attachments/records"), fields: { note, name } });
 
@@ -351,7 +346,7 @@ export const pageHtml = (s: Server, url: string): Promise<{ url: string; html: s
 
 /** The summary of the page at `url` (server/pb_hooks/summary.pb.js), as the markdown block a note's editor puts under the
  *  link: the server reads the page and asks its model, so it waits as a clip does. HttpError 400 a URL it won't fetch, 422
- *  nothing to summarise, 502 it couldn't be written; the reason is the body's `error` (`clipError`). */
+ *  nothing to summarise, 502 it couldn't be written; the reason is the body's `error`. */
 export const pageSummary = async (s: Server, url: string): Promise<string> =>
   (await getJson(api(s, "tefnotes/summary"), json("POST", { url }), 1, 60_000)).summary as string;
 
@@ -362,44 +357,6 @@ export const hasPreview = (p: LinkPreview | null | undefined): p is LinkPreview 
  *  own address is no tile picture: it can't be blurred in, and it would be fetched from the site by every client). */
 export const previewPictureUrl = (s: Server, p: Pick<LinkPreview, "picture"> | null | undefined, size: ThumbSize) =>
   p?.picture ? `${s.url}/api/files/link_previews/${p.picture}?thumb=${THUMB_SIZES[size]}` : undefined;
-
-// ---- the clip routes
-
-// Where a shared page, text or picture is filed (server/pb_hooks/clip.pb.js; shapes: core/clip.ts): suggest asks JEV
-// where it fits and writes nothing, save writes where the owner chose. A model call is behind each, so they wait longer
-// than a read, and neither is retried: a save that failed after landing would land twice.
-const CLIP_MS = 120_000;
-
-/** The server's words for a failed clip call (`{error}`), else HTTP's. */
-export const clipError = (e: unknown): string => (e instanceof HttpError && typeof e.body?.error === "string" ? e.body.error : e instanceof Error ? e.message : String(e));
-
-/** Where the notes and tasks a clip fits are suggested: `look` the picture as JEV sees it (base64 JPEG). */
-export const clipSuggest = (s: Server, page: ClipPage, note: string, look?: string): Promise<Suggestions> =>
-  getJson(api(s, "tefnotes/clip/suggest"), json("POST", suggestBody(page, note, look)), 1, CLIP_MS);
-
-/** Where a save goes up, as a multipart POST: `@jsonPayload` beside the picture's JPEG as `file` (a note's clip of a picture
- *  only). Split from the sending as an upload's is: the phone streams the file from disk natively. */
-export const clipTo = (s: Server, page: ClipPage, line: string | undefined, target: Target, note: string, summary: boolean) =>
-  ({ url: api(s, "tefnotes/clip"), fields: { "@jsonPayload": JSON.stringify(saveBody(page, line, target, note, summary)) } });
-
-/** The reply to a save: where it went, or the failure as an HttpError carrying the server's `{error}`. */
-export function clipped(status: number, body: string): ClipResult {
-  let j: any;
-  try { j = JSON.parse(body); } catch { j = undefined; }
-  if (status >= 200 && status < 300 && j) return j;
-  throw new HttpError(status, `HTTP ${status}`, undefined, j);
-}
-
-/** A save with no picture to send: a page's or a text's clip, or any to an existing task. */
-export async function clipSave(s: Server, page: ClipPage, line: string | undefined, target: Target, note: string, summary: boolean): Promise<ClipResult> {
-  const to = clipTo(s, page, line, target, note, summary), form = new FormData();
-  for (const [k, v] of Object.entries(to.fields)) form.append(k, v);
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CLIP_MS);
-  try {
-    const r = await fetch(to.url, { method: "POST", body: form, signal: ctl.signal });
-    return clipped(r.status, await r.text());
-  } finally { clearTimeout(timer); }
-}
 
 // ---- the agent
 
@@ -425,8 +382,6 @@ export const pdfPages = async (s: Server, note: string, name: string): Promise<n
     throw e;
   }
 };
-
-export const agentModels = (s: Server): Promise<AgentModels> => getJson(agentUrl(s, "models"), {}, 2);
 
 export type ChatRec = { id: string; title: string; updated: string };
 export type Chat = ChatRec & { messages: unknown[] };

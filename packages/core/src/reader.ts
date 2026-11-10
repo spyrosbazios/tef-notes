@@ -1,5 +1,5 @@
-// Reader view's contract: a linked page read as an article, its clutter (menus, ads, comments) gone, for both clients'
-// reader (web/src/components/reader.tsx, mobile/src/ui/reader.tsx). The agent's `GET /agent/reader?url=` answers it
+// Reader view's contract: a linked page read as an article, its clutter (menus, ads, comments) gone, for the web app's
+// reader (web/src/components/reader.tsx). The agent's `GET /agent/reader?url=` answers it
 // (server/agent/src/reader.ts, whose answer the compiler holds to `Article`): PocketBase fetches the page through the
 // link-preview guard, Defuddle finds the article and writes it as markdown. Here: the shape, the route, and the one
 // defensive reading of the answer.

@@ -7,8 +7,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:editor": "vite build --config vite.editor.config.ts",
-    "build:pdf": "vite build --config vite.pdf.config.ts",
     "lint": "oxlint",
     "test": "bun test",
     "typecheck": "tsc -b",
@@ -79,7 +77,6 @@
     "typescript": "~7.0.2",
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0",
-    "vite-plugin-singlefile": "^2.3.4",
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1",
     "workbox-window": "^7.4.1"

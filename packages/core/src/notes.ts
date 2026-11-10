@@ -238,7 +238,7 @@ export function newNotePath(title: string, now = Date.now(), taken: Set<string> 
 
 /** Inline markdown as the words a reader sees, in one pass so an escape (`\*`) is never taken for a mark: escapes
  *  read as their character; an image goes, a link is its words, an autolink its address; emphasis, strikethrough
- *  and code marks come off. Match marks (HIT) pass through, so a search snippet can go through here too. */
+ *  and code marks come off. */
 const INLINE = /\\([\\`*_{}[\]()#+\-.!|<>~"'&:])|!\[(?:\\.|[^\]\\])*\]\([^)]*\)|\[((?:\\.|[^\]\\])*)\]\([^)]*\)|<([a-z][a-z0-9+.-]*:[^>\s]+)>|\*\*|__|~~|`|\*([^\s*](?:[^*]*[^\s*])?)\*/gi;
 function inlineText(s: string): string {
   return s.replace(INLINE, (_m, esc?: string, link?: string, auto?: string, em?: string) => esc ?? (link != null ? inlineText(link) : auto ?? (em != null ? inlineText(em) : "")));
@@ -267,9 +267,6 @@ export function plainLines(md: string, prose = false): string[] {
   }
   return out;
 }
-
-/** Markdown as one line of plain text: what a search snippet, a preview or a title shows of it. */
-export const plainText = (md: string): string => plainLines(md).join(" ");
 
 /** ~160 characters of prose for the list: headings, images, rules, code and blank lines skipped; a bullet
  *  or a task reads as its text, a link as its words. */
@@ -394,28 +391,9 @@ export function rewriteImagePaths(body: string, noteId: string, resolve: (name: 
 
 // ---- search
 
-/** What search compares: lowercase, accents and Greek tonos gone. FTS5's unicode61 only strips Latin accents,
- *  so the index holds folded text and queries are folded the same way. Length-preserving for precomposed text. */
+/** What search compares: lowercase, accents and Greek tonos gone, the text and the query folded the same way.
+ *  Length-preserving for precomposed text. */
 export const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC").toLowerCase();
-
-/** A typed query as an FTS5 MATCH: each word a quoted phrase, the last one a prefix. null when nothing in it
- *  is a word (only punctuation): search falls back to LIKE. */
-export function matchQuery(q: string): string | null {
-  const terms = fold(q).split(/\s+/).map((t) => t.replace(/"/g, "")).filter((t) => /[\p{L}\p{N}]/u.test(t));
-  return terms.length ? terms.map((t, i) => `"${t}"${i === terms.length - 1 ? "*" : ""}`).join(" ") : null;
-}
-
-/** The marks around a match in a search snippet. Control characters: no note text has them. */
-export const HIT = ["\u0002", "\u0003"] as const;
-
-/** A search snippet as runs of text, `hit` where the query matched. */
-export function snippetParts(s: string): { text: string; hit: boolean }[] {
-  return s.split(HIT[0]).flatMap((p, i) => {
-    if (!i) return p ? [{ text: p, hit: false }] : [];
-    const [h, ...rest] = p.split(HIT[1]), tail = rest.join("");
-    return [...(h ? [{ text: h, hit: true }] : []), ...(tail ? [{ text: tail, hit: false }] : [])];
-  });
-}
 
 // ---- merge
 

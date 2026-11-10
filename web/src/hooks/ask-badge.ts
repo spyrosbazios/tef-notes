@@ -1,4 +1,4 @@
-// The dot on the bottom bar's Ask tab (the phone's `useAskBadge`, mobile/src/agent/background.ts): an answer finished while the
+// The dot on the bottom bar's Ask tab: an answer finished while the
 // assistant was not in front. Set by the provider when a reply ends with the dock closed; cleared the moment the dock opens.
 import { useSyncExternalStore } from "react";
 import { dockNow, onDock } from "./dock";

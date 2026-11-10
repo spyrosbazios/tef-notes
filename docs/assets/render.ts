@@ -9,10 +9,10 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const dir = fileURLToPath(new URL('./', import.meta.url));
 const { C, TINT, NOTE_COLORS } = withAccent(THEMES.rosepine, 'orange');
 for (const [weight, name] of [['400Regular', 'Regular'], ['500Medium', 'Medium'], ['600SemiBold', 'Semibold'], ['700Bold', 'Bold']]) {
-  GlobalFonts.registerFromPath(`${root}/mobile/assets/fonts/AtkinsonHyperlegibleNext_${weight}.ttf`, `Atkinson ${name}`);
+  GlobalFonts.registerFromPath(`${root}/assets/fonts/AtkinsonHyperlegibleNext_${weight}.ttf`, `Atkinson ${name}`);
 }
-const original = await Bun.file(`${root}/mobile/assets/logo/foreground.svg`).text();
-const mark = original.replace(/<!--[\s\S]*?-->/, '<!-- Generated from mobile/assets/logo/foreground.svg and packages/core/src/theme.ts. -->').replace('viewBox="0 0 1024 1024"', 'viewBox="260 200 504 624"').replace(/fill="#[a-f0-9]+"/, `fill="${C.brand}"`);
+const original = await Bun.file(`${root}/assets/mark.svg`).text();
+const mark = original.replace(/<!--[\s\S]*?-->/, '<!-- Generated from assets/mark.svg and packages/core/src/theme.ts. -->').replace('viewBox="0 0 1024 1024"', 'viewBox="260 200 504 624"').replace(/fill="#[a-f0-9]+"/, `fill="${C.brand}"`);
 await Bun.write(`${dir}/mark.svg`, mark);
 const logo = await loadImage(Buffer.from(mark));
 const web = await loadImage(`${dir}/web-home.png`);

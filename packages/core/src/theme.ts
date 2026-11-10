@@ -1,9 +1,5 @@
-// The ONE palette, one per theme. The phone reads the active theme through `useTheme()` (mobile/src/ui/use-theme.ts);
-// `bun scripts/theme-css.ts` in mobile/ writes every theme into the phone's CSS (mobile/src/theme.css) as a Uniwind theme
-// of the same name, and ../vite.ts writes the default into the web app's, the site's and the extension's, so no colour is
-// written twice. The web app re-sets the variables to the user's pick at runtime (web/src/hooks/appearance.ts).
-// Theme names are also Uniwind's: the two that aren't its built-in `light`/`dark` are registered as `extraThemes` in
-// mobile/metro.config.js and as `--theme` in mobile/package.json's typecheck.
+// The ONE palette, one per theme. ../vite.ts writes the default into the web app's, the site's and the extension's CSS, so
+// no colour is written twice; the web app re-sets the variables to the user's pick at runtime (web/src/hooks/appearance.ts).
 import type { Color } from "./notes";
 import type { PageTheme } from "./page-theme";
 
@@ -51,7 +47,7 @@ export type Tint = ReturnType<typeof tints>;
 export type Theme = {
   name: ThemeName;
   label: string;
-  /** What the system bars, the WebViews' `color-scheme` and Android's night mode follow. */
+  /** What `color-scheme` (scrollbars, form controls) and the installed app's system bars follow. */
   scheme: "dark" | "light";
   C: Palette;
   TINT: Tint;
@@ -281,12 +277,11 @@ export function withAccent(t: Theme, a: AccentName): Theme {
   return out;
 }
 
-/** The default theme, for what has one look only: mobile/app.config.ts (splash, icon ground) and the web app. The phone's
- *  screens never read these; they follow the chosen theme through `useTheme()`. */
+/** The default theme, for what has one look only: the site, the extension, and the web app before the owner's pick applies. */
 export const { C, TINT, NOTE_COLORS } = THEMES[DEFAULT_THEME];
 
 /** A theme as flat CSS variable names (without the `--tf-` prefix) to values: the palette, the tints and
- *  `note-<colour>-<part>`. The web app's stylesheet and the phone's editor page both read these. */
+ *  `note-<colour>-<part>`. The web app's stylesheet reads these. */
 export function themeVars(t: Theme): Record<string, string> {
   return Object.fromEntries([
     ...Object.entries(t.C),
@@ -295,5 +290,5 @@ export function themeVars(t: Theme): Record<string, string> {
   ]);
 }
 
-/** A theme as a WebView page takes it (core/page-theme.ts). */
+/** A theme as the page takes it (core/page-theme.ts). */
 export const pageTheme = (t: Theme): PageTheme => ({ scheme: t.scheme, vars: themeVars(t) });

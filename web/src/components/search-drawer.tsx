@@ -1,4 +1,4 @@
-// Search on a phone (mobile/src/ui/search.tsx `SearchDrawer`): Home's drawer, opened by the header's search button, its results
+// Search on a phone: Home's drawer, opened by the header's search button, its results
 // in place of the page. One field; under it the notes it finds, the tasks, tags and the screens to jump to. A finished `#tag`
 // becomes a chip in the field (absorbed as it is typed, taken off with its x or Backspace) and narrows notes and tasks alike;
 // a tag still being typed is a prefix, and the Tags rows offer the names (tap: a chip). Everything is inside the lens that is on.

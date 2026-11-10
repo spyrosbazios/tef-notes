@@ -1,6 +1,6 @@
 // The agent's words and choices both clients share (the phone's Ask tab, the web's Ask view) and the server agent
 // (server/agent) holds to: the models on offer and which one a message goes to, how a tool and a run of steps are said,
-// a write's flags and line diff, the reason an unanswered confirm card is settled with. Pure: no "ai", RN or DOM import,
+// a write's flags and line diff, the reason an unanswered confirm card is settled with. Pure: no "ai" or DOM import,
 // since the sidecar loads this file outside the clients' node_modules.
 import type { UiToolName } from "./assistant";
 import { dropTitle, isNotePath, parseNote, picturesOf } from "./notes";

@@ -1,4 +1,4 @@
-// The always-on assistant's contract, one home for both clients (the web's docked panel, the phone's overlay) and the
+// The always-on assistant's contract, one home for the web app's dock and the
 // server agent (server/agent/src/assistant.ts). Two halves (the widgets the server's tools hand back to draw are widgets.ts's):
 //  - the page context: what a client sends with every chat request (`context` in the body), where the owner is and what is
 //    open, so "this note" and "this task" mean something. The server reads it with `contextOf` (untrusted input) and renders
@@ -8,7 +8,7 @@
 //    their data: no confirm card. One of them, `ask_choice`, is answered by the owner, not by the app: see "the question".
 //    Two write, into the text the owner selected and asked about: see "the selection". One draws, in the web's drawing editor:
 //    see "the drawing".
-// Pure: no "ai", RN or DOM import, since the sidecar loads this file outside the clients' node_modules.
+// Pure: no "ai" or DOM import, since the sidecar loads this file outside the clients' node_modules.
 
 import { DRAWING_LIMITS, shapeOf, type DrawEdit, type Shape } from "./drawing";
 import { isNotePath } from "./notes";
@@ -35,7 +35,6 @@ export type AssistantView = { kind: PlainView } | { kind: "tag"; tag: string };
  *  from it, not the dock's); `filter`: the search text or filter chip applied to the list. `drawing`: the drawing open in the
  *  web's editor (see "the drawing"). */
 export type AssistantContext = {
-  client?: "web" | "phone";
   view: AssistantView;
   note?: { path: string; title: string; rev?: number };
   task?: { id: string; title: string };
@@ -69,7 +68,6 @@ export function contextOf(raw: unknown): AssistantContext | undefined {
   const view = o && obj(o.view) && viewFrom(obj(o.view)!.kind, obj(o.view)!);
   if (!o || !view) return undefined;
   const out: AssistantContext = { view };
-  if (o.client === "web" || o.client === "phone") out.client = o.client;
   const n = obj(o.note);
   if (n && typeof n.path === "string" && isNotePath(n.path)) {
     out.note = { path: n.path, title: line(n.title, LIMITS.title) };
@@ -120,11 +118,10 @@ export const uiError = (error: string): UiOutput => ({ error });
 export const goView = (i: UiToolInput["go_view"]): AssistantView | null => viewFrom(i.view, i);
 
 /** The UI tools a request may use: those the client can do. Without a context there is no assistant to do them (the call
- *  would hang), so none; the selection tools only when it holds an editable selection; the drawing tools only on the web, the one
- *  client with a drawing editor. */
+ *  would hang), so none; the selection tools only when it holds an editable selection. */
 export function uiToolsFor(context: AssistantContext | undefined): readonly UiToolName[] {
   if (!context) return [];
-  return UI_TOOL_NAMES.filter((n) => (context.editable || !isSelectionTool(n)) && (!isDrawTool(n) || context.client === "web"));
+  return context.editable ? UI_TOOL_NAMES : UI_TOOL_NAMES.filter((n) => !isSelectionTool(n));
 }
 
 // ---- the selection
@@ -159,13 +156,10 @@ export const SELECTION_TEXT_MAX = 20_000;
  *  changes not saved yet. */
 export type OpenDrawing = { path: string; name?: string; shapes: Shape[]; more?: number; selected?: string[]; unsaved?: true };
 
-/** `draw`'s input: the note (`path`), which of its drawings (`name`, else the open one, else a new one), and the edit. */
-export const DRAW_TOOL_NAMES = ["draw", "save_drawing"] as const satisfies readonly UiToolName[];
-export const isDrawTool = (name: string): boolean => (DRAW_TOOL_NAMES as readonly string[]).includes(name);
-
 /** `save_drawing`'s answer: saved, with the drawing's file name (a new one's is made on its first save). */
 export type SaveDrawingOutput = { ok: true; name: string } | { error: string };
 
+/** `draw`'s input: the note (`path`), which of its drawings (`name`, else the open one, else a new one), and the edit. */
 export type DrawInput = { path: string; name?: string } & DrawEdit;
 
 /** `draw`'s answer: done, with a picture of the drawing as it then is (a data URL the client's editor exported), which the

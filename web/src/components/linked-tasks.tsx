@@ -1,5 +1,5 @@
 // A note's backlinks that are tasks (core/record-links.ts backlinks): "Linked tasks" under a note's title, a
-// grouped list like the phone's (mobile/src/ui/links.tsx), each row opening the task beside the list it sits in. Nothing at all when no task links to the note.
+// grouped list, each row opening the task beside the list it sits in. Nothing at all when no task links to the note.
 import { ChevronRight, Circle, CircleCheck, ListTodo } from "lucide-react";
 import { useMemo } from "react";
 import { useLinks } from "@/hooks/links";

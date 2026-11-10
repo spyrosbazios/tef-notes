@@ -1,6 +1,6 @@
-// What Android's Share sheet hands over — a link, clipped text, photos, PDFs — shaped for the two things the app does
-// with it: save it as a note as it is, or hand it to the agent to file. Pure: the intent's parsing and the
-// text it becomes are tested in packages/core/test/share.test.ts; the writing is mobile/src/store/share.ts.
+// What Android's Share sheet hands the installed web app — a link, clipped text, photos, PDFs — shaped for the two things
+// the app does with it: save it as a note as it is, or hand it to the agent to file. Pure: the form's parsing and the
+// text it becomes are tested in packages/core/test/share.test.ts; the page is web/src/components/share-page.tsx.
 import type { ClipPage, Target } from "./clip";
 import { inheritTags, type Lens } from "./lens";
 import { firstUrl, linkify } from "./links";
@@ -11,29 +11,9 @@ export type SharedImage = { uri: string; width: number | null; height: number | 
 export type SharedPdf = { uri: string; name: string };
 export type Shared = { text: string; url: string | null; images: SharedImage[]; pdfs: SharedPdf[]; title: string | null };
 
-/** What the share module reports, the parts this app reads. */
-type Intent = {
-  text?: string | null;
-  webUrl?: string | null;
-  files?: { path: string; mimeType: string; fileName?: string | null; width: number | null; height: number | null }[] | null;
-  meta?: { title?: string } | null;
-};
-
-/** The intent as a Shared: images and PDFs only (a video has nowhere to go in a note), the text without the
- *  URL when that's all it was. null when nothing usable was shared. */
-export function fromIntent(i: Intent): Shared | null {
-  const images = (i.files ?? []).filter((f) => f.mimeType.startsWith("image/")).map((f) => ({ uri: f.path, width: f.width, height: f.height }));
-  const pdfs = (i.files ?? []).filter((f) => f.mimeType === PDF).map((f) => ({ uri: f.path, name: f.fileName || decodeURIComponent(f.path.slice(f.path.lastIndexOf("/") + 1)) }));
-  const url = i.webUrl?.trim() || null;
-  let text = (i.text ?? "").trim();
-  if (url && text === url) text = "";
-  if (!text && !url && !images.length && !pdfs.length) return null;
-  return { text, url, images, pdfs, title: i.meta?.title?.trim() || null };
-}
-
 const isUrl = (s: string) => /^https?:\/\/\S+$/.test(s);
 
-/** What the web app's share target received as a Shared (the phone's `fromIntent`, for a form). Android puts the link in
+/** What the web app's share target received, as a Shared. Android puts the link in
  *  `text` (after the page's title, or with some words of the app's), sometimes in `title`, rarely in `url`: the first one
  *  found is the link, and text that says no more than the link and the title is dropped. Images and PDFs only; a file's
  *  `uri` is its place in `files`, the page's own copy of the bytes. null when nothing usable was shared. */

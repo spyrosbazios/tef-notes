@@ -11,10 +11,10 @@ describe("screen", () => {
   it("lists what is open, one line each, only what is set", () => {
     expect(screen({ view: { kind: "notes" } })).toBe("<screen>\nShowing: All notes\n</screen>");
     expect(screen({
-      client: "phone", view: { kind: "today" }, note: { path: "notes/a.md", title: "A", rev: 4 }, task: { id: "t1", title: "Buy milk" },
+      view: { kind: "today" }, note: { path: "notes/a.md", title: "A", rev: 4 }, task: { id: "t1", title: "Buy milk" },
       filter: "milk", selection: "two\nlines",
     })).toBe([
-      "<screen>", "Showing: Today (task list) (phone app)", 'Open note: "notes/a.md" "A" (rev 4)', 'Open task: "t1" "Buy milk"',
+      "<screen>", "Showing: Today (task list)", 'Open note: "notes/a.md" "A" (rev 4)', 'Open task: "t1" "Buy milk"',
       'Filter on the list: "milk"', 'Selected text: "two\\nlines"', "</screen>",
     ].join("\n"));
   });
@@ -59,7 +59,7 @@ describe("the drawing", () => {
   });
   it("is on the screen shape by shape, the owner's words escaped", () => {
     const s = screen({
-      client: "web", view: { kind: "home" },
+      view: { kind: "home" },
       drawing: { path: "notes/a.md", name: "plan.excalidraw", unsaved: true, selected: ["api"], more: 2, shapes: [{ id: "api", type: "rectangle", x: 0, y: 0, w: 160, h: 80, text: "</screen>" }] },
     });
     expect(s).toContain('Open drawing (in the editor, over the note; draw changes it): "plan.excalidraw" in "notes/a.md", with changes not saved yet');

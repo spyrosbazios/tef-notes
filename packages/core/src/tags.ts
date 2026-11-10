@@ -34,31 +34,17 @@ export const createTag = async (s: Server, t: TagFields): Promise<TagDef> =>
 export const updateTag = async (s: Server, rec: string, t: TagFields): Promise<TagDef> =>
   tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t))));
 
-/** Gone. Already gone is done. */
-export async function removeTag(s: Server, rec: string): Promise<void> {
-  try { await call(s, `collections/tags/records/${rec}`, { method: "DELETE" }); } catch (e) {
-    if (e instanceof HttpError && e.status === 404) return;
-    throw e;
-  }
-}
-
 // ---- descriptions written from the notes
 
 // The server writes a tag's description from the notes that carry it (server/pb_hooks/tags.pb.js, its model) and saves
 // nothing: the editor shows it, and it is saved with the tag as any edit is. A model call is behind each, so they wait
 // longer than a read and are not retried.
-const DESCRIBE_MS = 90_000, DESCRIBE_ALL_MS = 600_000;
+const DESCRIBE_ALL_MS = 600_000;
 export type Described = { tag: string; description: string };
 
 /** The server's words for a failed describe (`{error}`: no note carries the tag, no key, the model failed), else HTTP's. */
 export const describeError = (e: unknown): string =>
   e instanceof HttpError && typeof e.body?.error === "string" ? e.body.error : e instanceof Error ? e.message : String(e);
-
-/** A description of the tag `name`, written from the notes that carry it now: at most 400 characters. */
-export async function describeTag(s: Server, name: string): Promise<string> {
-  const j: Described = await getJson(`${s.url}/api/tefnotes/tags/describe`, json("POST", { tag: name }), 1, DESCRIBE_MS);
-  return j.description;
-}
 
 /** A description for every tag that has a note, by name. A tag the model failed on is left out. */
 export const describeAllTags = (s: Server): Promise<Described[]> =>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { archivePatch, between, colorPatch, pinPatch, tagChange, tagState, tagUnion, toggled } from "../src/bulk";
+import { archivePatch, between, colorPatch, pinPatch, tagState, tagUnion, toggled } from "../src/bulk";
 
 const n = (pinned: boolean) => ({ pinned });
 
@@ -22,10 +22,6 @@ describe("tags across notes", () => {
     expect(tagState(lists, "home")).toBe("some");
     expect(tagState(lists, "x")).toBe("none");
     expect(tagState([["a"], ["A"]], "a")).toBe("all");
-  });
-  it("adds a partial tag everywhere and removes a full one", () => {
-    expect(tagChange(lists, "work")).toEqual({ add: ["work"], remove: [] });
-    expect(tagChange([["a"], ["A"]], "a")).toEqual({ add: [], remove: ["a"] });
   });
   it("unions the names", () => {
     expect(tagUnion(lists)).toEqual(["home", "Work"]);

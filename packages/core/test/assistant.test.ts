@@ -17,7 +17,7 @@ describe("viewFrom", () => {
 describe("contextOf", () => {
   it("reads a full context", () => {
     const raw = {
-      client: "web", view: { kind: "tag", tag: "home" }, note: { path: "notes/20261101-a.md", title: "A", rev: 3 },
+      view: { kind: "tag", tag: "home" }, note: { path: "notes/20261101-a.md", title: "A", rev: 3 },
       task: { id: "t1", title: "Buy milk" }, selection: "some words", filter: "milk",
     };
     expect(contextOf(raw)).toEqual(raw as never);
@@ -48,7 +48,7 @@ describe("contextOf", () => {
 describe("the UI tools", () => {
   it("are offered only with a context, and each has a label", () => {
     expect(uiToolsFor(undefined)).toEqual([]);
-    expect(uiToolsFor({ view: { kind: "home" } })).toEqual(UI_TOOL_NAMES.filter((n) => !isSelectionTool(n) && n !== "draw" && n !== "save_drawing"));
+    expect(uiToolsFor({ view: { kind: "home" } })).toEqual(UI_TOOL_NAMES.filter((n) => !isSelectionTool(n)));
     for (const n of UI_TOOL_NAMES) expect(label(n)).not.toBe(n);
     expect(isUiTool("open_note")).toBe(true);
     expect(isUiTool("read_note")).toBe(false);
@@ -69,7 +69,7 @@ describe("the selection", () => {
     expect(contextOf({ view: { kind: "home" }, note, selection: "x", editable: "yes" })?.editable).toBeUndefined();
   });
   it("offers its tools only then, beside every other UI tool", () => {
-    expect(uiToolsFor({ client: "web", view: { kind: "home" }, note, selection: "x", editable: true })).toEqual(UI_TOOL_NAMES);
+    expect(uiToolsFor({ view: { kind: "home" }, note, selection: "x", editable: true })).toEqual(UI_TOOL_NAMES);
     for (const n of SELECTION_TOOL_NAMES) expect(isUiTool(n) && isSelectionTool(n)).toBe(true);
     expect(isSelectionTool("open_note")).toBe(false);
   });

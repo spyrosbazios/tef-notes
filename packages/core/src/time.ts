@@ -10,7 +10,6 @@ export const localDay = (t = Date.now()) => {
 export const ymd = (ts: number) => localDay(ts * 1000);
 
 export const hm = (ts: number) => { const d = new Date(ts * 1000); return `${two(d.getHours())}:${two(d.getMinutes())}`; };
-export const mdhm = (ts: number) => { const d = new Date(ts * 1000); return `${two(d.getMonth() + 1)}-${two(d.getDate())} ${hm(ts)}`; };
 /** `YYYY-MM-DD HH:MM`, the strategies' frontmatter time format. */
 export const stamp = (ts: number) => `${ymd(ts)} ${hm(ts)}`;
 

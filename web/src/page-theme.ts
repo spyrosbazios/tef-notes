@@ -1,5 +1,5 @@
-// A phone page (editor-host, pdf-host) takes the app's active theme over its bridge: each colour onto the `--tf-*`
-// variable index.css maps its tokens from, and the scheme onto `color-scheme` (scrollbars, form controls).
+// The app's active theme onto the page: each colour onto the `--tf-*` variable index.css maps its tokens from, and the
+// scheme onto `color-scheme` (scrollbars, form controls).
 import type { PageTheme } from "@/core/page-theme";
 
 export function applyPageTheme({ scheme, vars }: PageTheme) {

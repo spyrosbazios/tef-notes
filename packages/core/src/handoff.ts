@@ -1,5 +1,5 @@
 // Notes handed to the chat agent, and notes written out as files — what the phone, the web app and the CLI do the same
-// way with a set of notes. Pure: no RN or DOM import.
+// way with a set of notes. Pure: no DOM import.
 import { ATTACHMENTS, NOTES, noteIdOf, parseNote, rewriteImagePaths, serializeNote, slugify } from "./notes";
 import type { Photo } from "./pocketbase";
 

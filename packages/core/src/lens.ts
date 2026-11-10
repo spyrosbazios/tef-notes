@@ -81,10 +81,6 @@ export const inLens = (lens: Lens | null | undefined, item: Tagged): boolean => 
   return (!lens.tags.length || lens.tags.some(has)) && !lens.exclude.some(has);
 };
 
-/** `items` that are in `lens`; the same array when there is none. */
-export const withinLens = <T extends Tagged>(lens: Lens | null | undefined, items: readonly T[]): readonly T[] =>
-  lens ? items.filter((i) => inLens(lens, i)) : items;
-
 // ---- making
 
 /** The tag a new item carries under `lens`: its first. */

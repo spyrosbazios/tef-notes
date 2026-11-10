@@ -24,10 +24,6 @@ export function tagState(lists: string[][], name: string): TagState {
   return n === 0 ? "none" : n === lists.length ? "all" : "some";
 }
 
-/** What tapping a tag does across the notes: on all of them → take it off; otherwise put it on the ones without. */
-export const tagChange = (lists: string[][], name: string): { add: string[]; remove: string[] } =>
-  tagState(lists, name) === "all" ? { add: [], remove: [name] } : { add: [name], remove: [] };
-
 /** Every tag any of the notes carries, spelt as first seen, one per name. */
 export function tagUnion(lists: string[][]): string[] {
   const seen = new Map<string, string>();

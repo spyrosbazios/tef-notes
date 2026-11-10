@@ -6,7 +6,7 @@ illustrated, not a screenshot of a device. It is identified as an illustration i
 main README.
 
 The colours come from `packages/core/src/theme.ts` (Rosé Pine, orange accent), the
-fonts and notebook mark from `mobile/assets/`, and the icons from Lucide. The phone
+fonts and notebook mark from `assets/`, and the icons from Lucide. The phone
 layout follows `site/src/components/mock/PhoneHome.tsx` and `mock/parts.tsx`, which
 draw the same screen: the mark and Search, the days strip, the task box, two columns
 of note tiles and the floating tab bar.

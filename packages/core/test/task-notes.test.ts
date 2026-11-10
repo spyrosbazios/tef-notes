@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { attachmentsIn, imagesOf, readsAsMarkdown, resolveAttachments, withLineBreaks } from "../src/task-notes";
+import { imagesOf, readsAsMarkdown, withLineBreaks } from "../src/task-notes";
 
 describe("imagesOf", () => {
   it("lists the image lines in order, remote and attached", () => {
@@ -10,17 +10,6 @@ describe("imagesOf", () => {
     expect(imagesOf("![x](<https://a.b/c.jpg>)\n```\n![no](https://a.b/d.jpg)\n```\n![y](https://a.b/e.jpg \"t\")")).toEqual(["https://a.b/c.jpg", "https://a.b/e.jpg"]);
   });
   it("is empty without any", () => expect(imagesOf("[Picture](https://a.b/c.png)\nplain")).toEqual([]));
-});
-
-describe("attachmentsIn / resolveAttachments", () => {
-  const md = "![](../attachments/n1/a%20b.jpg) ![](attachments/n2/c.jpg) ![](../attachments/n1/a%20b.jpg) ![r](https://h.example/attachments/n3/d.jpg)";
-  it("finds each note's attachment once and ignores a remote path", () => {
-    expect(attachmentsIn(md)).toEqual([{ noteId: "n1", name: "a b.jpg" }, { noteId: "n2", name: "c.jpg" }]);
-  });
-  it("points the ones it can at their copy and leaves the rest", () => {
-    const out = resolveAttachments(md, (id, name) => (id === "n1" ? `file:///docs/${id}/${name}` : undefined));
-    expect(out).toBe("![](file:///docs/n1/a b.jpg) ![](attachments/n2/c.jpg) ![](file:///docs/n1/a b.jpg) ![r](https://h.example/attachments/n3/d.jpg)");
-  });
 });
 
 

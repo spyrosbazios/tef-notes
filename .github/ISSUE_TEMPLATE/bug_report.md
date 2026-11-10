@@ -8,7 +8,7 @@ labels: bug
 <!-- Do not paste note contents, tasks, chat transcripts, provider keys or your server's address. Describe, or use a throwaway note. -->
 
 **Which client**
-<!-- Android app, web app, CLI, browser extension, or the chat agent -->
+<!-- Web app (including the installed one on a phone), CLI, browser extension, or the chat agent -->
 
 **Server version**
 <!-- The git tag or commit you deployed: `git describe --tags` in your checkout -->
@@ -24,4 +24,4 @@ labels: bug
 1.
 
 **Logs**
-<!-- `docker compose logs --tail 50 pocketbase` or `agent`, with keys and note text removed. For the app: version and Android version. -->
+<!-- `docker compose logs --tail 50 pocketbase` or `agent`, with keys and note text removed. For the app: version and browser. -->

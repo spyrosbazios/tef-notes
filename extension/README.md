@@ -1,6 +1,6 @@
 # TEF Notes Clipper
 
-<!-- reviewed: 2026-11-01 -->
+<!-- reviewed: 2026-11-10 -->
 
 A Chrome (Manifest V3) extension that saves the page you are on, a selection, a link or a picture to your
 [TEF Notes](../README.md) notes. The server suggests which of your notes and open tasks it fits; you pick one (or a new
@@ -22,7 +22,7 @@ note), optionally add a note of your own, and only then is anything written.
 - **Optional summary**: tick "Add a summary" and the server writes a short summary under the link or picture. It is
   off by default and remembered. A clip is saved whether or not the summary could be written; the popup says when it
   could not.
-- **Pictures**: saved as an attachment of the note, downscaled as the phone does it. If the extension cannot fetch a
+- **Pictures**: saved as an attachment of the note, downscaled to a long edge of 1600 px (`packages/core/src/photos.ts`). If the extension cannot fetch a
   picture itself, the server tries, and failing that the popup offers to ask for access to that one site.
 
 ## Requirements

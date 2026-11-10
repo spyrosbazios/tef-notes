@@ -1,4 +1,4 @@
-// A picture's bytes as the server takes them: what is stored (long edge 1600, JPEG 0.82: what the phone uploads) and what
+// A picture's bytes as the server takes them: what is stored (long edge 1600, JPEG 0.82) and what
 // JEV looks at when it suggests where a clip goes (core/photos.ts `lookSize`, base64 JPEG).
 import { fit, LOOK_QUALITY, lookSize, MAX, QUALITY } from "@/core/photos";
 

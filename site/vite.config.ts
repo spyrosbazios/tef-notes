@@ -8,9 +8,9 @@ export default defineConfig({
   base: process.env.SITE_BASE ?? "/",
   plugins: [react(), tailwindcss(), theme(), identity()],
   resolve: { alias },
-  // mobile/ has its own tsconfig (extending expo's, not installed here): the shared files are built under this one.
+  // The shared files (../packages/core) are built under this tsconfig.
   tsconfig: "./tsconfig.app.json",
-  // The fonts and the palette come from mobile/, outside this root.
+  // The fonts (../assets) and the palette (../packages/core) come from outside this root.
   server: { fs: { allow: [at("..")] } },
   build: { outDir: "dist", emptyOutDir: true },
 });

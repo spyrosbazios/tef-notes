@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-08 -->
+<!-- reviewed: 2026-11-10 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -33,7 +33,7 @@ of it is the only gate.
   the app). The model (~460 MB) is downloaded from huggingface.co on first use into the `stt_data` volume, so the host
   needs to reach it once; without voice input, nothing is downloaded (see Voice input).
 - To build from source, or the extension: BuildKit (the signing key is a build secret) and the whole repository cloned,
-  because the build context is the repo root (the web app, extension and agent share `packages/core` and the phone's assets).
+  because the build context is the repo root (the web app, extension and agent share `packages/core` and `assets/`).
 - bun, only to run the tests (see Development).
 
 ## Quick start
@@ -107,7 +107,7 @@ in PocketBase's logs (admin UI, Logs).
 ## Push reminders
 
 The installed web app gets a task's reminder (its `when` day and `remind` time) as a Web Push notification, sent by the
-agent every minute; the older Android app, which is frozen, rings its own local ones. Set up once: generate a VAPID key pair with
+agent every minute. Set up once: generate a VAPID key pair with
 `bunx web-push generate-vapid-keys --json`, put its `privateKey` alone in `keys/push/api-key` (the public key is derived
 from it; keep it unreadable to others, `chmod 600`, owned by uid 1000), and set `TEF_NOTES_VAPID_SUBJECT` to
 `mailto:you@example.com` in `.env`. Then `docker compose up -d`; `docker compose logs agent` says "web push is off" once

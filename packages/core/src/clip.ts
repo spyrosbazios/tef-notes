@@ -1,5 +1,5 @@
-// The clip routes' shapes (server/pb_hooks/clip.pb.js, lib/clip.js), one home for the two clients that call them: the
-// Chrome extension (extension/src/clip.ts) and the phone's Share screen (mobile/src/store/clip.ts). A clip is a page, text or a
+// The clip routes' shapes (server/pb_hooks/clip.pb.js, lib/clip.js), one home for the clients that call them: the
+// Chrome extension (extension/src/clip.ts) and the web app's share page (web/src/services/clip.ts). A clip is a page, text or a
 // picture sent in two steps: suggest (where JEV would file it, writes nothing), then save, where the owner chose: a new
 // note, an existing note, an open task (its `notes`), or a new task (a picture then in a new note the task links to).
 // Pure and import-free, so the extension bundles it as it is.

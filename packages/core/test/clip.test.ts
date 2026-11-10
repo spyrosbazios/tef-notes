@@ -1,9 +1,7 @@
 // The clip routes' shapes shared with the extension (src/clip.ts), a share as a clip, the picture JEV looks at.
 import { describe, expect, it } from "bun:test";
 import { choices, describe as said, NEW, NEW_TASK, saveBody, sendsFile, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
-import { HttpError } from "../src/http";
 import { LOOK_MAX, LOOK_MIN, lookSize } from "../src/photos";
-import { clipError, clipped, clipTo } from "../src/pocketbase";
 import { clipOf, type Shared } from "../src/share";
 
 const S = (p: Partial<Shared>): Shared => ({ text: "", url: null, images: [], pdfs: [], title: null, ...p });
@@ -75,19 +73,13 @@ describe("the requests", () => {
     expect(sendsFile({ url: U, title: "t" }, NEW_TASK)).toBe(false);
     expect(sendsFile({ url: U, title: "t" }, NEW)).toBe(false);
   });
-  it("a save goes up as one multipart field", () => {
-    const to = clipTo({ url: "https://h:1" }, page, undefined, NEW, "n", false);
-    expect(to.url).toBe("https://h:1/api/tefnotes/clip");
-    expect(JSON.parse(to.fields["@jsonPayload"])).toMatchObject({ url: U, target: { kind: "new" }, note: "n" });
-  });
   it("a summary asked for sends the flag and the page's text, which is otherwise not sent again", () => {
     const withText = { ...page, text: "The page's text." };
     expect(saveBody(withText, undefined, NEW, "", false)).not.toHaveProperty("text");
     expect(saveBody(withText, undefined, NEW, "", false)).not.toHaveProperty("summary");
     expect(saveBody(withText, undefined, NEW, "", true)).toMatchObject({ summary: true, text: "The page's text." });
-    // the phone has no page text: the flag alone (the server fetches the page)
+    // no page text (a share of a link): the flag alone (the server fetches the page)
     expect(JSON.parse(JSON.stringify(saveBody({ url: U, title: "Page" }, undefined, NEW, "", true)))).toEqual({ url: U, title: "Page", target: { kind: "new" }, summary: true });
-    expect(JSON.parse(clipTo({ url: "https://h:1" }, withText, undefined, NEW, "", true).fields["@jsonPayload"])).toMatchObject({ summary: true, text: "The page's text." });
   });
   it("the notice when a summary was asked for and not written", () => {
     const r = (summary?: ClipResult["summary"]): ClipResult => ({ kind: "note", path: "notes/a.md", title: "A", action: "created", summary });
@@ -95,14 +87,6 @@ describe("the requests", () => {
     expect(summaryNotice(r("added"))).toBeNull();
     expect(summaryNotice(r("skipped"))).toBe("Saved without a summary: there was no text to write it from.");
     expect(summaryNotice({ kind: "task", id: ID, title: "T", action: "appended", summary: "failed" })).toBe("Saved without a summary: it couldn't be written.");
-  });
-  it("the reply: where it went, or the server's own words for a refusal", () => {
-    expect(clipped(200, JSON.stringify({ kind: "task", id: ID, title: "T", action: "appended" }))).toMatchObject({ kind: "task", id: ID });
-    expect(clipped(200, JSON.stringify({ kind: "note", path: "notes/a.md", title: "A", action: "created", summary: "failed" })).summary).toBe("failed");
-    expect(() => clipped(404, JSON.stringify({ error: "That task no longer exists." }))).toThrow(HttpError);
-    try { clipped(404, JSON.stringify({ error: "That task no longer exists." })); } catch (e) { expect(clipError(e)).toBe("That task no longer exists."); }
-    expect(() => clipped(200, "not json")).toThrow(HttpError);
-    expect(clipError(new Error("network down"))).toBe("network down");
   });
 });
 

@@ -13,8 +13,8 @@ COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY packages/core/src /src/packages/core/src
 COPY packages/core/vite.ts /src/packages/core/vite.ts
-COPY mobile/assets/fonts /src/mobile/assets/fonts
-COPY mobile/assets/images/icon.png /src/mobile/assets/images/icon.png
+COPY assets/fonts /src/assets/fonts
+COPY assets/icon.png /src/assets/icon.png
 COPY web ./
 # Settings → Maintenance shows the version; scripts/version.sh reads TEF_NOTES_VERSION (no .git in the image).
 COPY scripts/version.sh /src/scripts/version.sh

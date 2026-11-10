@@ -1,5 +1,5 @@
 // The note body as a ProseMirror document, and back: the schema, the markdown parser and the serializer.
-// Pure: nothing here touches the DOM, so a Worker, a test or an Android WebView can run it. The editor view,
+// Pure: nothing here touches the DOM, so a Worker or a test can run it. The editor view,
 // its keys and its node views live beside this file and import it, never the other way round.
 //
 // Dialect: GitHub-flavoured markdown (tables, `- [ ]` tasks, ~~strike~~, bare-URL links) with raw HTML kept

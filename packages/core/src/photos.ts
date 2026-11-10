@@ -51,9 +51,6 @@ export const MAX_PDF = 25 * 1024 * 1024;
 
 export const isPdf = (name: string) => /\.pdf$/i.test(name);
 
-/** The mime type a stored file is uploaded as, by its name: photos are all JPEG, a PDF and a drawing keep their own. */
-export const mimeOf = (name: string) => (isPdf(name) ? PDF : isDrawing(name) ? DRAWING : "image/jpeg");
-
 /** A PDF's name as the note stores it: its slug as a note id's is made (ASCII, lowercase, dashes, Greek transliterated)
  *  and `.pdf`, so it is safe in a link, a path on the phone and a URL; `-2`, `-3` when the note has that one already.
  *  The original name stays as the link's text. */

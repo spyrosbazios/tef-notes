@@ -1,6 +1,6 @@
 # Contributing
 
-<!-- reviewed: 2026-11-07 -->
+<!-- reviewed: 2026-11-10 -->
 
 Thanks for looking. Read [ARCHITECTURE.md](ARCHITECTURE.md) first; it explains the note format and the write contract
 that most changes have to respect. Security reports go through [SECURITY.md](SECURITY.md), not issues.
@@ -11,11 +11,11 @@ that most changes have to respect. Security reports go through [SECURITY.md](SEC
 |---|---|
 | `packages/core/` | Dependency-free TypeScript shared by every client, imported as `@/core/*` |
 | `server/` | PocketBase hooks and migrations; `server/agent/` is the chat agent |
-| `web/` | The web app; also builds the phone's editor and PDF pages |
-| `mobile/` | The Android app, frozen: the phone runs the web app installed from Chrome |
+| `web/` | The web app; on a phone, the installed PWA |
 | `cli/` | The `tefnotes` command |
 | `extension/` | The Chrome clipper |
 | `site/` | The public marketing page |
+| `assets/` | Fonts, the logo SVGs, the app icon |
 
 Clone the whole repository: every module imports `packages/core`.
 
@@ -24,8 +24,7 @@ Clone the whole repository: every module imports `packages/core`.
 - **`packages/core` stays dependency-free and shared.** No runtime dependencies, no platform APIs. If two clients need the
   same logic, it goes there; never copy it into a client. (`server/pb_hooks/lib/notes.js` is the one deliberate copy,
   because hooks are plain JS, and a test keeps it in step.)
-- **Package managers are fixed per module**: bun everywhere (`packages/core`, `server/agent`, `web`, `cli`, `extension`),
-  except `mobile/`, which uses pnpm 11 (`npx pnpm@11 install`). Do not add a second lockfile to a module.
+- **Package managers are fixed per module**: bun everywhere (`packages/core`, `server/agent`, `web`, `cli`, `extension`). Do not add a second lockfile to a module.
 - **`web/src/components/ui/` is shadcn's output.** Add components with `bunx --bun shadcn@latest add <name>`; never
   hand-edit them.
 - **Migrations are append-only.** A schema change is a new file in `server/pb_migrations/`; never edit one that has
@@ -44,7 +43,6 @@ Each module's README has its setup and commands:
 - `packages/core`: `cd packages/core && bun test && bun run typecheck`
 - `server` (hooks and the agent): [server/README.md](server/README.md); `cd server && bun test`
 - `web`: [web/README.md](web/README.md)
-- `mobile`: [mobile/README.md](mobile/README.md)
 - `cli`: [cli/README.md](cli/README.md)
 - `extension`: [extension/README.md](extension/README.md)
 
@@ -70,5 +68,4 @@ extension's manifest reads it from there.
 
 To release: move the `## Unreleased` entries of `CHANGELOG.md` under `## X.Y.Z - date`, commit to `main`, then tag
 `vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and attaches it to a GitHub release
-whose notes are that changelog section; `docker.yml` publishes the server images. The phone runs the web app installed
-from Chrome, so no APK is built.
+whose notes are that changelog section; `docker.yml` publishes the server images.

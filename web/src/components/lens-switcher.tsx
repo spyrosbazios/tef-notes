@@ -152,7 +152,7 @@ function LensTheme({ value, onChange }: { value: ThemeName | null; onChange: (t:
   );
 }
 
-/** `header`: Home's header on a phone (mobile/src/ui/lens.tsx), where the app's mark is the control, with the lens's name ("All" while none is on) and a chevron beside it, so it reads as a picker. */
+/** `header`: Home's header on a phone, where the app's mark is the control, with the lens's name ("All" while none is on) and a chevron beside it, so it reads as a picker. */
 /** `folded`: the desktop rail is down to its icons, so the name fades out under the clip and the off button goes. */
 export function LensSwitcher({ header = false, folded = false }: { header?: boolean; folded?: boolean }) {
   const { data: lenses = [] } = useLenses(), active = useActiveLens(), remove = useRemoveLens();

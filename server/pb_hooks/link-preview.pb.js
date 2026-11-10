@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 // GET /api/tefnotes/link-preview?url=<http(s) URL>: the title, description, site, picture and icon of a page, for the
-// editors' link cards and the lists' thumbnails. Fetched here because a browser or WebView can't read another site's
+// editors' link cards and the lists' thumbnails. Fetched here because a browser can't read another site's
 // HTML (CORS), and cached in `link_previews` (pb_migrations/1792500001). The fetch, its SSRF guard and the parser are
 // in lib/link-preview.js: a handler runs in a VM of its own and sees none of this file's top-level scope, so it
 // `require`s the lib instead (constants included).

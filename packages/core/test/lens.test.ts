@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { activeLens, contextFilter, inheritTags, inLens, lensColumns, lensAccent, lensFilter, lensOf, lensProblem, lensTag, withinLens, type Lens } from "../src/lens";
+import { activeLens, contextFilter, inheritTags, inLens, lensColumns, lensAccent, lensFilter, lensOf, lensProblem, lensTag, type Lens } from "../src/lens";
 import { lenses } from "../src/pocketbase";
 
 const work: Lens = { rec: "w", name: "Work", tags: ["work", "Clients"], exclude: [], accent: null, theme: null };
@@ -51,12 +51,6 @@ describe("inLens", () => {
   });
   it("is no filter without a lens", () => {
     expect(inLens(null, { tags: [] })).toBe(true);
-    const all = [{ tags: ["a"] }];
-    expect(withinLens(undefined, all)).toBe(all);
-  });
-  it("filters a list", () => {
-    const a = { id: 1, tags: ["work"] }, b = { id: 2, tags: ["home"] };
-    expect(withinLens(work, [a, b])).toEqual([a]);
   });
   it("leaves out anything with an excluded tag", () => {
     const hide: Lens = { rec: "h", name: "H", tags: [], exclude: ["archive"], accent: null, theme: null };

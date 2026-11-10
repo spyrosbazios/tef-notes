@@ -1,5 +1,5 @@
 // The look: the theme and the accent (the owner's preferences, hooks/prefs.ts, so every device has the same), applied to the page
-// the way the phone's WebView pages take theirs (page-theme.ts), so the same palette in theme.ts paints both.
+// as CSS variables (page-theme.ts) from the palette in theme.ts.
 import { useCallback, useLayoutEffect } from "react";
 import { flushSync } from "react-dom";
 import { pageTheme, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";

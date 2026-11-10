@@ -8,17 +8,17 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
 ## The pieces
 
 ```
- Android app ─┐                          ┌─ PocketBase (collections, rev hook, jobs, routes) ─ pb_data/
- Web app     ─┼─ reverse proxy ─ HTTP ───┤        also serves the web app and the extension
- CLI         ─┤  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
- Clipper     ─┘                                   └─ stt (python): speech to text, reached by the agent only
+ Web app     ─┐                          ┌─ PocketBase (collections, rev hook, jobs, routes) ─ pb_data/
+ CLI         ─┼─ reverse proxy ─ HTTP ───┤        also serves the web app and the extension
+ Clipper     ─┘  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
+                                          └─ stt (python): speech to text, reached by the agent only
 ```
 
 - `server/`: PocketBase with JS hooks (`pb_hooks/`) and migrations (`pb_migrations/`). It holds the data, enforces the
   write contract and runs the server-side jobs below. `server/agent/` is the chat agent, a separate bun process because
   PocketBase hooks cannot stream. `server/stt/` is voice input: a Python service running Parakeet on the CPU, on the
   compose network only, that the agent's `/agent/transcribe` passes a clip to (`server/README.md`, "Voice input").
-- `packages/core/`: dependency-free TypeScript shared by the web app, phone app, CLI, extension and agent, imported as
+- `packages/core/`: dependency-free TypeScript shared by the web app, CLI, extension and agent, imported as
   `@/core/*`. It holds the note format, the merge, the PocketBase client, task logic, agent card shapes and the theme
   palettes. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
   the note format that a test (`server/test/notes.test.js`) checks against `packages/core/src/notes.ts`.
@@ -46,8 +46,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
 - `title` and `created` are always present. `pinned`, `archived`, `color` and `tags` appear only when set. Notes have no place: only tasks do (`where`, below).
 - `archived: true` puts a note away: out of the notes lists (the list's archive button shows them, `?archived=1`), the agent's
   notes index and a clip's choice of where to file, but still found by search, its links and the agent's tools
-  (`list_notes "archived"`). Archiving unpins it (`archivePatch`, `packages/core/src/bulk.ts`). The frozen phone app still
-  lists it, and keeps the line when it saves.
+  (`list_notes "archived"`). Archiving unpins it (`archivePatch`, `packages/core/src/bulk.ts`).
 - There is no `updated` field on purpose: both sides would touch it on every edit and the line merge would conflict every
   time. The server's own `updated` column tracks it.
 - `color` is one of `yellow pink blue green purple gray`: the note card's tint in the list.
@@ -58,8 +57,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   the PDF in a viewer (a pdf.js page).
 - A drawing is an Excalidraw scene, `<name>.excalidraw` (JSON), stored with a `<name>.png` preview beside it. The body
   links only the scene, as a PDF is linked. The web app opens it in Excalidraw on a layer over the note, the assistant's
-  dock beside it (a lazy chunk; a save replaces both files, a new drawing's first save links it into the note); the phone
-  shows the PNG, view-only. The agent draws on the open canvas with the `draw` UI tool: its shapes land unsaved and
+  dock beside it (a lazy chunk; a save replaces both files, a new drawing's first save links it into the note). The agent draws on the open canvas with the `draw` UI tool: its shapes land unsaved and
   undoable, and the owner's Save is what writes them, so the server never writes a scene (`packages/core/src/drawing.ts`).
   Each `draw` answers with a picture of the drawing after it, which the model looks at to fix what is off; a saved chat
   keeps no picture. A drawing's PNG is also a tile picture of its note, like a photo.
@@ -77,7 +75,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   create without one is a `note`). It is the only test of what a note is: nothing reads a kind out of a path. Clients get it
   with every listing (`Listed`, `Remote`, `Card` in `packages/core/src/pocketbase.ts`; `noteKindOf`). The removed screenshot
   captures' `capture` is still in old data and reads as `note`.
-- A `- [ ]` box in a note is only a box, ticked in the note's editor (the web's and the phone's are the same one). Tasks are
+- A `- [ ]` box in a note is only a box, ticked in the note's editor. Tasks are
   records (below), never lines in a note.
 
 ## Tasks
@@ -91,7 +89,7 @@ Things-style to-dos, records of their own (`tasks`; schema in
   Unset text is `""`.
 - Tags (`server/pb_migrations/1793500000_task_tags.js`): `tags` is the one copy of a task's tag names (a task has no
   frontmatter), an ordinary `rev` write; two edits merge as a set (`mergeRecord`). The server never tags a saved task: the
-  new-task forms (web `quick-add.tsx`, phone `AddSheet`) ask the guess route as the title and notes are typed
+  new-task forms (`web/src/components/quick-add.tsx`) ask the guess route as the title and notes are typed
   (`tagGuesser` in `packages/core/src/tags.ts`, 0.8 s debounce) and put its answer on the draft; a tag taken off there is
   not guessed again. What the form holds on save is the task's.
 - Values: days are `YYYY-MM-DD`, and there is no "today" value: a past `when` is Today. `evening` (This Evening) only goes
@@ -107,7 +105,7 @@ Things-style to-dos, records of their own (`tasks`; schema in
 - Ticking a repeating task marks it done without `every` and makes its next round a new record (`complete`), linked to
   what the done one was linked to (`linksForNextRound` in `packages/core/src/record-links.ts`).
 - Transport: `packages/core/src/pocketbase.ts` (`tasks`: `revs`, `list`, `get`, `getMany`, `create`,
-  `update`, `remove`). The phone's offline copy and sync live in `mobile/src/store/todo.ts`.
+  `update`, `remove`).
 
 ## Lenses
 
@@ -119,10 +117,9 @@ lens says; only lists are narrowed.
 - The definitions are the `lenses` collection (`server/pb_migrations/1793600000_lenses.js`: `name`, unique ignoring case, and
   `tags` as JSON), so every device has the same ones. Like the `tags` definitions it has open rules and no `rev`: a lens is
   edited whole and the last save wins. Calls: `packages/core/src/pocketbase.ts` `lenses`.
-- Which lens is on is a preference every device shares (`packages/core/src/prefs.ts` `lens`), and none is the unfiltered app;
-  the frozen phone app keeps its own (`mobile/src/store/prefs.ts`). A lens deleted elsewhere is none (`activeLens`).
-  The web switcher is at the bottom of the rail; the phone's is on Home, and its lens filters every tab.
-- The assistant is told: both clients send the lens as the request context's `filter` (`lens: Work (tags: work, clients)`,
+- Which lens is on is a preference every device shares (`packages/core/src/prefs.ts` `lens`), and none is the unfiltered app. A lens deleted elsewhere is none (`activeLens`).
+  The web switcher is at the bottom of the rail; on a phone it is on Home, and the lens filters every tab.
+- The assistant is told: the web app sends the lens as the request context's `filter` (`lens: Work (tags: work, clients)`,
   `contextFilter`), and the agent's instructions say to scope what it lists, counts and summarises to those tags unless asked
   otherwise (`server/agent/src/systemPrompt.ts`). The scoping is the model's, not a server filter.
 
@@ -184,7 +181,7 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   `packages/core/src/agent.ts`.
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
   next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`.
-- Always-on assistant: a client that stays with you (the web's docked panel, the phone's Ask tab) sends the page it is on as
+- Always-on assistant: a client that stays with you (the web's docked panel, its Ask tab on a phone) sends the page it is on as
   `context` with each message (`packages/core/src/assistant.ts`). The agent reads it as the last part of the newest message's
   `<context>` (never the instructions), resolves "this note" from it, and gets UI tools (`open_note`, `open_task`,
   `go_view`) that the client does itself: no server `execute`, no confirm card, answered through `addToolOutput`.
@@ -232,13 +229,12 @@ one-line description. `clip` then takes a `target`: `{kind: "note", path}` (appe
 (added to the task's `notes`; a picture only as an image line to its address, a task having no attachments),
 `{kind: "new"}` or `{kind: "newtask"}` (a new task with the clip's text as its `notes`; a picture then goes into a new note
 of the whole clip, which the task is `about`, all in one transaction). A screenshot is no feature of its own: it is a
-picture clip like any other. The picture is stored as an attachment and embedded as the phone embeds a photo. Your own note is
+picture clip like any other. The picture is stored as an attachment and embedded as any photo is. Your own note is
 written up by the model, which tidies and adds nothing. Only when you ticked "Add a summary" (`summary: true`, off by
 default, remembered by each client) does the model add a short summary under the link or picture, from the page's text
 (fetched through the link-preview guard for a link that came with none; a picture's only from the words it came with).
 The answer's `summary` is `"added"`, `"skipped"` or `"failed"`, and the clip is saved in every case. The note edit is
-re-read and `rev`-bumped in one transaction; a picture's attachment is removed again if that fails. The phone's Share
-screen calls the same routes (`mobile/src/store/clip.ts`); shapes are in `packages/core/src/clip.ts`. Without a
+re-read and `rev`-bumped in one transaction; a picture's attachment is removed again if that fails. Shapes are in `packages/core/src/clip.ts`. Without a
 `typesafe` key `suggest` returns nothing (`pick: "new"`); without the model provider's key a note goes in as typed.
 
 **Link previews** (`link-preview.pb.js`, `lib/link-preview.js`). Link cards are bare-URL paragraphs only: the markdown
@@ -256,23 +252,17 @@ last written (`tags.described`), replacing a hand-written one.
 writes a summary when you asked, and drafts a tag description when you asked (returned, not saved) or when 10 more notes carry the tag (saved). Only the chat agent
 writes text of its own, and only with your confirmation.
 
-## Web app and the phone's pages
+## Web app
 
 `web/` is built by the server image into `pb_public`, so the web app and the API share an origin (no CORS, one URL to
 configure). It uses shadcn, TanStack Query and axios services (`web/src/services/`), with errors mapped to the core's
-`Conflict`.
-
-The phone's note editor and PDF viewer are web pages shown in a WebView. The web build produces them as single HTML
-strings: `web/src/editor` through `web/vite.editor.config.ts` into `mobile/src/ui/editor-html.ts`, and the pdf.js viewer
-through `web/vite.pdf.config.ts` into `pdf-html.ts`. Both are generated and gitignored (the editor is about 930 KB, the
-viewer about 2 MB), so a fresh checkout has none; the mobile scripts build them first. Page and app talk through
-`packages/core/src/editor-bridge.ts` and `pdf-bridge.ts`.
+`Conflict`. On a phone it is the installed PWA, in its own layout below `md`.
 
 Colours live in one place, `packages/core/src/theme.ts` (`THEMES`: sixteen themes, nine dark and seven light, each a palette,
-tints and note colours, and `ACCENTS`). The phone's `src/theme.css` is generated from it; the web app, the site and the extension get the
-default theme as `--tf-*` CSS variables from one Vite plugin, `packages/core/vite.ts`. The phone and the web app let the
-user pick a theme and an accent (the web app re-sets the variables at runtime); the site and the extension show the
-default. The brand mark is `packages/core/src/brand.ts`, generated from the launcher's SVG by `mobile/scripts/icons.ts`,
+tints and note colours, and `ACCENTS`). The web app, the site and the extension get the
+default theme as `--tf-*` CSS variables from one Vite plugin, `packages/core/vite.ts`. The web app lets the
+user pick a theme and an accent (it re-sets the variables at runtime); the site and the extension show the
+default. The brand mark is `packages/core/src/brand.ts`, generated from `assets/mark.svg` by `assets/icons.ts`,
 and every client draws that path.
 
 ## Deploys

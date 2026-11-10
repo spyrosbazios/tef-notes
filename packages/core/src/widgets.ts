@@ -17,7 +17,7 @@
 //
 // A finished call's output is `{ widget }` or `{ error }`: read it with `widgetOf` (defensive: a chat saved by another version
 // still draws, and anything malformed is simply no widget). `find_free_slots` has no widget: plain data for the model.
-// Pure: no "ai", RN or DOM import, since the sidecar loads this file outside the clients' node_modules.
+// Pure: no "ai" or DOM import, since the sidecar loads this file outside the clients' node_modules.
 
 import { cardsOf, type NoteCard, type TaskCard } from "./agent";
 import { isNotePath } from "./notes";

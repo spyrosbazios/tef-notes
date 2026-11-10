@@ -1,6 +1,6 @@
 # TEF Notes web app
 
-<!-- reviewed: 2026-11-08 -->
+<!-- reviewed: 2026-11-10 -->
 
 The laptop client for [TEF Notes](../README.md): browse and edit notes and tasks, view photos, PDFs and
 drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, TanStack Router and axios.
@@ -13,7 +13,7 @@ contract are in [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 
 - [bun](https://bun.sh) for installs and scripts, and Node.js for the tools Vite and shadcn run on.
 - The whole repository cloned, not just `web/`: the app imports the shared code from [`../packages/core`](../packages/core/README.md)
-  and its fonts and icon from `../mobile/assets/`.
+  and its fonts and icon from `../assets/`.
 - A running TEF Notes server to talk to (`server/`, `docker compose up -d --build`).
 
 ## Quick start
@@ -36,8 +36,6 @@ your real notes. Without it the app loads but has nothing to talk to.
 | `bun run typecheck` | `tsc -b` over the app, the Vite configs and `test/` |
 | `bun run lint` | oxlint. Three `only-export-components` warnings in `src/components/ui/` are shadcn's own |
 | `bun run test` | `bun test` over `test/` (editor markdown, link cards, task writes, links, lenses, the assistant) |
-| `bun run build:editor` | Builds the phone's note editor page into `mobile/src/ui/editor-html.ts` (see below) |
-| `bun run build:pdf` | Builds the phone's PDF viewer page into `mobile/src/ui/pdf-html.ts` (see below) |
 | `bun run preview` | Serves the built `dist/` locally |
 
 ## How it reaches the server
@@ -45,7 +43,7 @@ your real notes. Without it the app loads but has nothing to talk to.
 Everything is a same-origin request: `/api` goes to PocketBase and `/agent` to the chat agent. Production gets that
 from the server itself, which serves the built app from `pb_public`; in development the Vite proxy stands in for
 it. The transport is `src/services/` (axios); a stale write is mapped to the core's `Conflict`, and the app merges
-and retries as the phone does.
+and retries.
 
 ## The assistant
 
@@ -79,8 +77,7 @@ button at the corner opens it (`assistant/fab.tsx`).
 
 ## Phone layout
 
-Below `md` (768px) the app is the Android app's layout, so the installed PWA can stand in for it (the phone's own map:
-[`../mobile/AGENTS.md`](../mobile/AGENTS.md)). The shell (`components/shell.tsx`) swaps the rail and the app bar for the phone's bottom tabs
+Below `md` (768px) the app is the phone layout. The shell (`components/shell.tsx`) swaps the rail and the app bar for the phone's bottom tabs
 (`components/tab-bar.tsx`: Home, Tasks, Notes, Ask, Settings in the owner's order, a floating pill with the front tab's label on a capsule; hidden on a note
 page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). A note's page is a layer over whatever screen it was opened
 from (`NoteLayer` in `components/shell.tsx`; Home, a task list or Settings): that screen stays matched and mounted under it, `invisible`
@@ -94,7 +91,7 @@ same task box at a fixed height, then the notes in two columns (`columnCount` in
 tiles or grouped, sort, +) and tiles showing two tags, held to select (a wider screen's hold opens the tile's menu). Search is a
 drawer taking Home's place (`components/search-drawer.tsx`): `#tag` chips, notes, tasks, tags, the views, and "Search with the
 assistant" when nothing matches; it and the palette (⌘K, laptop) share their data in `hooks/search.ts` and the note row in
-`components/note-hit.tsx`. Differences from the Android app: scroll-snap stands in for the strip's drag physics (a day does not
+`components/note-hit.tsx`. Scroll-snap stands in for the strip's drag physics (a day does not
 spring as it nears the slot, it steps), the strip does not follow Upcoming scrolled by hand, and a search result's long press opens
 the laptop's note menu. A list comes back where it was left: the router restores each list's scroll (Routing, below), and Home keeps its task box (the
 list in front) for as long as the app is open. Upcoming scrolled by hand moves the days strip to the
@@ -187,9 +184,8 @@ worker except attachment and link-picture files (below, Offline): `/api`, `/agen
 The installed app opens, browses and **edits** without the server. The service worker precaches the app. Notes, tasks and links live
 in a local copy in IndexedDB (`tefnotes-sync` database, `src/lib/local.ts`, over idb-keyval: held whole in memory, written behind
 it); everything on screen is read from it, every edit is written to it first, and a sync reconciles it with the server. The sync
-is the phone's contract ported into `packages/core/src/sync.ts` (the logic, tested over a fake server in
-`packages/core/test/sync.test.ts`) and run by `src/lib/sync.ts`; the phone's own, which it mirrors, is in
-[`../mobile/AGENTS.md`](../mobile/AGENTS.md) "Storage and sync contract".
+is `packages/core/src/sync.ts` (the logic, tested over a fake server in
+`packages/core/test/sync.test.ts`), run by `src/lib/sync.ts`.
 
 - **Edits:** a note row holds its text, the `rev` it was last in step with and `base`, the text as of that `rev`; a task row its
   record and `base`; a link its `pushed` time. An edit marks the row unsent and goes up 1.5 s after the last one, when the page
@@ -198,7 +194,7 @@ is the phone's contract ported into `packages/core/src/sync.ts` (the logic, test
 - **Merging:** a push names the `rev` it was based on (the write contract, [`../ARCHITECTURE.md`](../ARCHITECTURE.md)); a stale
   one is never resent. A note both sides edited is merged by lines against `base`; where the edits overlap nothing is sent and the
   note is listed under **Settings > Server & sync > Conflicts**, where the owner keeps the text made here or uses the server's
-  (which keeps the replaced text to restore), as on the phone. A task is merged field by field, this side winning a field both
+  (which keeps the replaced text to restore). A task is merged field by field, this side winning a field both
   changed, so it never conflicts. A new note whose path another device took first goes up as `-2`. Links are a set of ids: an
   add is idempotent, a delete is a tombstone, and an add whose end is gone from the server is dropped.
 - **Shown:** `src/components/offline-bar.tsx` says so while the server can't be reached and "N changes waiting" while rows are
@@ -213,11 +209,11 @@ is the phone's contract ported into `packages/core/src/sync.ts` (the logic, test
   marked `synced`, every other write is refused up front): attachment uploads, drawings, the assistant (chats, models, replies),
   search by asking, reader view, clips, tags, lenses and push subscriptions. They have no local copy to wait in. Mutations of
   those keep TanStack's `networkMode: "always"` (`src/root.tsx`) so they fail instead of pausing.
-- **Differs from the phone:** a note made here has no server record id until it first goes up, so it can't be linked to a task
+- **Limits:** a note made here has no server record id until it first goes up, so it can't be linked to a task
   before then (the picker leaves it out); a new note is checked against the server for a free path when it can be reached, and a
-  clash found at the push moves the note to `-2` without moving photos uploaded to it meanwhile (the phone moves them); there is no
+  clash found at the push moves the note to `-2` without moving photos uploaded to it meanwhile; there is no
   background sync after the page closes, so changes wait for the next visit; no "restore" banner on a note's own page (Settings
-  lists them); notes are fetched whole, as the phone does.
+  lists them); notes are fetched whole.
 - **If IndexedDB is unavailable** (a private window) the app runs on memory: edits sync while the page is open and are lost with
   it.
 - **To clear it:** Settings > Server & sync > Clear the offline copy (refused while changes wait), or the browser's site data
@@ -232,7 +228,7 @@ PDF shared to it open the Share page (`src/components/share-page.tsx`, `/share`)
 (`packages/core/vite.ts`) makes the browser POST the share to `/share`; the service worker (`sw/sw.ts`) reads the form once,
 stashes it in the Cache API (`packages/core/src/share-stash.ts`) and redirects to `/share?shared=1`, where the page takes it
 out. Android puts a link in `text`, not `url`: `fromPost` (`packages/core/src/share.ts`) finds it. The page files a link,
-text or one photo through the server's clip routes as the extension and the phone do (`src/services/clip.ts`, the shapes
+text or one photo through the server's clip routes as the extension does (`src/services/clip.ts`, the shapes
 and the contract in [`../extension/AGENTS.md`](../extension/AGENTS.md)); PDFs and several photos become a new note with the
 files attached; "Ask the assistant" hands any of it to the chat. A lens's first tag goes on what is made.
 
@@ -241,7 +237,7 @@ goes the same way. A share needs the worker installed: after a deploy, the first
 
 ## Reminders
 
-A task with a day and a reminder time can notify the phone the way the Android app does, through Web Push. In Settings >
+A task with a day and a reminder time can notify the phone through Web Push. In Settings >
 Reminders, "Task reminders on this device" asks for the notification permission, subscribes this browser with the server's key
 (`GET /agent/push/key`) and hands the subscription over (`POST /agent/push/subscribe`, `src/hooks/push.ts`, `src/services/push.ts`);
 turning it off removes it from the server and the browser. Each device turns it on for itself. The server sends the reminder at
@@ -251,14 +247,13 @@ its time whether or not the app is open: the service worker (`sw/sw.ts`) shows i
 a reminder's time has no zone and is read in the server's. It also needs the installed app's service worker (a dev server has
 none): Chrome on Android with the app installed, or on iPhone the app added to the Home Screen. A tap on a reminder asks the
 open app to go to the task (`src/components/update-toast.tsx`; it never reloads the page, so a note being typed is kept) and opens
-a window only when there is none. While the Android app is still installed too, both ring: remove its reminders (or the app)
-on that phone to have one.
+a window only when there is none.
 
 ## Phone width
 
 Below `md` (768px) the web app takes the phone's shapes. A task opens as a bottom sheet over its list (the shadcn drawer, vaul)
 and its pickers (When, Deadline, Repeat, Reminder, Tags, Notes) are sheets over that (`src/components/pick.tsx`: a popover in a
-window, a sheet here); the new-task form is a sheet too. Under a finger a task row swipes as the phone's does
+window, a sheet here); the new-task form is a sheet too. Under a finger a task row swipes
 (`src/hooks/swipe.ts`, geometry in `src/lib/swipe.ts`: right asks When, left brings out Delete; the grip handle still reorders).
 A tick waits 1.5 s before it is written and a toast's Undo, or a second tap on the box, takes it back
 (`src/hooks/linger.ts` over `packages/core/src/tick.ts`). The Tasks page has the Inbox, Today, Upcoming and Logbook as tabs, and
@@ -272,14 +267,6 @@ A finger among the pointers is the switch, not the width: Tailwind's `any-pointe
 hover-only controls show, and a hold stands in for a right-click: a long press (`src/hooks/long-press.ts`) opens a tile's or a
 result's menu and, on Home's days, adds a task to the day. A task row's grip handle reorders and its swipe asks When or brings
 out Delete (Phone width, above). A tick buzzes briefly, as a swipe does, where the browser can (`navigator.vibrate`).
-
-## The phone's pages
-
-The phone's note editor and PDF viewer are web pages inside a WebView, built from this module so the editor is the
-same on both. `build:editor` (from `editor-host/`) and `build:pdf` (from `pdf-host/`) each produce one
-self-contained HTML file, written into the app as a string module (`mobile/src/ui/editor-html.ts`,
-`mobile/src/ui/pdf-html.ts`). The two files are generated and gitignored (they are about 1 MB and 2 MB), so a fresh
-checkout has none: the mobile scripts build them first, see [`../mobile/README.md`](../mobile/README.md).
 
 ## shadcn
 

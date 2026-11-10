@@ -1,6 +1,6 @@
-// The web app's sync: the engine of packages/core/src/sync.ts (the phone's sync contract, ported) run over the local copy
+// The web app's sync: the engine of packages/core/src/sync.ts run over the local copy
 // (lib/local.ts) and this app's services. Edits are made on the local copy first and shown from it; a sync sends them. One sync
-// runs at a time: a request while one runs asks for one more after it. Triggers, as the phone's (mobile/src/store/notes.ts):
+// runs at a time: a request while one runs asks for one more after it. Triggers:
 // the app opening, the page coming to the front or going to the back, the browser coming back online, 1.5 s after the last
 // edit (`edited`), leaving a note (hooks/draft.ts) and any realtime event that is news (`heard`).
 //

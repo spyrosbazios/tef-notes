@@ -1,5 +1,5 @@
-// A task just ticked waits a moment before it is written, shown ticked and faded in its list (Things does the same, and so does
-// the phone: mobile/src/store/ticks.ts): a second tap on its box inside `TICK_MS`, or the toast's Undo (a touch screen has no
+// A task just ticked waits a moment before it is written, shown ticked and faded in its list (Things does the same): a second
+// tap on its box inside `TICK_MS`, or the toast's Undo (a touch screen has no
 // hover to see the box by), takes the tick back and nothing is written. Once the time is up the write goes out (the rev
 // compare-and-swap in hooks/todo.ts, which rolls a repeating task over) and the row leaves, at the place it had. An untick is
 // written at once and lingers the same moment. `lingering` holds the row for that while, as it was; shared by the list and the
