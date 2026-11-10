@@ -3,13 +3,29 @@
 All notable changes to TEF Notes. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 version is one semver number for the whole repository, set by the git tag (see [CONTRIBUTING.md](CONTRIBUTING.md#versioning)).
 
-## Unreleased
+## 0.9.0 - 2026-11-10
 
 ### Added
+
+- Web: a bar over selected words in a note (bold, italic, strikethrough, code, link, text style), and its AI button asks
+  about the selection in place. On a phone it is the assistant's button alone; the keyboard bar has the format tools.
+- Web: a note shows how far it's scrolled, an accent bar under its header.
 
 - CLI: `search` (words and meaning, over the agent's new `GET /agent/search`), `set` and `drop` for tasks, `tag` to
   define a tag, and `--tag` / `--notes` on `add`. With `TEF_NOTES_AGENT=1` every write is marked `tainted`.
 - `skills/tefnotes`: a skill that drives the CLI, for Claude Code, Codex and other coding agents.
+
+### Changed
+
+- Places are for tasks only: a note no longer has a `where`.
+- Web: every format tool fits in the note bar when it is wide; colour swatches wrap.
+
+### Fixed
+
+- Web: a link to another note opens on a plain click.
+- Web: the selection bar stays on screen when the selection is taller than the window.
+- Web: toolbar icons at their button's size on desktop.
+- Web: the update toast reloads on a first visit's page too, and Later's toast comes back at the next check.
 
 ### Removed
 
