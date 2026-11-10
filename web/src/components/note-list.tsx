@@ -249,13 +249,14 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
             <div className="max-md:mr-auto max-md:flex max-md:items-baseline max-md:gap-2 md:contents">
               <h2 className="font-bold text-[22px] tracking-tight max-md:text-lg max-md:font-extrabold">{shelf ? "Archived" : "Notes"}</h2>
               <span className={cn("text-xs tabular-nums text-faint md:self-baseline md:pt-1", !chips.length && "md:mr-auto")}>{shown.length}</span>
-              {/* The tag filter reads as what it is, the tags themselves beside the count, each taken off on its own */}
-              {chips.length ? (
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5 self-center md:mr-auto md:ml-2">
-                  {chips.map((t) => <TagBadge key={t} name={t} className="h-6 text-xs" onRemove={() => setTags(chips.filter((c) => c !== t))} />)}
-                </div>
-              ) : null}
             </div>
+            {/* The tag filter reads as what it is, the tags themselves, each taken off on its own: beside the count on a
+                laptop, on a row of their own under the title and controls on a phone (one line, scrolled sideways) */}
+            {chips.length ? (
+              <div className="flex min-w-0 items-center gap-1.5 self-center md:mr-auto md:ml-2 md:flex-wrap max-md:order-last max-md:basis-full max-md:overflow-x-auto max-md:[scrollbar-width:none]">
+                {chips.map((t) => <TagBadge key={t} name={t} className="h-6 shrink-0 text-xs" onRemove={() => setTags(chips.filter((c) => c !== t))} />)}
+              </div>
+            ) : null}
             {narrow ? (
               // The phone's toggle: one button showing the other layout (the animated group's gliding highlight has
               // nothing to sit on when the selected item is hidden, and paints a stray surface)
