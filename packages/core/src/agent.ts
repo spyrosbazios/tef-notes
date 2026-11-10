@@ -65,7 +65,7 @@ const LABEL: Record<ToolName, string> = {
   list_tasks: "Reading your tasks", list_tagged: "Gathering by tag", add_task: "Adding a task", add_tasks: "Adding tasks", update_task: "Changing a task", complete_task: "Completing a task",
   delete_task: "Deleting a task", find_place: "Searching the map", set_place: "Setting a place",
   open_note: "Opening a note", open_task: "Opening a task", go_view: "Going to a view", ask_choice: "Asking you to choose",
-  replace_selection: "Changing the selected text", insert_after_selection: "Adding under the selected text", draw: "Drawing",
+  replace_selection: "Changing the selected text", insert_after_selection: "Adding under the selected text", draw: "Drawing", save_drawing: "Saving the drawing",
 };
 export const label = (name: string) => LABEL[name as ToolName] ?? name;
 

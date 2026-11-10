@@ -28,7 +28,7 @@ function stub(p: ToolResultPart): ToolResultPart {
 /** Never offered once the turn has read someone else's text: memory rides on every later chat, the place a page's
  *  instructions would last longest; the selection tools write into a note with no card (core/assistant.ts "the
  *  selection"), so a page's instructions would too. The note tools stay, and ask. */
-export const NOT_WHEN_TAINTED = new Set(["update_memory", ...SELECTION_TOOL_NAMES]);
+export const NOT_WHEN_TAINTED = new Set(["update_memory", ...SELECTION_TOOL_NAMES, "save_drawing"]);
 
 /** The tools one step is offered: `base` (the request's), less the ones a tainted turn loses. */
 export const stepTools = <T extends string>(base: readonly T[], tainted: boolean): T[] =>

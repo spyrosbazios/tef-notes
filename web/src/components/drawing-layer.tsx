@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { closeDrawing, savedAs, type Opened } from "@/hooks/drawing";
+import { closeDrawing, savedAs, saverNow, setSaver, type Opened } from "@/hooks/drawing";
 import { useDrawings } from "@/hooks/photos";
 import { message } from "@/services/api";
 import type { DrawingHandle } from "./drawing-canvas";
@@ -46,22 +46,34 @@ export function DrawingLayer({ opened, onCreated }: Props) {
     return () => { live = false; };
   }, [drawings]);
 
-  const save = async () => {
+  // Saves the canvas; answers why not (shown too) or the drawing's file. The owner's Save, ⌘S, and the assistant's save_drawing
+  const save = async (): Promise<{ error: string } | { name: string }> => {
     setBusy(true); setErr(null);
+    const fail = (error: string) => { setErr(error); return { error }; };
     try {
       const snap = await canvas.current?.snapshot();
-      if (!snap) { setErr("Draw something first."); return; }
-      if (name) await drawings.save(name, snap.scene, snap.preview);
+      if (!snap) return fail("Draw something first.");
+      let saved = name;
+      if (saved) await drawings.save(saved, snap.scene, snap.preview);
       else {
         const made = await drawings.create(snap.scene, snap.preview);
+        saved = made.name;
         savedAs(made.name);
         onCreated(made.markdown);
       }
       canvas.current?.saved();
-    } catch (e) { setErr(`Not saved: ${message(e)}`); } finally { setBusy(false); }
+      return { name: saved };
+    } catch (e) { return fail(`Not saved: ${message(e)}`); } finally { setBusy(false); }
   };
   const saving = useRef(save);
   useEffect(() => { saving.current = save; });
+
+  // The assistant's save_drawing presses the same Save, for this opening only
+  useEffect(() => {
+    const mine = { seq: opened.seq, save: () => saving.current() };
+    setSaver(mine);
+    return () => { if (saverNow() === mine) setSaver(null); };
+  }, [opened.seq]);
 
   // ⌘S / Ctrl+S saves the drawing while focus is on it
   const box = useRef<HTMLDivElement>(null);

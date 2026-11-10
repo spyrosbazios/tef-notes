@@ -55,6 +55,13 @@ export function useOpened(noteId: string): Opened | null {
   return o?.noteId === noteId ? o : null;
 }
 
+/** The open drawing's Save, as the layer does it (drawing-layer.tsx): `save_drawing` presses it for the owner. */
+export type Saver = { seq: number; save: () => Promise<{ error: string } | { name: string }> };
+const saver = store<Saver | null>(null);
+/** The layer registers its Save while it is up (null when it goes). */
+export const setSaver = saver.set;
+export const saverNow = saver.get;
+
 const live = store<Live | null>(null);
 /** The canvas registers itself while it is up (null when it goes). */
 export const setLive = live.set;

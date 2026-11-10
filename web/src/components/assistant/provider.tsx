@@ -24,7 +24,7 @@ import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
-import { liveFor, liveNow, openDrawing, openedNow } from "@/hooks/drawing";
+import { liveFor, liveNow, openDrawing, openedNow, saverNow } from "@/hooks/drawing";
 import { photoListQuery } from "@/hooks/photos";
 import { prefsNow } from "@/hooks/prefs";
 import { activeLensOf } from "@/hooks/lens";
@@ -122,6 +122,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       const r = await live.apply({ add, update, remove });
       if ("error" in r) return uiError(`${r.error} Nothing was drawn.`);
       return r.picture ? { ok: true, picture: r.picture } : UI_OK;
+    },
+    // Only the drawing open over that note, by the same Save the owner presses (drawing-layer.tsx)
+    saveDrawing: async (path) => {
+      const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path), o = openedNow(), s = saverNow();
+      if (!n || !o || o.noteId !== n.note.id || s?.seq !== o.seq) return { error: `No drawing is open over ${path}: open one with draw first.` };
+      const r = await s.save();
+      return "error" in r ? r : { ok: true, name: r.name };
     },
   }), [qc]);
 

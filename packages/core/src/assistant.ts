@@ -99,13 +99,14 @@ export type UiToolInput = {
   replace_selection: { text: string };
   insert_after_selection: { text: string };
   draw: DrawInput;
+  save_drawing: { path: string };
 };
 export type UiToolName = keyof UiToolInput;
 /** Where `go_view` can go: any view. */
 export const GO_VIEWS = VIEW_KINDS;
 export type GoViewKind = ViewKind;
 
-export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice", "replace_selection", "insert_after_selection", "draw"] as const satisfies readonly UiToolName[];
+export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice", "replace_selection", "insert_after_selection", "draw", "save_drawing"] as const satisfies readonly UiToolName[];
 export const isUiTool = (name: string): name is UiToolName => (UI_TOOL_NAMES as readonly string[]).includes(name);
 
 /** What a client answers a UI tool with (`addToolOutput({ tool, toolCallId, output })`): `{ ok: true }` once the app shows it,
@@ -119,11 +120,11 @@ export const uiError = (error: string): UiOutput => ({ error });
 export const goView = (i: UiToolInput["go_view"]): AssistantView | null => viewFrom(i.view, i);
 
 /** The UI tools a request may use: those the client can do. Without a context there is no assistant to do them (the call
- *  would hang), so none; the selection tools only when it holds an editable selection; `draw` only on the web, the one client
- *  with a drawing editor. */
+ *  would hang), so none; the selection tools only when it holds an editable selection; the drawing tools only on the web, the one
+ *  client with a drawing editor. */
 export function uiToolsFor(context: AssistantContext | undefined): readonly UiToolName[] {
   if (!context) return [];
-  return UI_TOOL_NAMES.filter((n) => (context.editable || !isSelectionTool(n)) && (n !== "draw" || context.client === "web"));
+  return UI_TOOL_NAMES.filter((n) => (context.editable || !isSelectionTool(n)) && (!isDrawTool(n) || context.client === "web"));
 }
 
 // ---- the selection
@@ -148,7 +149,9 @@ export const SELECTION_TEXT_MAX = 20_000;
 // (core/drawing.ts `shapesOf`): its note, its file (none while it is new and unsaved), what is on it and what the owner has
 // selected. `draw` opens a drawing in that editor (one named of the note's, else the note's open one, else a new one) and makes
 // an edit on it (`DrawEdit`), in sight, undoable, and unsaved: the owner keeps it with Save, as they keep their own strokes, so
-// a draw never writes by itself and needs no card. Saving a new drawing links it into the note. The resumed request's context
+// a draw never writes by itself and needs no card. `save_drawing` is that Save, pressed for the owner who asked for it:
+// the open drawing over the note it names is saved as it is on screen (a new one linked into the note), as their own Save
+// would. Withdrawn once the turn is tainted (server/agent/src/loop.ts), like the selection tools: then only the owner saves. Saving a new drawing links it into the note. The resumed request's context
 // shows the drawing as it then is, with the ids to change it by.
 
 /** The drawing open in the editor: `name` its file (`drawing.excalidraw`), absent while new; `shapes` at most
@@ -157,6 +160,12 @@ export const SELECTION_TEXT_MAX = 20_000;
 export type OpenDrawing = { path: string; name?: string; shapes: Shape[]; more?: number; selected?: string[]; unsaved?: true };
 
 /** `draw`'s input: the note (`path`), which of its drawings (`name`, else the open one, else a new one), and the edit. */
+export const DRAW_TOOL_NAMES = ["draw", "save_drawing"] as const satisfies readonly UiToolName[];
+export const isDrawTool = (name: string): boolean => (DRAW_TOOL_NAMES as readonly string[]).includes(name);
+
+/** `save_drawing`'s answer: saved, with the drawing's file name (a new one's is made on its first save). */
+export type SaveDrawingOutput = { ok: true; name: string } | { error: string };
+
 export type DrawInput = { path: string; name?: string } & DrawEdit;
 
 /** `draw`'s answer: done, with a picture of the drawing as it then is (a data URL the client's editor exported), which the
@@ -210,8 +219,8 @@ export const ASK = { min: 2, max: 6, id: 40, question: 300, label: 60, hint: 120
  *  send only with something chosen), or `{ error }` when the question can't be shown or they dismissed it. */
 export type ChoiceOutput = { chosen: string[] } | { error: string };
 
-/** The UI tools answer with `UiOutput`, but `ask_choice` with `ChoiceOutput` and `draw` with `DrawOutput`. */
-export type UiOutputOf<N extends UiToolName> = N extends "ask_choice" ? ChoiceOutput : N extends "draw" ? DrawOutput : UiOutput;
+/** The UI tools answer with `UiOutput`, but `ask_choice` with `ChoiceOutput`, `draw` with `DrawOutput`, `save_drawing` with `SaveDrawingOutput`. */
+export type UiOutputOf<N extends UiToolName> = N extends "ask_choice" ? ChoiceOutput : N extends "draw" ? DrawOutput : N extends "save_drawing" ? SaveDrawingOutput : UiOutput;
 
 /** The tool the owner answers, not the app: its call waits in the chat, drawn as buttons, until they tap. */
 export const isAskTool = (name: string): name is "ask_choice" => name === "ask_choice";

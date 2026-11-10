@@ -75,6 +75,7 @@ function host() {
     },
     showAssistant: () => did.push("assistant"),
     draw: async (input) => { did.push(`draw ${input.path} ${input.add?.length ?? 0}`); return UI_OK; },
+    saveDrawing: async (path) => { did.push(`save drawing ${path}`); return { ok: true, name: "drawing.excalidraw" }; },
   };
   return { h, did };
 }

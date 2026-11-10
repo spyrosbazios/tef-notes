@@ -2,7 +2,7 @@
 // as the `context` every request carries, and the UI tools the agent drives the app with. Pure: the nav, the cache and the
 // dock come in as arguments, so this is what `test/assistant.test.ts` exercises.
 import { getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
-import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type DrawOutput, type OpenDrawing, type UiOutput, type UiToolName } from "@/core/assistant";
+import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type DrawOutput, type OpenDrawing, type SaveDrawingOutput, type UiOutput, type UiToolName } from "@/core/assistant";
 import { editWords } from "@/core/drawing";
 import { contextFilter, type Lens } from "@/core/lens";
 import { isNotePath } from "@/core/notes";
@@ -76,13 +76,15 @@ export type UiHost = {
   held?: () => Held | null;
   /** Opens the drawing `draw` names over its note and makes the edit on it; answers with a picture of the result. */
   draw: (input: DrawInput) => Promise<DrawOutput>;
+  /** Saves the drawing open over the note at `path`, as the owner's Save would. */
+  saveDrawing: (path: string) => Promise<SaveDrawingOutput>;
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /** Do one UI tool call in the app, and say how it went: `{ ok: true }` (`draw`'s with a picture), or `{ error }` for the model
  *  to read. Always answers. */
-export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Promise<UiOutput | DrawOutput> {
+export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Promise<UiOutput | DrawOutput | SaveDrawingOutput> {
   const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   switch (name) {
     case "open_note": {
@@ -115,13 +117,18 @@ export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Pr
       if (!isNotePath(path)) return uiError(`No note ${path || "(none named)"}.`);
       return host.draw({ ...(i as Omit<DrawInput, "path">), path });
     }
+    case "save_drawing": {
+      const path = str(i.path);
+      if (!isNotePath(path)) return uiError(`No note ${path || "(none named)"}.`);
+      return host.saveDrawing(path);
+    }
   }
 }
 
 const CANT: Record<AppTool, string> = {
   open_note: "Couldn't open the note", open_task: "Couldn't open the task", go_view: "Couldn't go there",
   replace_selection: "Couldn't change the selected text", insert_after_selection: "Couldn't add under the selected text",
-  draw: "Couldn't draw",
+  draw: "Couldn't draw", save_drawing: "Couldn't save the drawing",
 };
 /** A UI tool call that failed, as a line: what it was, and `why` (the app's answer, or the error). The SDK's refusal of a call
  *  whose input didn't fit the tool carries the whole input: the line says only that (the model is told the rest, and retries). */
@@ -142,6 +149,7 @@ export function uiWords(name: AppTool, input: unknown, title: string | undefined
     }
     case "replace_selection": return str(i.text).trim() ? "Changed the selected text" : "Removed the selected text";
     case "insert_after_selection": return "Added under the selected text";
+    case "save_drawing": return `Saved the drawing${quoted ? ` in${quoted}` : ""}`;
     case "draw": {
       const n = (k: string) => (Array.isArray(i[k]) ? i[k] : []);
       return `${editWords({ add: n("add"), update: n("update"), remove: n("remove") })} in the drawing${quoted ? ` in${quoted}` : ""}`;

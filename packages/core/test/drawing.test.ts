@@ -99,6 +99,7 @@ describe("the drawing on screen", () => {
   test("draw is offered only on the web", () => {
     expect(uiToolsFor({ client: "web", view: { kind: "home" } })).toContain("draw");
     expect(uiToolsFor({ client: "phone", view: { kind: "home" } })).not.toContain("draw");
+    expect(uiToolsFor({ client: "phone", view: { kind: "home" } })).not.toContain("save_drawing");
     expect(uiToolsFor({ view: { kind: "home" } })).not.toContain("draw");
   });
 });

@@ -3,7 +3,8 @@
 // tools the client does itself. Those are declared without an `execute`, so the SDK streams the call to the client and the
 // turn waits for its output (`addToolOutput`); they change what the owner sees, never their data, so no confirm card. The
 // selection tools are the exception: the owner's editor writes them, in sight and undoable (core's "the selection"); so is
-// `draw`, whose edit lands in the open drawing unsaved, the owner's to keep (core's "the drawing").
+// `draw`, whose edit lands in the open drawing unsaved, the owner's to keep, and
+// `save_drawing`, which saves it when the owner asked for that (core's "the drawing").
 import { tool } from "ai";
 import { z } from "zod";
 import { isNotePath } from "@/core/notes";
@@ -62,6 +63,7 @@ const input = {
     })).max(DRAWING_LIMITS.update).optional().describe("Fields to change on shapes there are, by id; moving a box takes its label and arrows along"),
     remove: z.array(shapeId).max(DRAWING_LIMITS.remove).optional().describe("Ids of shapes to delete"),
   }),
+  save_drawing: z.object({ path: z.string().refine(isNotePath, "notes/<file>.md").describe("The note the open drawing is over") }),
 };
 true satisfies Same<z.infer<typeof input.open_note>, UiToolInput["open_note"]>;
 true satisfies Same<z.infer<typeof input.open_task>, UiToolInput["open_task"]>;
@@ -70,6 +72,7 @@ true satisfies Same<z.infer<typeof input.ask_choice>, UiToolInput["ask_choice"]>
 true satisfies Same<z.infer<typeof input.replace_selection>, UiToolInput["replace_selection"]>;
 true satisfies Same<z.infer<typeof input.insert_after_selection>, UiToolInput["insert_after_selection"]>;
 true satisfies Same<z.infer<typeof input.draw>, UiToolInput["draw"]>;
+true satisfies Same<z.infer<typeof input.save_drawing>, UiToolInput["save_drawing"]>;
 
 const ANSWER = "The app does it and answers; if it can't (no such note), it says why.";
 /** No `execute`: the client does these (`ask_choice` the owner does, by tapping). Only offered when the request has a context (`uiToolsFor`). */
@@ -90,7 +93,7 @@ export const uiTools = {
     inputSchema: input.insert_after_selection,
   }),
   draw: tool({
-    description: "Draw in one of a note's Excalidraw drawings, in the web app's drawing editor, which opens over the note beside the chat: sketches, diagrams, flows, wireframes. Names a drawing of the note (`name`), else the one open on screen, else starts a new one; then adds, changes and removes shapes. The owner sees it happen and keeps it with Save (a new drawing is then linked into the note), or undoes it: it is never saved by itself, so it needs no card. Answers with a picture of the drawing as it then is (look at it, and fix what is off), and from then on the <screen> shows the drawing's shapes with their ids, the owner's own strokes and selection too: read it before changing anything. To look at one without opening it, read_drawing. For a diagram or a wireframe, diagram_guide first. Lay it out yourself: boxes on a grid with room between them (24 px or more), labels short enough for their box, arrows joining shapes by id. A phone screen is 390x844, a laptop's 1440x900.",
+    description: "Draw in one of a note's Excalidraw drawings, in the web app's drawing editor, which opens over the note beside the chat: sketches, diagrams, flows, wireframes. Names a drawing of the note (`name`), else the one open on screen, else starts a new one; then adds, changes and removes shapes. The owner sees it happen and keeps it with Save (a new drawing is then linked into the note), or undoes it: it is never saved by itself, so it needs no card; save_drawing saves it when they asked you to. Answers with a picture of the drawing as it then is (look at it, and fix what is off), and from then on the <screen> shows the drawing's shapes with their ids, the owner's own strokes and selection too: read it before changing anything. To look at one without opening it, read_drawing. For a diagram or a wireframe, diagram_guide first. Lay it out yourself: boxes on a grid with room between them (24 px or more), labels short enough for their box, arrows joining shapes by id. A phone screen is 390x844, a laptop's 1440x900.",
     inputSchema: input.draw,
     // The app's answer carries a picture of the drawing after the edit: shown to the model, so it sees what it drew
     toModelOutput: ({ output }) => {
@@ -106,6 +109,10 @@ export const uiTools = {
         ],
       };
     },
+  }),
+  save_drawing: tool({
+    description: "Save the drawing open in the editor over the note, as it is on screen, as the owner's Save button would (a new drawing is then linked into the note). Only when the owner asked you to save or keep it, or to make a drawing for a note and leave it there; otherwise they keep a drawing with Save themselves. Answers `{ ok: true, name }` (its file, for read_drawing and show_drawing) or `{ error }`: then say so.",
+    inputSchema: input.save_drawing,
   }),
 } satisfies Record<UiToolName, unknown>;
 
