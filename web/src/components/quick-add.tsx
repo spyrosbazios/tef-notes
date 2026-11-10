@@ -1,6 +1,7 @@
 // New task: the whole card at once (title, notes, When, deadline, repeat, reminder, tags), started from where it was
 // asked for: Today's + starts on Today, This Evening's in the evening, the Inbox's undated. Opened by Q anywhere the
 // cursor isn't in a field, and by the + on a task list or a Home section.
+import { haptic } from "@/lib/haptics";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, Calendar, Flag, Moon, Repeat, Tag } from "lucide-react";
 import { useRef, useState } from "react";
@@ -43,8 +44,8 @@ function Form({ initial, onDone }: { initial: Start; onDone: () => void }) {
     e.preventDefault();
     if (!title.trim() || busy) return;
     setBusy(true); setFailed(false);
-    try { await addTask(qc, { title, notes, ...scheduleOf(schedule), due: due ?? "", every, remind: schedule ? remind : "", tags }); onDone(); }
-    catch (x) { toast.error(message(x)); setFailed(true); shake(); }
+    try { await addTask(qc, { title, notes, ...scheduleOf(schedule), due: due ?? "", every, remind: schedule ? remind : "", tags }); haptic("success"); onDone(); }
+    catch (x) { haptic("error"); toast.error(message(x)); setFailed(true); shake(); }
     finally { setBusy(false); }
   };
   const target = !schedule ? "Inbox" : schedule.when === today ? (schedule.evening ? "This Evening" : "Today") : when ?? "Upcoming";

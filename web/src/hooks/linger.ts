@@ -4,6 +4,7 @@
 // compare-and-swap in hooks/todo.ts, which rolls a repeating task over) and the row leaves, at the place it had. An untick is
 // written at once and lingers the same moment. `lingering` holds the row for that while, as it was; shared by the list and the
 // open task, so a tick from either fades the same row. The wait's timing is core/tick.ts.
+import { haptic } from "@/lib/haptics";
 import { useSyncExternalStore } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -56,7 +57,7 @@ export async function toggleTask(qc: QueryClient, task: Task): Promise<void> {
     set(new Map(state).set(task.id, { task: cur?.task ?? task, checked }));
     clients.set(task.id, qc);
     waiting.toggle(task.id);
-    navigator.vibrate?.(8);
+    haptic("tick");
     if (touching()) {
       toast(`“${task.title}” done`, { id: toastId(task.id), duration: TICK_MS, action: { label: "Undo", onClick: () => { void toggleTask(qc, task); } } });
     }

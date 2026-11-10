@@ -6,6 +6,7 @@
 // a drag never crosses one), scrolls the list when held at its edge, and lands where the pointer lets go. Escape or a
 // cancelled pointer drops it where it was. The hook holds which row is up and which side of which row it is over; the list says
 // what a drop means.
+import { haptic } from "@/lib/haptics";
 import { useEffect, useRef, useState, type HTMLAttributes, type PointerEvent } from "react";
 
 export type RowDrag = {
@@ -77,7 +78,7 @@ export function useRowDrag(onMove: (group: string, id: string, over: string, aft
       getSelection()?.removeAllRanges();
       document.body.style.cursor = "grabbing";
       document.body.dataset.rowDrag = "";                                   // hooks/swipe.ts lets go of the row
-      if (touch) navigator.vibrate?.(8);
+      if (touch) haptic("tick");
       p.frame = requestAnimationFrame(tick);
     };
     const hold = touch ? setTimeout(lift, HOLD) : 0;

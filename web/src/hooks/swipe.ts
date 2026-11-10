@@ -7,6 +7,7 @@
 // The row's offset is a motion value, not React state: a finger moves it with no render, and letting go eases it to where it
 // rests on `spring.slide` (a press that grabs it mid-glide takes over from where it is). `side` is the one thing that does
 // render: which action the row has uncovered, so the layer behind it is there while it shows.
+import { haptic } from "@/lib/haptics";
 import { spring, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { animate, useMotionValue, useMotionValueEvent, type AnimationPlaybackControls } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
@@ -91,8 +92,8 @@ export function useSwipe({ when, onWhen }: { when: boolean; onWhen: () => void }
       }
       swallow.current = true;
       const o = outcomeOf(now.current);
-      if (o === "delete") { rest(-DELETE_WIDTH); navigator.vibrate?.(8); }
-      else { close(); if (o === "when") { navigator.vibrate?.(8); ask.current(); } }
+      if (o === "delete") { rest(-DELETE_WIDTH); haptic("tick"); }
+      else { close(); if (o === "when") { haptic("tick"); ask.current(); } }
     },
     onPointerCancel: (e: PointerEvent<HTMLElement>) => {
       if (g.current?.pointer !== e.pointerId) return;

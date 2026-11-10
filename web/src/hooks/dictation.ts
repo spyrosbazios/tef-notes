@@ -1,6 +1,7 @@
 // Dictation: the microphone recorded until stopped, the clip turned into what the server's speech model takes (mono
 // 16 kHz float32, core/voice.ts) and sent; its text handed to `onText`. Nothing is kept: the clip lives in memory until it
 // is sent. While recording, `level` (0..1) follows the voice and `seconds` counts up; at MAX_SECONDS it stops by itself.
+import { haptic } from "@/lib/haptics";
 import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -122,7 +123,7 @@ export function useDictation(onText: (text: string) => void) {
   // Leaving mid-recording drops the clip
   useEffect(() => () => { const l = live.current; if (l) { l.cancelled = true; if (l.rec.state === "recording") l.rec.stop(); } }, []);
 
-  const toggle = useCallback(() => { if (state === "recording") stop(); else if (state === "idle") void start(); }, [state, start, stop]);
+  const toggle = useCallback(() => { if (state === "recording") { haptic("success"); stop(); } else if (state === "idle") { haptic("start"); void start(); } }, [state, start, stop]);
   return { state, level, seconds, start, stop, cancel, toggle };
 }
 

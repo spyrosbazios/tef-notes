@@ -10,6 +10,7 @@
 // `lg`, and the app bar between. Ask is the assistant's dock opened whole (assistant/dock.tsx): a tab, not a page, so it is
 // "in front" while the dock is open; it is a step in the history, which any other tab navigates away from, closing it. Hidden under the keyboard (a composer sits on the keys).
 // A dot on Ask: an answer finished while it was not in front (hooks/ask-badge.ts), read when the dock opens.
+import { haptic } from "@/lib/haptics";
 import { BottomNavigation, BottomNavigationHighlight, BottomNavigationHighlightItem, BottomNavigationItem, BottomNavigationLabel } from "@animate-ui/react/primitives/bottom-navigation";
 import { spring } from "@animate-ui/react/utils/motion";
 import { LiquidGlass } from "quick-liquid/react";
@@ -33,6 +34,7 @@ export function TabBar() {
   const lastList = useRef<View | null>(null);
   useEffect(() => { if (isTaskView(view)) lastList.current = { kind: view.kind }; }, [view]);
   const go = (t: Tab) => {
+    haptic("tap");
     if (t === "ask") { setDock({ open: true }); return; }
     goView(t === "tasks" ? lastList.current ?? { kind: phone.tasksList } : { kind: t });
   };
