@@ -2,7 +2,7 @@
 // as the `context` every request carries, and the UI tools the agent drives the app with. Pure: the nav, the cache and the
 // dock come in as arguments, so this is what `test/assistant.test.ts` exercises.
 import { getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
-import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type OpenDrawing, type UiOutput, type UiToolName } from "@/core/assistant";
+import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type DrawOutput, type OpenDrawing, type UiOutput, type UiToolName } from "@/core/assistant";
 import { editWords } from "@/core/drawing";
 import { contextFilter, type Lens } from "@/core/lens";
 import { isNotePath } from "@/core/notes";
@@ -74,15 +74,15 @@ export type UiHost = {
   showAssistant: () => void;
   /** The words an ask from the selection bar holds, while it does: what the selection tools change. */
   held?: () => Held | null;
-  /** Opens the drawing `draw` names over its note and makes the edit on it (`call`: the call's id, which its picture is kept by). */
-  draw: (input: DrawInput, call: string) => Promise<UiOutput>;
+  /** Opens the drawing `draw` names over its note and makes the edit on it; answers with a picture of the result. */
+  draw: (input: DrawInput) => Promise<DrawOutput>;
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-/** Do one UI tool call in the app, and say how it went: `{ ok: true }`, or `{ error }` for the model to read. Always answers.
- *  `call`: the call's id. */
-export async function runUiTool(name: AppTool, input: unknown, host: UiHost, call: string): Promise<UiOutput> {
+/** Do one UI tool call in the app, and say how it went: `{ ok: true }` (`draw`'s with a picture), or `{ error }` for the model
+ *  to read. Always answers. */
+export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Promise<UiOutput | DrawOutput> {
   const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   switch (name) {
     case "open_note": {
@@ -113,7 +113,7 @@ export async function runUiTool(name: AppTool, input: unknown, host: UiHost, cal
     case "draw": {
       const path = str(i.path);
       if (!isNotePath(path)) return uiError(`No note ${path || "(none named)"}.`);
-      return host.draw({ ...(i as Omit<DrawInput, "path">), path }, call);
+      return host.draw({ ...(i as Omit<DrawInput, "path">), path });
     }
   }
 }

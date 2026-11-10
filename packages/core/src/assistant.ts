@@ -159,6 +159,23 @@ export type OpenDrawing = { path: string; name?: string; shapes: Shape[]; more?:
 /** `draw`'s input: the note (`path`), which of its drawings (`name`, else the open one, else a new one), and the edit. */
 export type DrawInput = { path: string; name?: string } & DrawEdit;
 
+/** `draw`'s answer: done, with a picture of the drawing as it then is (a data URL the client's editor exported), which the
+ *  model is shown so it can see what it drew and set right what doesn't look it; or why not. The picture rides only in the
+ *  live turn: the server drops it before it saves the chat (server/agent/src/drawings.ts `withoutPictures`), and before a
+ *  model that takes no images. */
+export type DrawOutput = { ok: true; picture?: string } | { error: string };
+
+/** The largest picture an answer may carry, as a data URL's length. */
+export const DRAW_PICTURE_MAX = 2_000_000;
+
+/** The picture a `draw` answer carries, split for the model: its type and base64 data; null without a usable one. */
+export function drawPictureOf(output: unknown): { mediaType: string; data: string } | null {
+  const p = obj(output)?.picture;
+  if (typeof p !== "string" || p.length > DRAW_PICTURE_MAX) return null;
+  const m = /^data:(image\/(?:png|webp|jpeg));base64,([A-Za-z0-9+/]+=*)$/.exec(p);
+  return m ? { mediaType: m[1], data: m[2] } : null;
+}
+
 
 /** The open drawing out of a context's `drawing` (untrusted), or undefined. */
 function drawingOf(raw: unknown): OpenDrawing | undefined {
@@ -193,8 +210,8 @@ export const ASK = { min: 2, max: 6, id: 40, question: 300, label: 60, hint: 120
  *  send only with something chosen), or `{ error }` when the question can't be shown or they dismissed it. */
 export type ChoiceOutput = { chosen: string[] } | { error: string };
 
-/** The UI tools answer with `UiOutput`, but `ask_choice` with `ChoiceOutput`. */
-export type UiOutputOf<N extends UiToolName> = N extends "ask_choice" ? ChoiceOutput : UiOutput;
+/** The UI tools answer with `UiOutput`, but `ask_choice` with `ChoiceOutput` and `draw` with `DrawOutput`. */
+export type UiOutputOf<N extends UiToolName> = N extends "ask_choice" ? ChoiceOutput : N extends "draw" ? DrawOutput : UiOutput;
 
 /** The tool the owner answers, not the app: its call waits in the chat, drawn as buttons, until they tap. */
 export const isAskTool = (name: string): name is "ask_choice" => name === "ask_choice";

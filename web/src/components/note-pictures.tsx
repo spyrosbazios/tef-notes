@@ -22,10 +22,11 @@ function useTiming(t: Transition): CSSProperties {
 export function BlurImage({ src, className, onBroken }: { src: Source; className?: string; onBroken?: () => void }) {
   const before = drawn.has(src.key);
   const [tiny, setTiny] = useState(false), [sharp, setSharp] = useState(before);
-  const fit = cn("absolute inset-0 size-full object-cover", src.page && "object-top");
+  const fit = cn("absolute inset-0 size-full", src.fit === "drawing" ? "object-contain" : "object-cover", src.fit === "page" && "object-top");
   const fade = useTiming(transition.fade), reveal = useTiming(transition.reveal);
   return (
-    <div className={cn("relative overflow-hidden bg-raised", !tiny && !sharp && "animate-pulse", className)}>
+    // A drawing sits whole on the white of Excalidraw's canvas, which a dark theme turns dark with Excalidraw's own filter
+    <div className={cn("relative overflow-hidden bg-raised", src.fit === "drawing" && "bg-white dark:hue-rotate-180 dark:invert-[0.93]", !tiny && !sharp && "animate-pulse", className)}>
       {before ? null : <img src={src.at("blur")} alt="" aria-hidden decoding="async" onLoad={() => setTiny(true)}
         style={fade} className={cn(fit, "scale-110 blur-lg transition-opacity motion-reduce:scale-100", tiny && !sharp ? "opacity-100" : "opacity-0")} />}
       <img src={src.at("sharp")} alt="" loading="lazy" decoding="async" onLoad={() => { drawn.add(src.key); setSharp(true); }} onError={onBroken}

@@ -11,8 +11,9 @@ import { FONT_SIZES, shapesOf } from "@/core/drawing";
 import { setLive, liveNow, type Live } from "@/hooks/drawing";
 import { edited } from "@/lib/drawing-edit";
 
-/** The long edge the PNG preview is capped at, as photos are (core/photos.ts MAX); the chat's picture of an edit, smaller. */
-const PREVIEW_EDGE = 1600, CHAT_EDGE = 720;
+/** The long edge the PNG preview is capped at, as photos are (core/photos.ts MAX); the picture an edit answers with (the agent
+ *  looks at it, the chat shows it), smaller and WebP. */
+const PREVIEW_EDGE = 1600, LOOK_EDGE = 800, LOOK_QUALITY = 0.8;
 
 export type DrawingHandle = {
   /** The scene as its JSON file and a PNG of it; null while nothing is drawn. */
@@ -30,14 +31,22 @@ type Props = {
   ref: React.Ref<DrawingHandle>;
 };
 
-/** A PNG of `elements` at most `edge` px on its long side. */
-function picture(api: ExcalidrawImperativeAPI, elements: readonly ExcalidrawElement[], edge: number) {
+/** A picture of `elements` at most `edge` px on its long side, PNG unless asked otherwise. */
+function picture(api: ExcalidrawImperativeAPI, elements: readonly ExcalidrawElement[], edge: number, mimeType = "image/png", quality?: number) {
   return exportToBlob({
-    elements, files: api.getFiles(), mimeType: "image/png", exportPadding: 16,
+    elements, files: api.getFiles(), mimeType, quality, exportPadding: 16,
     appState: { ...api.getAppState(), exportBackground: true, exportWithDarkMode: false },
     getDimensions: (w: number, h: number) => { const k = Math.min(1, edge / Math.max(w, h)); return { width: Math.round(w * k), height: Math.round(h * k), scale: k }; },
   });
 }
+
+/** A blob as a data URL: what a tool's answer, plain JSON, can carry. */
+const dataUrl = (b: Blob) => new Promise<string | null>((done) => {
+  const r = new FileReader();
+  r.onload = () => done(typeof r.result === "string" ? r.result : null);
+  r.onerror = () => done(null);
+  r.readAsDataURL(b);
+});
 
 export default function DrawingCanvas({ initial, opening, onUnsaved, ref }: Props) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
@@ -91,7 +100,9 @@ export default function DrawingCanvas({ initial, opening, onUnsaved, ref }: Prop
         const elements = api.getSceneElements();
         // Drawn on an empty canvas: brought into view, where the owner is looking
         if (!before && elements.length) api.scrollToContent(elements, { fitToViewport: true, viewportZoomFactor: 0.9, animate: true });
-        return { picture: elements.length ? await picture(api, elements, CHAT_EDGE).catch(() => null) : null };
+        if (!elements.length) return { picture: null };
+        const shot = await picture(api, elements, LOOK_EDGE, "image/webp", LOOK_QUALITY).catch(() => null);
+        return { picture: shot && await dataUrl(shot) };
       },
     };
     setLive(live);

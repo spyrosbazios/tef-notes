@@ -26,6 +26,8 @@ type Provider = {
   options: ProviderOptions;
   /** Headers for the model list; default a bearer key. */
   listHeaders?: (apiKey: string) => Record<string, string>;
+  /** The provider's models that take no images (a picture sent to one is an error): its others do. */
+  blind?: (id: string) => boolean;
 };
 
 /** Exported for server/test/llm.test.js, which holds the hooks' copy to it. No reasoning option here: a provider option
@@ -34,6 +36,7 @@ export const PROVIDERS = {
   deepseek: {
     label: "DeepSeek", model: "deepseek-flash", base: "https://api.deepseek.com",
     make: (apiKey) => createDeepSeek({ apiKey }), options: {},   // its prompt cache is automatic
+    blind: (id) => /pro/i.test(id),   // only Flash takes images (api-docs.deepseek.com/guides/vision)
   },
   anthropic: {
     label: "Anthropic", model: "claude-sonnet-5-5", base: "https://api.anthropic.com/v1",
@@ -108,6 +111,9 @@ export async function catalog(): Promise<AgentModels> {
   const apiKey = await credential();
   return { provider: P.label, available: !!apiKey, default: DEFAULT, models: apiKey ? await ids(apiKey) : KNOWN, web: !!(await key("exa")) };
 }
+
+/** Whether a model can be shown a picture (a drawing it made, core/assistant.ts `DrawOutput`). */
+export const sees = (id: string) => !P.blind?.(id);
 
 export class Unavailable extends Error {}
 

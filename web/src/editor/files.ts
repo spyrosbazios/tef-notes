@@ -1,9 +1,9 @@
 // A link to a PDF or a drawing attached to the note (`[name.pdf](../attachments/<id>/<name>.pdf)`, `[sketch](../attachments/<id>/<name>.excalidraw)`)
 // drawn as a chip. The markdown is untouched: the link's own text is decorated, so the chip edits, copies and round-trips
 // like any link, and a tap on it hands the href to the caller (which opens the file) instead of placing the cursor.
-// A drawing's chip also carries a thumbnail, the PNG kept beside it, when the page can show it. A PDF's chip sits under
-// its first page, the server's picture of it (`pdfPage`), shown full width so the note reads like the document, with
-// its page count (`pdfPages`) on it once known.
+// A drawing's chip sits under the drawing itself, the PNG kept beside it, shown full width when the page can show it; a
+// PDF's under its first page, the server's picture of it (`pdfPage`), with its page count (`pdfPages`) on it once known:
+// so the note reads like the document, or shows the diagram, not an icon of it.
 import type { Mark, Node } from "prosemirror-model";
 import { Plugin } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
@@ -11,7 +11,7 @@ import { attachmentLink, drawingPreview, isDrawing, isPdf } from "@/core/photos"
 import { schema } from "./markdown";
 import type { ResolveImage } from "./views";
 
-export const FILE_CHIP = "file-chip", DRAWING_CHIP = "drawing-chip", DRAWING_THUMB = "drawing-thumb", PDF_PAGE = "pdf-page", PDF_COUNT = "pdf-count";
+export const FILE_CHIP = "file-chip", DRAWING_CHIP = "drawing-chip", DRAWING_PAGE = "drawing-page", PDF_PAGE = "pdf-page", PDF_COUNT = "pdf-count";
 
 /** The picture of a PDF link's first page, by href; null when there is none to show (no server, not a note's PDF). */
 export type PdfPage = (href: string) => string | null;
@@ -35,10 +35,9 @@ export const drawingPreviewSrc = (href: string) => drawingPreview(href);
 
 const kindOf = (href: string) => (isPdfLink(href) ? FILE_CHIP : isDrawingLink(href) ? `${FILE_CHIP} ${DRAWING_CHIP}` : null);
 
-/** The thumbnail before a drawing's chip: not editable, a click on it is a click on the chip. */
-function thumb(url: string, href: string, label: string, className = DRAWING_THUMB) {
+/** A file's picture: not editable, a click on it is a click on the chip. */
+function thumb(url: string, href: string, label: string) {
   const img = document.createElement("img");
-  img.className = className;
   img.src = url;
   img.alt = label;
   img.draggable = false;
@@ -47,13 +46,14 @@ function thumb(url: string, href: string, label: string, className = DRAWING_THU
   return img;
 }
 
-/** A PDF's first page, its page count on its corner once `count` answers. A page the server can't draw (yet) goes: just the chip. */
-function page(url: string, href: string, label: string, count: Promise<number | null> | undefined) {
+/** A PDF's first page, its page count on its corner once `count` answers, or a drawing (`className` DRAWING_PAGE). A picture
+ *  that can't be had (yet) goes: just the chip. */
+function page(url: string, href: string, label: string, count: Promise<number | null> | undefined, className = PDF_PAGE) {
   const box = document.createElement("span");
-  box.className = PDF_PAGE;
+  box.className = className;
   box.contentEditable = "false";
   box.dataset.href = href;
-  const img = thumb(url, href, label, "");
+  const img = thumb(url, href, label);
   img.onerror = () => box.remove();
   box.append(img);
   count?.then((n) => {
@@ -77,7 +77,7 @@ function chips(doc: Node, resolve: ResolveImage, pdfPage: PdfPage | undefined, c
         const href: string = run.mark.attrs.href, label = doc.textBetween(run.from, run.to);
         out.push(Decoration.inline(run.from, run.to, { class: kindOf(href) ?? FILE_CHIP, "data-href": href }));
         const url = isDrawingLink(href) ? resolve(drawingPreviewSrc(href)) : null;
-        if (url) out.push(Decoration.widget(run.from, () => thumb(url, href, label), { side: -1, key: `${href}\n${url}`, ignoreSelection: true }));
+        if (url) out.push(Decoration.widget(run.from, () => page(url, href, label, undefined, DRAWING_PAGE), { side: -1, key: `drawing\n${url}`, ignoreSelection: true }));
         const first = isPdfLink(href) ? pdfPage?.(href) : null;
         if (first) out.push(Decoration.widget(run.from, () => page(first, href, label, counted(href)), { side: -1, key: `page\n${first}`, ignoreSelection: true }));
       }
@@ -112,4 +112,4 @@ export function fileChips(resolve: () => ResolveImage, pdfPage?: PdfPage, pdfPag
 
 /** The PDF or drawing link a click (on its chip, thumbnail or page) landed on, as its href; null when it landed anywhere else. */
 export const chipHref = (target: EventTarget | null) =>
-  (target as HTMLElement | null)?.closest<HTMLElement>(`.${FILE_CHIP}, .${DRAWING_THUMB}, .${PDF_PAGE}`)?.dataset.href ?? null;
+  (target as HTMLElement | null)?.closest<HTMLElement>(`.${FILE_CHIP}, .${DRAWING_PAGE}, .${PDF_PAGE}`)?.dataset.href ?? null;

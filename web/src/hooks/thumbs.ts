@@ -35,8 +35,9 @@ const indexed = (all: Photo[]) => {
   return m;
 };
 
-/** One picture to draw: the URL at each size, and whether it is a page (shown from its top). */
-export type Source = { key: string; at: (size: ThumbSize) => string; page: boolean };
+/** One picture to draw: the URL at each size, and how it fills its box: cropped (`cover`), a page from its top (`page`), or a
+ *  drawing whole (`drawing`, on its own white ground, which a dark theme turns dark as Excalidraw does). */
+export type Source = { key: string; at: (size: ThumbSize) => string; fit: "cover" | "page" | "drawing" };
 
 const here = () => ({ url: location.origin });
 
@@ -50,11 +51,11 @@ export function useNotePictures<T extends Element>(noteId: string, body: string)
   const preview = useLinkPreview(link, seen);
   const sources = useMemo<Source[]>(() => {
     if (!seen) return [];
-    if (link) return preview?.picture ? [{ key: preview.picture, at: (z) => previewPictureUrl(here(), preview, z)!, page: false }] : [];
+    if (link) return preview?.picture ? [{ key: preview.picture, at: (z) => previewPictureUrl(here(), preview, z)!, fit: "cover" }] : [];
     return (found && "pictures" in found ? found.pictures : []).flatMap((p): Source[] => {
-      if ("pdf" in p) return [{ key: `pdf:${p.pdf}`, at: (z) => pdfThumbUrl(here(), noteId, p.pdf, z), page: true }];
+      if ("pdf" in p) return [{ key: `pdf:${p.pdf}`, at: (z) => pdfThumbUrl(here(), noteId, p.pdf, z), fit: "page" }];
       const photo = all?.get(`${noteId}/${p.image}`);
-      return photo ? [{ key: photo.file, at: (z) => photoThumbUrl(here(), photo, z), page: false }] : [];
+      return photo ? [{ key: photo.file, at: (z) => photoThumbUrl(here(), photo, z), fit: p.drawing ? "drawing" : "cover" }] : [];
     });
   }, [seen, link, preview, found, all, noteId]);
   return [ref, sources, found && "more" in found ? found.more : 0] as const;

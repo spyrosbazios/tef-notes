@@ -130,7 +130,7 @@ export function previewOf(body: string, title: string): string {
 
 /** The card of a note from its file text. */
 export function noteCardOf(path: string, text: string): NoteCard {
-  const n = parseNote(path, text), p = picturesOf(n.id, n.body), image = p && "pictures" in p ? p.pictures.find((x) => "image" in x) : undefined;
+  const n = parseNote(path, text), p = picturesOf(n.id, n.body), image = p && "pictures" in p ? p.pictures.find((x) => "image" in x) : undefined;   // a photo, or a drawing's picture
   return { kind: "note", path, title: n.title, preview: previewOf(n.body, n.title), ...(n.tags.length ? { tags: n.tags } : {}),
     ...(image && "image" in image ? { image: image.image } : {}) };
 }

@@ -2,9 +2,7 @@
 //  - which drawing is open, and over which note: the note's page lays the editor over itself while its own is (note-pane.tsx),
 //    and the `draw` tool opens one there (lib/assistant.ts);
 //  - the open canvas itself (`Live`), registered by the editor's chunk once Excalidraw is up (drawing-canvas.tsx): what is on it,
-//    for every request's context, and the hand that makes an agent's edit on it;
-//  - the picture each `draw` call left, for its row in the chat (assistant/turn.tsx). Kept in memory: a reloaded chat shows
-//    the drawing's saved picture instead.
+//    for every request's context, and the hand that makes an agent's edit on it, which answers with a picture of the result.
 // The window's state, never saved: a reload closes the editor, as it closed the dialog it replaced.
 import { useSyncExternalStore } from "react";
 import type { DrawEdit, Shape } from "@/core/drawing";
@@ -24,8 +22,8 @@ export type Live = {
   /** Whether it holds changes not saved yet. */
   unsaved(): boolean;
   /** Makes the edit on the canvas, in sight and undoable; resolves to why it couldn't (nothing changed then), or to a picture of
-   *  the drawing after it. */
-  apply(edit: DrawEdit): Promise<{ error: string } | { picture: Blob | null }>;
+   *  the drawing after it (a data URL; null for an empty canvas). */
+  apply(edit: DrawEdit): Promise<{ error: string } | { picture: string | null }>;
 };
 
 function store<T>(initial: T) {
@@ -71,13 +69,4 @@ export function liveFor(at: number, ms = 15_000): Promise<Live | null> {
     const off = live.subscribe(() => { if (fits(live.get())) { clearTimeout(t); off(); done(live.get()); } });
     const t = setTimeout(() => { off(); done(null); }, ms);
   });
-}
-
-const pictures = store<ReadonlyMap<string, string>>(new Map());
-/** The picture a `draw` call left (an object URL), by the call's id. */
-export function keepPicture(callId: string, picture: Blob) {
-  pictures.set(new Map(pictures.get()).set(callId, URL.createObjectURL(picture)));
-}
-export function usePicture(callId: string): string | undefined {
-  return useSyncExternalStore(pictures.subscribe, pictures.get).get(callId);
 }

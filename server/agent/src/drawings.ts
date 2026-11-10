@@ -1,7 +1,7 @@
 // A note's drawings as the agent reads them: the Excalidraw scenes attached to it (ARCHITECTURE.md), turned into shapes
 // (core/drawing.ts `shapesOf`) so the model reads what is on one, not its file. Drawing on one is the web editor's (the `draw`
 // UI tool, core/assistant.ts "the drawing"): the server never writes a scene.
-import { tool } from "ai";
+import { tool, type UIMessage } from "ai";
 import { z } from "zod";
 import { DRAWING_LIMITS, shapesOf, type Shape } from "@/core/drawing";
 import { isDrawing, isDrawingName } from "@/core/photos";
@@ -11,6 +11,21 @@ import type { DrawingWidget } from "@/core/widgets";
 import type { Notes } from "./notes";
 
 export type Drawing = Pick<pb.Photo, "rec" | "name" | "file">;
+
+/** The messages with every `draw` answer's picture taken out (core/assistant.ts `DrawOutput`): what a chat is saved as, so a
+ *  saved chat holds no image bytes, and what a model that takes no images is sent. The same messages when there is none. */
+export function withoutPictures<M extends UIMessage>(ms: M[]): M[] {
+  const has = (p: M["parts"][number]) => p.type === "tool-draw" && "output" in p && !!p.output && typeof p.output === "object" && "picture" in p.output;
+  if (!ms.some((m) => m.parts.some(has))) return ms;
+  return ms.map((m) => (!m.parts.some(has) ? m : {
+    ...m,
+    parts: m.parts.map((p) => {
+      if (!has(p) || !("output" in p)) return p;
+      const { picture: _, ...rest } = p.output as Record<string, unknown>;
+      return { ...p, output: rest };
+    }),
+  }));
+}
 
 /** The note's drawings (`note`: its own id, parseNote's). */
 export async function drawingsOf(server: pb.Server, note: string): Promise<Drawing[]> {

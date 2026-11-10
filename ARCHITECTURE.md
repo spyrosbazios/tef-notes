@@ -61,6 +61,8 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   dock beside it (a lazy chunk; a save replaces both files, a new drawing's first save links it into the note); the phone
   shows the PNG, view-only. The agent draws on the open canvas with the `draw` UI tool: its shapes land unsaved and
   undoable, and the owner's Save is what writes them, so the server never writes a scene (`packages/core/src/drawing.ts`).
+  Each `draw` answers with a picture of the drawing after it, which the model looks at to fix what is off; a saved chat
+  keeps no picture. A drawing's PNG is also a tile picture of its note, like a photo.
 - The `title`, `day`, flag and `tags` columns are copies of the frontmatter, written by the client beside `text`. Edit the
   text; never set those columns alone (`noteColumns` in `packages/core/src/pocketbase.ts` builds them for every writer).
 - `autotagged` and `tagged` belong to the server's auto-tagger and are never written by a client. The auto-tagger suggests nothing: every tag it judges likelier than not (p >= 0.5) it adds

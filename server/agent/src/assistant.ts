@@ -8,7 +8,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { isNotePath } from "@/core/notes";
 import { isDrawingName } from "@/core/photos";
-import { ASK, contextOf, GO_VIEWS, LIMITS, SELECTION_TEXT_MAX, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
+import { ASK, contextOf, drawPictureOf, GO_VIEWS, LIMITS, SELECTION_TEXT_MAX, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
 import { DRAW_COLOR_NAMES, DRAW_KINDS, DRAWING_LIMITS, FONT_SIZES, type DrawColor, type FontSize } from "@/core/drawing";
 
 /** True only when A and B are assignable both ways: a schema that drifts from the contract stops compiling. */
@@ -90,8 +90,22 @@ export const uiTools = {
     inputSchema: input.insert_after_selection,
   }),
   draw: tool({
-    description: "Draw in one of a note's Excalidraw drawings, in the web app's drawing editor, which opens over the note beside the chat: sketches, diagrams, flows, wireframes. Names a drawing of the note (`name`), else the one open on screen, else starts a new one; then adds, changes and removes shapes. The owner sees it happen and keeps it with Save (a new drawing is then linked into the note), or undoes it: it is never saved by itself, so it needs no card. Answers `{ ok: true }`, and from then on the <screen> shows the drawing's shapes with their ids, the owner's own strokes and selection too: read it before changing anything. To look at one without opening it, read_drawing. Lay it out yourself: boxes on a grid with room between them (24 px or more), labels short enough for their box, arrows joining shapes by id. A phone screen is 390x844, a laptop's 1440x900.",
+    description: "Draw in one of a note's Excalidraw drawings, in the web app's drawing editor, which opens over the note beside the chat: sketches, diagrams, flows, wireframes. Names a drawing of the note (`name`), else the one open on screen, else starts a new one; then adds, changes and removes shapes. The owner sees it happen and keeps it with Save (a new drawing is then linked into the note), or undoes it: it is never saved by itself, so it needs no card. Answers with a picture of the drawing as it then is (look at it, and fix what is off), and from then on the <screen> shows the drawing's shapes with their ids, the owner's own strokes and selection too: read it before changing anything. To look at one without opening it, read_drawing. Lay it out yourself: boxes on a grid with room between them (24 px or more), labels short enough for their box, arrows joining shapes by id. A phone screen is 390x844, a laptop's 1440x900.",
     inputSchema: input.draw,
+    // The app's answer carries a picture of the drawing after the edit: shown to the model, so it sees what it drew
+    toModelOutput: ({ output }) => {
+      const o = output as { error?: unknown };
+      if (typeof o?.error === "string") return { type: "error-text" as const, value: o.error };
+      const picture = drawPictureOf(output);
+      if (!picture) return { type: "json" as const, value: { ok: true } };
+      return {
+        type: "content" as const,
+        value: [
+          { type: "text" as const, text: "Done. This is the drawing now, as the owner sees it. Check it: labels inside their shapes, nothing overlapping that shouldn't, arrows joining what they should, an even layout. Fix what is off with another draw call (twice at most), then answer." },
+          { type: "file" as const, mediaType: picture.mediaType, data: { type: "data" as const, data: picture.data } },
+        ],
+      };
+    },
   }),
 } satisfies Record<UiToolName, unknown>;
 

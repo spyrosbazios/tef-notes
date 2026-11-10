@@ -3,6 +3,7 @@
 // parsed by hand: a YAML library would rewrite what it doesn't understand.
 
 import { firstUrl } from "./links";
+import { drawingPreview, isDrawing } from "./photos";
 import { localDay } from "./time";
 
 export const NOTES = "notes/";
@@ -286,9 +287,10 @@ export function snippetOf(body: string, max = 160): string {
 }
 
 /** One picture a note's tile can show: a photo (`image`: the name in the note's attachments folder) or a PDF (`pdf`:
- *  the name; its first page, as the agent renders it). */
-export type TilePicture = { image: string } | { pdf: string };
-/** What stands for a note in a list: up to `max` of its photos and PDFs in the body's order, `more` how many it has
+ *  the name; its first page, as the agent renders it). A drawing is the PNG kept beside it (photos.ts `drawingPreview`), an
+ *  image like a photo, marked `drawing` so a client can show it whole rather than cropped. */
+export type TilePicture = { image: string; drawing?: true } | { pdf: string };
+/** What stands for a note in a list: up to `max` of its photos, PDFs and drawings in the body's order, `more` how many it has
  *  past those; with none, the first web link in it (`link`: the page, whose picture the server's link preview finds).
  *  null: neither. */
 export type Pictures = { pictures: TilePicture[]; more: number } | { link: string };
@@ -303,6 +305,7 @@ export function picturesOf(noteId: string, body: string, max = MOSAIC_MAX): Pict
     seen.add(name);
     if (/\.(jpe?g|png|webp|gif)$/i.test(name)) all.push({ image: name });
     else if (/\.pdf$/i.test(name)) all.push({ pdf: name });
+    else if (isDrawing(name) && !seen.has(drawingPreview(name))) { seen.add(drawingPreview(name)); all.push({ image: drawingPreview(name), drawing: true }); }
     return undefined;
   });
   if (all.length) return { pictures: all.slice(0, max), more: Math.max(0, all.length - max) };

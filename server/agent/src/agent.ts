@@ -23,7 +23,8 @@ import { key } from "./keys";
 import { stepTools, trim } from "./loop";
 import { Notes } from "./notes";
 import { Todo } from "./todo";
-import { model, Unavailable } from "./models";
+import { model, sees, Unavailable } from "./models";
+import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
 import { placeProblem, type PlaceInput } from "./placeTools";
 import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
@@ -140,11 +141,13 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   try {
     // settle: a turn stopped mid-tool, a card passed over. repair: chats saved before a tool's schema changed
     messages = await repair(settle(parsed.data.messages as AgentMessage[]), agent.tools);
+    if (!sees(picked)) messages = withoutPictures(messages);
   } catch (e) {
     return fail(400, `Bad messages: ${(e as Error).message}`);
   }
 
-  const save = saver(server, id, picked);
+  // A saved chat holds no picture bytes: a draw's picture is for the turn it was drawn in (drawings.ts)
+  const keep = saver(server, id, picked), save = (ms: AgentMessage[]) => keep(withoutPictures(ms));
   let stream: ReadableStream<any>;
   try {
     stream = await createAgentUIStream({

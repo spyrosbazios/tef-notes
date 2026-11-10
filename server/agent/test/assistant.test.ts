@@ -70,3 +70,30 @@ describe("the drawing", () => {
     expect(screen({ view: { kind: "home" }, drawing: { path: "notes/a.md", shapes: [] } })).toContain("a new drawing, not saved yet");
   });
 });
+
+describe("the picture a draw answers with", () => {
+  const png = "data:image/webp;base64,UklGRg==";
+  const toModel = (uiTools.draw as unknown as { toModelOutput: (o: { output: unknown }) => { type: string; value: unknown } }).toModelOutput;
+  it("is shown to the model as an image, after a line on what to check", () => {
+    const out = toModel({ output: { ok: true, picture: png } });
+    expect(out.type).toBe("content");
+    expect(out.value).toEqual([expect.objectContaining({ type: "text" }), { type: "file", mediaType: "image/webp", data: { type: "data", data: "UklGRg==" } }]);
+  });
+  it("is plain ok without one or with a bad one, and an error stays an error", () => {
+    expect(toModel({ output: { ok: true } })).toEqual({ type: "json", value: { ok: true } });
+    expect(toModel({ output: { ok: true, picture: "javascript:alert(1)" } })).toEqual({ type: "json", value: { ok: true } });
+    expect(toModel({ output: { error: "No note x." } })).toEqual({ type: "error-text", value: "No note x." });
+  });
+  it("is dropped before a chat is saved, and only from draw answers", async () => {
+    const { withoutPictures } = await import("../src/drawings");
+    const ms = [{ id: "a", role: "assistant", parts: [
+      { type: "tool-draw", toolCallId: "1", state: "output-available", input: {}, output: { ok: true, picture: png } },
+      { type: "tool-show_notes", toolCallId: "2", state: "output-available", input: {}, output: { picture: "keep" } },
+    ] }] as never[];
+    const out = withoutPictures(ms) as unknown as { parts: { output: unknown }[] }[];
+    expect(out[0].parts[0].output).toEqual({ ok: true });
+    expect(out[0].parts[1].output).toEqual({ picture: "keep" });
+    const plain = [{ id: "u", role: "user", parts: [{ type: "text", text: "hi" }] }] as never[];
+    expect(withoutPictures(plain)).toBe(plain);
+  });
+});

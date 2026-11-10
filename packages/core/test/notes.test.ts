@@ -315,8 +315,12 @@ describe("picturesOf", () => {
     expect(picturesOf(id, "Read [the docs](https://docs.example.com/a_(b)) then https://later.example.com.")).toEqual({ link: "https://docs.example.com/a_(b)" });
     expect(picturesOf(id, "nothing\nhttps://a.example.com/x.\nhttps://b.example.com")).toEqual({ link: "https://a.example.com/x" });
   });
-  it("ignores another note's files, a drawing, and links in code", () => {
-    expect(picturesOf(id, `![](../attachments/other-note/a.jpg)\n[scan](../attachments/other-note/scan.pdf)\n[d](../attachments/${id}/d.excalidraw)`)).toBeNull();
+  it("is a drawing as the picture kept beside it, marked so it is shown whole, once", () => {
+    expect(picturesOf(id, `[Drawing](../attachments/${id}/plan.excalidraw)\n${att("1.jpg")}\n[again](../attachments/${id}/plan.excalidraw)`))
+      .toEqual({ pictures: [{ image: "plan.png", drawing: true }, { image: "1.jpg" }], more: 0 });
+  });
+  it("ignores another note's files, and links in code", () => {
+    expect(picturesOf(id, `![](../attachments/other-note/a.jpg)\n[scan](../attachments/other-note/scan.pdf)\n[d](../attachments/other-note/d.excalidraw)`)).toBeNull();
     expect(picturesOf(id, "```\ncurl https://a.example.com\n```\n~~~sh\nhttps://b.example.com\n~~~\nhttps://c.example.com")).toEqual({ link: "https://c.example.com" });
   });
   it("is null for a note with neither", () => expect(picturesOf(id, "just words\n\n- [ ] a task")).toBeNull());

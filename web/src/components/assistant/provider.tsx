@@ -24,7 +24,7 @@ import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
-import { keepPicture, liveFor, liveNow, openDrawing, openedNow } from "@/hooks/drawing";
+import { liveFor, liveNow, openDrawing, openedNow } from "@/hooks/drawing";
 import { photoListQuery } from "@/hooks/photos";
 import { prefsNow } from "@/hooks/prefs";
 import { activeLensOf } from "@/hooks/lens";
@@ -106,7 +106,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     },
     showAssistant: () => setDock({ open: true }),
     // The drawing named (else the one open over the note, else a new one) opens over its note, and the edit is made on it, unsaved
-    draw: async ({ path, name, add, update, remove }, call) => {
+    draw: async ({ path, name, add, update, remove }) => {
       const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path);
       if (!n) return uiError(`No note ${path}.`);
       const id = n.note.id;
@@ -121,8 +121,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       if (!live) return uiError("The drawing editor didn't open in time. Nothing was drawn.");
       const r = await live.apply({ add, update, remove });
       if ("error" in r) return uiError(`${r.error} Nothing was drawn.`);
-      if (r.picture) keepPicture(call, r.picture);
-      return UI_OK;
+      return r.picture ? { ok: true, picture: r.picture } : UI_OK;
     },
   }), [qc]);
 
@@ -153,7 +152,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           return;
         }
         // Not awaited (the SDK's rule); answered once the app has done it, unless a Stop closed the call meanwhile
-        void runUiTool(toolName, toolCall.input, held ? { ...host, held } : host, toolCallId)
+        void runUiTool(toolName, toolCall.input, held ? { ...host, held } : host)
           .catch((e: unknown) => uiError(message(e)))
           .then((output) => {
             const open = chat.lastMessage?.parts.some((p) => isTool(p) && p.toolCallId === toolCallId && p.state === "input-available");

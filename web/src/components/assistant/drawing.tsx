@@ -1,14 +1,15 @@
 // Drawings in the chat: the `show_drawing` widget (core/widgets.ts), a note's drawing as its saved picture, and the row a `draw`
-// call leaves (core/assistant.ts "the drawing"): what it did, the drawing as it was right after (a picture the editor took, kept
-// for this session; a reloaded chat shows the saved one instead), and a way back to it. A tap opens the drawing in the editor,
+// call leaves (core/assistant.ts "the drawing"): what it did, the drawing as it was right after (the picture its answer
+// carries, which a saved chat no longer holds: then the saved one), and a way back to it. A tap opens the drawing in the editor,
 // over its note.
 import { ArrowUpRight, Loader2, PenTool, TriangleAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { label } from "@/core/agent";
+import { drawPictureOf } from "@/core/assistant";
 import { noteIdOf } from "@/core/notes";
 import { drawingPreview, isDrawingName } from "@/core/photos";
 import type { DrawingWidget } from "@/core/widgets";
-import { liveNow, openDrawing, usePicture } from "@/hooks/drawing";
+import { liveNow, openDrawing } from "@/hooks/drawing";
 import { useNotes } from "@/hooks/notes";
 import { photoListQuery } from "@/hooks/photos";
 import { uiTrouble, uiWords } from "@/lib/assistant";
@@ -32,7 +33,8 @@ function useOpen() {
 
 function Picture({ src, alt }: { src: string | undefined; alt: string }) {
   return src
-    ? <img src={src} alt={alt} loading="lazy" className="block max-h-72 w-full object-contain" />
+    // On the white of Excalidraw's canvas, which a dark theme turns dark with Excalidraw's own filter, as the note does
+    ? <img src={src} alt={alt} loading="lazy" className="block max-h-72 w-full bg-white object-contain dark:hue-rotate-180 dark:invert-[0.93]" />
     : <div className="grid h-24 place-items-center text-faint"><PenTool className="size-5" /></div>;
 }
 
@@ -55,7 +57,8 @@ export function DrawRow({ p }: { p: ToolPart }) {
   const open = useOpen(), { data } = useNotes();
   const i = (p.input ?? {}) as Record<string, unknown>;
   const note = data?.find((n) => n.path === i.path), name = isDrawingName(i.name) ? i.name : undefined;
-  const fresh = usePicture(p.toolCallId), saved = useSaved(note?.note.id ?? "", name);
+  const after = p.state === "output-available" ? drawPictureOf(p.output) : null;
+  const fresh = after ? `data:${after.mediaType};base64,${after.data}` : undefined, saved = useSaved(note?.note.id ?? "", name);
   const refused = p.state === "output-available" && p.output && typeof p.output === "object" && "error" in p.output ? String((p.output as { error: unknown }).error) : undefined;
   const failed = p.state === "output-error" || p.state === "output-denied" || refused !== undefined;
   const running = !failed && p.state !== "output-available";
