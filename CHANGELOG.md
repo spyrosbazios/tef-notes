@@ -5,11 +5,40 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.10.0 - 2026-11-11
+
+### Added
+
+- Drawings with the assistant: it draws on the open Excalidraw canvas (unsaved, undoable, kept with Save), sees a
+  picture of what it drew to check its work, fetches a layout recipe per diagram kind first (`diagram_guide`), and
+  saves the drawing when asked (`save_drawing`).
+- Drawings show whole in a note and are tile pictures like its photos.
+- CLI: `tefnotes draw`, an Excalidraw scene into a note with a PNG the server draws.
+- Agent: a photo or PDF attached in the chat can be filed into a note (`attach_file`).
+- Web assistant: messages typed while a reply runs are queued (edit, remove, Send now), and a running reply can be
+  steered: the message joins it at the next step.
+- Archive notes: an archived flag in the frontmatter takes a note out of the lists and the agent's index; search
+  still finds it.
+- Lenses: a theme of their own beside the accent.
+- Web editor: a slash menu (`/`) for headings, lists, todo, quote, code, divider and table.
+- Web: haptics on Android (tab switch, mic, adding a task, failed writes).
+
 ### Changed
 
 - Voice input: Parakeet TDT 0.6B v3 (int8) replaces TDT_CTC 110M: fewer misheard words, and Greek with 24 other European
   languages besides English, at the same speed. The app sends a recording in pieces cut at pauses while you talk, so
   stopping waits only for the last few seconds. The model needs ~1.4 GB loaded (was ~650 MB).
+- Web: on the phone, the Ask tab covers the screen behind the floating tab bar, and Notes' tag filter chips have a row
+  of their own.
+
+### Fixed
+
+- Web: the phone's search drawer no longer shows Notes' sticky header over it.
+- Web: the archived-notes button's icon at its button's size on desktop.
+
+### Removed
+
+- The frozen Android app (`mobile/`): the phone is the installed web app.
 
 ## 0.9.0 - 2026-11-10
 
