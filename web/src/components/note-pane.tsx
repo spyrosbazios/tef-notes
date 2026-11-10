@@ -187,7 +187,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
 
       <ScrollProgressProvider>
       <div className="relative min-h-0 flex-1">
-      <ScrollProgress aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 origin-left bg-accent" />
+      <ScrollProgress aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 origin-left bg-brand" />
       <ScrollProgressContainer data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
           <input ref={title} value={d.title} onChange={(e) => d.setTitle(e.target.value)} aria-label="Title" placeholder="Title"
