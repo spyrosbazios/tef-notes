@@ -139,7 +139,7 @@ export function Home() {
                     ); })}
                   </Highlight>
                 </nav>
-                <Button variant={phone ? "outline" : "ghost"} size="icon-sm" aria-label="New task" title="New task (Q)" onClick={add} className={cn("shrink-0 text-brand hover:text-brand", TOOL)}><Plus className="max-md:size-5" /></Button>
+                <Button variant={phone ? "outline" : "ghost"} size="icon-sm" aria-label="New task" title="New task (Q)" onClick={add} className={cn("shrink-0 text-brand hover:text-brand", TOOL)}><Plus className="size-4 max-md:size-5" /></Button>
               </header>
               {/* The list picked pushes the one in front out of the box, both on screen while they slide */}
               <div className="relative min-h-0 flex-1 overflow-hidden max-md:h-72 max-md:flex-none">

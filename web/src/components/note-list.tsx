@@ -270,14 +270,14 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
             <Select value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
               <SelectTrigger size="sm" aria-label="Sort notes"
                 className="text-dim max-md:w-10 max-md:min-w-10 max-md:justify-center max-md:p-0 max-md:data-[size=sm]:h-10 max-md:data-[size=sm]:rounded-xl max-md:[&_[data-slot=select-value]]:hidden max-md:[&>svg:last-child]:hidden">
-                <ArrowDownUp className="max-md:size-5" /><SelectValue />
+                <ArrowDownUp className="size-3.5 max-md:size-5" /><SelectValue />
               </SelectTrigger>
               <SelectContent align="end">
                 {NOTE_SORTS.map((k) => <SelectItem key={k} value={k}>{NOTE_SORT_LABEL[k]}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button size="sm" variant={narrow ? "outline" : "default"} className={cn("rounded-full", TOOL, "max-md:px-0 max-md:text-brand max-md:hover:text-brand")} aria-label="New note" onClick={onNew}>
-              <Plus className="max-md:size-5" /><span className="max-md:hidden">New note</span>
+              <Plus className="size-3.5 max-md:size-5" /><span className="max-md:hidden">New note</span>
             </Button>
           </div>
         )}
