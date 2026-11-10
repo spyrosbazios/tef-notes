@@ -3,6 +3,7 @@
 // UI tool, core/assistant.ts "the drawing"): the server never writes a scene.
 import { tool, type UIMessage } from "ai";
 import { z } from "zod";
+import { DIAGRAM_KINDS, diagramGuide, diagramKindsText } from "@/core/diagram-guides";
 import { DRAWING_LIMITS, shapesOf, type Shape } from "@/core/drawing";
 import { isDrawing, isDrawingName } from "@/core/photos";
 import { isNotePath, parseNote } from "@/core/notes";
@@ -56,6 +57,12 @@ const input = z.object({
 
 export function drawingTools(notes: Notes) {
   return {
+    diagram_guide: tool({
+      description: `How to lay out a kind of diagram well: grid, sizes, shapes and colours by role, what to avoid. Call it once before you draw a diagram or wireframe (not for a quick change to one), and follow it. Kinds: ${diagramKindsText()}.`,
+      inputSchema: z.object({ kind: z.enum(DIAGRAM_KINDS) }),
+      execute: async ({ kind }) => diagramGuide(kind),
+    }),
+
     read_drawing: tool({
       description: `What is on one of a note's drawings (its links to ../attachments/<id>/<name>.excalidraw), as shapes: id, kind, place, size, text, colours, and the shapes each arrow joins; up to ${DRAWING_LIMITS.shown}. The drawing open in the editor is in the <screen> already, with any unsaved changes: read that instead.`,
       inputSchema: input,
