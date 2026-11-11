@@ -43,7 +43,8 @@ tasks again from the note.
 ### Ask an assistant that knows what is open
 
 Search and discuss your notes, or ask the assistant to add a task or edit a note. Select words in a note to ask about
-them, or have them rewritten in place as an edit you can undo. It sees the page you are on and shows changes for approval
+them, or have them rewritten in place as an edit you can undo. Ask for a diagram and it draws it on the open
+Excalidraw canvas, checks its own work and leaves it for you to keep. It sees the page you are on and shows changes for approval
 before saving by default. Choose your model provider, including a local model through
 Ollama. Auto-tagging and web search are optional too.
 

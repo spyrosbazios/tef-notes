@@ -254,7 +254,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: "Drawings, in the page", text: "An Excalidraw sketch, saved with the note.",
+    title: "Drawings, in the page", text: "An Excalidraw sketch in the note. Or ask, and the assistant draws it.",
     art: <Drawing />,
   },
   {
