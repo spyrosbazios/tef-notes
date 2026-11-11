@@ -5,6 +5,20 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.11.0 - 2026-11-11
+
+### Added
+
+- Web editor: a link in a note has a Delete button, beside the link and on its card; undo brings it back.
+
+### Changed
+
+- Web: Ask about a note shows the note as a chip instead of its path in the message.
+
+### Fixed
+
+- Web editor: a space typed before a pause is no longer lost when the saved body comes back.
+
 ## 0.10.0 - 2026-11-11
 
 ### Added
