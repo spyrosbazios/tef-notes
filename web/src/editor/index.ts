@@ -230,8 +230,10 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     markdown: () => serialize(view.state.doc),
 
     setMarkdown(markdown) {
-      const doc = parse(markdown), next = serialize(doc);
-      if (next === serialize(view.state.doc)) { last = next; return; }
+      // Parsing loses what typing leaves mid-word, a trailing space above all: a body that differs from the editor's only by
+      // that (the save of "hello " read back, or the copy from before it) is the same text, and replacing it would eat the space.
+      const doc = parse(markdown), next = serialize(doc), now = serialize(view.state.doc);
+      if (next === now || next === normalizeBody(now)) { last = now; return; }
       const at = view.state.selection.from;
       const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content).setMeta(EXTERNAL, true).setMeta("addToHistory", false);
       tr.setSelection(Selection.near(tr.doc.resolve(Math.min(at, tr.doc.content.size))));
