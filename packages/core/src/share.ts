@@ -2,6 +2,7 @@
 // the app does with it: save it as a note as it is, or hand it to the agent to file. Pure: the form's parsing and the
 // text it becomes are tested in packages/core/test/share.test.ts; the page is web/src/components/share-page.tsx.
 import type { ClipPage, Target } from "./clip";
+import { askedAbout } from "./handoff";
 import { inheritTags, type Lens } from "./lens";
 import { firstUrl, linkify } from "./links";
 import { isPdf, PDF } from "./photos";
@@ -104,10 +105,13 @@ export function plainShared(text: string): string {
   return `Shared:\n${inner}`;
 }
 
-/** What a chat is called in the history: a typed first question as it is (one line), a share as "Shared:" and what it
+/** What a chat is called in the history: a typed first question as it is (one line; one about notes by its words, else
+ *  their titles), a share as "Shared:" and what it
  *  was: the page's title, else the site, else the text's first line, else what files came with it. */
 export function chatTitle(text: string): string {
   const one = (t: string) => t.replace(/\s+/g, " ").trim();
+  const about = askedAbout(text);
+  if (about.notes.length) return one(about.rest) || one(about.notes.map((n) => n.title).join(", "));
   if (!text.startsWith("<shared>")) return one(text);
   const what = firstLine(plainShared(text).replace(/^Shared:\n/, ""));
   return what ? `Shared: ${/^https?:\/\/\S+$/.test(what) ? host(what) : one(what)}` : "Shared";

@@ -20,6 +20,7 @@ import { DRAWING_LIMITS } from "@/core/drawing";
 import { isDrawing } from "@/core/photos";
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
+import type { NoteRef } from "@/core/handoff";
 import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
@@ -197,7 +198,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [build]);
 
   // `focusKey` counts the asks for the field: a new chat, a chat opened, a handoff (and the panel leaves the chat list for it)
-  const [input, setInput] = useState(""), [focusKey, setFocusKey] = useState(0);
+  const [input, setInput] = useState(""), [about, setAbout] = useState<NoteRef[]>([]), [focusKey, setFocusKey] = useState(0);
 
   const newChat = useCallback(() => {
     opening.current++;
@@ -249,9 +250,10 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }, (e: unknown) => { if (mine === opening.current) toast.error(message(e)); });
   }, [build, qc]);
 
-  const show = useCallback((draft?: string) => {
+  const show = useCallback((draft?: { text?: string; about?: NoteRef[] }) => {
     setDock({ open: true });
-    if (draft != null) setInput(draft);
+    if (draft?.text != null) setInput(draft.text);
+    if (draft?.about) setAbout(draft.about);
     setFocusKey((k) => k + 1);
   }, []);
 
@@ -288,7 +290,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setFocusKey((k) => k + 1);
   }, []);
 
-  const value = useMemo<Assistant>(() => ({ chat, input, setInput, focusKey, show, send, stop, newChat, openChat, ask, adopt, halt }),
-    [chat, input, focusKey, show, send, stop, newChat, openChat, ask, adopt]);
+  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, ask, adopt, halt }),
+    [chat, input, about, focusKey, show, send, stop, newChat, openChat, ask, adopt]);
   return <AssistantContext value={value}>{children}</AssistantContext>;
 }

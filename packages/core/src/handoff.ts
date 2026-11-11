@@ -3,20 +3,40 @@
 import { ATTACHMENTS, NOTES, noteIdOf, parseNote, rewriteImagePaths, serializeNote, slugify } from "./notes";
 import type { Photo } from "./pocketbase";
 
-const named = (n: { path: string; title: string }) => `“${n.title.trim() || noteIdOf(n.path)}” (${n.path})`;
+/** A note named in a message: its path, and the title it was named by. */
+export type NoteRef = { path: string; title: string };
 
-/** The opening of a chat about these notes, for the owner to finish and send. It names each by title and path: the
- *  agent's notes index (the `<context>` block) lists notes by path and `read_note` takes one, so no field travels beside
- *  the message and the agent reads the notes before it answers. The line is left open for the question. */
-export function aboutNotes(notes: { path: string; title: string }[]): string {
+const named = (n: NoteRef) => `“${n.title.trim() || noteIdOf(n.path)}” (${n.path})`;
+
+/** The opening of a chat about these notes, put before the owner's question when it is sent. It names each by title and
+ *  path: the agent's notes index (the `<context>` block) lists notes by path and `read_note` takes one, so no field travels
+ *  beside the message and the agent reads the notes before it answers. The web shows them as chips (`askedAbout`). */
+export function aboutNotes(notes: NoteRef[]): string {
+  if (!notes.length) return "";
   if (notes.length === 1) return `About my note ${named(notes[0])}: `;
   return `About these notes:\n${notes.map((n) => `- ${named(n)}`).join("\n")}\n\n`;
+}
+
+const ONE = /^About my note “(.*?)” \((notes\/[^)\s]+\.md)\): ?/s;
+const MANY = /^About these notes:\n((?:- .*\n)+)\n/;
+const ITEM = /^- “(.*)” \((notes\/[^)\s]+\.md)\)$/;
+
+/** `aboutNotes`' inverse: the notes a message opens by naming, and the owner's own words after them. */
+export function askedAbout(text: string): { notes: NoteRef[]; rest: string } {
+  const one = ONE.exec(text);
+  if (one) return { notes: [{ title: one[1], path: one[2] }], rest: text.slice(one[0].length) };
+  const many = MANY.exec(text);
+  if (many) {
+    const notes = many[1].trimEnd().split("\n").map((l) => ITEM.exec(l));
+    if (notes.every((m) => m)) return { notes: notes.map((m) => ({ title: m![1], path: m![2] })), rest: text.slice(many[0].length) };
+  }
+  return { notes: [], rest: text };
 }
 
 /** A chat's first message asking the agent to change one note, sent as it stands (the note screen's assistant box). It
  *  names the note as `aboutNotes` does, so the agent reads it with its own tools, and the owner's words follow the colon
  *  unchanged; the write comes back as a confirm card on the Ask tab. */
-export function editNote(note: { path: string; title: string }, instruction: string): string {
+export function editNote(note: NoteRef, instruction: string): string {
   return `Edit my note ${named(note)}, changing only what I ask: ${instruction.trim()}`;
 }
 

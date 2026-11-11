@@ -41,5 +41,7 @@ describe("for the agent", () => {
     expect(chatTitle(askText(S({ text: "a quote\nmore" }), null))).toBe("Shared: a quote");
     expect(chatTitle(askText(S({ images: [{ uri: "f", width: 1, height: 1 }] }), null, "notes/p.md"))).toBe("Shared: 1 photo");
     expect(chatTitle("what\n  is  this?")).toBe("what is this?");
+    expect(chatTitle("About my note “Garage” (notes/g.md): the code?")).toBe("the code?");
+    expect(chatTitle("About my note “Garage” (notes/g.md): ")).toBe("Garage");
   });
 });

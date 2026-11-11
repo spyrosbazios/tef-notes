@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { ChatList } from "@/components/assistant/chat-list";
 import { Loaded } from "@/components/loaded";
 import { ModelMenu } from "@/components/assistant/model-menu";
+import { NoteChip } from "@/components/assistant/note-chip";
 import { Turn } from "@/components/assistant/turn";
 import { Queue, type Queued } from "@/components/assistant/queue";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MicButton } from "@/components/mic-button";
 import { dictateInto } from "@/hooks/dictation";
 import { SUGGEST } from "@/core/agent";
+import { aboutNotes, askedAbout } from "@/core/handoff";
 import { ATTACH_ACCEPT, ATTACH_MAX, type ChoiceOutput } from "@/core/assistant";
 import { useModel } from "@/hooks/agent";
 import { useAssistant } from "@/hooks/assistant";
@@ -96,7 +98,7 @@ function Header({ children }: { children?: ReactNode }) {
 }
 
 function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory: () => void; listing: boolean }) {
-  const { input, setInput, focusKey, send, stop, newChat } = useAssistant();
+  const { input, setInput, about, setAbout, focusKey, send, stop, newChat } = useAssistant();
   const { model, models, unasked } = useModel();
   const { messages, regenerate, status, error, addToolApprovalResponse, addToolOutput } = useChat<UIMessage>({ chat });
   const answer = useCallback((toolCallId: string, output: ChoiceOutput) => { void addToolOutput({ tool: "ask_choice", toolCallId, output }); }, [addToolOutput]);
@@ -153,13 +155,15 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   }, [blocked, paused, model, queue, sending, send, follow]);
 
   const go = async (raw: string) => {
-    const text = raw.trim(), sent = files;
-    if ((!text && !sent.length) || !ready) return;
+    const typed = raw.trim(), sent = files, notes = about;
+    if ((!typed && !sent.length) || !ready) return;
+    const text = aboutNotes(notes) + typed;
     setInput("");
     setFiles([]);
+    setAbout([]);
     if (busy || queue.length) { setQueue((q) => [...q, { id: nextId.current++, text, files: sent }]); return; }
     follow();
-    if (!(await send(text, sent))) { setInput(text); setFiles(sent); return; }
+    if (!(await send(text, sent))) { setInput(typed); setFiles(sent); setAbout(notes); return; }
     // On the phone the answer is read, not typed over: the keyboard closes (the Send button's tap kept the focus so that tap landed)
     if (shutKeyboard()) field.current?.blur();
   };
@@ -222,9 +226,14 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
           <div className="shrink-0 border-t border-line px-3 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Queue items={queue} paused={paused || (!!error && !busy)} live={busy} sending={sending} onSteer={steerNow} onResume={() => { setPaused(false); if (error) void regenerate(); }}
               onRemove={(id) => setQueue((q) => q.filter((x) => x.id !== id))}
-              onEdit={(q) => { setQueue((all) => all.filter((x) => x.id !== q.id)); setInput(q.text); setFiles(q.files); field.current?.focus(); }} />
+              onEdit={(q) => { setQueue((all) => all.filter((x) => x.id !== q.id)); const a = askedAbout(q.text); setInput(a.rest); setAbout(a.notes); setFiles(q.files); field.current?.focus(); }} />
             <Seeing />
             <div className="rounded-3xl border border-line bg-card p-2 focus-within:border-ring">
+              {about.length ? (
+                <div className="flex flex-wrap gap-1.5 px-1 pt-1 pb-1.5">
+                  {about.map((n) => <NoteChip key={n.path} note={n} remove={() => setAbout(about.filter((x) => x.path !== n.path))} />)}
+                </div>
+              ) : null}
               <Attached files={files} remove={(i) => setFiles((fs) => fs.filter((_, j) => j !== i))} />
               <Textarea ref={field} autoFocus value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} rows={1} disabled={!model}
                 placeholder={asked ? "Answer the card above first" : "Ask, or tap the mic and say what to note"}

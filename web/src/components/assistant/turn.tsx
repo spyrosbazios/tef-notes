@@ -10,6 +10,7 @@ import { Markdown } from "@/components/markdown";
 import { buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type WriteInput } from "@/core/agent";
+import { askedAbout } from "@/core/handoff";
 import { plainShared } from "@/core/share";
 import { isAskTool, type ChoiceOutput } from "@/core/assistant";
 import { isWidgetTool, widgetOf } from "@/core/widgets";
@@ -17,6 +18,7 @@ import { useNotes } from "@/hooks/notes";
 import { useTasks } from "@/hooks/todo";
 import { isAppTool, uiTrouble, uiWords, type AppTool } from "@/lib/assistant";
 import { DrawRow } from "@/components/assistant/drawing";
+import { NoteChip } from "@/components/assistant/note-chip";
 import { isTool, toolName, type Part, type ToolPart } from "@/lib/ask";
 import { cn } from "@/lib/utils";
 import { Cards } from "./cards";
@@ -113,10 +115,12 @@ function UiRow({ name, p, title }: { name: AppTool; p: ToolPart; title: string |
 /** The owner's own words: a message, or one sent into a running reply (a steering message). Photos as thumbnails, PDFs by name. */
 function Said({ parts }: { parts: Part[] }) {
   // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
-  const text = plainShared(parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
+  const { notes, rest } = askedAbout(parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
+  const text = plainShared(rest);
   const files = parts.filter((p) => p.type === "file");
   return (
     <div className="flex flex-col items-end gap-1.5">
+      {notes.length ? <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">{notes.map((n) => <NoteChip key={n.path} note={n} />)}</div> : null}
       {files.length ? (
         <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
           {files.map((f, i) => f.mediaType.startsWith("image/")

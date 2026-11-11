@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { aboutNotes, editNote, exportPlan, fileNameOf, importPlan } from "../src/handoff";
+import { aboutNotes, askedAbout, editNote, exportPlan, fileNameOf, importPlan } from "../src/handoff";
 
 describe("aboutNotes", () => {
   it("names one note by title and path and leaves the line open", () => {
@@ -52,5 +52,20 @@ describe("importPlan", () => {
     const plan = importPlan([{ from: "a/note.md", text: "![](../../etc/p.png)" }, { from: "b/note.md", text: "x" }, { from: "attachments/n/r.md", text: "" }], new Set(["p.png"]), "2026-11-05");
     expect(plan.map((e) => e.path)).toEqual(["notes/note.md", "notes/note-2.md"]);
     expect(plan[0].files).toEqual([]);
+  });
+});
+
+describe("askedAbout", () => {
+  it("reads back one note and the question", () => {
+    const text = aboutNotes([{ path: "notes/a.md", title: "A “quoted” title" }]) + "what is in it?";
+    expect(askedAbout(text)).toEqual({ notes: [{ path: "notes/a.md", title: "A “quoted” title" }], rest: "what is in it?" });
+  });
+  it("reads back several notes", () => {
+    const notes = [{ path: "notes/a.md", title: "A" }, { path: "notes/b.md", title: "B" }];
+    expect(askedAbout(aboutNotes(notes) + "compare")).toEqual({ notes, rest: "compare" });
+  });
+  it("leaves any other message alone", () => {
+    expect(askedAbout("About my note, roughly")).toEqual({ notes: [], rest: "About my note, roughly" });
+    expect(aboutNotes([])).toBe("");
   });
 });
