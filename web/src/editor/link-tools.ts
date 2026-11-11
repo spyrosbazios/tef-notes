@@ -1,4 +1,5 @@
 // The buttons beside a link (./link-read) and on a link's card (./link-cards). Copy: the URL. Read: the page as an article, in the app.
+// Delete: the link itself out of the note (an ordinary, undoable edit).
 // Summary: the server writes a summary of the page
 // (server/pb_hooks/summary.pb.js) and it goes in as the block right under the link's paragraph, the place a clip with
 // "Add a summary" puts it. A link already followed by one gets no button. The insert is an ordinary edit (`onChange`).
@@ -57,6 +58,27 @@ export function copyButton(cls: string, href: string): HTMLElement {
     else fallback();
   });
   btn.addEventListener("keydown", (e) => e.stopPropagation());
+  return btn;
+}
+
+/** The Delete button: a lucide trash icon and "Delete"; a click removes the range `range` gives (the link's text, or
+ *  its card's paragraph) as an ordinary edit, so Ctrl+Z brings it back. No range (the link moved away): nothing. */
+export function deleteButton(cls: string, view: EditorView, range: () => { from: number; to: number } | undefined): HTMLElement {
+  const btn = document.createElement("button");
+  btn.className = cls;
+  btn.type = "button";
+  btn.contentEditable = "false";
+  btn.dataset.icon = "delete";
+  btn.title = "Delete the link from the note";
+  btn.textContent = "Delete";
+  btn.addEventListener("keydown", (e) => e.stopPropagation());
+  btn.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const r = range();
+    if (view.isDestroyed || !r || r.from >= r.to) return;
+    view.dispatch(view.state.tr.delete(r.from, r.to));
+    view.focus();
+  });
   return btn;
 }
 

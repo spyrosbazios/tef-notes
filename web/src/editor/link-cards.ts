@@ -10,7 +10,7 @@ import type { EditorView } from "prosemirror-view";
 import type { LinkPreview } from "@/core/pocketbase";
 import { youtubeEmbed, youtubeVideo } from "@/core/links";
 import { isPdfLink } from "./files";
-import { copyButton, readButton, summarised, summaryButton, type Summarize } from "./link-tools";
+import { copyButton, deleteButton, readButton, summarised, summaryButton, type Summarize } from "./link-tools";
 
 /** The preview of a URL. null: the page has nothing to show (no card). A rejection: it could not be asked (offline), so
  *  it is asked again later. */
@@ -102,7 +102,7 @@ function card(url: string, p: LinkPreview | null, open: (url: string) => void, t
   site.append(el("span", "pm-card-host", p?.site || host));
   body.append(site);
   root.append(thumb, body);
-  // Copy, Read and Summary: buttons of their own, so a click on the rest of the item still opens the page
+  // Copy, Read, Summary and Delete: buttons of their own, so a click on the rest of the item still opens the page
   {
     const tools = el("div", "pm-card-tools");
     tools.append(copyButton("pm-link-tool", url));
@@ -112,6 +112,12 @@ function card(url: string, p: LinkPreview | null, open: (url: string) => void, t
       if (t.done) { (btn as HTMLButtonElement).disabled = true; btn.textContent = "Summarised"; btn.title = "The summary is under the link"; }
       tools.append(btn);
     }
+    tools.append(deleteButton("pm-link-tool", t.view, () => {
+      // The card sits at the end of its paragraph: Delete takes that paragraph (a summary under it stays, its own block)
+      const end = t.getPos();
+      const block = end === undefined ? null : t.view.state.doc.resolve(end).nodeBefore;
+      return end === undefined || !block ? undefined : { from: end - block.nodeSize, to: end };
+    }));
     root.append(tools);
   }
   root.addEventListener("click", (e) => { e.preventDefault(); open(url); });
