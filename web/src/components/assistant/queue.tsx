@@ -2,6 +2,7 @@
 // a card or a choice waits on the owner, and not after Stop or an error: then the owner resumes). Local to the open chat's
 // panel, never sent to the server until its turn: switching chats drops it. "Send now" steers the running reply instead
 // (services/agent.ts `steer`): the agent reads it at its next step; if the reply ends first, it stays queued.
+import { askedAbout } from "@/core/handoff";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import type { FileUIPart } from "ai";
 import { CornerDownRight, Loader2, Paperclip, Pencil, Play, SendHorizontal, X } from "lucide-react";
@@ -32,7 +33,7 @@ export function Queue({ items, paused, live, sending, onEdit, onRemove, onResume
                 <motion.li key={q.id} layout="position" className="flex items-center gap-2 rounded-xl border border-line bg-raised py-1 pr-1 pl-3 text-sm"
                   initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0, transition: { ...move, opacity: fade } }} exit={{ opacity: 0, transition: fade }}>
                   <CornerDownRight className="size-3.5 shrink-0 text-faint" />
-                  <span className="min-w-0 flex-1 truncate">{q.text || q.files[0]?.filename || "Attachment"}</span>
+                  <span className="min-w-0 flex-1 truncate">{askedAbout(q.text).rest || askedAbout(q.text).notes[0]?.title || q.files[0]?.filename || "Attachment"}</span>
                   {q.files.length ? <span className="flex shrink-0 items-center gap-0.5 text-xs text-dim"><Paperclip className="size-3" />{q.files.length}</span> : null}
                   {sending.has(q.id) ? <Loader2 className="mx-1.5 size-4 shrink-0 animate-spin text-dim" aria-label="Sending into the reply" /> : (
                     <>

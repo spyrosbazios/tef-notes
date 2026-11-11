@@ -190,7 +190,7 @@ export function SharePage() {
       const filesAt = shared.images.length || shared.pdfs.length ? await saveShared(qc, shared, files, title, "", true) : undefined;
       const text = askText(shared, title, filesAt);
       await navigate({ to: "/", replace: true });
-      if (await assistant.send(text)) assistant.show(); else assistant.show(text);
+      if (await assistant.send(text)) assistant.show(); else assistant.show({ text });
     } catch (e) {
       setErr(`Couldn't hand it over: ${message(e)}`);
       setBusy(null);

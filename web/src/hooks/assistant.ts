@@ -2,6 +2,7 @@
 // which survives navigating and closing the dock, the message field, and what the rest of the app asks of it.
 import type { Chat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
+import type { NoteRef } from "@/core/handoff";
 import type { Held } from "@/editor";
 import { createContext, useContext } from "react";
 
@@ -11,10 +12,14 @@ export type Assistant = {
   /** The message field's text: here, not in the panel, so closing the dock keeps what was typed. */
   input: string;
   setInput: (text: string) => void;
+  /** The notes the next message is about, shown as chips above the field and named at its start when sent (core/handoff.ts). */
+  about: NoteRef[];
+  setAbout: (notes: NoteRef[]) => void;
   /** Counts up when something asks for the field to be focused. */
   focusKey: number;
-  /** Open the dock and focus the field; with `draft`, fill it for the owner to finish and send. */
-  show: (draft?: string) => void;
+  /** Open the dock and focus the field; with `text`, fill it for the owner to finish and send; with `about`, the notes the
+   *  next message is about. */
+  show: (draft?: { text?: string; about?: NoteRef[] }) => void;
   /** Send `text`, with any attached `files`, as the next message; false when it could not go (the chat's record could not be made). */
   send: (text: string, files?: FileUIPart[]) => Promise<boolean>;
   /** Stop the reply, and close the tool calls it left unfinished. */
