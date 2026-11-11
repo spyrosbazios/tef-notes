@@ -43,7 +43,7 @@ Each module has its own `README.md`; `extension/` also has an `AGENTS.md`.
 | `packages/core/src/theme.ts` | The themes (`THEMES`): the web app's, the site's and the extension's CSS variables are generated from it | ⭐ colours |
 | `web/src/services/` | The web app's transport (axios), errors mapped to the core's `Conflict` | |
 | `web/vite-boot.ts` + `server/pb_hooks/manifest.pb.js` | The launch in the chosen theme: index.html's inline boot script paints the stored theme and accent before any script loads, under a layer of the theme's ground (no mark: Android's splash has just shown the icon) that `web/src/lib/splash.ts` fades once the router's first screen is on; the manifest Android builds the installed app's splash from is served by the server, at its one address, with the owner's theme's ground (`lib/manifest.js` over the build's `manifest-colors.json`, `packages/core/vite.ts`); Chrome remints the app a day or two after the theme changes | |
-| `extension/AGENTS.md` | The clipper's clip contract, its build and the signed CRX (`scripts/crx.ts`) | |
+| `extension/AGENTS.md` | The clipper's clip contract, its build and the signed CRX (`extension/scripts/crx.ts`) | |
 | `site/README.md` | The public marketing page: a static Vite build deployed on its own (any static host, or its Dockerfile from the repo root); palette and fonts from `@/core/theme` and `assets/`; the app screens drawn in code (`src/components/mock/`), never screenshots | |
 | `assets/` | The brand's fonts (Atkinson Hyperlegible, OFL), the logo SVGs, the app icon; `bun assets/icons.ts` regenerates `icon.png` and `packages/core/src/brand.ts` (needs `server/agent` deps installed) | |
 
