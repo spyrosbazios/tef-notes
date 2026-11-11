@@ -5,6 +5,13 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.11.1 - 2026-11-12
+
+### Changed
+
+- Assistant: wireframes start from the screen's purpose and its one main action, keep the app's own structure, use
+  real copy, show empty, loading and error states, and avoid template layouts.
+
 ## 0.11.0 - 2026-11-11
 
 ### Added
