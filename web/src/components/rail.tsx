@@ -1,4 +1,4 @@
-// The left rail: search, the task lists (Inbox to Logbook), Notes and Talk (Talk only where the server has it), those of them the owner shows (core/prefs.ts
+// The left rail: search, the task lists (Inbox to Logbook) and Notes, those of them the owner shows (core/prefs.ts
 // `desktop.hidden`, set in Settings → Layout), and at the bottom the lens switcher and settings. The logo
 // is the way back to Home (where the notes are). Its counts are those of the lens that is on. The assistant is its own button
 // at the corner (assistant/fab.tsx), and tags are Home's filter. It replaces the phone's tabs: every view is one click away. One
@@ -18,7 +18,6 @@ import { toggleRail } from "@/hooks/rail";
 import { useViews } from "@/hooks/todo";
 import { shownRail } from "@/core/prefs";
 import { usePrefs } from "@/hooks/prefs";
-import { useOffered } from "@/hooks/talk";
 import { titleOf, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { ReactElement } from "react";
@@ -59,10 +58,8 @@ export function Rail({ onSearch, onPick, fold }: { onSearch: () => void; onPick?
   const counts = { inbox: views.inbox.length, today: views.today.length + views.evening.length };
   const { view, goView } = useNav();
   const is = (v: View) => view.kind === v.kind;
-  const offered = useOffered();
-  const shown = shownRail(usePrefs().desktop).filter(offered);
-  const lists = shown.filter((k) => k !== "notes" && k !== "talk");
-  const screens = shown.filter((k) => k === "notes" || k === "talk");
+  const shown = shownRail(usePrefs().desktop);
+  const lists = shown.filter((k) => k !== "notes");
   const go = (v: View) => { goView(v); onPick?.(); };
 
   return (
@@ -83,11 +80,7 @@ export function Rail({ onSearch, onPick, fold }: { onSearch: () => void; onPick?
             ))}
           </div>
         ) : null}
-        {screens.length ? (
-          <div className="space-y-0.5">
-            {screens.map((k) => <Item key={k} icon={RAIL_ICON[k]} value={k} label={titleOf({ kind: k })} active={is({ kind: k })} onClick={() => go({ kind: k })} folded={folded} />)}
-          </div>
-        ) : null}
+        {shown.includes("notes") ? <Item icon={RAIL_ICON.notes} value="notes" label="Notes" active={is({ kind: "notes" })} onClick={() => go({ kind: "notes" })} folded={folded} /> : null}
         <div className="flex-1" />
         <div className="space-y-0.5 border-t border-line pt-3">
           <LensSwitcher folded={folded} />

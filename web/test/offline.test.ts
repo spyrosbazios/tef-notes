@@ -29,7 +29,7 @@ describe("net", () => {
 
 describe("persistable", () => {
   test("the lists and details are kept", () => {
-    for (const k of [["tags"], ["lenses"], ["photos", "n1"], ["photos", "all"], ["link-preview", "https://x.test"], ["talk"]]) expect(persistable(k)).toBe(true);
+    for (const k of [["tags"], ["lenses"], ["photos", "n1"], ["photos", "all"], ["link-preview", "https://x.test"]]) expect(persistable(k)).toBe(true);
   });
   test("the notes, tasks and links are not: the local copy keeps them", () => {
     for (const k of [["notes"], ["tasks"], ["links"]]) expect(persistable(k)).toBe(false);

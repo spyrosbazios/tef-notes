@@ -13,7 +13,6 @@ import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { search } from "./search";
 import { steerRoute } from "./steer";
-import { talkRoute, talkSocket } from "./talk";
 import { semantic } from "./semantic";
 import { transcribe, warmSpeech } from "./transcribe";
 
@@ -38,12 +37,10 @@ Bun.serve({
     "/agent/places/map": { GET: (req) => mapRoute(req) },
     "/agent/push/key": { GET: () => keyRoute() },
     "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
-    "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server) },
     "/agent/transcribe": { POST: (req) => transcribe(req) },
     "/agent/transcribe/warm": { POST: (req) => warmSpeech(req) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
   },
-  websocket: talkSocket,
   fetch: () => new Response("Not found", { status: 404 }),
   error: (e) => {
     console.error(`agent: ${e.message}`);

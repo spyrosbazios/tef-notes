@@ -1,4 +1,4 @@
-// The bottom bar below `md`: a floating pill with Home, Tasks, Notes, Ask, Talk and Settings (in the owner's order; Tasks, Notes, Ask and Talk hideable, Notes and Talk off at first, Talk absent where the server has none: core/prefs.ts `phone`), on Animate UI's
+// The bottom bar below `md`: a floating pill with Home, Tasks, Notes, Ask and Settings (in the owner's order; Tasks, Notes and Ask hideable, Notes off at first: core/prefs.ts `phone`), on Animate UI's
 // Bottom Navigation. The tab in front shows its label (`show="active"`) on a capsule tinted by the brand that glides to the next
 // one, the others are icons; a press scales them. The pill is liquid glass (quick-liquid's `LiquidGlass`, its optics only: the
 // motion stays Animate UI's; the glass is the app's one, hooks/glass.ts): the page scrolling under it is refracted through its rim,
@@ -21,16 +21,15 @@ import { useAskUnread } from "@/hooks/ask-badge";
 import { setDock, useDock } from "@/hooks/dock";
 import { useGlass } from "@/hooks/glass";
 import { usePrefs } from "@/hooks/prefs";
-import { useOffered } from "@/hooks/talk";
 import { isTaskView, useNav, type View } from "@/lib/nav";
 
 export function TabBar() {
   const { view, goView } = useNav();
   const [{ open }] = useDock();
   const unread = useAskUnread();
-  const { phone } = usePrefs(), offered = useOffered(), tabs = shownTabs(phone).filter(offered);
+  const { phone } = usePrefs(), tabs = shownTabs(phone);
   const glass = useGlass();
-  const now: Tab = open ? "ask" : isTaskView(view) ? "tasks" : view.kind === "settings" || view.kind === "notes" || view.kind === "talk" ? view.kind : "home";
+  const now: Tab = open ? "ask" : isTaskView(view) ? "tasks" : view.kind === "settings" || view.kind === "notes" ? view.kind : "home";
   // The list Tasks goes back to: the one last in front, at first the owner's pick (core/prefs.ts `phone.tasksList`)
   const lastList = useRef<View | null>(null);
   useEffect(() => { if (isTaskView(view)) lastList.current = { kind: view.kind }; }, [view]);

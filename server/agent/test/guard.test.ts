@@ -36,15 +36,6 @@ describe("settle", () => {
     expect(settle(ms)).toBe(ms);
   });
 
-  it("closes the newest turn's card too once the conversation is over (a Talk that ended)", () => {
-    const ms = [user("note x"), msg([card("c1", "approval-requested", { id: "a1" }), call("input-available", {})])];
-    const [, m] = settle(ms, true);
-    expect(m.parts).toEqual([
-      { ...card("c1", "output-denied", { id: "a1", approved: false, reason: "Not confirmed." }) },
-      { ...call("input-available", {}), state: "output-error", errorText: "Stopped before it finished." },
-    ] as never);
-  });
-
   it("denies a card passed over for a new message, so the next request has a result for every call", async () => {
     const ms = [
       user("note x"),

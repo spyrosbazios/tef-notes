@@ -5,10 +5,9 @@ import type { QueryKey } from "@tanstack/react-query";
 
 /** The query keys' first element worth keeping: the lists and details the app browses by. The notes, tasks and links are not
  *  here on purpose: they are read from the local copy (lib/local.ts), which is what keeps them, with the edits not yet sent.
- *  `talk` (whether the server has Talk) is kept so its tab is there the moment the app opens rather than arriving with the answer.
  *  Everything else is left out on purpose, and so is anything added later until it is named here: the chats and models (the agent's), the reader's
  *  articles, and anything a person searched for (the palette's "find" is a route call, not a query at all). */
-const KEPT = new Set(["tags", "lenses", "photos", "link-preview", "talk"]);
+const KEPT = new Set(["tags", "lenses", "photos", "link-preview"]);
 
 export const persistable = (key: QueryKey): boolean => typeof key[0] === "string" && KEPT.has(key[0]);
 

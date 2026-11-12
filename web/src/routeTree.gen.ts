@@ -16,7 +16,6 @@ import { Route as AppInboxRouteImport } from "./routes/_app/inbox"
 import { Route as AppLogbookRouteImport } from "./routes/_app/logbook"
 import { Route as AppNotesRouteImport } from "./routes/_app/notes"
 import { Route as AppSettingsRouteImport } from "./routes/_app/settings"
-import { Route as AppTalkRouteImport } from "./routes/_app/talk"
 import { Route as AppTodayRouteImport } from "./routes/_app/today"
 import { Route as AppUpcomingRouteImport } from "./routes/_app/upcoming"
 import { Route as NoteIdRouteImport } from "./routes/note.$id"
@@ -55,11 +54,6 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: "/settings",
   getParentRoute: () => AppRoute,
 } as any)
-const AppTalkRoute = AppTalkRouteImport.update({
-  id: "/talk",
-  path: "/talk",
-  getParentRoute: () => AppRoute,
-} as any)
 const AppTodayRoute = AppTodayRouteImport.update({
   id: "/today",
   path: "/today",
@@ -83,7 +77,6 @@ export interface FileRoutesByFullPath {
   "/logbook": typeof AppLogbookRoute
   "/notes": typeof AppNotesRoute
   "/settings": typeof AppSettingsRoute
-  "/talk": typeof AppTalkRoute
   "/today": typeof AppTodayRoute
   "/upcoming": typeof AppUpcomingRoute
   "/note/$id": typeof NoteIdRoute
@@ -94,7 +87,6 @@ export interface FileRoutesByTo {
   "/logbook": typeof AppLogbookRoute
   "/notes": typeof AppNotesRoute
   "/settings": typeof AppSettingsRoute
-  "/talk": typeof AppTalkRoute
   "/today": typeof AppTodayRoute
   "/upcoming": typeof AppUpcomingRoute
   "/note/$id": typeof NoteIdRoute
@@ -108,7 +100,6 @@ export interface FileRoutesById {
   "/_app/logbook": typeof AppLogbookRoute
   "/_app/notes": typeof AppNotesRoute
   "/_app/settings": typeof AppSettingsRoute
-  "/_app/talk": typeof AppTalkRoute
   "/_app/today": typeof AppTodayRoute
   "/_app/upcoming": typeof AppUpcomingRoute
   "/note/$id": typeof NoteIdRoute
@@ -123,7 +114,6 @@ export interface FileRouteTypes {
     | "/logbook"
     | "/notes"
     | "/settings"
-    | "/talk"
     | "/today"
     | "/upcoming"
     | "/note/$id"
@@ -134,7 +124,6 @@ export interface FileRouteTypes {
     | "/logbook"
     | "/notes"
     | "/settings"
-    | "/talk"
     | "/today"
     | "/upcoming"
     | "/note/$id"
@@ -147,7 +136,6 @@ export interface FileRouteTypes {
     | "/_app/logbook"
     | "/_app/notes"
     | "/_app/settings"
-    | "/_app/talk"
     | "/_app/today"
     | "/_app/upcoming"
     | "/note/$id"
@@ -211,13 +199,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
-    "/_app/talk": {
-      id: "/_app/talk"
-      path: "/talk"
-      fullPath: "/talk"
-      preLoaderRoute: typeof AppTalkRouteImport
-      parentRoute: typeof AppRoute
-    }
     "/_app/today": {
       id: "/_app/today"
       path: "/today"
@@ -247,7 +228,6 @@ interface AppRouteChildren {
   AppLogbookRoute: typeof AppLogbookRoute
   AppNotesRoute: typeof AppNotesRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppTalkRoute: typeof AppTalkRoute
   AppTodayRoute: typeof AppTodayRoute
   AppUpcomingRoute: typeof AppUpcomingRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -258,7 +238,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppLogbookRoute: AppLogbookRoute,
   AppNotesRoute: AppNotesRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppTalkRoute: AppTalkRoute,
   AppTodayRoute: AppTodayRoute,
   AppUpcomingRoute: AppUpcomingRoute,
   AppIndexRoute: AppIndexRoute,

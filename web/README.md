@@ -1,6 +1,6 @@
 # TEF Notes web app
 
-<!-- reviewed: 2026-11-12 -->
+<!-- reviewed: 2026-11-10 -->
 
 The laptop client for [TEF Notes](../README.md): browse and edit notes and tasks, view photos, PDFs and
 drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, TanStack Router and axios.
@@ -59,31 +59,6 @@ UI tools (`open_note`, `open_task`, `go_view`) are done through the router (`use
 by itself after a card's answer or a UI tool's (`resumes`). What the agent writes reaches the page through the realtime
 feed, as any client's writes do. A note's "Ask about this" opens the dock with a draft naming it; there is no `/ask` page.
 
-## Talk
-
-A spoken conversation with the assistant (`/talk`; the contract is [`packages/core/src/talk.ts`](../packages/core/src/talk.ts), the server side
-`server/agent/src/talk.ts`). The page is `components/talk/page.tsx`; the conversation is not: `lib/talk-session.ts` is a store made once above the
-routes (`components/talk/provider.tsx`), because the assistant's own tools (`open_note`, `go_view`) move the app while it talks, and the pill
-(`talk/pill.tsx`, in the shell) brings it back from any other screen. It is offered only where `GET /agent/talk` answers (`hooks/talk.ts`
-`useTalkStatus`: no tab, sidebar item, settings row or palette entry otherwise).
-
-- **One socket, same origin**, `/agent/talk`: the microphone up as 16-bit PCM from `ready` on, the voice down, JSON for the rest. What was said
-  and done arrives as the chat's own message parts (`lib/talk.ts` `withPart`), so cards, widgets and `ask_choice` are the Ask panel's `Turn`;
-  the transcript draws a message's text itself as captions and holds out what waits for a tap (`rowsOf`) into the tray under it.
-- **Only a tap approves.** `approve` and `choose` on the session are called from the tray's card and buttons, never from anything the model
-  said or heard; the session never calls them itself.
-- **Audio.** The microphone is `lib/mic.ts` (an AudioWorklet tap, shared with dictation; echo cancellation, noise suppression and gain control on:
-  the voice plays through the speaker while it is open). The voice is `lib/talk-voice.ts`: each frame an audio buffer started where the last
-  ends, on a context of its own at the voice's 24 kHz; `interrupted` stops them all. Both contexts are made before the Start tap's first
-  `await`, or the browser's autoplay rule keeps them suspended.
-- **Levels never render.** The orb (a canvas, `lib/orb.ts`) and the pill's bars are drawn from a frame loop (`useFrames`) reading `session.levels()`;
-  React sees only the state (`listening`, `speaking`, `working`, `waiting`...). Colours are read from the theme's CSS tokens each half second.
-- **The page's layout is a container query**, not `md:`: the assistant's dock takes width from the page, so two columns need a wide page, not a
-  wide window.
-- **Dev proxy.** `vite.config.ts` passes `/agent`'s WebSocket and sets `X-Forwarded-Host` on its upgrade (the proxy's `xfwd` does it only for plain
-  requests), because the server refuses a socket whose `Origin` matches neither `Host` nor `X-Forwarded-Host`. The service worker never sees a
-  WebSocket, and its navigation fallback leaves `/agent/` alone.
-
 ## Home and search
 
 Home (`src/components/home.tsx`) is the date, the task box (Today, Inbox and Upcoming as their views draw them, `TaskList
@@ -103,7 +78,7 @@ button at the corner opens it (`assistant/fab.tsx`).
 ## Phone layout
 
 Below `md` (768px) the app is the phone layout. The shell (`components/shell.tsx`) swaps the rail and the app bar for the phone's bottom tabs
-(`components/tab-bar.tsx`: Home, Tasks, Notes, Ask, Talk, Settings in the owner's order, a floating pill with the front tab's label on a capsule; hidden on a note
+(`components/tab-bar.tsx`: Home, Tasks, Notes, Ask, Settings in the owner's order, a floating pill with the front tab's label on a capsule; hidden on a note
 page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). A note's page is a layer over whatever screen it was opened
 from (`NoteLayer` in `components/shell.tsx`; Home, a task list or Settings): that screen stays matched and mounted under it, `invisible`
 and `inert` (Routing, below), so Back finds it as it was, with no tiles entering again, no
@@ -138,7 +113,6 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 | `/` | `_app/index.tsx` | Home; a bare launch goes on to the chosen start screen (`lib/start.ts`, `beforeLoad`) | `tags` (a comma list) |
 | `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list and the task beside it | `t` (task id) |
 | `/notes` | `_app/notes.tsx` | `notes-page.tsx`: the notes alone (its tab off until turned on in Settings → Layout) | `tags` (a comma list) |
-| `/talk` | `_app/talk.tsx` | `components/talk/page.tsx`: the spoken conversation (its tab and sidebar item are off until turned on in Settings → Layout, and absent where the server has none) | |
 | `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
 | `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |
 | `/note/$id` | `note.$id.tsx` | redirects to `/?note=<id>`, replacing itself | |

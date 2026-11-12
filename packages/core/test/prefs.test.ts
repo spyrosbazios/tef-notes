@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import { DEFAULT_PREFS, RAIL, everyPath, isPrefPath, movedTab, NEW_CHAT_IDLE_MS, newChatDue, patchPaths, prefAt, prefsOf, rebased, shownRail, shownTabs, withPatch } from "../src/prefs";
+import { DEFAULT_PREFS, everyPath, isPrefPath, movedTab, NEW_CHAT_IDLE_MS, newChatDue, patchPaths, prefAt, prefsOf, rebased, shownRail, shownTabs, withPatch } from "../src/prefs";
 
 describe("prefsOf", () => {
   test("nothing is the defaults", () => {
@@ -10,8 +10,8 @@ describe("prefsOf", () => {
     const p = prefsOf({ theme: "nope", phone: { tabs: ["ask", "ask", "bogus", "home"], hidden: ["settings", "tasks"], start: "today" },
       notes: { grouped: true, collapsed: ["a", 1, "a"], sort: "created" }, agent: { model: "", effort: "deep", unasked: "yes" } });
     expect(p.theme).toBe(DEFAULT_PREFS.theme);
-    expect(p.phone.tabs).toEqual(["ask", "home", "tasks", "notes", "talk", "settings"]);
-    expect(p.phone.hidden).toEqual(["tasks", "notes", "talk"]);
+    expect(p.phone.tabs).toEqual(["ask", "home", "tasks", "notes", "settings"]);
+    expect(p.phone.hidden).toEqual(["tasks", "notes"]);
     expect(p.phone.start).toBe("today");
     expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
     expect(prefsOf({ lens: "" }).lens).toBeNull();
@@ -19,36 +19,20 @@ describe("prefsOf", () => {
     expect(p.agent).toEqual({ effort: "deep", unasked: false, newChat: "app" });
   });
   test("each layout keeps its own", () => {
-    const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"], known: RAIL } });
+    const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"] } });
     expect(p.phone).toMatchObject({ start: "inbox", homeList: "upcoming" });
-    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"], known: [...RAIL] });
+    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"] });
   });
   test("the shape before layouts reads as defaults: the migration moved it (1794600000_prefs_layouts.js)", () => {
     expect(prefsOf({ start: "inbox", tabs: ["ask", "home"] }).phone).toEqual(DEFAULT_PREFS.phone);
   });
 });
 
-test("Notes and Talk: off by default, kept once placed", () => {
-  expect(prefsOf({}).phone.hidden).toEqual(["notes", "talk"]);
-  expect(prefsOf({ phone: { tabs: ["notes", "talk", "home"], hidden: [] } }).phone.hidden).toEqual([]);
-  expect(prefsOf({}).desktop.hidden).toEqual(["notes", "talk"]);
-  expect(prefsOf({ desktop: { hidden: [], known: RAIL } }).desktop.hidden).toEqual([]);
-});
-
-test("a screen new to a stored record starts hidden, whatever else it shows", () => {
-  // A phone's bar that was saved before Talk existed: it knows its tabs, and Talk is not among them
-  const old = { phone: { tabs: ["home", "tasks", "notes", "ask", "settings"], hidden: [] } };
-  expect(prefsOf(old).phone.hidden).toEqual(["talk"]);
-  expect(prefsOf(old).phone.tabs).toEqual(["home", "tasks", "notes", "ask", "settings", "talk"]);
-  // A sidebar saved knowing every screen but Talk, Notes shown: only Talk is held back
-  const rail = { desktop: { hidden: ["today"], known: ["inbox", "today", "upcoming", "logbook", "notes"] } };
-  expect(prefsOf(rail).desktop.hidden).toEqual(["today", "talk"]);
-  expect(prefsOf(rail).desktop.known).toEqual([...RAIL]);
-  // Turned on, it stays on: the copy a device holds has read it, and knows it
-  const on = withPatch(prefsOf(rail), { desktop: { hidden: ["today"] } });
-  expect(on.desktop.hidden).toEqual(["today"]);
-  expect(prefsOf(on).desktop.hidden).toEqual(["today"]);
-  expect(withPatch(prefsOf(old), { phone: { hidden: [] } }).phone.hidden).toEqual([]);
+test("Notes: off by default, kept once placed", () => {
+  expect(prefsOf({}).phone.hidden).toEqual(["notes"]);
+  expect(prefsOf({ phone: { tabs: ["notes", "home"], hidden: [] } }).phone.hidden).toEqual([]);
+  expect(prefsOf({}).desktop.hidden).toEqual(["notes"]);
+  expect(prefsOf({ desktop: { hidden: [] } }).desktop.hidden).toEqual([]);
 });
 
 test("task lists", () => {
@@ -56,9 +40,8 @@ test("task lists", () => {
 });
 
 test("shownRail: the sidebar's order, less what is hidden", () => {
-  expect(shownRail({ hidden: ["today", "notes", "talk"] })).toEqual(["inbox", "upcoming", "logbook"]);
+  expect(shownRail({ hidden: ["today", "notes"] })).toEqual(["inbox", "upcoming", "logbook"]);
   expect(shownRail(DEFAULT_PREFS.desktop)).toEqual(["inbox", "today", "upcoming", "logbook"]);
-  expect(shownRail({ hidden: [] })).toEqual([...RAIL]);
 });
 
 test("shownTabs and movedTab", () => {
@@ -80,7 +63,7 @@ describe("changes", () => {
     expect(p.phone).toEqual(DEFAULT_PREFS.phone);
   });
   test("a patch still goes through the reader", () => {
-    expect(withPatch(DEFAULT_PREFS, { phone: { tabs: ["ask"] } }).phone.tabs).toEqual(["ask", "home", "tasks", "notes", "talk", "settings"]);
+    expect(withPatch(DEFAULT_PREFS, { phone: { tabs: ["ask"] } }).phone.tabs).toEqual(["ask", "home", "tasks", "notes", "settings"]);
     expect(withPatch({ ...DEFAULT_PREFS, agent: { ...DEFAULT_PREFS.agent, model: "m" } }, { agent: { model: undefined } }).agent.model).toBeUndefined();
     expect(withPatch({ ...DEFAULT_PREFS, lens: "x" }, { lens: null }).lens).toBeNull();
   });

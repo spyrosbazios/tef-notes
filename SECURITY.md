@@ -30,12 +30,6 @@ on every device would add friction without keeping out anyone the network does n
   typed by name alone sends nothing.
 - Voice input stays on your server: the browser posts the recording to your agent, which hands it to the `stt` container
   on the compose network (no port on the host); neither keeps it, and the text goes only into the field you dictated into.
-- Talk does leave your server: with a Gemini key set, what you say, and whatever the assistant reads to answer (notes,
-  tasks, the notes index), goes to Google's Gemini Live API for as long as a conversation is open. No audio is stored
-  on your server. A write still asks with a card, and only a tap confirms it: nothing the model heard counts. Talk's
-  WebSocket has no browser preflight to keep other websites out, so the agent refuses an upgrade whose `Origin` is not
-  the server's own host; a proxy in front must pass `Host` or `X-Forwarded-Host` through. Leave the key out to keep
-  Talk off.
 - The link-preview and clip-image routes fetch URLs from your server. They refuse private and loopback addresses at every
   redirect hop; report any bypass. The push route posts to a subscribed browser's push-service URL (https, and its name
   resolved and checked as public before every send); it stores at most 20 devices.

@@ -14,7 +14,6 @@ to it. See the security model in [../README.md](../README.md).
 |---|---|---|
 | `POST` | `/agent/chat` | Streams a chat turn. Body: `id`, `messages`, `model`, `writesWithoutAsking`, and optional `context` (below) |
 | `GET` | `/agent/search` | Notes by words and meaning, `q` and `limit` (1 to 30): the chat's `search_notes`, no model call (`src/search.ts`; contract `packages/core/src/find.ts` `SearchHit`); the CLI's `search` |
-| `GET`, WebSocket | `/agent/talk` | Talk, the spoken conversation (Gemini Live): `GET` answers the model (404 without the `gemini` key), an upgrade is one conversation, mic up and voice down as binary frames, the rest JSON (`src/talk.ts`; contract `packages/core/src/talk.ts`; [../README.md](../README.md) "Talk") |
 | `GET` | `/agent/models` | The models; `provider` names the server's; `available` is true when its key is read |
 | `GET` | `/agent/push/key` | The VAPID public key for `pushManager.subscribe`; 404 while push is off (`src/push.ts`, [../README.md](../README.md) "Push reminders") |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Store or forget a browser's push subscription (`packages/core/src/push.ts` is the contract) |
@@ -59,13 +58,13 @@ Claude Code, Codex and other coding agents reach the notes through the CLI, driv
 | `TEF_NOTES_PB` | `http://127.0.0.1:8097` | PocketBase's URL (compose sets `http://pocketbase:8090`) |
 | `HOST` | `127.0.0.1` | Listen address (the image sets `0.0.0.0`; compose publishes it on loopback only) |
 | `PORT` | `8098` | Listen port |
-| `TEF_NOTES_KEYS_DIR` | `/run` | Keys are read from `<dir>/<name>/api-key` (`llm`, `exa`, `push`, `gemini`) on every use |
+| `TEF_NOTES_KEYS_DIR` | `/run` | Keys are read from `<dir>/<name>/api-key` (`llm`, `exa`, `push`) on every use |
 | `TEF_NOTES_VAPID_SUBJECT` | | `mailto:` or https URL for push reminders; with the key at `<dir>/push/api-key` they switch `src/reminders.ts` on |
 | `TEF_NOTES_PROVIDER` | `deepseek` | The model provider (`src/models.ts` `PROVIDERS`) |
 | `TEF_NOTES_MODEL` | the provider's | The default model |
 | `TZ` | system zone | The day used in the prompt and for a new note's name |
 
-Without the provider's key (`llm`) a chat is refused; without `exa` the web tools are left out; without `gemini` Talk is off.
+Without the provider's key (`llm`) a chat is refused; without `exa` the web tools are left out.
 
 ## Development
 

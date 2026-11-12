@@ -19,7 +19,6 @@ import { useAssistant } from "@/hooks/assistant";
 import { useNow } from "@/hooks/now";
 import { setActiveLens, useActiveLens, useLenses } from "@/hooks/lens";
 import { useFinder } from "@/hooks/search";
-import { useTalkOn } from "@/hooks/talk";
 import { homeOfTask, titleOf, useNav, type View } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
@@ -48,8 +47,7 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const { openNote, showTask, goView } = useNav();
   const [q, setQ] = useState("");
   const { hits, taskHits, tags, empty, asked, ask: askAgent, foundNotes, foundTasks } = useFinder(q);
-  const talk = useTalkOn();
-  const destinations: View[] = [{ kind: "home" }, { kind: "today" }, { kind: "inbox" }, { kind: "upcoming" }, { kind: "logbook" }, { kind: "notes" }, ...(talk ? [{ kind: "talk" as const }] : []), { kind: "settings" }];
+  const destinations: View[] = [{ kind: "home" }, { kind: "today" }, { kind: "inbox" }, { kind: "upcoming" }, { kind: "logbook" }, { kind: "notes" }, { kind: "settings" }];
   const now = useNow();
   const { data: lenses = [] } = useLenses(), lensOn = useActiveLens();
   const lensQ = fold(q.replace(/^lens:?\s*/i, "").trim());   // "lens work" or just "work"
@@ -120,7 +118,7 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
             <CommandGroup heading="Go">
               <CommandItem value="new" onSelect={() => run(onNew)}><Plus /> New note</CommandItem>
               <CommandItem value="home" onSelect={() => run(() => goView({ kind: "home" }))}><House /> Home</CommandItem>
-              {destinations.filter((v) => ["today", "inbox", "upcoming", "logbook", "talk", "settings"].includes(v.kind)).map((v) => <CommandItem key={v.kind} value={`view:${v.kind}`} onSelect={() => run(() => goView(v))}>{titleOf(v)}</CommandItem>)}
+              {destinations.filter((v) => ["today", "inbox", "upcoming", "logbook", "settings"].includes(v.kind)).map((v) => <CommandItem key={v.kind} value={`view:${v.kind}`} onSelect={() => run(() => goView(v))}>{titleOf(v)}</CommandItem>)}
               <CommandItem value="ask" onSelect={() => run(() => assistant.show())}><Sparkles /> Ask the assistant</CommandItem>
             </CommandGroup>
           ) : null}

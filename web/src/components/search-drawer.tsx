@@ -11,7 +11,7 @@ import { ReducedMotionConfig, spring, transition, useShouldReduceMotion, useTemp
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import { MicButton } from "@/components/mic-button";
-import { Archive, AudioLines, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
+import { Archive, CalendarDays, Check, Hash, Inbox, ListTodo, Loader2, Search, SearchX, Settings, Sparkles, Star, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { absorbTags, dropTyping } from "@/core/tags";
 import { fold } from "@/core/notes";
@@ -24,7 +24,6 @@ import { useActiveLens } from "@/hooks/lens";
 import { useNow } from "@/hooks/now";
 import { useLeaving } from "@/hooks/presence";
 import { useFinder } from "@/hooks/search";
-import { useTalkOn } from "@/hooks/talk";
 import { homeOfTask, noteLink, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
@@ -33,7 +32,7 @@ import type { TaskRec } from "@/services/todo";
 const VIEWS: { label: string; icon: LucideIcon; view: View | "ask" }[] = [
   { label: "Inbox", icon: Inbox, view: { kind: "inbox" } }, { label: "Today", icon: Star, view: { kind: "today" } },
   { label: "Upcoming", icon: CalendarDays, view: { kind: "upcoming" } }, { label: "Logbook", icon: Archive, view: { kind: "logbook" } },
-  { label: "Ask the assistant", icon: Sparkles, view: "ask" }, { label: "Talk", icon: AudioLines, view: { kind: "talk" } }, { label: "Settings", icon: Settings, view: { kind: "settings" } },
+  { label: "Ask the assistant", icon: Sparkles, view: "ask" }, { label: "Settings", icon: Settings, view: { kind: "settings" } },
 ];
 
 const row = "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] transition-colors active:bg-muted disabled:opacity-60";
@@ -113,8 +112,7 @@ function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void })
     setQ(dropTyping(q));
   };
   const backspace = (e: KeyboardEvent<HTMLInputElement>) => { if (e.key === "Backspace" && !q && chips.length) setChips((c) => c.slice(0, -1)); };
-  const talk = useTalkOn();
-  const views = useMemo(() => VIEWS.filter((v) => (talk || v.view === "ask" || v.view.kind !== "talk") && (!f.wanted || fold(v.label).includes(fold(f.wanted)))), [f.wanted, talk]);
+  const views = useMemo(() => (f.wanted ? VIEWS.filter((v) => fold(v.label).includes(fold(f.wanted))) : VIEWS), [f.wanted]);
   const go = (v: View | "ask") => { onClose(); if (v === "ask") assistant.show(); else goView(v); };
   const open = (id: string) => openNote(id);
   const task = (t: TaskRec) => showTask(homeOfTask(t), t.id);

@@ -44,7 +44,6 @@ import { TAB_ICON } from "@/components/tab-icons";
 import { RAIL_ICON } from "@/components/task-icons";
 import { useLayout, useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
-import { useOffered } from "@/hooks/talk";
 import { useSyncStatus } from "@/hooks/sync";
 import { usePush } from "@/hooks/push";
 import { clearOffline, keptFiles } from "@/lib/offline";
@@ -278,8 +277,7 @@ function StartRow({ layout }: { layout: Layout }) {
 /** The phone's bottom bar: the tabs dragged into order (a finger after a long press), shown or hidden, and Home and Tasks tapped
  *  open for the list each starts on. */
 function PhoneLayout({ here }: { here: boolean }) {
-  const { tabs: stored, hidden, tabLabels } = usePrefs().phone;
-  const offered = useOffered(), tabs = stored.filter(offered);
+  const { tabs, hidden, tabLabels } = usePrefs().phone;
   const [open, setOpen] = useState<Tab | null>(null);
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ phone: { tabs: movedTab(prefsNow().phone.tabs, id as Tab, over as Tab, after) } }));
   return (
@@ -322,7 +320,6 @@ function PhoneLayout({ here }: { here: boolean }) {
 /** The desktop's: Home's list, and the screens the sidebar lists. */
 function DesktopLayout({ here }: { here: boolean }) {
   const { homeList, hidden } = usePrefs().desktop;
-  const offered = useOffered();
   return (
     <LayoutCard layout="desktop" here={here}>
       <div className="space-y-2.5 px-3 py-2.5">
@@ -334,7 +331,7 @@ function DesktopLayout({ here }: { here: boolean }) {
         <p className="text-[13px] leading-snug text-dim">The screens it lists. A hidden one is still a search away, and can still be where the app opens. Home, Search and Settings always stay.</p>
       </div>
       <ul aria-label="Sidebar" className="divide-y divide-line">
-        {RAIL.filter(offered).map((r) => {
+        {RAIL.map((r) => {
           const shown = !hidden.includes(r), Icon = RAIL_ICON[r];
           return (
             <li key={r}>
