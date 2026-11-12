@@ -30,14 +30,15 @@ import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
 import { attachProblem, type AttachInput } from "./fileTools";
 import { placeProblem, type PlaceInput } from "./placeTools";
-import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
+import { instructions, today } from "./systemPrompt";
 import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
 import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type AddManyInput, type UpdateInput } from "./todoTools";
 
 /** A message as useChat holds it, tool parts typed: what `chats.messages` holds. */
 export type AgentMessage = UIMessage<unknown, never, InferUITools<Tools>>;
 
-const SAVE_EVERY = 3000;
+/** How often a running reply is saved to its chat, in ms (Talk's conversation too). */
+export const SAVE_EVERY = 3000;
 
 const Body = z.object({
   id: z.string().min(1).max(64),
@@ -53,7 +54,7 @@ const Body = z.object({
  *  instructions — those stay byte for byte the same, the prompt cache's prefix. The live screen comes last: it changes
  *  most. `foreign`: whether someone else's text is in it, which taints the turn (approvals): a PDF's, or words selected
  *  in an open note a chat that read the web wrote (its `tainted` column: the selection is that note's text, read back). */
-async function context(notes: Notes, page: AssistantContext | undefined, files: readonly Attached[] = []) {
+export async function context(notes: Notes, page: AssistantContext | undefined, files: readonly Attached[] = []) {
   const memory = (await notes.meta(MEMORY))?.text.trim() || "(empty)";
   const open = page?.note && await notes.meta(page.note.path);
   const pdfs = open ? await preview(notes.server, { id: parseNote(open.path, open.text).id, path: open.path }) : "";
@@ -112,7 +113,7 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
   const base = (Object.keys(all) as (keyof Tools)[]).filter((n) => !off.has(n));
   return new ToolLoopAgent({
     model: m,
-    instructions: `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}`,
+    instructions: instructions(web),
     tools: all,
     stopWhen: isStepCount(steps),
     reasoning,

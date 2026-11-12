@@ -29,20 +29,21 @@ export const LAYOUT_LABEL: Record<Layout, string> = { phone: "Phone", desktop: "
 // ---- the choices
 
 /** The phone's bottom bar: its tabs, in the order the owner put them. Settings is always shown (it is where the bar is set). */
-export const TABS = ["home", "tasks", "notes", "ask", "settings"] as const;
+export const TABS = ["home", "tasks", "notes", "ask", "talk", "settings"] as const;
 export type Tab = (typeof TABS)[number];
-export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", notes: "Notes", ask: "Ask", settings: "Settings" };
-export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask"];
-/** Tabs off until turned on: Notes, a page of only the notes, which Home already lists under its tasks. */
-const OFF: readonly Tab[] = ["notes"];
+export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", notes: "Notes", ask: "Ask", talk: "Talk", settings: "Settings" };
+export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask", "talk"];
+/** Tabs off until turned on: Notes, a page of only the notes, which Home already lists under its tasks, and Talk, the spoken
+ *  conversation (an experiment, which the server may not even offer: web/src/hooks/talk.ts). */
+const OFF: readonly Tab[] = ["notes", "talk"];
 
 /** The desktop's sidebar (the rail): the screens it lists, in its order, each of which can be hidden. Home (the logo), Search, the
  *  lens and Settings are always there (Settings is where the sidebar is set). */
-export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes"] as const;
+export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes", "talk"] as const;
 export type RailItem = (typeof RAIL)[number];
-export const RAIL_LABEL: Record<RailItem, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook", notes: "Notes" };
-/** Off until turned on: Notes, as on the phone. */
-const RAIL_OFF: readonly RailItem[] = ["notes"];
+export const RAIL_LABEL: Record<RailItem, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook", notes: "Notes", talk: "Talk" };
+/** Off until turned on: Notes and Talk, as on the phone. */
+const RAIL_OFF: readonly RailItem[] = ["notes", "talk"];
 
 /** The task lists Home's box and the Tasks tab open on. */
 export const TASK_LISTS = ["today", "inbox", "upcoming"] as const;
@@ -99,6 +100,10 @@ export type PhonePrefs = LayoutPrefs & {
 export type DesktopPrefs = LayoutPrefs & {
   /** The sidebar's screens it doesn't list (a hidden one is still reached by its link, the palette or the start screen). */
   hidden: RailItem[];
+  /** Every screen this record has been saved knowing, as the phone's `tabs` is: one it doesn't hold is new to the record and
+   *  starts as a new record's would (`RAIL_OFF` ones hidden), whatever `hidden` says, since `hidden` can't tell a screen shown
+   *  from one it never heard of. Always every screen once read; it is stored so the next reader can tell. */
+  known: RailItem[];
 };
 
 export type Prefs = {
@@ -128,7 +133,7 @@ export const DEFAULT_PREFS: Prefs = {
   clip: { summary: false },
   lens: null,
   phone: { ...LAYOUT_DEFAULTS, tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
-  desktop: { ...LAYOUT_DEFAULTS, hidden: [...RAIL_OFF] },
+  desktop: { ...LAYOUT_DEFAULTS, hidden: [...RAIL_OFF], known: [...RAIL] },
 };
 
 // ---- reading
@@ -172,7 +177,12 @@ export function prefsOf(raw: unknown): Prefs {
       tabLabels: one(TAB_LABELS, phone.tabLabels, "active"),
       tasksList: one(TASK_LISTS, phone.tasksList, "today"),
     },
-    desktop: { ...layoutOf(desktop), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF] },
+    desktop: {
+      ...layoutOf(desktop),
+      // A screen the record doesn't know yet is new to it: as on the phone, it starts as a new record's would
+      hidden: RAIL.filter((r) => railIn(desktop.hidden).includes(r) || (RAIL_OFF.includes(r) && !railIn(desktop.known).includes(r))),
+      known: [...RAIL],
+    },
   };
 }
 

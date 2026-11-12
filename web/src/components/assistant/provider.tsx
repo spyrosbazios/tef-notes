@@ -11,13 +11,11 @@
 //    dock's own doings (its badge, opening for a card) are for the dock's chat only: an ask shows its reply where it was made.
 // The writes the agent makes reach the screen through `useLive` (realtime), as any other client's do.
 import { Chat } from "@ai-sdk/react";
-import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { choiceFrom, isAskTool, isUiTool, uiError, UI_OK, type OpenDrawing } from "@/core/assistant";
-import { DRAWING_LIMITS } from "@/core/drawing";
-import { isDrawing } from "@/core/photos";
+import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import type { NoteRef } from "@/core/handoff";
@@ -25,43 +23,20 @@ import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
-import { liveFor, liveNow, openDrawing, openedNow, saverNow } from "@/hooks/drawing";
-import { photoListQuery } from "@/hooks/photos";
+import { openDrawingNow, useNavNow, useUiHost } from "@/hooks/ui-host";
 import { prefsNow } from "@/hooks/prefs";
 import { activeLensOf } from "@/hooks/lens";
 import { NOTES } from "@/hooks/notes";
 import { persisted } from "@/hooks/store";
 import { TASKS } from "@/hooks/todo";
 import type { Held } from "@/editor";
-import { closeUnfinished, pageContext, resumes, runUiTool, type UiHost } from "@/lib/assistant";
+import { closeUnfinished, pageContext, resumes, runUiTool } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
-import { useNav } from "@/lib/nav";
-import { syncNow } from "@/lib/sync";
 import { STORAGE } from "@/lib/storage-keys";
 import { message } from "@/services/api";
 import { chat as loadChat, createChat, newChatId } from "@/services/agent";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
-
-/** A record from the cache, else from the server (the agent may have just made it and the live feed not yet told us): a sync brings
- *  it into the local copy, and so into the cache. */
-async function find<T>(qc: QueryClient, key: QueryKey, is: (r: T) => boolean): Promise<T | undefined> {
-  const held = () => qc.getQueryData<T[]>(key)?.find(is);
-  if (held()) return held();
-  await syncNow();
-  return held();
-}
-
-/** The drawing open in the editor, as the context carries it; undefined when none is, or its note isn't in the cache. */
-function openDrawingNow(notes: NoteRec[] | undefined): OpenDrawing | undefined {
-  const l = liveNow(), n = l && notes?.find((x) => x.note.id === l.noteId);
-  if (!l || !n) return undefined;
-  const { shapes, selected } = l.shapes(), shown = shapes.slice(0, DRAWING_LIMITS.shown);
-  return {
-    path: n.path, ...(l.name ? { name: l.name } : {}), shapes: shown, ...(shapes.length > shown.length ? { more: shapes.length - shown.length } : {}),
-    ...(selected.length ? { selected } : {}), ...(l.unsaved() ? { unsaved: true as const } : {}),
-  };
-}
 
 /** Stop the reply, and close the calls it left open (lib/assistant.ts `closeUnfinished` says why). */
 async function halt(chat: Chat<UIMessage>) {
@@ -80,9 +55,7 @@ const seen = {
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
-  const nav = useNav();
-  const navNow = useRef(nav);
-  useEffect(() => { navNow.current = nav; });
+  const navNow = useNavNow();
 
   // The text selected on the page, kept while the owner clicks into the dock (which would clear the browser's own)
   const selected = useRef("");
@@ -96,42 +69,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("selectionchange", track);
   }, []);
 
-  const host = useMemo<UiHost>(() => ({
-    note: (path) => find<NoteRec>(qc, NOTES, (n) => n.path === path),
-    task: (id) => find<TaskRec>(qc, TASKS, (t) => t.id === id),
-    nav: {
-      // Below `md` the dock covers the page, but a navigation leaves the Ask step (dock.tsx `useAskStep`), uncovering what was opened
-      openNote: (id) => navNow.current.openNote(id),
-      showTask: (v, id) => navNow.current.showTask(v, id),
-      goView: (v) => navNow.current.goView(v),
-    },
-    showAssistant: () => setDock({ open: true }),
-    // The drawing named (else the one open over the note, else a new one) opens over its note, and the edit is made on it, unsaved
-    draw: async ({ path, name, add, update, remove }) => {
-      const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path);
-      if (!n) return uiError(`No note ${path}.`);
-      const id = n.note.id;
-      if (name) {
-        const there = (await qc.fetchQuery(photoListQuery(id))).filter((p) => isDrawing(p.name)).map((p) => p.name);
-        if (!there.includes(name)) return uiError(`${path} has no drawing ${name}${there.length ? ` (it has ${there.join(", ")})` : ""}. Leave the name out to start a new one.`);
-      }
-      const o = openedNow(), same = !!o && o.noteId === id && (!name || o.name === name);
-      if (o && !same && liveNow()?.unsaved()) return uiError("Another drawing is open with changes not saved yet: ask the owner to save or close it first. Nothing was drawn.");
-      navNow.current.openNote(id);
-      const live = await liveFor(same ? o.seq : openDrawing(id, name ?? null));
-      if (!live) return uiError("The drawing editor didn't open in time. Nothing was drawn.");
-      const r = await live.apply({ add, update, remove });
-      if ("error" in r) return uiError(`${r.error} Nothing was drawn.`);
-      return r.picture ? { ok: true, picture: r.picture } : UI_OK;
-    },
-    // Only the drawing open over that note, by the same Save the owner presses (drawing-layer.tsx)
-    saveDrawing: async (path) => {
-      const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path), o = openedNow(), s = saverNow();
-      if (!n || !o || o.noteId !== n.note.id || s?.seq !== o.seq) return { error: `No drawing is open over ${path}: open one with draw first.` };
-      const r = await s.save();
-      return "error" in r ? r : { ok: true, name: r.name };
-    },
-  }), [qc]);
+  const host = useUiHost(navNow);
 
   // The dock's chat, for the callbacks of every chat (an ask's included) to tell it apart
   const docked = useRef<Chat<UIMessage> | null>(null);
@@ -176,7 +114,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       },
     });
     return chat;
-  }, [qc, host]);
+  }, [qc, host, navNow]);
 
   const [chat, setChat] = useState<Chat<UIMessage> | null>(null);
   useEffect(() => { docked.current = chat; }, [chat]);

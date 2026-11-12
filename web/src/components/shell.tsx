@@ -6,7 +6,7 @@
 // into a sheet and lay the dock over the page, and on a phone-width one the list and the task take turns. An open task brings its
 // own bar, so the narrow app bar steps aside and its back and menu buttons sit in that bar. Installed on a phone it is the whole
 // screen (`h-dvh`, which follows the keyboard: index.html's `interactive-widget`), padded by the safe-area insets.
-// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Notes, Ask, Settings, as the owner set them) instead of the rail and the app bar, Home
+// Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Notes, Ask, Talk, Settings, as the owner set them) instead of the rail and the app bar, Home
 // drawing its own header (lens, search), the Tasks tab the list with its own switcher (task-list.tsx), Ask the dock opened whole. From `md` to
 // `lg` the app bar's buttons are the touch way to everything the keys do: Views, Assistant (a), Search (/ and ⌘K), New note or task (n, q).
 import { Command as CommandIcon, Menu, Plus, Sparkles } from "lucide-react";
@@ -23,6 +23,7 @@ import { Palette } from "@/components/palette";
 import { QuickAdd, type Start } from "@/components/quick-add";
 import { Rail } from "@/components/rail";
 import { TabBar } from "@/components/tab-bar";
+import { TalkPill } from "@/components/talk/pill";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { dockNow, setDock, useDock } from "@/hooks/dock";
@@ -153,6 +154,8 @@ export function Shell() {
         </div>
         {/* The pill inside is what a route change names (`data-vt="tabs"`, tab-bar.tsx), not this strip */}
         {bar ? <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}
+        {/* The spoken conversation while the owner is on another screen (Talk's own page has all of it) */}
+        <TalkPill />
       </div>
     </ShellContext.Provider>
   );

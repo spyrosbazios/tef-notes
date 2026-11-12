@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-11 -->
+<!-- reviewed: 2026-11-12 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -72,6 +72,8 @@ result.
 | `TEF_NOTES_KEY_TYPESAFE` | `./keys/typesafe` | Directory holding `api-key`, mounted read-only at `/run/typesafe`. |
 | `TEF_NOTES_KEY_LLM` | `./keys/<TEF_NOTES_PROVIDER>` | Same, for the model provider, mounted into both containers at `/run/llm`. |
 | `TEF_NOTES_KEY_EXA` | `./keys/exa` | Same, for Exa, mounted into the agent at `/run/exa`. |
+| `TEF_NOTES_KEY_GEMINI` | `./keys/gemini` | Same, for the Gemini API key of Talk, mounted into the agent at `/run/gemini`. |
+| `TEF_NOTES_TALK_MODEL` | `gemini-3.8-live` | The Gemini Live model Talk speaks through. |
 | `TEF_NOTES_KEY_PUSH` | `./keys/push` | Same, for the VAPID private key of push reminders, mounted into the agent at `/run/push`. |
 | `TEF_NOTES_VAPID_SUBJECT` | | A `mailto:` or https URL the push services may reach you at. Empty: push reminders are off. |
 | `TEF_NOTES_CRX_KEY` | `./no-crx-key` | Path to the extension's signing key, inside `server/`. Extension build only, see the extension section. |
@@ -97,6 +99,7 @@ root-owned. Every provider is optional.
 | `typesafe` | The auto-tagger (a per-minute job tagging notes) and the clip's destination suggestions | Nothing is auto-tagged; clip suggest returns `pick: "new"` and saves still work |
 | the model provider (`llm`) | The chat agent, the clip's tidied note and optional summary, tag descriptions | The chat is refused and models are listed with `available: false`; a clip's note is saved as typed and a requested summary reports `"failed"` |
 | `exa` | The agent's web search and page-reading tools | The agent runs without its web tools |
+| `gemini` | Talk, the spoken conversation with the assistant (Gemini Live) | Talk is off: `GET /agent/talk` answers 404 and the apps hide it |
 
 Place search needs no key: it uses OpenStreetMap's free public services (Photon, Nominatim, the standard tiles), so the
 agent needs outbound access to `photon.komoot.io`, `nominatim.openstreetmap.org` and `tile.openstreetmap.org`.
@@ -153,6 +156,25 @@ CPU, `stt/app.py`. Nothing is stored: not the recording, not the text, only what
 The image is `ghcr.io/spyrosbazios/tef-notes-stt` (amd64 and arm64), published with the others by `docker.yml`; from
 source it is `stt/Dockerfile`, built by `docker-compose.build.yml` like the rest. Contract: `packages/core/src/voice.ts`;
 the agent's half: `agent/src/transcribe.ts`.
+
+## Talk
+
+A spoken, real-time conversation with the same assistant: the app's Talk page streams the microphone to the agent over one
+WebSocket, `/agent/talk`, and the agent holds the live session with Google's Gemini Live API (speech in, speech out, function
+calling). The model runs the chat's own tools, confirm cards and web-taint rules; the conversation is saved to `chats` like
+any chat and reopens in the text assistant. No audio is stored. Contract: `packages/core/src/talk.ts`; the agent's half:
+`agent/src/talk.ts`.
+
+- **Off without a key.** `keys/gemini/api-key` holds the Gemini API key alone (`TEF_NOTES_KEY_GEMINI` moves the directory).
+  Without it `GET /agent/talk` answers `404` and the apps hide Talk; with it, `{ "model": "gemini-3.8-live" }`
+  (`TEF_NOTES_TALK_MODEL` names another Live model). The key is re-read on every conversation: no restart.
+- **Only the app's own origin may open it.** A browser lets any website open a WebSocket to any address, and there is no
+  sign-in, so an upgrade whose `Origin` is not this server's `Host` (or `X-Forwarded-Host`, behind the reverse proxy) is
+  refused with `403`. Make sure your proxy passes `Host` or `X-Forwarded-Host` and the WebSocket upgrade through.
+- **It costs money, per turn.** Gemini bills the whole session context again with every turn (instructions, the ~40 tool
+  declarations, the notes index, the turns so far) and caches nothing; audio is about 25 tokens a second. The agent compresses
+  the context past 48k tokens, and the app shows the running cost (tokens and US dollars at list price).
+- **Check it:** `curl -s http://localhost:8098/agent/talk` answers the model with the key present, `404` without.
 
 ## The write contract
 

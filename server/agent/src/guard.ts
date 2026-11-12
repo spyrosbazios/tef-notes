@@ -11,24 +11,29 @@ const awaiting = (p: Part) => isToolUIPart(p) && (p.state === "approval-requeste
 
 const lastUser = (ms: UIMessage[]) => { let i = ms.length - 1; while (i >= 0 && ms[i].role !== "user") i--; return i; };
 
+/** A tool call that never got its answer, closed for the history: a call still open (the owner's tap never came, the turn
+ *  was stopped) is a failed one, a confirm card is denied as not confirmed (a "no" keeps its own reason). Any other part
+ *  stays as it is. */
+export function close(p: Part): Part {
+  if (!isToolUIPart(p)) return p;
+  if (p.state === "input-available") return { ...p, state: "output-error", errorText: isAskTool(getToolName(p)) ? "The owner didn't answer." : isUiTool(getToolName(p)) ? "The app didn't do it." : "Stopped before it finished." };
+  if (p.state !== "approval-requested" && p.state !== "approval-responded") return p;
+  const reason = p.state === "approval-responded" && !p.approval.approved ? p.approval.reason : UNCONFIRMED;
+  return { ...p, state: "output-denied", approval: { ...p.approval, approved: false, reason } };
+}
+
 /** A turn stopped mid-tool leaves a call with no result, and the SDK refuses to send that history again (a call to a tool
  *  the client does itself too: the app never answered it). Close each such call as failed; one still streaming its input never reached the model, so it goes. A confirm
  *  card before the newest user message was never answered, or answered with nothing resent: no write ran, so
- *  it's denied. The newest turn's card is still live and stays. */
-export function settle<M extends UIMessage>(ms: M[]): M[] {
+ *  it's denied. The newest turn's card is still live and stays, unless `ended`: the conversation is over (a Talk that
+ *  closed), nothing will answer it. */
+export function settle<M extends UIMessage>(ms: M[], ended = false): M[] {
   const last = lastUser(ms);
-  const stale = (p: Part, i: number) => open(p) || (i < last && awaiting(p));
+  const stale = (p: Part, i: number) => open(p) || ((ended || i < last) && awaiting(p));
   if (!ms.some((m, i) => m.parts.some((p) => stale(p, i)))) return ms;
   return ms.map((m, i) => (!m.parts.some((p) => stale(p, i)) ? m : {
     ...m,
-    parts: m.parts.flatMap((p) => {
-      if (!isToolUIPart(p) || !stale(p, i)) return [p];
-      if (p.state === "input-streaming") return [];
-      if (p.state === "input-available") return [{ ...p, state: "output-error", errorText: isAskTool(getToolName(p)) ? "The owner didn't answer." : isUiTool(getToolName(p)) ? "The app didn't do it." : "Stopped before it finished." }];
-      if (p.state !== "approval-requested" && p.state !== "approval-responded") return [p];
-      const reason = p.state === "approval-responded" && !p.approval.approved ? p.approval.reason : UNCONFIRMED;   // a "no" keeps its own
-      return [{ ...p, state: "output-denied", approval: { ...p.approval, approved: false, reason } }];
-    }),
+    parts: m.parts.flatMap((p) => (!stale(p, i) ? [p] : isToolUIPart(p) && p.state === "input-streaming" ? [] : [close(p)])),
   } as M));
 }
 

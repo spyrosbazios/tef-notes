@@ -10,7 +10,7 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
 ```
  Web app     ─┐                          ┌─ PocketBase (collections, rev hook, jobs, routes) ─ pb_data/
  CLI         ─┼─ reverse proxy ─ HTTP ───┤        also serves the web app and the extension
- Clipper     ─┘  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
+ Clipper     ─┘  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe, /agent/talk
                                           └─ stt (python): speech to text, reached by the agent only
 ```
 
@@ -200,6 +200,11 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   answers its text from the `stt` service (`TEF_NOTES_STT`); `/agent/transcribe/warm` loads the model as recording
   starts; `keep` is how long the model stays loaded once idle, the owner's setting (`packages/core/src/prefs.ts`
   `voice.keep`). Nothing is stored. Contract: `packages/core/src/voice.ts`; without `TEF_NOTES_STT` both answer 404.
+- Talk (`src/talk.ts`): a spoken conversation over one WebSocket, `/agent/talk`. The agent holds a Gemini Live session
+  and runs the chat's own tools, pre-write checks, confirm cards and taint rules for it; the app sends the microphone
+  and plays the voice. The speech model's tool list is fixed when its session starts, so what a chat withdraws once it
+  has read outside text is refused in the handler instead. Saved to `chats` like a chat; no audio is stored. Contract:
+  `packages/core/src/talk.ts`; without the `gemini` key `GET /agent/talk` answers 404 (`server/README.md`, "Talk").
 
 ## Server jobs and routes
 

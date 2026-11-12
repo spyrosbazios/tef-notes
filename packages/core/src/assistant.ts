@@ -20,8 +20,8 @@ import { isDrawingName, PDF } from "./photos";
 export const TASK_LISTS = ["inbox", "today", "upcoming", "logbook"] as const;
 export type TaskList = (typeof TASK_LISTS)[number];
 
-/** The places with nothing to name: `home` (the phone's Home tab), `notes` (all notes), `pinned`, a task list, `ask` (the full chat), `memory` and `settings`. Beside them a `tag`'s notes. */
-export const PLAIN_VIEWS = ["home", "notes", "pinned", ...TASK_LISTS, "ask", "memory", "settings"] as const;
+/** The places with nothing to name: `home` (the phone's Home tab), `notes` (all notes), `pinned`, a task list, `ask` (the full chat), `talk` (the spoken one), `memory` and `settings`. Beside them a `tag`'s notes. */
+export const PLAIN_VIEWS = ["home", "notes", "pinned", ...TASK_LISTS, "ask", "talk", "memory", "settings"] as const;
 export type PlainView = (typeof PLAIN_VIEWS)[number];
 export const VIEW_KINDS = [...PLAIN_VIEWS, "tag"] as const;
 export type ViewKind = (typeof VIEW_KINDS)[number];

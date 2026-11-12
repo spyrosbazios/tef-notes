@@ -16,6 +16,7 @@
     "@ai-sdk/openai-compatible": "3.0.85",
     "@ai-sdk/provider-utils": "5.0.75",
     "@ai-sdk/xai": "5.0.39",
+    "@google/genai": "3.2.0",
     "@huggingface/transformers": "4.3.2",
     "@napi-rs/canvas": "1.1.0",
     "ai": "7.0.163",

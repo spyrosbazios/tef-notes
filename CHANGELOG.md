@@ -5,6 +5,12 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- Talk, an experiment: a spoken conversation with the assistant on its own page, through Google's Gemini Live. It uses
+  the chat's tools, confirm cards (a tap, never a spoken yes) and saved chats, and shows the time and cost as it runs.
+  Off until the server has a Gemini key, and its tab and sidebar entry are off until turned on in Settings.
+
 ## 0.11.1 - 2026-11-12
 
 ### Changed

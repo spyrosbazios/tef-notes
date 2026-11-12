@@ -122,7 +122,7 @@ export const uiTools = {
 const q = (s: string) => JSON.stringify(s).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 
 const PLACE: Record<Exclude<AssistantView["kind"], "tag">, string> = {
-  home: "Home", notes: "All notes", pinned: "Pinned notes", ask: "The full chat", memory: "Agent memory", settings: "Settings",
+  home: "Home", notes: "All notes", pinned: "Pinned notes", ask: "The full chat", talk: "Talk (the spoken chat)", memory: "Agent memory", settings: "Settings",
   inbox: "Inbox (task list)", today: "Today (task list)", upcoming: "Upcoming (task list)", logbook: "Logbook (task list)",
 };
 const place = (v: AssistantView) => (v.kind === "tag" ? `Notes tagged ${q(v.tag)}` : PLACE[v.kind]);
