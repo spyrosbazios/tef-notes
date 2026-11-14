@@ -44,7 +44,7 @@ class NotesWidget : GlanceAppWidget() {
         val feed = notesFeedOf(state[Keys.Feed])
         val look = feed?.look ?: Store.look(context)
         val stale = state[Keys.Stale] == true
-        Frame(look, feed?.title ?: "Notes", feed?.url ?: "/notes", stale && feed != null, null) {
+        Frame(look, feed?.title ?: "Notes", feed?.url ?: "/notes", stale && feed != null, feed?.switches, null) {
             when {
                 feed == null -> Unread(context, look, stale)
                 feed.notes.isEmpty() -> Message(look, "No notes here", open(feed.url))

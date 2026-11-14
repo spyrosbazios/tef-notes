@@ -18,7 +18,7 @@ if (!out) throw new Error("generate: give the res directory to write");
 const ICONS = {
   check: "Check", add: "Plus", refresh: "RefreshCw", task: "ListTodo", append: "ListPlus", note: "FilePlus",
   newtask: "ClipboardPlus", page: "Globe", pin: "Pin", box: "Circle", close: "X", fail: "CircleAlert", offline: "CloudOff",
-  notes: "NotebookText", picture: "Image", settings: "Settings",
+  notes: "NotebookText", picture: "Image", settings: "Settings", lens: "Focus", ask: "Sparkles",
 } as const;
 
 type Attrs = Record<string, string | number | undefined>;

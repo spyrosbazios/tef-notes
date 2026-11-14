@@ -2,7 +2,7 @@
 // PocketBase's JS hooks can't stream. Served same-origin under /agent/* by a reverse proxy on a private network (e.g.
 // a tunnel such as `tailscale serve`); no sign-in, like PocketBase: that network is the gate, so it listens on loopback only on the host.
 import { chat } from "./agent";
-import { addTaskRoute, helloRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
+import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
 import { drawingPictureRoute } from "./drawing-picture";
 import { find } from "./find";
 import { catalog } from "./models";
@@ -45,6 +45,7 @@ Bun.serve({
     "/agent/companion/tasks": { GET: (req) => tasksRoute(req, server), POST: (req) => addTaskRoute(req, server) },
     "/agent/companion/tasks/:id/done": { POST: (req) => tickRoute(server, req.params.id) },
     "/agent/companion/notes": { GET: () => notesRoute(server) },
+    "/agent/companion/lens": { POST: (req) => lensRoute(req, server) },
   },
   fetch: () => new Response("Not found", { status: 404 }),
   error: (e) => {

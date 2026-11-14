@@ -23,14 +23,14 @@ class ContractTest {
 
     @Test
     fun helloIsOnlyATefNotesServers() {
-        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":1,"look":$look,"summary":true,"tag":"work"}"""))!!
-        assertEquals(Hello(1, JSONObject(look).toString(), true, "work"), h)
-        assertNull(helloOf(JSONObject("""{"app":"tefnotes","contract":1,"look":$look,"summary":false,"tag":null}"""))!!.tag)
+        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":2,"look":$look,"summary":true,"tag":"work"}"""))!!
+        assertEquals(Hello(2, JSONObject(look).toString(), true, "work"), h)
+        assertNull(helloOf(JSONObject("""{"app":"tefnotes","contract":2,"look":$look,"summary":false,"tag":null}"""))!!.tag)
         assertNull(helloOf(JSONObject("""{"app":"other","look":$look}""")))
         assertNull(helloOf(JSONObject("""{"message":"Not found"}""")))
     }
 
-    private val feed = """{"contract":1,"list":"today","title":"Today · Work","url":"/today","more":2,"look":$look,"sections":[
+    private val feed = """{"contract":2,"list":"today","title":"Today · Work","url":"/today","more":2,"look":$look,"sections":[
         {"label":"","tasks":[{"id":"a","title":"A","detail":"09:30","late":false,"url":"/today?t=a"},{"id":"b","title":"B","detail":"Due Nov 12","late":true,"url":"/today?t=b"}]},
         {"label":"This Evening","tasks":[{"id":"c","title":"C","detail":"","late":false,"url":"/today?t=c"}]}]}"""
 
@@ -45,8 +45,19 @@ class ContractTest {
     }
 
     @Test
+    fun aFeedsSwitches() {
+        val lenses = """[{"id":"","name":"No lens","on":false},{"id":"w","name":"Work","on":true}]"""
+        val f = tasksFeedOf(feed.replace("\"more\":2", "\"more\":2,\"ask\":\"/?ask=1\",\"lenses\":$lenses"))!!
+        assertEquals(Switches(listOf(LensChoice("", "No lens", false), LensChoice("w", "Work", true)), "/?ask=1"), f.switches)
+        assertEquals(f.switches.lenses, lensChoicesOf(lensesJson(f.switches.lenses)))
+        assertEquals(Switches(emptyList(), ""), tasksFeedOf(feed)!!.switches)
+        assertEquals(emptyList<LensChoice>(), lensChoicesOf("no list"))
+        assertEquals(emptyList<LensChoice>(), lensChoicesOf(null))
+    }
+
+    @Test
     fun aFeedOfAnotherContractOrNoFeedIsNotDrawn() {
-        assertNull(tasksFeedOf(feed.replace("\"contract\":1", "\"contract\":2")))
+        assertNull(tasksFeedOf(feed.replace("\"contract\":2", "\"contract\":3")))
         assertNull(tasksFeedOf("<html>"))
         assertNull(tasksFeedOf(null))
         assertNull(notesFeedOf("{}"))
@@ -62,7 +73,7 @@ class ContractTest {
 
     @Test
     fun aNotesFeed() {
-        val f = notesFeedOf("""{"contract":1,"title":"Notes","url":"/notes","more":0,"look":$look,"notes":[
+        val f = notesFeedOf("""{"contract":2,"title":"Notes","url":"/notes","more":0,"look":$look,"notes":[
             {"id":"a","title":"A","peek":"words","pinned":true,"url":"/note/a","color":{"bg":"#172331","fg":"#d2e2f3","line":"#6a92bd"}},
             {"id":"b","title":"B","peek":"","pinned":false,"url":"/note/b"}]}""")!!
         assertEquals(FeedNote("a", "A", "words", true, "/note/a", 0xFF172331.toInt(), 0xFFD2E2F3.toInt()), f.notes[0])

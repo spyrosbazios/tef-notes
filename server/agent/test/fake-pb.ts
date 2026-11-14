@@ -52,7 +52,15 @@ export function fakePb() {
         const lens = { ...(await req.json() as Rec), id: `lens${lenses.length + 1}` }; lenses.push(lens);
         return Response.json(lens);
       }
-      if (col === "prefs") return Response.json({ items: prefs });   // the owner's one record, read only
+      if (col === "prefs") {                                  // the owner's one record: read, made, saved whole
+        if (req.method === "GET") return Response.json({ items: prefs });
+        const body = await req.json() as Rec;
+        if (req.method === "POST") { const rec = { ...body, id: "prefs1" }; prefs.push(rec); return Response.json(rec); }
+        const rec = prefs.find((p) => p.id === id);
+        if (!rec) return err(404);
+        Object.assign(rec, body);
+        return Response.json(rec);
+      }
       if (col === "tags") {
         if (req.method === "GET") return Response.json({ items: tags });
         const body = await req.json() as Rec;

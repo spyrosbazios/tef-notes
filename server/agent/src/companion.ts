@@ -1,25 +1,28 @@
 // The native companion's routes (the contract is packages/core/src/companion.ts): the feeds its widgets draw and the two
 // writes they make, a tick and a new task. Everything is read fresh on each request and shaped by the core, so the
 // companion holds no rules: it is told what to draw, where each row opens in the web app, and in which colours. The
-// writes go through the agent's own task store (todo.ts): a rev compare-and-swap, a repeating task rolled over.
-import { helloOf, newTaskOf, notesFeed, ownerLook, taskListOf, tasksFeed } from "@/core/companion";
+// task writes go through the agent's own task store (todo.ts): a rev compare-and-swap, a repeating task rolled over. The
+// lens is one of the owner's preferences, saved as every client saves one (prefs.ts): the record read, one path changed.
+import { helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, taskListOf, tasksFeed } from "@/core/companion";
 import { activeLens, inheritTags, type Lens } from "@/core/lens";
 import * as pb from "@/core/pocketbase";
-import { PREFS_KEY, prefsOf, type Prefs } from "@/core/prefs";
+import { PREFS_KEY, prefsOf, withPatch, type Prefs } from "@/core/prefs";
 import { localDay } from "@/core/time";
 import { Notes } from "./notes";
 import { Todo } from "./todo";
 
 const refuse = (status: number, error: string) => Response.json({ error }, { status });
 
-/** The owner's preferences (none saved yet: the defaults) and the lens they have on. */
-async function owner(server: pb.Server): Promise<{ prefs: Prefs; lens: Lens | null }> {
+type Owner = { rec: string | null; prefs: Prefs; lenses: Lens[]; lens: Lens | null };
+
+/** The owner's preferences (none saved yet: the defaults, and no record), their lenses and the one they have on. */
+async function owner(server: pb.Server): Promise<Owner> {
   const [saved, lenses] = await Promise.all([
     pb.call(server, `collections/prefs/records?filter=${encodeURIComponent(`key = ${pb.lit(PREFS_KEY)}`)}&perPage=1&skipTotal=1`),
     pb.lenses.list(server),
   ]);
-  const prefs = prefsOf(saved.items?.[0]?.data);
-  return { prefs, lens: activeLens(lenses, prefs.lens) };
+  const record = saved.items?.[0], prefs = prefsOf(record?.data);
+  return { rec: record?.id ?? null, prefs, lenses, lens: activeLens(lenses, prefs.lens) };
 }
 
 export async function helloRoute(server: pb.Server): Promise<Response> {
@@ -28,13 +31,13 @@ export async function helloRoute(server: pb.Server): Promise<Response> {
 }
 
 export async function tasksRoute(req: Request, server: pb.Server): Promise<Response> {
-  const [{ prefs, lens }, tasks] = await Promise.all([owner(server), new Todo(server).tasks()]);
-  return Response.json(tasksFeed(tasks, taskListOf(new URL(req.url).searchParams.get("list")), localDay(), lens, ownerLook(prefs, lens)));
+  const [{ prefs, lenses, lens }, tasks] = await Promise.all([owner(server), new Todo(server).tasks()]);
+  return Response.json(tasksFeed(tasks, taskListOf(new URL(req.url).searchParams.get("list")), localDay(), lenses, lens, ownerLook(prefs, lens)));
 }
 
 export async function notesRoute(server: pb.Server): Promise<Response> {
-  const [{ prefs, lens }, notes] = await Promise.all([owner(server), new Notes(server).list()]);
-  return Response.json(notesFeed(notes, lens, prefs));
+  const [{ prefs, lenses, lens }, notes] = await Promise.all([owner(server), new Notes(server).list()]);
+  return Response.json(notesFeed(notes, lenses, lens, prefs));
 }
 
 /** A new open task, after the last one: planned for today when added from Today, tagged as the lens on tags what is made. */
@@ -52,4 +55,18 @@ export async function tickRoute(server: pb.Server, id: string): Promise<Response
   if (!(await todo.task(id))) return refuse(404, "That task is gone.");
   const r = await todo.completeTask(id, true);
   return "error" in r ? refuse(409, r.error) : Response.json({ ok: true });
+}
+
+/** The lens on, changed from a widget: for every screen of the owner's, as when the web app's switcher changes it (the
+ *  record is saved whole with the one path changed; the web app hears over the realtime feed). */
+export async function lensRoute(req: Request, server: pb.Server): Promise<Response> {
+  const pick = lensPickOf(await req.json().catch(() => null));
+  if (pick === null) return refuse(400, "Which lens?");
+  const { rec, prefs, lenses } = await owner(server);
+  if (pick && !lenses.some((l) => l.rec === pick)) return refuse(404, "That lens is gone.");
+  const data = withPatch(prefs, { lens: pick || null });
+  await (rec
+    ? pb.call(server, `collections/prefs/records/${rec}`, pb.json("PATCH", { data }))
+    : pb.call(server, "collections/prefs/records", pb.json("POST", { key: PREFS_KEY, data })));
+  return Response.json({ ok: true });
 }

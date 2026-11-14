@@ -1,5 +1,6 @@
 // The Tasks widget: one of the task lists (Today, unless the owner picked another when placing it), each task with a box
-// to tick and a tap to open it in the web app, and a plus for a new task in that list.
+// to tick and a tap to open it in the web app, and a plus for a new task in that list. Its heading switches the lens and
+// opens the assistant (Widgets.kt `Frame`).
 package app.tefnotes.companion.widget
 
 import android.appwidget.AppWidgetManager
@@ -46,7 +47,7 @@ class TasksWidget : GlanceAppWidget() {
         val look = feed?.look ?: Store.look(context)
         val stale = state[Keys.Stale] == true
         val add = actionStartActivity<TaskActivity>(actionParametersOf(ActionParameters.Key<String>(TaskActivity.LIST) to list))
-        Frame(look, feed?.title ?: listLabel(list), feed?.url ?: "/$list", stale && feed != null, add) {
+        Frame(look, feed?.title ?: listLabel(list), feed?.url ?: "/$list", stale && feed != null, feed?.switches, add) {
             when {
                 feed == null -> Unread(context, look, stale)
                 feed.sections.isEmpty() -> Message(look, "Nothing here", open(feed.url))

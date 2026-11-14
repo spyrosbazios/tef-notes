@@ -78,6 +78,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".widget.LensActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Sheet" />
+
         <service
             android:name=".TaskTile"
             android:exported="true"

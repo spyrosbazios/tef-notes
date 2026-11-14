@@ -19,7 +19,9 @@ screen and no task screen; everything it shows comes from your server ready to d
 - **Offline**: a share or a new task made with the server out of reach waits on the phone and is sent when it is back;
   a tick on a widget does the same. Settings lists what waits.
 
-Widgets follow your theme, accent and the lens you have on, and show what the web app shows under that lens.
+Widgets follow your theme, accent and the lens you have on, and show what the web app shows under that lens. A widget's
+heading switches the lens, for the web app too, and its sparkle opens the assistant ready for a message: a task to
+schedule, something to note.
 
 ## Requirements
 

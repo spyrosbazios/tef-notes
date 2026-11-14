@@ -1,7 +1,7 @@
 // The native companion's feeds (src/companion.ts): rows worked out here, so a companion only draws them.
 import { describe, expect, it } from "bun:test";
 import { choices, describe as describeResult, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
-import { DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, newTaskOf, notesFeed, ownerLook, shareClip, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
+import { DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, shareClip, switchesOf, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
 import { fit, lookSize } from "../src/photos";
@@ -13,7 +13,7 @@ import cases from "./companion-cases.json";
 const TODAY = "2026-11-14";
 const task = (id: string, fields: Partial<Task> = {}): Task => ({ ...newTask(id, { title: `Task ${id}`, order: 0 }), ...fields });
 const work: Lens = { rec: "w", name: "Work", tags: ["work"], exclude: [], accent: "teal", theme: "light" };
-const feed = (tasks: Task[], list: "today" | "inbox" | "upcoming", lens: Lens | null = null) => tasksFeed(tasks, list, TODAY, lens, DEFAULT_LOOK);
+const feed = (tasks: Task[], list: "today" | "inbox" | "upcoming", lens: Lens | null = null) => tasksFeed(tasks, list, TODAY, [work], lens, DEFAULT_LOOK);
 
 describe("the look", () => {
   it("is the owner's theme and accent, the lens's over them", () => {
@@ -24,7 +24,7 @@ describe("the look", () => {
     expect(ownerLook({ theme: "nord", accent: "rose" }, work)).toMatchObject({ scheme: "light", bg: THEMES.light.C.bg, brand: ACCENTS.teal.light });
   });
   it("hello names the app, the contract and the summary box as left", () => {
-    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 1, look: DEFAULT_LOOK, summary: true, tag: null });
+    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 2, look: DEFAULT_LOOK, summary: true, tag: null });
     expect(helloOf(DEFAULT_PREFS, work).tag).toBe("work");
   });
 });
@@ -38,7 +38,7 @@ describe("a task list", () => {
       task("d", { when: "2026-11-20" }),
       task("e", { when: TODAY, done: TODAY }),
     ], "today");
-    expect(f).toMatchObject({ contract: 1, list: "today", title: "Today", url: "/today", more: 0 });
+    expect(f).toMatchObject({ contract: 2, list: "today", title: "Today", url: "/today", more: 0 });
     expect(f.sections).toEqual([
       { label: "", tasks: [
         { id: "a", title: "Task a", detail: "09:30", late: false, url: "/today?t=a" },
@@ -85,6 +85,22 @@ describe("a new task", () => {
   });
 });
 
+describe("what a heading offers", () => {
+  it("the lenses to turn on, none first and the one on marked; nothing to switch with no lens defined", () => {
+    expect(switchesOf([work], null)).toEqual({ lenses: [{ id: "", name: "No lens", on: true }, { id: "w", name: "Work", on: false }], ask: "/?ask=1" });
+    expect(switchesOf([work], work).lenses.map((l) => l.on)).toEqual([false, true]);
+    expect(switchesOf([], null).lenses).toEqual([]);
+    expect(feed([], "today", work).lenses).toHaveLength(2);
+  });
+  it("a pick is a lens's id, or none", () => {
+    expect(lensPickOf({ lens: "w" })).toBe("w");
+    expect(lensPickOf({ lens: "" })).toBe("");
+    expect(lensPickOf({ lens: null })).toBe("");
+    expect(lensPickOf({})).toBeNull();
+    expect(lensPickOf("w")).toBeNull();
+  });
+});
+
 describe("the notes", () => {
   const row = (id: string, p: Partial<NoteRow> & { body?: string; color?: "blue" } = {}): NoteRow => ({
     path: `notes/${id}.md`, text: serializeNote({ title: `Note ${id}`, created: "2026-11-01", tags: [...(p.tags ?? [])], ...(p.color ? { color: p.color } : {}) }, p.body ?? ""),
@@ -92,16 +108,16 @@ describe("the notes", () => {
   });
   it("pinned first, then the latest; no archived note, nor the memory file", () => {
     const f = notesFeed([row("old", { updated: 1 }), row("new", { updated: 5 }), row("pin", { pinned: true }), row("gone", { archived: true, updated: 9 }),
-      { ...row("memory"), path: "memory.md" }], null, DEFAULT_PREFS);
+      { ...row("memory"), path: "memory.md" }], [], null, DEFAULT_PREFS);
     expect(f.notes.map((n) => n.id)).toEqual(["pin", "new", "old"]);
-    expect(f).toMatchObject({ title: "Notes", url: "/notes", more: 0, look: DEFAULT_LOOK });
+    expect(f).toMatchObject({ title: "Notes", url: "/notes", more: 0, look: DEFAULT_LOOK, lenses: [], ask: "/?ask=1" });
   });
   it("a row peeks at the body as plain text and opens the note", () => {
-    const [n] = notesFeed([row("a", { body: "# Heading\n\nSome **bold** words and a [link](https://x.y).\n", color: "blue" })], null, DEFAULT_PREFS).notes;
+    const [n] = notesFeed([row("a", { body: "# Heading\n\nSome **bold** words and a [link](https://x.y).\n", color: "blue" })], [], null, DEFAULT_PREFS).notes;
     expect(n).toEqual({ id: "a", title: "Note a", peek: "Some bold words and a link.", pinned: false, url: "/note/a", color: THEMES.oled.NOTE_COLORS.blue });
   });
   it("is seen through the lens, in its theme", () => {
-    const f = notesFeed([row("a", { tags: ["work"], color: "blue" }), row("b")], work, DEFAULT_PREFS);
+    const f = notesFeed([row("a", { tags: ["work"], color: "blue" }), row("b")], [work], work, DEFAULT_PREFS);
     expect(f.title).toBe("Notes · Work");
     expect(f.notes.map((n) => [n.id, n.color])).toEqual([["a", THEMES.light.NOTE_COLORS.blue]]);
   });

@@ -16,7 +16,7 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
 | `Server.kt` | The server's address and last look (`Store`), the requests (`Api`), `Unreachable` and `Refused` | |
 | `Sync.kt`, `Outbox.kt` | The one background job; what waits to be sent | |
 | `ClipActivity.kt`, `TaskActivity.kt`, `SettingsActivity.kt`, `OpenActivity.kt`, `TaskTile.kt` | The share sheet, the new task, the settings, the way into the web app, the tile | |
-| `widget/` | The two widgets, their per-widget state (`Keys`), frame and actions; the Tasks widget's list picker | |
+| `widget/` | The two widgets, their per-widget state (`Keys`), frame and actions; the Tasks widget's list picker; the lens picker (`LensActivity`) | |
 | `scripts/generate.ts` | Colours, icons (lucide), the brand mark and fonts as resources, written at build time into `app/build` | |
 | `gradle.sh` | The pinned Gradle version and its checksum | |
 
@@ -26,7 +26,7 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
   the server's answer. A new need is a new field in `companion.ts`, for the iPhone companion too, never logic in Kotlin.
   The copies that exist (a share as a clip, a picture's sizes, a clip's choices, tags and result lines) are listed in
   `companion.ts`'s header and each has cases in `companion-cases.json`; a new copy needs both.
-- **No screens of the app's.** A tap opens the web app (`OpenActivity`) at a `url` the server sent.
+- **No screens of the app's.** A tap opens the web app (`OpenActivity`) at a `url` the server sent; the assistant button is one such (`Switches.ask`), not a chat of its own.
 - **No colour, icon or font of its own.** Colours are the feed's `look`, or the generated default (`R.color.tf_*`);
   icons are lucide through `scripts/generate.ts` (`ICONS`); nothing generated is committed or edited.
 - **Only https, and no sign-in**: the same gate as every client (`../SECURITY.md`). Never allow cleartext.
