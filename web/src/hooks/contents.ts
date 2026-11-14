@@ -99,9 +99,9 @@ export type Scrub = {
 };
 
 /** The scrub in progress, null when there is none. A finger held still at the left edge opens the rail around it, the section
- *  being read under the finger; dragged, it picks a heading while the note holds still (its scrolling is off for the scrub), and
- *  the note glides there when the finger lifts: back on the tick it began on, nothing moves. Android's back gesture is a swipe
- *  inward from that edge: a hold and a drag along it are neither, and a touch the system takes over picks nothing. */
+ *  being read under the finger; dragged, the note glides to each heading it comes onto and stays where the finger lifts. Only
+ *  those glides move the note: its own scrolling is off for the scrub, so the drag never scrolls it. Android's back gesture is a
+ *  swipe inward from that edge: a hold and a drag along it are neither, and a touch the system takes over puts the note back. */
 export function useScrub(contents: Contents, on: boolean): Scrub | null {
   const [scrub, setScrub] = useState<Scrub | null>(null);
   const latest = useRef(contents);
@@ -124,6 +124,7 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
       from = current;
       el.style.overflowY = "hidden";     // no scroll of the browser's own under the scrub, one already begun included
       haptic("tick");
+      if (held.index !== from) latest.current.jump(held.index);
       setScrub(held);
     };
     const stop = () => {
@@ -136,7 +137,7 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
       setScrub(null);
       return index;
     };
-    const lift = () => { const index = stop(); if (index !== null && index !== from) latest.current.jump(index); };
+    const cancel = () => { const index = stop(); if (index !== null && index !== from) latest.current.jump(from); };
     const down = (e: TouchEvent) => {
       stop();
       const t = e.touches[0];
@@ -152,6 +153,7 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
         if (index === held.index) return;
         held = { ...held, index };
         haptic("tap");
+        latest.current.jump(index);
         setScrub(held);
       } else if (start && Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP) stop();
     };
@@ -159,15 +161,15 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
     const menu = (e: Event) => { if (start) e.preventDefault(); };
     el.addEventListener("touchstart", down, { passive: true });
     el.addEventListener("touchmove", move, { passive: false });
-    el.addEventListener("touchend", lift);
-    el.addEventListener("touchcancel", stop);
+    el.addEventListener("touchend", stop);
+    el.addEventListener("touchcancel", cancel);
     el.addEventListener("contextmenu", menu);
     return () => {
       stop();
       el.removeEventListener("touchstart", down);
       el.removeEventListener("touchmove", move);
-      el.removeEventListener("touchend", lift);
-      el.removeEventListener("touchcancel", stop);
+      el.removeEventListener("touchend", stop);
+      el.removeEventListener("touchcancel", cancel);
       el.removeEventListener("contextmenu", menu);
     };
   }, [on, count, scroller]);

@@ -3,7 +3,7 @@
 // to tick with the scroll. Under a mouse a tick shows a card of its heading and the first words under it (Animate UI's own Tooltip:
 // one card that glides from tick to tick) and a click scrolls there. On a phone the ticks are small and fade in while the note
 // scrolls, to say where you are; a finger held at the left edge opens them to a fingertip's step around it, and dragged along the
-// edge it picks a heading, the same card beside the finger, and the note glides there on release (hooks/contents.ts `useScrub`).
+// edge the note glides to each heading it comes onto, the same card standing over the finger (hooks/contents.ts `useScrub`).
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@animate-ui/react/primitives/tooltip";
 import { blur, scale, spring, transition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AnimatePresence, motion } from "motion/react";
@@ -19,6 +19,9 @@ const lengthOf = (level: number) => (level <= 1 ? LONG : level === 2 ? 15 : 9);
 const SMALL_ROW = 7, SMALL = 0.6;
 /** Under a finger: the tick it is on and the ones beside it grow, so the place reads past the fingertip. */
 const ON = 1.35, BESIDE = 1.15;
+/** The scrub's card stands above the finger, clear of the thumb and the hand under it: its foot `LIFT` over the tick. Too near the
+ *  top for that (`ROOM`), it stands beside the finger instead, `ASIDE` further in, past the thumb's pad. */
+const LIFT = 44, ROOM = 132, ASIDE = 40, HALF = 38;
 
 const CARD = "w-60 rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10";
 
@@ -98,11 +101,13 @@ function PhoneRail({ contents, scrub }: { contents: Contents; scrub: Scrub | nul
   if (!items.length) return null;
 
   const row = scrub?.row ?? SMALL_ROW, at = Math.min(scrub?.index ?? current, items.length - 1);
-  // From the scroller's centre line: the rail's top, each tick's line, and the card's (kept clear of the top and bottom edges)
+  // From the scroller's centre line: the rail's top and each tick's line
   const top = scrub ? scrub.top - scrub.height / 2 : -(items.length * SMALL_ROW) / 2;
   const line = (i: number) => top + (i + 0.5) * row - 1;
   const size = (i: number) => (!scrub ? SMALL : i === at ? ON : Math.abs(i - at) === 1 ? BESIDE : 1);
-  const reach = scrub ? scrub.height / 2 - 52 : 0;
+  // The card hangs by its foot: over the finger, or level with it and further in when the finger is near the top
+  const beside = !!scrub && line(at) + scrub.height / 2 < ROOM;
+  const card = beside ? { x: ASIDE, y: line(at) + HALF } : { x: 0, y: line(at) - LIFT };
   const hidden = { opacity: 0, scale: reduce ? 1 : scale.popover };
 
   return (
@@ -117,9 +122,9 @@ function PhoneRail({ contents, scrub }: { contents: Contents; scrub: Scrub | nul
       </motion.div>
       <AnimatePresence>
         {scrub ? (
-          <motion.div key="card" initial={false} animate={{ y: Math.max(-reach, Math.min(reach, line(at))) }} transition={follow} className="absolute top-1/2 left-12 h-0">
+          <motion.div key="card" initial={false} animate={card} transition={follow} className="absolute top-1/2 left-10 h-0">
             <motion.div initial={hidden} animate={{ opacity: 1, scale: 1, transition: bloom }} exit={{ ...hidden, transition: bloom }}
-              className={`relative max-w-[calc(100vw-4rem)] -translate-y-1/2 ${CARD}`} style={{ transformOrigin: "0% 50%" }}>
+              className={`relative max-w-[calc(100vw-6rem)] -translate-y-full ${CARD}`} style={{ transformOrigin: "0% 100%" }}>
               <AnimatePresence mode="popLayout" initial={false}>
                 <motion.div key={at} initial={{ opacity: 0, filter: blur.icon }} animate={{ opacity: 1, filter: "blur(0px)", transition: swap }} exit={{ opacity: 0, filter: blur.icon, transition: swap }}>
                   <Card item={items[at]} />
