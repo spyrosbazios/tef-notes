@@ -11,7 +11,7 @@ import { DrawingLayer } from "@/components/drawing-layer";
 import { FormatTools } from "@/components/format-tools";
 import { Swatches } from "@/components/note-actions";
 import { MicButton } from "@/components/mic-button";
-import { ContentsButton, ContentsRail } from "@/components/note-contents";
+import { ContentsRail } from "@/components/note-contents";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
@@ -75,7 +75,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const [uploading, setUploading] = useState(false);
   const drawing = useOpened(n.note.id);     // the drawing open over the note, the owner's or the agent's (hooks/drawing.ts)
   const scroller = useRef<HTMLDivElement>(null);
-  const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text and the phone's sheet
+  const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text
   const title = useRef<HTMLInputElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
   const addFiles = useAddFiles(n.note.id);
   const note = n.note;
@@ -156,7 +156,6 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         <Turns className={cn("ml-2 shrink-0 place-items-start text-xs", d.status !== "error" && "max-sm:hidden")} aria-live="polite" state={d.status} states={STATUS} />
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
-        <ContentsButton contents={contents} />
         <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
         <DropdownMenu>
           <Tooltip>
