@@ -273,3 +273,39 @@ there is no way back.
 docker compose -f docker-compose.yml -f docker-compose.build.yml build --build-arg PB_VERSION=<new> pocketbase
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d   # or edit the ARG default
 ```
+
+### Real PocketBase integration contract
+
+From the repository root:
+
+```sh
+bun --no-env-file server/integration/run.ts
+# Include application services, companion handlers and the chat saver (also used in CI).
+bun install --frozen-lockfile --cwd server/agent
+bun --no-env-file server/integration/run.ts --application
+bun server/agent/node_modules/typescript/bin/tsc --project server/integration/tsconfig.json
+# Optional: use an existing binary (must match server/Dockerfile's PB_VERSION).
+TEF_TEST_POCKETBASE=/absolute/path/to/pocketbase bun --no-env-file server/integration/run.ts
+```
+
+Requires Bun, and `curl` + `unzip` when no PocketBase binary is supplied or on PATH. The runner reads the production
+version from `Dockerfile`; downloads use that exact GitHub release and are checked against its published SHA-256
+checksums. An existing binary with a different version fails explicitly. The default suite needs no package install;
+`--application` also loads the agent's application services and needs its dependencies.
+
+The runner copies the repository migrations and hooks into a fresh temporary directory, starts PocketBase on an
+OS-assigned `127.0.0.1` port, and tests the public shared client over HTTP. It uses an empty key directory and a minimal
+child environment, never deployment configuration, production data, Docker Compose, or an existing server URL.
+It stops its children and removes only its temporary directory on completion or handled interruption.
+
+Coverage: notes/tasks rev compare-and-swap (missing/stale writes and deletes), noteColumns create/update round trips,
+immutable note path/kind, link replay and relation uniqueness, invalid link shapes, cascades from either endpoint,
+multipart attachments (bytes, unique names, download and deletion cleanup), and legacy/versioned chat history round trips.
+`--application` adds service writes and cache refreshes, recurring tasks carrying links, companion add/tick handlers,
+and versioned chat saving against that server. This checks actual PocketBase hooks and migrations, including the HTTP
+errors the shared client maps to Conflict. It does not exercise external AI jobs, the sidecar HTTP listener,
+upgrades of an existing database, or simultaneous competing writes.
+
+The integration suites deliberately have no Bun test-discovery suffix. Ordinary `bun test` does not run them; the
+runner creates a temporary test wrapper for this explicit command. CI runs it as the separate **PocketBase - HTTP
+integration contract** job. Download, startup and assertion failures fail the job rather than silently skipping it.

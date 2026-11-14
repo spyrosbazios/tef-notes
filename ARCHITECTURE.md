@@ -21,7 +21,10 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
   compose network only, that the agent's `/agent/transcribe` passes a clip to (`server/README.md`, "Voice input").
 - `packages/core/`: dependency-free TypeScript shared by the web app, CLI, extension and agent, imported as
   `@/core/*`. It holds the note format, the merge, the PocketBase client, task logic, agent card shapes and the theme
-  palettes. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
+  palettes. `record-contracts.ts` holds transport-free record types, conflict errors and derived note columns;
+  `record-protocol.ts` holds note/task/link requests over an injected transport. The fetch client (`pocketbase.ts`)
+  and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports the contracts,
+  not the HTTP client. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
   the note format that a test (`server/test/notes.test.js`) checks against `packages/core/src/notes.ts`.
 - Clients own merging. The server stays thin: schema, rules, the `rev` contract and a few jobs.
 - There is no sign-in; see [SECURITY.md](SECURITY.md).
@@ -168,8 +171,10 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - `POST /agent/chat` streams an [AI SDK](https://ai-sdk.dev) UI message stream (`useChat` with `DefaultChatTransport` on
   the clients). `GET /agent/models` lists the provider's models and says whether the server holds a key (`available`).
 - The prompt, the notes context, the memory and chat saving are in `src/agent.ts`. Its tools work on PocketBase through
-  the same `rev` compare-and-swap: `src/tools.ts` and `src/notes.ts` for notes, `src/todoTools.ts` over `src/todo.ts` for
-  tasks.
+  the same `rev` compare-and-swap. `src/application/notes.ts` and `todo.ts` own persistence, revision retries, merges,
+  links and recurrence, returning domain records/text. `src/notes.ts` and `todo.ts` are assistant card adapters;
+  `src/tools.ts` and `todoTools.ts` expose them as tools. Companion routes, direct search and index warming use the
+  application services directly. Import boundaries are checked by `scripts/check-boundaries.ts` in CI.
 - `search_notes` finds a note by its words and by meaning (`src/semantic.ts`): a small multilingual embedding model
   (bekko-embedding-v1-a8m, MIT) runs in the agent on the CPU, so a Greek question finds an English note; no key, nothing
   leaves the host. Each note is cut into chunks and embedded when its text changes; the vectors and the model live in the
@@ -180,6 +185,9 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   notes and tasks as cards: every write's result carries its `card`, and `show_items` is how the agent puts
   what it found in front of you. Card shapes (`NoteCard`, `TaskCard`) and builders are in
   `packages/core/src/agent.ts`.
+- Tool policy lives beside each tool-definition module in typed tables (`src/tool-policy.ts`): approval and validation,
+  result provenance, availability after taint, and the Exa requirement. `src/tools.ts` assembles them; the agent derives
+  approvals from them and supplies policy lookup to the pure guard and loop utilities.
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
   next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`.
 - Always-on assistant: a client that stays with you (the web's docked panel, its Ask tab on a phone) sends the page it is on as
@@ -187,7 +195,10 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   `<context>` (never the instructions), resolves "this note" from it, and gets UI tools (`open_note`, `open_task`,
   `go_view`) that the client does itself: no server `execute`, no confirm card, answered through `addToolOutput`.
 - A chat is a record in `chats`: a client creates it empty, and the agent writes `messages`, `title` and `model` as the
-  reply streams and when it ends.
+  reply streams and when it ends. `packages/core/src/chat-history.ts` owns the persistence envelope: `historyVersion`
+  is additive, missing/zero versions read as legacy, and newer unsupported versions fail without replacing history.
+  Historical tool inputs and outputs remain intact for display and export. Schema repair and prompt trimming operate
+  on an execution copy; taint is classified before repair, and both streaming and final saves retain the historical parts.
 - Providers: one model provider per server, `TEF_NOTES_PROVIDER` (DeepSeek by default; `server/agent/src/models.ts`, with
   `server/pb_hooks/lib/llm.js` its plain-HTTP copy for the hooks); `exa` powers web search. Without the provider's key a chat is refused; without
   `exa` the web tools are left out of the prompt.
@@ -258,7 +269,9 @@ writes text of its own, and only with your confirmation.
 
 `web/` is built by the server image into `pb_public`, so the web app and the API share an origin (no CORS, one URL to
 configure). It uses shadcn, TanStack Query and axios services (`web/src/services/`), with errors mapped to the core's
-`Conflict`. On a phone it is the installed PWA, in its own layout below `md`.
+`Conflict`. The web sync controller (`web/src/lib/sync-controller.ts`) owns its mutable status and timers over an injected
+store and transport. The root frame's `hooks/live.ts` owns realtime and browser lifecycle subscriptions; `lib/local-records.ts`
+owns the notes/tasks/links query projections, shared by feature edits and sync redraws. On a phone it is the installed PWA, in its own layout below `md`.
 
 Colours live in one place, `packages/core/src/theme.ts` (`THEMES`: sixteen themes, nine dark and seven light, each a palette,
 tints and note colours, and `ACCENTS`). The web app, the site and the extension get the

@@ -10,7 +10,7 @@ import { plannedByDay } from "@/core/planner";
 import { localDay } from "@/core/time";
 import { dedupeTags, type Task } from "@/core/todo";
 import { WIDGET_LIMITS, type BookedTask, type DayWidget, type ReviewWidget, type TimelineDay, type WeekWidget } from "@/core/widgets";
-import type { Meta } from "./notes";
+import type { Meta } from "./application/notes";
 
 const DAY = 86_400_000;
 const two = (n: number) => String(n).padStart(2, "0");
@@ -107,7 +107,8 @@ export function freeSlots(tasks: readonly Task[], date: string, minutes: number,
 export const STALLED_DAYS = 14;
 
 /** A task's times on the server (`created`, `updated`, ms): the core's Task has neither. */
-export type Stamp = { created: number; updated: number };
+import type { Stamp } from "./application/metadata";
+export type { Stamp } from "./application/metadata";
 
 /** The last `days` days up to the day of `now`. Counts by local day: tasks ticked in them (`done`), made (`created`), notes made
  *  (their `created` day) and edited (changed in them, not made in them). A task is stalled when open and unchanged for

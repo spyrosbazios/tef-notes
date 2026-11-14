@@ -6,7 +6,7 @@ import { addDays } from "@/core/dates";
 import { localDay } from "@/core/time";
 import { newTask, type Task } from "@/core/todo";
 import { widgetOf } from "@/core/widgets";
-import { fromWeb } from "../src/guard";
+import { fromWeb } from "../src/tools";
 import type { Meta } from "../src/notes";
 import { Notes } from "../src/notes";
 import { dayOfTasks, freeSlots, quoteIn, reviewOf, STALLED_DAYS, weekOfTasks, type Stamp } from "../src/plan";

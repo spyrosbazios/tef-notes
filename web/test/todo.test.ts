@@ -1,6 +1,6 @@
 // The notes, tasks and links hooks over the local copy, with the services faked as a server that holds the rev contract: an edit
 // is made on the copy and shows at once, goes up when a sync runs, and a stale one is merged, never sent over the newer.
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import "./storage";
 import { QueryClient } from "@tanstack/react-query";
 import { parseNote } from "@/core/notes";
@@ -74,23 +74,25 @@ const { LENSES, setActiveLens } = await import("@/hooks/lens");
 const { addItem } = await import("@/core/todo");
 const { local } = await import("@/lib/local");
 const { note } = await import("@/lib/net");
-const { getStatus, heard, onRedraw, syncNow } = await import("@/lib/sync");
-const { projectNotes } = await import("@/hooks/notes");
-const { projectTasks } = await import("@/hooks/todo");
-const { projectLinks } = await import("@/hooks/links");
+const { getStatus, heard, onRedraw, sync, syncNow } = await import("@/lib/sync");
+const { projectLocal } = await import("@/lib/local-records");
 
 let qc: QueryClient, stop: (() => void) | undefined;
-beforeEach(() => {
+beforeEach(async () => {
   for (const n of local.notes.all()) local.notes.delete(n.path);
   for (const t of local.tasks.all()) local.tasks.delete(t.id);
   for (const l of local.links.all()) local.links.delete(l.link.id);
   server.tasks.clear(); server.notes.clear(); server.links.clear(); server.down = false; sent.length = 0;
   qc = new QueryClient();
   stop?.();
-  stop = onRedraw(() => { projectNotes(qc); projectTasks(qc); projectLinks(qc); });     // what useLive does
+  const redraw = onRedraw(() => projectLocal(qc));
+  const background = sync.start();
+  stop = () => { background(); redraw(); };
+  await syncNow();
   note("online");                                           // Bun has no `navigator.onLine`, which lib/net.ts reads as it loads
   setActiveLens(null);
 });
+afterEach(() => stop?.());
 const cached = (id: string) => qc.getQueryData<{ id: string; rev: number; [k: string]: any }[]>(TASKS)?.find((t) => t.id === id);
 const seen = () => qc.getQueryData<{ path: string; text: string }[]>(NOTES) ?? [];
 

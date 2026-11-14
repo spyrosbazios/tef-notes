@@ -8,7 +8,7 @@ import { find } from "./find";
 import { catalog } from "./models";
 import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
 import { mapRoute, placeRoute, suggestRoute } from "./places";
-import { Notes } from "./notes";
+import { NoteService } from "./application/notes";
 import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
 import { startReminders } from "./reminders";
 import { reader } from "./reader";
@@ -56,7 +56,7 @@ Bun.serve({
 /** Keeps search by meaning warm: the model loaded and every note embedded before anyone searches (a search also
  *  catches up on its own). */
 const WARM = 10 * 60_000;
-const warm = () => new Notes(server).list().then(async (n) => semantic().sync(n, await allPdfs(server, n)))
+const warm = () => new NoteService(server).list().then(async (n) => semantic().sync(n, await allPdfs(server, n)))
   .catch((e) => console.error(`agent: indexing notes by meaning failed: ${(e as Error).message}`));
 void warm();
 setInterval(warm, WARM);

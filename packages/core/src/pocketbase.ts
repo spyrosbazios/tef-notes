@@ -10,15 +10,15 @@
 import { SEARCH_PATH, searchHitsOf, type SearchHit } from "./find";
 import { getJson, HttpError } from "./http";
 import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
-import { noteKindOf, parseNote, type NoteKind } from "./notes";
-import { LINK_COLUMNS, linkOf, linkColumn, linkRecord, sameLink, type Link, type LinkEnd, type LinkSide } from "./record-links";
+import { noteKindOf, type NoteKind } from "./notes";
+import type { Link, LinkEnd } from "./record-links";
+import { conflictOf, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
+export { Conflict, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
+import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "./record-protocol";
+export { linkFilter } from "./record-protocol";
 import { taskOf, type Task } from "./todo";
 
 export type Server = { url: string };                      // https://host[:port], no trailing slash
-export type Entry = { rec: string; path: string; rev: number };
-export type Remote = Entry & { text: string; kind: NoteKind };
-/** A listing's line: an Entry and its kind. */
-export type Listed = Entry & { kind: NoteKind };
 export type Photo = { rec: string; note: string; name: string; file: string; size?: number };
 
 /** What a page says about itself (the server's link-preview route): all strings, empty where the page is silent.
@@ -30,8 +30,6 @@ export type LinkPreview = { url: string; title: string; description: string; sit
  *  agent's PDF pages alike: `blur` a few hundred bytes, shown blurred at once; `sharp` the one that fades in over it. */
 export type ThumbSize = "blur" | "sharp";
 export const THUMB_SIZES: Record<ThumbSize, string> = { blur: "32x32f", sharp: "640x640f" };
-
-export class Conflict extends Error {}
 
 const PAGE = 500;
 
@@ -48,12 +46,7 @@ export const json = (method: string, body: unknown): RequestInit => ({
 
 /** An HTTP failure as what it means here: a stale rev; a create whose path, photo name or record id the server has
  *  already — someone else made one by that name first, or this one landed before. Anything else stays an HttpError. */
-function meaning(e: HttpError, what: string): Error {
-  if (e.status === 409) return new Conflict(what);
-  const taken = (f: string) => e.body?.data?.[f]?.code === "validation_not_unique";
-  if (e.status === 400 && (taken("path") || taken("note") || taken("name") || taken("id"))) return new Conflict(what);
-  return e;
-}
+function meaning(e: HttpError, what: string): Error { return conflictOf(e.status, e.body, what) ?? e; }
 
 /** One request, its failures as meaning() reads them. */
 export async function call(s: Server, path: string, init: RequestInit = {}): Promise<any> {
@@ -64,37 +57,15 @@ export async function call(s: Server, path: string, init: RequestInit = {}): Pro
   }
 }
 
-/** A filter literal: PocketBase's are double-quoted, with backslash escapes. */
-export const lit = (v: string) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-
-// ---- notes
-
-/** Every record's path, rev and kind, no text: what a pull compares the phone against. `kind` comes with every listing
- *  so a copy made before the column existed learns it without a fetch. */
-export async function list(s: Server): Promise<Listed[]> {
-  const out: Listed[] = [];
-  for (let page = 1; ; page++) {
-    const j = await call(s, `collections/notes/records?fields=id,path,rev,kind&perPage=${PAGE}&page=${page}&skipTotal=1&sort=path`);
-    out.push(...j.items.map((r: any) => ({ rec: r.id, path: r.path, rev: r.rev, kind: noteKindOf(r.kind) })));
-    if (j.items.length < PAGE) return out;
-  }
-}
-
+const transport = (s: Server): RecordTransport => ({
+  request: (path, request = {}) => call(s, path, request.body === undefined ? { method: request.method } : json(request.method ?? "POST", request.body)),
+  status: (e) => e instanceof HttpError ? e.status : undefined,
+});
 const remote = (r: any): Remote => ({ rec: r.id, path: r.path, rev: r.rev, text: r.text, kind: noteKindOf(r.kind) });
-
-/** One record by id; null when it's gone. */
-export async function get(s: Server, rec: string): Promise<Remote | null> {
-  try { return remote(await call(s, `collections/notes/records/${rec}`)); } catch (e) {
-    if (e instanceof HttpError && e.status === 404) return null;
-    throw e;
-  }
-}
-
-/** One record by path; null when there's none. */
-export async function read(s: Server, path: string): Promise<Remote | null> {
-  const j = await call(s, `collections/notes/records?filter=${encodeURIComponent(`path = ${lit(path)}`)}&perPage=1&skipTotal=1`);
-  return j.items.length ? remote(j.items[0]) : null;
-}
+const notes = (s: Server) => noteCollection(transport(s), remote, { sort: "path" });
+export const list = (s: Server): Promise<Listed[]> => notes(s).list();
+export const get = (s: Server, rec: string): Promise<Remote | null> => notes(s).get(rec);
+export const read = (s: Server, path: string): Promise<Remote | null> => notes(s).read(path);
 
 export type Card = { path: string; kind: NoteKind; title: string; tags: string[]; pinned: boolean; archived: boolean; updated: string };
 
@@ -117,148 +88,28 @@ export async function search(s: Server, query: string, limit = 20): Promise<Remo
   return j.items.map(remote);
 }
 
-/** A record's columns: `text`, and the rest copied out of its frontmatter. Every
- *  writer sends these (the web app's own transport too),
- *  and only these: a PATCH leaves the server's own columns (`autotagged`, `tagged`) as they are. */
-export function noteColumns(path: string, text: string) {
-  const n = parseNote(path, text);
-  return { path, text, title: n.title, day: /^\d{4}-\d{2}-\d{2}$/.test(n.created) ? n.created : "", pinned: n.pinned,
-    archived: n.archived, color: n.color ?? "", tags: n.tags };
-}
+export const create = (s: Server, path: string, text: string, mark: Mark = {}): Promise<Remote> => notes(s).create(path, text, mark);
+export const update = (s: Server, e: Entry, text: string, mark: Mark = {}): Promise<Remote | null> => notes(s).update(e, text, mark);
+export const remove = (s: Server, e: Pick<Entry, "rec" | "rev">): Promise<void> => notes(s).remove(e);
 
-/** A write's marks. `tainted`: written by an outside agent, so the in-app assistant treats it as web text (it asks
- *  before writing once it has read it). Set in the same write, never cleared. */
-export type Mark = { tainted?: true };
-
-/** A new note (kind `note`) at rev 1. Conflict: the path is taken. */
-export const create = async (s: Server, path: string, text: string, mark: Mark = {}): Promise<Remote> =>
-  remote(await call(s, "collections/notes/records", json("POST", { ...noteColumns(path, text), ...mark })));
-
-/** `rev`: the version this edit was based on. Conflict: it has moved on since. null: the record is gone. */
-export async function update(s: Server, e: Entry, text: string, mark: Mark = {}): Promise<Remote | null> {
-  try { return remote(await call(s, `collections/notes/records/${e.rec}`, json("PATCH", { ...noteColumns(e.path, text), rev: e.rev, ...mark }))); } catch (err) {
-    if (err instanceof HttpError && err.status === 404) return null;
-    throw err;
-  }
-}
-
-/** Gone, unless it moved on since `rev` (Conflict). Already gone is done. */
-export async function remove(s: Server, e: Pick<Entry, "rec" | "rev">): Promise<void> {
-  try { await call(s, `collections/notes/records/${e.rec}?rev=${e.rev}`, { method: "DELETE" }); } catch (err) {
-    if (err instanceof HttpError && err.status === 404) return;
-    throw err;
-  }
-}
-
-// ---- tasks
-
-/** A record as the server holds it: its fields and the version they are at. */
-export type Versioned<T> = T & { rev: number };
-/** A listing's line: what a pull compares against. */
-export type RevEntry = { id: string; rev: number };
-
-const ID_BATCH = 40;
-
-/** The calls for one collection under the rev contract (server/pb_hooks/rev.pb.js), its records read by `of`. */
-function revCollection<T extends { id: string }>(name: string, of: (r: any) => T) {
-  const rec = (r: any): Versioned<T> => ({ ...of(r), rev: r.rev });
-  const records = `collections/${name}/records`;
-  const gone = (e: unknown) => e instanceof HttpError && e.status === 404;
-  const paged = async (s: Server, q: string): Promise<any[]> => {
-    const out: any[] = [];
-    for (let page = 1; ; page++) {
-      const j = await call(s, `${records}?${q}&perPage=${PAGE}&page=${page}&skipTotal=1`);
-      out.push(...j.items);
-      if (j.items.length < PAGE) return out;
-    }
-  };
-  return {
-    /** Every record's id and rev, nothing else. */
-    revs: async (s: Server): Promise<RevEntry[]> => (await paged(s, "fields=id,rev&sort=id")).map((r) => ({ id: r.id, rev: r.rev })),
-    /** Every record, or those a PocketBase `filter` picks (build literals with lit), in `sort` order (`order`, `-done`). */
-    list: async (s: Server, o: { filter?: string; sort?: string } = {}): Promise<Versioned<T>[]> =>
-      (await paged(s, [o.filter ? `filter=${encodeURIComponent(o.filter)}` : "", `sort=${encodeURIComponent(o.sort ?? "order")}`].filter(Boolean).join("&"))).map(rec),
-    /** One record; null when there's none. */
-    async get(s: Server, id: string): Promise<Versioned<T> | null> {
-      try { return rec(await call(s, `${records}/${id}`)); } catch (e) { if (gone(e)) return null; throw e; }
-    },
-    /** The records of these ids the server has, a few dozen a request. */
-    async getMany(s: Server, ids: string[]): Promise<Versioned<T>[]> {
-      const out: Versioned<T>[] = [];
-      for (let i = 0; i < ids.length; i += ID_BATCH) {
-        const filter = ids.slice(i, i + ID_BATCH).map((id) => `id = ${lit(id)}`).join(" || ");
-        out.push(...(await call(s, `${records}?filter=${encodeURIComponent(filter)}&perPage=${ID_BATCH}&skipTotal=1`)).items.map(rec));
-      }
-      return out;
-    },
-    /** A new record under the client's own id, at rev 1. Conflict: a record has that id (this create landed before). */
-    create: async (s: Server, r: T, mark: Mark = {}): Promise<Versioned<T>> => rec(await call(s, records, json("POST", { ...r, ...mark }))),
-    /** Some fields changed, from the version `rev`. Conflict: it has moved on since. null: the record is gone. */
-    async update(s: Server, id: string, rev: number, fields: Partial<Omit<T, "id">>, mark: Mark = {}): Promise<Versioned<T> | null> {
-      try { return rec(await call(s, `${records}/${id}`, json("PATCH", { ...fields, id: undefined, rev, ...mark }))); } catch (e) { if (gone(e)) return null; throw e; }
-    },
-    /** Gone, unless it moved on since `rev` (Conflict). Already gone is done. */
-    async remove(s: Server, id: string, rev: number): Promise<void> {
-      try { await call(s, `${records}/${id}?rev=${rev}`, { method: "DELETE" }); } catch (e) { if (!gone(e)) throw e; }
-    },
-  };
-}
-
-export const tasks = revCollection<Task>("tasks", taskOf);
-
-// ---- links
-
-/** A PocketBase filter for the links with `end` on `side`. */
-export const linkFilter = (side: LinkSide, end: LinkEnd) => `${linkColumn(side, end.type)} = ${lit(end.id)}`;
-
-const LINK_FIELDS = ["id", ...LINK_COLUMNS, "role"].join(",");
-
-/** The `links` collection (core/record-links.ts): made and deleted, never edited, no `rev`. Both idempotent, so a phone
- *  replays its queue without asking what landed. */
+const taskProtocol = revCollection<Task>("tasks", taskOf);
+export const tasks = {
+  revs: (s: Server) => taskProtocol.revs(transport(s)),
+  list: (s: Server, o: { filter?: string; sort?: string } = {}) => taskProtocol.list(transport(s), o),
+  get: (s: Server, id: string) => taskProtocol.get(transport(s), id),
+  getMany: (s: Server, ids: string[]) => taskProtocol.getMany(transport(s), ids),
+  create: (s: Server, r: Task, mark: Mark = {}) => taskProtocol.create(transport(s), r, mark),
+  update: (s: Server, id: string, rev: number, fields: Partial<Omit<Task, "id">>, mark: Mark = {}) => taskProtocol.update(transport(s), id, rev, fields, mark),
+  remove: (s: Server, id: string, rev: number) => taskProtocol.remove(transport(s), id, rev),
+};
 export const links = {
-  /** Every link, or those a PocketBase `filter` picks (linkFilter builds one end's), oldest first. A record that isn't a
-   *  link (a column set it doesn't know) is left out. */
-  async list(s: Server, filter?: string): Promise<Link[]> {
-    const out: Link[] = [], f = filter ? `&filter=${encodeURIComponent(filter)}` : "";
-    for (let page = 1; ; page++) {
-      const j = await call(s, `collections/links/records?fields=${LINK_FIELDS}&sort=created,id&perPage=${PAGE}&page=${page}&skipTotal=1${f}`);
-      for (const r of j.items) { const l = linkOf(r); if (l) out.push(l); }
-      if (j.items.length < PAGE) return out;
-    }
-  },
-  /** Every link's id: what a pull compares a phone's set against (an id never changes what it points at). */
-  async ids(s: Server): Promise<string[]> {
-    const out: string[] = [];
-    for (let page = 1; ; page++) {
-      const j = await call(s, `collections/links/records?fields=id&sort=id&perPage=${PAGE}&page=${page}&skipTotal=1`);
-      out.push(...j.items.map((r: any) => String(r.id)));
-      if (j.items.length < PAGE) return out;
-    }
-  },
-  /** The links with `end` at either side: a note's, both what it points at and what points at it (its backlinks). */
-  of: (s: Server, end: LinkEnd) => links.list(s, `${linkFilter("from", end)} || ${linkFilter("to", end)}`),
-  /** The links with `end` as their `from`. */
-  from: (s: Server, end: LinkEnd) => links.list(s, linkFilter("from", end)),
-  /** The links with `end` as their `to`: what points at it. */
-  to: (s: Server, end: LinkEnd) => links.list(s, linkFilter("to", end)),
-  /** `l` made (newLink names it). Idempotent: one the server has by that id, or another of the same ends and role, is the
-   *  link meant, and comes back as the server holds it (a phone keeps the server's id). HttpError 404 is an end that is
-   *  gone; any other 400 a link the server refuses. */
-  async add(s: Server, l: Link): Promise<Link> {
-    try { return linkOf(await call(s, `collections/links/records?fields=${LINK_FIELDS}`, json("POST", linkRecord(l)))) ?? l; } catch (e) {
-      if (!(e instanceof Conflict) && !(e instanceof HttpError && e.status === 400)) throw e;
-      const had = (await links.list(s, linkFilter("from", l.from))).find((x) => x.id === l.id || sameLink(x, l));
-      if (had) return had;
-      throw e;
-    }
-  },
-  /** A link gone. Already gone is done. */
-  async remove(s: Server, id: string): Promise<void> {
-    try { await call(s, `collections/links/records/${id}`, { method: "DELETE" }); } catch (e) {
-      if (e instanceof HttpError && e.status === 404) return;
-      throw e;
-    }
-  },
+  list: (s: Server, filter?: string) => linkProtocol.list(transport(s), filter),
+  ids: (s: Server) => linkProtocol.ids(transport(s)),
+  of: (s: Server, end: LinkEnd) => linkProtocol.of(transport(s), end),
+  from: (s: Server, end: LinkEnd) => linkProtocol.from(transport(s), end),
+  to: (s: Server, end: LinkEnd) => linkProtocol.to(transport(s), end),
+  add: (s: Server, l: Link) => linkProtocol.add(transport(s), l),
+  remove: (s: Server, id: string) => linkProtocol.remove(transport(s), id),
 };
 
 // ---- lenses

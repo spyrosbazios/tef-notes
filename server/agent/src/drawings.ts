@@ -1,6 +1,7 @@
 // A note's drawings as the agent reads them: the Excalidraw scenes attached to it (ARCHITECTURE.md), turned into shapes
 // (core/drawing.ts `shapesOf`) so the model reads what is on one, not its file. Drawing on one is the web editor's (the `draw`
 // UI tool, core/assistant.ts "the drawing"): the server never writes a scene.
+import type { Policies } from "./tool-policy";
 import { tool, type UIMessage } from "ai";
 import { z } from "zod";
 import { DIAGRAM_KINDS, diagramGuide, diagramKindsText } from "@/core/diagram-guides";
@@ -87,3 +88,10 @@ export function drawingTools(notes: Notes) {
     }),
   };
 }
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const drawingPolicies = {
+  diagram_guide: { approval: "none", result: "plain" },
+  read_drawing: { approval: "none", result: "records" },
+  show_drawing: { approval: "none", result: "records" },
+} satisfies Policies<ReturnType<typeof drawingTools>>;

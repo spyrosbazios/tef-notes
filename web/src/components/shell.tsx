@@ -31,7 +31,6 @@ import { dockNow, setDock, useDock } from "@/hooks/dock";
 import { closeDrawing, openedNow } from "@/hooks/drawing";
 import { useKeyboard } from "@/hooks/keyboard";
 import { useRail, toggleRail } from "@/hooks/rail";
-import { useLive } from "@/hooks/notes";
 import { useNewNote } from "@/hooks/new-note";
 import { INSETS, ShellContext, startOf, type ShellActions } from "@/hooks/shell";
 import { typing } from "@/lib/keys";
@@ -70,7 +69,6 @@ function NoteLayer({ id, reach }: { id: string; reach: boolean }) {
 
 /** The layout route's component (routes/_app.tsx). */
 export function Shell() {
-  useLive();
   // The screen the router is on, and the note over it: the screen keeps its place, the note is only laid over it
   const { view, task, note } = usePlace();
   const onNote = !!note;

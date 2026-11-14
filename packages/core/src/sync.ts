@@ -15,7 +15,7 @@
 //     under its own id, which the row takes), a remove is a tombstone, a 404 (an end gone from the server) drops the link.
 // "Unsent" is `updated !== pushed` (both ms, `tick`ed so an edit in the same millisecond as a push still reads as unsent,
 // and one made while a push is out stays unsent after it).
-import { Conflict, type Entry, type Listed, type Remote, type Versioned } from "./pocketbase";
+import { Conflict, type Entry, type Listed, type Remote, type Versioned } from "./record-contracts";
 import { isNotePath, newNotePath, parseNote, reconcile, type NoteKind } from "./notes";
 import { linksForNextRound, newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "./record-links";
 import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";

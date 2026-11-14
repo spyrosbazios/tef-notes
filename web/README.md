@@ -42,7 +42,8 @@ your real notes. Without it the app loads but has nothing to talk to.
 
 Everything is a same-origin request: `/api` goes to PocketBase and `/agent` to the chat agent. Production gets that
 from the server itself, which serves the built app from `pb_public`; in development the Vite proxy stands in for
-it. The transport is `src/services/` (axios); a stale write is mapped to the core's `Conflict`, and the app merges
+it. The transport is `src/services/` (axios), with `records.ts` adapting it to the shared
+`packages/core/src/record-protocol.ts` for notes, tasks and links; a stale write is mapped to the core's `Conflict`, and the app merges
 and retries.
 
 ## The assistant
@@ -186,7 +187,12 @@ The installed app opens, browses and **edits** without the server. The service w
 in a local copy in IndexedDB (`tefnotes-sync` database, `src/lib/local.ts`, over idb-keyval: held whole in memory, written behind
 it); everything on screen is read from it, every edit is written to it first, and a sync reconciles it with the server. The sync
 is `packages/core/src/sync.ts` (the logic, tested over a fake server in
-`packages/core/test/sync.test.ts`), run by `src/lib/sync.ts`.
+`packages/core/test/sync.test.ts`), run by an instance of `src/lib/sync-controller.ts`. `src/lib/sync.ts` composes
+that controller with browser storage and services. `src/hooks/live.ts`, mounted by the root frame, owns the realtime feed and
+starts/stops browser lifecycle listeners; importing a feature does not attach them. The controller owns its timers,
+status and subscriptions, and stopping its last lifecycle owner prevents late requests from scheduling another retry.
+`src/lib/local-records.ts` owns the query projections and their refresh after edits and sync; feature hooks use those
+projections rather than coordinating each other's caches.
 
 - **Edits:** a note row holds its text, the `rev` it was last in step with and `base`, the text as of that `rev`; a task row its
   record and `base`; a link its `pushed` time. An edit marks the row unsent and goes up 1.5 s after the last one, when the page

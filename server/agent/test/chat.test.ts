@@ -3,6 +3,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { isToolUIPart, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test";
+import { readChatHistory } from "@/core/chat-history";
 import { cardsOf } from "@/core/agent";
 import { parseNote } from "@/core/notes";
 import { chat } from "../src/agent";
@@ -225,5 +226,74 @@ describe("POST /agent/chat between steps", () => {
     expect(offered[0]).not.toContain("replace_selection");
     expect(offered[0]).toContain("read_note");
     expect(offered[1]).toContain("replace_selection");
+  });
+});
+
+describe("versioned history roundtrips", () => {
+  const user: UIMessage = { id: "old-user", role: "user", parts: [{ type: "text", text: "Earlier request" }] };
+  const obsolete: UIMessage = { id: "old-assistant", role: "assistant", parts: [
+    { type: "tool-read_note", toolCallId: "old-call", state: "output-available", input: { obsoletePath: "notes/old.md" }, output: { path: "notes/old.md", text: "Historical text", card: { title: "Old card" } } },
+  ] };
+  it("preserves obsolete tool inputs, outputs and display when continuing the same assistant and resuming a later turn", async () => {
+    pb.chats.set("chat1", { id: "chat1", messages: [user, obsolete] });
+    replies = [text("Continued.")];
+    const continued = await send([user, obsolete]);
+    expect(continued.parts[0]).toEqual(obsolete.parts[0]);
+    expect(pb.chats.get("chat1")!.historyVersion).toBe(1);
+    expect(pb.chats.get("chat1")!.messages[1].parts[0]).toEqual(obsolete.parts[0]);
+    expect(JSON.stringify(prompts[0])).toContain("from an older version");
+    const loaded = readChatHistory(JSON.parse(JSON.stringify(pb.chats.get("chat1")))) as UIMessage[];
+    replies = [text("Next.")];
+    await send([...loaded, { id: "next", role: "user", parts: [{ type: "text", text: "Next turn" }] }]);
+    expect(pb.chats.get("chat1")!.messages[1].parts[0]).toEqual(obsolete.parts[0]);
+    expect(pb.chats.get("chat1")!.messages).toHaveLength(4);
+  });
+  it("periodic saves during assistant continuation keep historical tool data", async () => {
+    let release!: () => void;
+    const finish = new Promise<void>((resolve) => { release = resolve; });
+    const streamed: Reply = { stream: new ReadableStream({
+      async start(controller) {
+        controller.enqueue({ type: "stream-start", warnings: [] });
+        controller.enqueue({ type: "text-start", id: "slow" });
+        await Bun.sleep(3100);
+        controller.enqueue({ type: "text-delta", id: "slow", delta: "Still working. " });
+        await finish;
+        controller.enqueue({ type: "text-end", id: "slow" });
+        controller.enqueue({ type: "finish", finishReason: { unified: "stop", raw: undefined }, usage });
+        controller.close();
+      },
+    }) };
+    replies = [streamed];
+    const pending = send([user, obsolete]);
+    try {
+      // The final callback cannot run until release: this must be the periodic save.
+      for (let n = 0; n < 45 && pb.chats.get("chat1")!.historyVersion !== 1; n++) await Bun.sleep(100);
+      expect(pb.chats.get("chat1")!.historyVersion).toBe(1);
+      expect(pb.chats.get("chat1")!.messages[1].parts[0]).toEqual(obsolete.parts[0]);
+    } finally { release(); }
+    expect((await pending).parts[0]).toEqual(obsolete.parts[0]);
+  }, 8000);
+  it("schema repair cannot erase taint from an old record read", async () => {
+    pb.put("notes/old.md", "Untrusted", { tainted: true });
+    replies = [toolCall("append_to_note", { path: "notes/20261001-shopping.md", text: "milk" })];
+    const answer = await send([user, obsolete, { id: "next", role: "user", parts: [{ type: "text", text: "Add milk" }] }], true);
+    expect(answer.parts.find(isToolUIPart)).toMatchObject({ state: "approval-requested" });
+    expect(pb.notes.get("notes/20261001-shopping.md")!.rev).toBe(1);
+    expect(offered[0]).not.toContain("update_memory");
+    expect(pb.chats.get("chat1")!.messages[1].parts[0]).toEqual(obsolete.parts[0]);
+  });
+  it("rejects future and malformed saved records before model execution or saving", async () => {
+    for (const record of [{ id: "chat1", historyVersion: 2, messages: [user, obsolete] },
+      { id: "chat1", historyVersion: 1, messages: { broken: true } }]) {
+      pb.chats.set("chat1", record);
+      const before = JSON.stringify(record);
+      const res = await chat(new Request("http://x/agent/chat", { method: "POST", body: JSON.stringify({
+        id: "chat1", messages: [user], model: "m", writesWithoutAsking: false, effort: "normal",
+      }) }), { url: pb.url }, pick);
+      expect(res.status).toBe(400);
+      expect(await res.text()).toContain("history");
+      expect(JSON.stringify(pb.chats.get("chat1"))).toBe(before);
+      expect(prompts).toHaveLength(0);
+    }
   });
 });

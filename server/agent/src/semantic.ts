@@ -9,7 +9,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseNote } from "@/core/notes";
-import type { Meta } from "./notes";
+import type { Meta } from "./application/notes";
 
 /** MIT, 8M active parameters, 100+ languages, mean-pooled 384-dim vectors (its 1_Pooling config). */
 export const MODEL = "hotchpotch/bekko-embedding-v1-a8m";

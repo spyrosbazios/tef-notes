@@ -51,6 +51,10 @@ Each module's README has its setup and commands:
 - `site` and `video` (the public page and the promo film drawn from its screens): [site/README.md](site/README.md),
   [video/README.md](video/README.md); a change to a screen in `site/src/components/mock/` is checked in both
 
+`bun scripts/check-boundaries.ts` checks runtime import boundaries without installing dependencies: core domain/sync
+code stays independent of HTTP adapters, application services stay independent of assistant cards/tools and the AI SDK,
+and web record features share projections rather than coordinating each other. CI runs this check separately.
+
 Run the checks of every module you touched, and of `packages/core` if you changed it (all clients depend on it).
 Format, then lint, type-check, test and build, in that order.
 

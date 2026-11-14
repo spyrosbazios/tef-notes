@@ -3,7 +3,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
 import { parseNote } from "@/core/notes";
-import { fromWeb } from "../src/guard";
+import { fromWeb } from "../src/tools";
 import { imageType } from "../src/images";
 import { Notes } from "../src/notes";
 import { Todo } from "../src/todo";

@@ -3,7 +3,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
 import { parseNote } from "@/core/notes";
-import { fromWeb } from "../src/guard";
+import { fromWeb } from "../src/tools";
 import { Notes } from "../src/notes";
 import { pageRange, pages, pagesRoute, preview, PREVIEW_CHARS, thumbRoute } from "../src/pdfs";
 import { Todo } from "../src/todo";

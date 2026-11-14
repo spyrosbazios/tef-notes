@@ -9,12 +9,14 @@ import { Toaster } from "@/components/ui/sonner";
 import { UpdateToast } from "@/components/update-toast";
 import { useShownLook } from "@/hooks/appearance";
 import { useNarrow } from "@/hooks/media";
+import { useLive } from "@/hooks/live";
 
 const Devtools = import.meta.env.DEV
   ? lazy(() => import("@tanstack/react-router-devtools").then((m) => ({ default: m.TanStackRouterDevtools })))
   : () => null;
 
 export function Frame() {
+  useLive();
   const { scheme } = useShownLook();
   const narrow = useNarrow();
   const clear = narrow ? { top: "calc(env(safe-area-inset-top) + 0.5rem)" } : undefined;

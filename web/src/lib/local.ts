@@ -81,9 +81,3 @@ export async function clearLocal(): Promise<void> {
   for (const t of Object.values(all.loaders)) t.clear();
   if (hasIdb) await clear(kv).catch(() => {});
 }
-
-// The page going away may not get to run a timer
-if (typeof addEventListener === "function") {
-  addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") void flushLocal(); });
-  addEventListener("pagehide", () => { void flushLocal(); });
-}

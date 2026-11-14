@@ -2,7 +2,8 @@
 // (packages/core/src/pocketbase.ts), so the UI handles a stale rev the same way the phone and the CLI do. No sign-in:
 // the private network is the gate (server/pb_migrations/1792400000_open.js).
 import axios, { AxiosError } from "axios";
-import { Conflict } from "@/core/pocketbase";
+import { conflictOf } from "@/core/record-contracts";
+export { lit } from "@/core/record-contracts";
 import { getNet, note } from "@/lib/net";
 
 export const api = axios.create({ baseURL: "/api", timeout: 45_000 });
@@ -29,15 +30,11 @@ api.interceptors.request.use((c) => {
   return c;
 });
 
-const taken = (body: any, f: string) => body?.data?.[f]?.code === "validation_not_unique";
-
 api.interceptors.response.use((r) => { note("reached"); return r; }, (e: AxiosError<any>) => {
   if (e.response) note("reached");
   else if (e.code === AxiosError.ERR_NETWORK) note("unreachable");
   const status = e.response?.status, body = e.response?.data, what = e.config?.url ?? "";
-  if (status === 409) return Promise.reject(new Conflict(body?.message ?? what));
-  if (status === 400 && (taken(body, "path") || taken(body, "note") || taken(body, "name") || taken(body, "id"))) return Promise.reject(new Conflict(what));
-  return Promise.reject(e);
+  return Promise.reject(conflictOf(status, body, status === 409 ? body?.message ?? what : what) ?? e);
 });
 
 /** 404 as null: a record that's gone. */
@@ -47,9 +44,6 @@ export async function orNull<T>(p: Promise<T>): Promise<T | null> {
     throw e;
   }
 }
-
-/** A filter literal: PocketBase's are double-quoted, with backslash escapes. */
-export const lit = (v: string) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
 /** What went wrong, in words for a toast. */
 export function message(e: unknown): string {

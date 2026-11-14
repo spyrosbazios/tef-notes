@@ -1,7 +1,8 @@
 // The agent's place tools: find_place searches OpenStreetMap (places.ts), set_place writes the place of a task (its `where` field,
 // core/todo.ts) through its rev compare-and-swap, as the web's picker does. Notes have no place. A place set by its id is OpenStreetMap's own details, fetched here, so the model never types an address
 // or coordinates into a record. OpenStreetMap's names and addresses are other people's text (a business names itself), so
-// find_place taints the chat like the web (guard.ts UNTRUSTED).
+// find_place taints the chat like the web (its untrusted result policy).
+import type { Policies } from "./tool-policy";
 import { tool, type ModelMessage } from "ai";
 import { z } from "zod";
 import { directionsUrl, type Place } from "@/core/places";
@@ -56,3 +57,9 @@ export function placeTools(todo: Todo, fromPage: (messages: ModelMessage[]) => P
     }),
   };
 }
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const placePolicies = {
+  find_place: { approval: "none", result: "untrusted" },
+  set_place: { approval: "write", result: "plain", check: ({ todo }, i) => placeProblem(todo, i) },
+} satisfies Policies<ReturnType<typeof placeTools>>;

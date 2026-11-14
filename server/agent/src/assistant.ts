@@ -5,6 +5,7 @@
 // selection tools are the exception: the owner's editor writes them, in sight and undoable (core's "the selection"); so is
 // `draw`, whose edit lands in the open drawing unsaved, the owner's to keep, and
 // `save_drawing`, which saves it when the owner asked for that (core's "the drawing").
+import type { Policies } from "./tool-policy";
 import { tool } from "ai";
 import { z } from "zod";
 import { isNotePath } from "@/core/notes";
@@ -153,3 +154,15 @@ function drawingLines(d: NonNullable<AssistantContext["drawing"]>): string[] {
   if (d.selected?.length) out.push(`Selected by the owner: ${d.selected.map(q).join(", ")}`);
   return out;
 }
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const uiPolicies = {
+  open_note: { approval: "none", result: "plain" },
+  open_task: { approval: "none", result: "plain" },
+  go_view: { approval: "none", result: "plain" },
+  ask_choice: { approval: "none", result: "plain" },
+  replace_selection: { approval: "none", result: "plain", unavailableWhenTainted: true },
+  insert_after_selection: { approval: "none", result: "plain", unavailableWhenTainted: true },
+  draw: { approval: "none", result: "plain" },
+  save_drawing: { approval: "none", result: "plain", unavailableWhenTainted: true },
+} satisfies Policies<typeof uiTools>;

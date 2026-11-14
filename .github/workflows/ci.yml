@@ -18,6 +18,18 @@ env:
   BUN_VERSION: "1.3.9"
 
 jobs:
+  boundaries:
+    name: Architecture - import boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun scripts/check-boundaries.ts
+      - run: bun test scripts/check-boundaries.test.ts
+
   core:
     name: Core - tests, typecheck
     runs-on: ubuntu-latest
@@ -62,6 +74,22 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: server/agent
       - run: bun test ./test
+
+  pocketbase-contract:
+    name: PocketBase - HTTP integration contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      # Isolated temporary data, real migrations/hooks, Dockerfile's PocketBase pin.
+      # Missing binary/download or startup failures fail this job; nothing is skipped.
+      - run: bun install --frozen-lockfile
+        working-directory: server/agent
+      - run: bun --no-env-file server/integration/run.ts --application
+      - run: bun server/agent/node_modules/typescript/bin/tsc --project server/integration/tsconfig.json
 
   agent:
     name: Agent - tests, typecheck

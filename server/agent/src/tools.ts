@@ -1,6 +1,13 @@
 // The agent's hands on the notes, over PocketBase (notes.ts): reads from the request's listing or the server, writes
 // through the rev compare-and-swap, so a note the agent wrote is just a note. The index rides in every prompt
 // (agent.ts); bodies only when read_note asks.
+import { uiPolicies } from "./assistant";
+import { drawingPolicies } from "./drawings";
+import { placePolicies } from "./placeTools";
+import { filePolicies } from "./fileTools";
+import { widgetPolicies } from "./widgetTools";
+import { todoPolicies } from "./todoTools";
+import type { Policy, Policies } from "./tool-policy";
 import { tool, type ModelMessage } from "ai";
 import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import { z } from "zod";
@@ -10,7 +17,7 @@ import { createTag, listTags, updateTag } from "@/core/tags";
 import { cardLines, withSummaries } from "@/core/link-summary";
 import { localDay } from "@/core/time";
 import { uiTools } from "./assistant";
-import { capList, clip, fromWeb } from "./guard";
+import { capList, clip, fromWeb as classifyReads } from "./guard";
 import { definedTags, TAGS, type Meta, type Notes } from "./notes";
 import { drawingTools } from "./drawings";
 import { fileTools } from "./fileTools";
@@ -97,6 +104,7 @@ export const readWeb = (notes: Notes, todo: Todo) => async (messages: ModelMessa
 export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo), files: readonly Attached[] = []) {
 
   return {
+    ...noteReadTools(notes),
     list_tags: tool({
       description: "Every existing tag: those defined in Settings (with what each means) and any already on a note. Notes and tasks may carry only these. Definitions have an id for update_tag; a tag without one is only in use, so create_tag to define it.",
       inputSchema: z.object({}),
@@ -149,15 +157,6 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
       },
     }),
 
-    search_notes: tool({
-      description: "Search every note's title and body by its words (accents and case ignored) and by meaning (a Greek question finds an English note, \"car\" finds \"Toyota service\"). Best matches first, each with a snippet and `match`: words, meaning or both. A meaning-only match may be loosely related: read_note before relying on it. Use before saying something isn't in the notes; for a miss, try other words.",
-      inputSchema: z.object({
-        query: z.string().min(1).describe("Words that would be in the note, or what it is about"),
-        limit: z.number().int().min(1).max(30).optional().describe("Default 10"),
-      }),
-      execute: async ({ query, limit = 10 }) => ({ results: await notes.search(query, limit) }),
-    }),
-
     list_notes: tool({
       description: "Notes by a filter, newest edit first, each with a snippet of its start: pinned, recent, or archived (put away by the owner, out of the index). By tag: list_tagged.",
       inputSchema: z.object({
@@ -172,16 +171,6 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
             ...(flagsOf(n) ? { flags: flagsOf(n) } : {}), ...(n.color ? { color: n.color } : {}), edited: ago(n.updated, now) })),
           ...(left_out ? { left_out } : {}),
         };
-      },
-    }),
-
-    read_note: tool({
-      description: `Read a note's whole file — frontmatter (title, created, flags, tags) and body — up to ${NOTE} characters. Paths from the index or search_notes: notes/<file>.md, or agent/memory.md.`,
-      inputSchema: z.object({ path: z.string().describe("notes/<file>.md or agent/memory.md") }),
-      execute: async ({ path }) => {
-        if (!READ_RE.test(path)) return { error: "Only notes/<file>.md and agent/memory.md." };
-        const f = await notes.read(path);
-        return f ? { path, ...clip(f.text, NOTE) } : { error: `${path} not found.` };
       },
     }),
 
@@ -407,3 +396,66 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
 }
 
 export type Tools = ReturnType<typeof tools>;
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const notePolicies = {
+  list_tags: { approval: "none", result: "plain" },
+  create_tag: { approval: "write", result: "plain" },
+  create_lens: { approval: "write", result: "plain", check: ({ notes }, i) => lensFields(notes, i).then((f) => ("error" in f ? f.error : null)) },
+  update_tag: { approval: "write", result: "plain" },
+  search_notes: { approval: "none", result: "records" },
+  list_notes: { approval: "none", result: "records" },
+  read_note: { approval: "none", result: "records" },
+  read_attachment: { approval: "none", result: "untrusted" },
+  read_image: { approval: "none", result: "untrusted" },
+  read_page: { approval: "none", result: "untrusted" },
+  create_note: { approval: "write", result: "plain" },
+  append_to_note: { approval: "write", result: "plain", check: ({ notes }, { path }: { path: string }) => checkWrite(notes, path) },
+  rewrite_note: { approval: "write", result: "plain", check: ({ notes }, { path, text }: { path: string; text: string }) => checkWrite(notes, path, text) },
+  summarise_links: { approval: "write", result: "plain", check: ({ notes }, { path }: { path: string }) => checkWrite(notes, path) },
+  set_note_flags: { approval: "write", result: "plain", check: ({ notes }, { path }: { path: string }) => checkWrite(notes, path) },
+  delete_note: { approval: "always", result: "plain", check: ({ notes }, { path }: { path: string }) => checkWrite(notes, path) },
+  show_items: { approval: "none", result: "records" },
+  update_memory: { approval: "tainted", result: "plain", unavailableWhenTainted: true, check: (_, { text }: { text: string }) => text.length > CAP ? "Too long" : null },
+  web_search: { approval: "none", result: "untrusted", requiresExa: true },
+  read_url: { approval: "none", result: "untrusted", requiresExa: true },
+} satisfies Policies<Omit<Tools, keyof typeof todoPolicies | keyof typeof widgetPolicies | keyof typeof filePolicies | keyof typeof placePolicies | keyof typeof drawingPolicies | keyof typeof uiPolicies>>;
+
+// Lazy because file tools also import note validators: read their policy table only after module initialization.
+let policies: ReturnType<typeof collectPolicies> | undefined;
+const collectPolicies = () => ({
+  ...notePolicies, ...todoPolicies, ...widgetPolicies, ...filePolicies,
+  ...placePolicies, ...drawingPolicies, ...uiPolicies,
+}) satisfies Policies<Tools>;
+export const toolPolicies = () => policies ??= collectPolicies();
+
+export function policyFor(name: string): Policy | undefined { return (toolPolicies() as Record<string, Policy>)[name]; }
+
+/** Bind the pure guard to this application's tool policies at the composition boundary. */
+export const fromWeb = (messages: ModelMessage[], tainted: ReadonlySet<string> = new Set()) =>
+  classifyReads(messages, tainted, policyFor);
+
+/** Read tools shared by chat and search; accept application services without card adapters. */
+export function noteReadTools(notes: Pick<import("./application/notes").NoteService, "search" | "read">) {
+  return {
+    search_notes: tool({
+      description: "Search every note's title and body by its words (accents and case ignored) and by meaning (a Greek question finds an English note, \"car\" finds \"Toyota service\"). Best matches first, each with a snippet and `match`: words, meaning or both. A meaning-only match may be loosely related: read_note before relying on it. Use before saying something isn't in the notes; for a miss, try other words.",
+      inputSchema: z.object({
+        query: z.string().min(1).describe("Words that would be in the note, or what it is about"),
+        limit: z.number().int().min(1).max(30).optional().describe("Default 10"),
+      }),
+      execute: async ({ query, limit = 10 }) => ({ results: await notes.search(query, limit) }),
+    }),
+
+    read_note: tool({
+      description: `Read a note's whole file — frontmatter (title, created, flags, tags) and body — up to ${NOTE} characters. Paths from the index or search_notes: notes/<file>.md, or agent/memory.md.`,
+      inputSchema: z.object({ path: z.string().describe("notes/<file>.md or agent/memory.md") }),
+      execute: async ({ path }) => {
+        if (!READ_RE.test(path)) return { error: "Only notes/<file>.md and agent/memory.md." };
+        const f = await notes.read(path);
+        return f ? { path, ...clip(f.text, NOTE) } : { error: `${path} not found.` };
+      },
+    }),
+
+  };
+}

@@ -6,11 +6,10 @@ import { recordId } from "@/core/pocketbase";
 import { type Link, type LinkEnd, type LinkRole } from "@/core/record-links";
 import { addLink as makeLink, removeLink as dropLink, visibleLinks } from "@/core/sync";
 import { local } from "@/lib/local";
-import { edited, LOCAL_QUERY, opened, syncing } from "@/lib/sync";
+import { LINKS, localEdited } from "@/lib/local-records";
+import { LOCAL_QUERY, opened, syncing } from "@/lib/sync";
 
-export const LINKS = ["links"] as const;
-
-export const projectLinks = (qc: QueryClient) => qc.setQueryData<Link[]>(LINKS, visibleLinks(local));
+export { LINKS } from "@/lib/local-records";
 
 export const linksQuery = queryOptions({ queryKey: LINKS, queryFn: async () => { await opened(); return visibleLinks(local); }, ...LOCAL_QUERY });
 
@@ -19,14 +18,12 @@ export const useLinks = () => useQuery(linksQuery);
 /** `from` linked to `to` as `role`, under a new id (the link already there, when this relation is); the sync sends it. */
 export async function addLink(qc: QueryClient, from: LinkEnd, to: LinkEnd, role: LinkRole): Promise<Link> {
   const id = makeLink(local, recordId(), from, to, role);
-  projectLinks(qc);
-  edited();
+  localEdited(qc, "links");
   return local.links.get(id)!.link;
 }
 
 /** A link gone (already gone is done). */
 export async function removeLink(qc: QueryClient, id: string): Promise<void> {
   dropLink(local, id, syncing());
-  projectLinks(qc);
-  edited();
+  localEdited(qc, "links");
 }

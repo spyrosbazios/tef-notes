@@ -3,7 +3,7 @@
 // script reads its theme and accent) and works offline. A change is on the copy at once and goes to the server shortly after,
 // several quick ones as one, carrying only what changed. The server is pulled on start, when the window comes back
 // (`usePrefsSync`, mounted once in root.tsx) and after the realtime feed was down; another device's save arrives over the feed
-// (`takePrefs` and `pullPrefs`, called by hooks/notes.ts `useLive`).
+// (`takePrefs` and `pullPrefs`, called by hooks/live.ts `useLive`).
 import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { isPrefPath, PREFS_KEY, prefsOf, type LayoutPrefs, type Prefs, type PrefsPatch } from "@/core/prefs";

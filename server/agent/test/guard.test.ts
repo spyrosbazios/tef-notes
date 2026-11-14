@@ -1,7 +1,8 @@
+import { fromWeb } from "../src/tools";
 import { describe, expect, it } from "bun:test";
 import { convertToModelMessages, tool, type ModelMessage, type UIMessage } from "ai";
 import { z } from "zod";
-import { capList, clip, fromWeb, repair, settle, withContext } from "../src/guard";
+import { capList, clip, repair, settle, withContext } from "../src/guard";
 
 const msg = (parts: unknown[], role: UIMessage["role"] = "assistant") => ({ id: "m", role, parts }) as UIMessage;
 const call = (state: string, input: unknown, extra: object = {}) => ({ type: "tool-get_stats", toolCallId: "c", state, input, ...extra });

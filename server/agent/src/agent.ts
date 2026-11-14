@@ -7,11 +7,12 @@
 // <context>, and the tools the app does itself (open_note …, no `execute`) are offered. Such a call ends the turn
 // until the client answers it with addToolOutput and resends.
 // While a turn runs, the owner can steer it (steer.ts): their message joins the turn at the next step boundary.
+import { ChatHistoryError, readChatHistory } from "@/core/chat-history";
+import { policyApprovals } from "./tool-policy";
 import {
   createAgentUIStream, createUIMessageStreamResponse, generateId, readUIMessageStream, isStepCount, smoothStream, ToolLoopAgent,
   type InferUITools, type ModelMessage, type UIMessage,
 } from "ai";
-import { lensFields, type LensInput } from "./widgetTools";
 import { z } from "zod";
 import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
 import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
@@ -19,7 +20,7 @@ import { MEMORY, parseNote } from "@/core/notes";
 import type { Server } from "@/core/pocketbase";
 import { exists, saver } from "./chats";
 import { Context, screen } from "./assistant";
-import { repair, settle, WEB_TOOLS, withContext } from "./guard";
+import { historyFromWeb, repair, settle, withContext } from "./guard";
 import { key } from "./keys";
 import { stepTools, trim } from "./loop";
 import { steeringFor } from "./steer";
@@ -28,11 +29,8 @@ import { Todo } from "./todo";
 import { model, sees, Unavailable } from "./models";
 import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
-import { attachProblem, type AttachInput } from "./fileTools";
-import { placeProblem, type PlaceInput } from "./placeTools";
 import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
-import { CAP, checkWrite, noteIndex, readWeb, tools, type Tools } from "./tools";
-import { checkAdd, checkAddMany, checkTask, checkUpdate, type AddInput, type AddManyInput, type UpdateInput } from "./todoTools";
+import { noteIndex, readWeb, tools, toolPolicies, policyFor, type Tools } from "./tools";
 
 /** A message as useChat holds it, tool parts typed: what `chats.messages` holds. */
 export type AgentMessage = UIMessage<unknown, never, InferUITools<Tools>>;
@@ -69,35 +67,7 @@ async function context(notes: Notes, page: AssistantContext | undefined, files: 
  *  the chat has read the web or a PDF (`web`), where a page can carry instructions aimed at the agent. A bad path skips
  *  the card: the tool's error goes straight back to the agent. */
 export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean, web = readWeb(notes, todo), files: readonly Attached[] = []) {
-  const ask = async (messages: ModelMessage[], bad: Promise<string | null> | null = null) =>
-    (await bad) || (writesWithoutAsking && !(await web(messages))) ? "not-applicable" as const : "user-approval" as const;
-  type O = { messages: ModelMessage[] };
-  return {
-    create_tag: (_: unknown, { messages }: O) => ask(messages),
-    // a lens is checked first, like a path: a bad tag goes straight back
-    create_lens: (i: LensInput, { messages }: O) => ask(messages, lensFields(notes, i).then((f) => ("error" in f ? f.error : null))),
-    update_tag: (_: unknown, { messages }: O) => ask(messages),
-    create_note: (_: unknown, { messages }: O) => ask(messages),
-    append_to_note: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
-    rewrite_note: ({ path, text }: { path: string; text: string }, { messages }: O) => ask(messages, checkWrite(notes, path, text)),
-    summarise_links: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
-    set_note_flags: ({ path }: { path: string }, { messages }: O) => ask(messages, checkWrite(notes, path)),
-    // someone else's file into a note: it always asks, unless the call is bad
-    attach_file: async (i: AttachInput) => ((await attachProblem(notes, files, i)) ? "not-applicable" as const : "user-approval" as const),
-    set_place: (i: PlaceInput, { messages }: O) => ask(messages, placeProblem(todo, i)),
-    // a delete has no way back: it asks whatever the setting, unless the path is bad
-    delete_note: async ({ path }: { path: string }) => ((await checkWrite(notes, path)) ? "not-applicable" as const : "user-approval" as const),
-    // tasks are records: the task, note and every value are checked first, like a path
-    add_task: (i: AddInput, { messages }: O) => ask(messages, checkAdd(notes, todo, i)),
-    add_tasks: (i: AddManyInput, { messages }: O) => ask(messages, checkAddMany(notes, todo, i)),
-    update_task: (i: UpdateInput, { messages }: O) => ask(messages, checkUpdate(notes, todo, i)),
-    complete_task: ({ id }: { id: string }, { messages }: O) => ask(messages, checkTask(todo, id)),
-    // a delete has no way back: it asks whatever the setting, unless the id is bad
-    delete_task: async ({ id }: { id: string }) => ((await checkTask(todo, id)) ? "not-applicable" as const : "user-approval" as const),
-    // memory is the agent's, unless a web page could be steering it. Too long goes straight back to the agent
-    update_memory: async ({ text }: { text: string }, { messages }: O) =>
-      (text.length <= CAP && await web(messages) ? "user-approval" as const : "not-applicable" as const),
-  };
+  return policyApprovals(toolPolicies(), { notes, todo, files }, writesWithoutAsking, web);
 }
 
 /** `foreign`: someone else's text is in this turn's context (`context`), or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
@@ -108,8 +78,8 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
   const web = !!(await key("exa")), all = tools(notes, todo, untrusted, files);
   // Out of the prompt: the web tools without an Exa key, and the tools the client does
   // itself unless this page can do them
-  const ui = uiToolsFor(page), off = new Set<string>([...(web ? [] : WEB_TOOLS), ...UI_TOOL_NAMES.filter((n) => !ui.includes(n))]);
-  const base = (Object.keys(all) as (keyof Tools)[]).filter((n) => !off.has(n));
+  const ui = uiToolsFor(page), off = new Set<string>(UI_TOOL_NAMES.filter((n) => !ui.includes(n)));
+  const base = (Object.keys(all) as (keyof Tools)[]).filter((n) => !off.has(n) && (web || !policyFor(n)?.requiresExa));
   return new ToolLoopAgent({
     model: m,
     instructions: `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}`,
@@ -120,7 +90,7 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
     // answer, or a tool call there ends the turn with no reply
     prepareStep: async ({ stepNumber, messages }) => ({
       ...(stepNumber === 0 && { messages: trim(messages) }),
-      ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages)) } : { toolChoice: "none" as const }),
+      ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : { toolChoice: "none" as const }),
     }),
     toolApproval: approvals(notes, todo, writesWithoutAsking, untrusted, files),
     providerOptions,
@@ -134,19 +104,28 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail(400, `Bad request: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
   const { id, model: picked, writesWithoutAsking, effort, context: page } = parsed.data;
-  if (!(await exists(server, id))) return fail(404, `No chat ${id}: create it in chats first.`);
+  let history: AgentMessage[];
+  try {
+    if (!(await exists(server, id))) return fail(404, `No chat ${id}: create it in chats first.`);
+    history = settle(readChatHistory({ messages: parsed.data.messages }) as AgentMessage[]);
+  } catch (e) {
+    if (e instanceof ChatHistoryError) return fail(400, e.message);
+    throw e;
+  }
 
   const files = attachedFiles(parsed.data.messages as AgentMessage[]);
   const notes = new Notes(server), todo = new Todo(server), ctx = await context(notes, page, files);
+  // Classify before schema repair: an obsolete input must never erase a past untrusted read.
+  const historicalTaint = historyFromWeb(history, new Set([...(await notes.tainted()), ...(await todo.tainted())]), policyFor);
   let agent: ToolLoopAgent<never, Tools>;
-  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.foreign || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
+  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }
   let messages: AgentMessage[];
   try {
     // settle: a turn stopped mid-tool, a card passed over. repair: chats saved before a tool's schema changed
-    messages = await repair(settle(parsed.data.messages as AgentMessage[]), agent.tools);
+    messages = await repair(history, agent.tools);
     if (!sees(picked)) messages = withoutPictures(messages);
   } catch (e) {
     return fail(400, `Bad messages: ${(e as Error).message}`);
@@ -160,7 +139,7 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
     stream = await createAgentUIStream({
       agent,
       uiMessages: withContext(await inlinePdfs(messages), ctx.text),
-      originalMessages: messages,
+      originalMessages: history,
       generateMessageId: generateId,
       abortSignal: req.signal,
       experimental_steering: steering,              // the client's Stop (or a dropped connection) ends the turn
@@ -176,8 +155,8 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
 
   // A copy of the stream builds the reply as the client sees it, saved every few seconds while it runs
   const [out, copy] = stream.tee();
-  const last = messages.at(-1), continued = last?.role === "assistant";
-  const before = continued ? messages.slice(0, -1) : messages;
+  const last = history.at(-1), continued = last?.role === "assistant";
+  const before = continued ? history.slice(0, -1) : history;
   void (async () => {
     let at = Date.now();
     try {

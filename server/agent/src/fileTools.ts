@@ -1,6 +1,7 @@
 // attach_file: a photo or PDF the owner attached in the chat filed into a note, as the app's own upload would: an
 // `attachments` record under the note's id and a line in its body pointing at it. The bytes come from the chat's file part
 // (its data URL); the model only names the file. Someone else's content: the write is always marked tainted.
+import type { Policies } from "./tool-policy";
 import { tool } from "ai";
 import { z } from "zod";
 import type { Attached } from "@/core/assistant";
@@ -79,3 +80,8 @@ export function fileTools(notes: Notes, files: readonly Attached[]) {
     }),
   };
 }
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const filePolicies = {
+  attach_file: { approval: "always", result: "plain", check: ({ notes, files }, i) => attachProblem(notes, files, i) },
+} satisfies Policies<ReturnType<typeof fileTools>>;

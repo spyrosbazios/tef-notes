@@ -35,6 +35,32 @@ call left unanswered (the owner typed on) is closed as an error on the next send
 the one the owner answers, not the app: the client draws its buttons and answers with `{ chosen: [ids] }` (`ChoiceOutput`); the
 choice writes nothing, any change after it is the model's own write tool with its confirm card.
 
+## Application services
+
+`src/application/notes.ts` and `todo.ts` own request-scoped reads, writes, caching, revision retries, merges, links,
+and recurring-task completion. They return saved records/text rather than assistant cards. `src/notes.ts` and
+`todo.ts` adapt those results for the assistant; companion routes, direct search and index warming use the services.
+Search by asking uses the same read-tool factories as chat with application services, without constructing write adapters.
+`src/application/metadata.ts` holds timestamp helpers shared with reminders and planning. The root import-boundary check
+keeps these services independent of assistant modules and card builders.
+
+## Tool policies
+
+Each tool-definition module also declares a typed policy table: approval mode and validator, whether its result
+contains external text or record references, whether taint withdraws it, and whether it requires Exa. Adding a tool
+requires a policy entry (`Policies<T>` in `src/tool-policy.ts`). `src/tools.ts` assembles the tables; `src/agent.ts`
+derives approval callbacks and availability from them. The pure guard and loop utilities receive policy lookup as an
+argument, so they do not import the tool registry. Tests cover completeness and the existing approval/taint behavior.
+
+## Chat history
+
+`packages/core/src/chat-history.ts` owns the versioned persistence envelope shared by the web and agent. The additive
+`chats.historyVersion` field is introduced by migration `1794900000_chat_history.js`; legacy arrays remain readable,
+and writes use version 1. Unsupported future versions and malformed records fail explicitly before a chat runs.
+Tool inputs and outputs are opaque historical data. `guard.ts` repairs only the execution copy for today's tool schemas;
+the stream and `chats.ts` saver keep the original parts, including during continuation and periodic saves. Taint is
+classified before repair so an obsolete read cannot remove the approval requirement.
+
 ## Widgets
 
 The agent never lays anything out. `show_day`, `show_week`, `show_review`, `show_quote`, `show_link` and `show_lens`

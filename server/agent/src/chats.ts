@@ -1,6 +1,7 @@
 // A chat is a record in `chats` (pb_migrations/1792600000_chats.js): the client creates it, empty, before its first
 // message; the agent writes its messages, title and model as a reply streams and when it ends, however it ends.
 import type { UIMessage } from "ai";
+import { readChatHistory, serializeChatHistory } from "@/core/chat-history";
 import { HttpError } from "@/core/http";
 import * as pb from "@/core/pocketbase";
 import { chatTitle } from "@/core/share";
@@ -12,9 +13,9 @@ export function titleOf(ms: UIMessage[]) {
   return text.trim() ? chatTitle(text.trim()).slice(0, 200) : "";
 }
 
-/** Whether the chat's record is there. */
+/** Whether the record exists and its history is readable. Never let an older agent replace a future format. */
 export async function exists(s: pb.Server, id: string) {
-  try { await pb.call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=id`); return true; } catch (e) {
+  try { const record = await pb.call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=id,messages,historyVersion`); readChatHistory(record); return true; } catch (e) {
     if (e instanceof HttpError && e.status === 404) return false;
     throw e;
   }
@@ -24,6 +25,6 @@ export async function exists(s: pb.Server, id: string) {
 export function saver(s: pb.Server, id: string, model: string) {
   let last = Promise.resolve();
   return (messages: UIMessage[]) => (last = last.then(() =>
-    pb.call(s, `collections/chats/records/${encodeURIComponent(id)}`, pb.json("PATCH", { messages, title: titleOf(messages), model }))
+    pb.call(s, `collections/chats/records/${encodeURIComponent(id)}`, pb.json("PATCH", { ...serializeChatHistory(messages), title: titleOf(messages), model }))
       .then(() => undefined, (e: Error) => console.error(`chat ${id}: not saved: ${e.message}`))));
 }

@@ -12,8 +12,11 @@ TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECT
 | `notes.ts`, `note-groups.ts`, `links.ts`, `photos.ts`, `task-notes.ts` | The note file format (parse, serialize, ids, paths), 3-way merge, grouping, pasted links' titles and photos |
 | `record-links.ts` | Links between records (`links`): types, wire columns, a task's notes, a note's backlinks |
 | `todo.ts`, `things.ts`, `bulk.ts`, `dates.ts`, `time.ts` | Tasks: types, patches, ticking and repeats, the field-level merge, the smart views |
-| `pocketbase.ts`, `http.ts`, `tags.ts` | The PocketBase client with the `rev` compare-and-swap, tag calls |
+| `record-contracts.ts` | Pure record types, conflict classification, filter literals and the columns derived from note text |
+| `record-protocol.ts` | Note/task/link requests, pagination and idempotency over an injected transport; no I/O of its own |
+| `pocketbase.ts`, `http.ts`, `tags.ts` | Fetch-based client and tag calls; `pocketbase.ts` re-exports the record contracts for existing callers |
 | `assistant.ts` | The always-on assistant's contract: the page context a client sends with each message, and the UI tools (`open_note`, `open_task`, `go_view`) the client does itself |
+| `chat-history.ts` | Versioned chat persistence, legacy reading and opaque historical parts; independent of SDK tool schemas |
 | `agent.ts`, `clip.ts`, `share.ts`, `handoff.ts` | The chat agent's card shapes and wording, the clip contract, share-to-agent, "Ask about this" |
 | `companion.ts` | The native companion's contract (`android/`): the feeds its widgets draw, the owner's colours, its two task writes |
 | `theme.ts`, `page-theme.ts` | The palettes: the one home of colour |
@@ -22,6 +25,7 @@ TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECT
 ## Rules
 
 - No dependencies: plain TypeScript, no `package.json` dependencies, and no imports from React or `node:`, so every runtime can import it.
+- The sync engine depends on `record-contracts.ts`, not the fetch client. The web adapts axios to `record-protocol.ts`; it does not implement a second collection protocol.
 - No second copy elsewhere: a client that needs note, task or merge logic imports it from here.
 
 ## Using it

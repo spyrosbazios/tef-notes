@@ -2,6 +2,7 @@
 // the reason it can't be: tool and check share it, so the check before a confirm card (agent.ts approvals) tries exactly
 // what the write would do, on the records as they are now, and a bad date, note or id goes straight back to the agent
 // instead of through a card.
+import type { Policies } from "./tool-policy";
 import { tool, type ModelMessage } from "ai";
 import { z } from "zod";
 import { views, newTask, type Task, type TaskPatch } from "@/core/todo";
@@ -190,26 +191,7 @@ export function tagged(have: string[], want: string[], all = false) {
  *  `fromPage`: whether the chat has read the web (tools.ts), so a write marks its record `tainted`. */
 export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMessage[]) => Promise<boolean>) {
   return {
-    list_tasks: tool({
-      description: "The user's tasks, as Things shows them, in a view: inbox (unscheduled), today (on or before today, or due by it; This Evening ones flagged), upcoming (a later day, soonest first), logbook (done, latest first), open (every task not done, any day), all (done ones too). `query` keeps those holding every word in the title, notes or checklist (case and accents ignored); `tag` those carrying it: to find a task, open with a query. Each with its id (update_task, complete_task and delete_task take it), checklist items with theirs, dates, `tags`, and `linked`: the notes it is about. Check before saying what's due.",
-      inputSchema: z.object({
-        view: z.enum(["inbox", "today", "upcoming", "logbook", "open", "all"]),
-        query: z.string().max(200).optional().describe("Words a task holds, in its title, notes or checklist"),
-        tag: z.string().max(40).optional().describe("Only tasks with this tag"),
-        limit: z.number().int().min(1).max(TASKS).optional().describe(`Default 30, at most ${TASKS}`),
-      }),
-      execute: async ({ view, query, tag, limit = 30 }) => {
-        const [tasks, all] = [await todo.tasks(), await notes.list()];
-        const today = localDay(), v = views(tasks, today);
-        const inView = view === "today" ? [...v.today, ...v.evening] : view === "upcoming" ? v.upcoming.flatMap((d) => d.tasks)
-          : view === "open" ? tasks.filter((t) => !t.done) : view === "all" ? tasks : v[view];
-        const list = inView.filter((t) => matches(t, query, tag));
-        const { list: shown, left_out } = capList(list, limit), paths = new Map(all.map((n) => [n.rec, n.path]));
-        const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
-        return { today, tasks: await Promise.all(shown.map(async (t) => listed(t, await linked(t)))), ...(left_out ? { left_out } : {}) };
-      },
-    }),
-
+    ...taskReadTools(notes, todo),
     list_tagged: tool({
       description: "Notes and tasks carrying tags, in one call: any of `tags`, or every one with `match: all` (case and accents ignored). Notes newest edit first, each with a snippet; tasks open ones only unless `done`, each as list_tasks gives it. Use it for \"everything about X\", or to see what a tag holds.",
       inputSchema: z.object({
@@ -277,5 +259,42 @@ export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMe
         return why ? { error: why } : todo.deleteTask(id);
       },
     }),
+  };
+}
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const todoPolicies = {
+  list_tasks: { approval: "none", result: "records" },
+  list_tagged: { approval: "none", result: "records" },
+  add_task: { approval: "write", result: "plain", check: ({ notes, todo }, i) => checkAdd(notes, todo, i) },
+  add_tasks: { approval: "write", result: "plain", check: ({ notes, todo }, i) => checkAddMany(notes, todo, i) },
+  update_task: { approval: "write", result: "plain", check: ({ notes, todo }, i: UpdateInput) => checkUpdate(notes, todo, i) },
+  complete_task: { approval: "write", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
+  delete_task: { approval: "always", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
+} satisfies Policies<ReturnType<typeof todoTools>>;
+
+/** Read tools shared by chat and search, independent of write-card adapters. */
+export function taskReadTools(notes: Pick<import("./application/notes").NoteService, "list">, todo: Pick<import("./application/todo").TaskService, "tasks" | "notesOf">) {
+  return {
+    list_tasks: tool({
+      description: "The user's tasks, as Things shows them, in a view: inbox (unscheduled), today (on or before today, or due by it; This Evening ones flagged), upcoming (a later day, soonest first), logbook (done, latest first), open (every task not done, any day), all (done ones too). `query` keeps those holding every word in the title, notes or checklist (case and accents ignored); `tag` those carrying it: to find a task, open with a query. Each with its id (update_task, complete_task and delete_task take it), checklist items with theirs, dates, `tags`, and `linked`: the notes it is about. Check before saying what's due.",
+      inputSchema: z.object({
+        view: z.enum(["inbox", "today", "upcoming", "logbook", "open", "all"]),
+        query: z.string().max(200).optional().describe("Words a task holds, in its title, notes or checklist"),
+        tag: z.string().max(40).optional().describe("Only tasks with this tag"),
+        limit: z.number().int().min(1).max(TASKS).optional().describe(`Default 30, at most ${TASKS}`),
+      }),
+      execute: async ({ view, query, tag, limit = 30 }) => {
+        const [tasks, all] = [await todo.tasks(), await notes.list()];
+        const today = localDay(), v = views(tasks, today);
+        const inView = view === "today" ? [...v.today, ...v.evening] : view === "upcoming" ? v.upcoming.flatMap((d) => d.tasks)
+          : view === "open" ? tasks.filter((t) => !t.done) : view === "all" ? tasks : v[view];
+        const list = inView.filter((t) => matches(t, query, tag));
+        const { list: shown, left_out } = capList(list, limit), paths = new Map(all.map((n) => [n.rec, n.path]));
+        const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
+        return { today, tasks: await Promise.all(shown.map(async (t) => listed(t, await linked(t)))), ...(left_out ? { left_out } : {}) };
+      },
+    }),
+
   };
 }

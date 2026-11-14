@@ -2,7 +2,8 @@
 // owner's own records and returns `{ widget }`: the model never describes a layout, and a client draws a fixed component per widget
 // type. They write nothing, so no confirm card. As show_items does, the model is told briefly what was shown (`toModelOutput`),
 // never the whole payload, but always the ids and paths on it: a record written with web text in view counts as read when it
-// comes back here (guard.ts READS). The rules they compute by are plan.ts's. find_free_slots is plain data for the model, no widget.
+// comes back here (the records result policy). The rules they compute by are plan.ts's. find_free_slots is plain data for the model, no widget.
+import type { Policies } from "./tool-policy";
 import { tool, type ModelMessage } from "ai";
 import { z } from "zod";
 import { noteCardOf, taskCardOf, type NoteCard, type TaskCard } from "@/core/agent";
@@ -221,3 +222,16 @@ export function widgetTools(notes: Notes, todo: Todo, fromPage: (messages: Model
     }),
   };
 }
+
+/** Complete policy for this module: adding a tool requires an explicit classification. */
+export const widgetPolicies = {
+  show_day: { approval: "none", result: "records" },
+  show_week: { approval: "none", result: "records" },
+  show_review: { approval: "none", result: "records" },
+  show_quote: { approval: "none", result: "records" },
+  show_link: { approval: "none", result: "plain" },
+  show_lens: { approval: "none", result: "records" },
+  show_tasks: { approval: "none", result: "records" },
+  show_notes: { approval: "none", result: "records" },
+  find_free_slots: { approval: "none", result: "plain" },
+} satisfies Policies<ReturnType<typeof widgetTools>>;

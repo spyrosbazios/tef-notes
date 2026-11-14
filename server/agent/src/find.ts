@@ -6,10 +6,11 @@ import { z } from "zod";
 import { FOUND_MAX, type Found } from "@/core/find";
 import type { Server } from "@/core/pocketbase";
 import { DEFAULT, model, Unavailable } from "./models";
-import { Notes } from "./notes";
+import { NoteService } from "./application/notes";
 import { today } from "./systemPrompt";
-import { Todo } from "./todo";
-import { tools } from "./tools";
+import { TaskService } from "./application/todo";
+import { noteReadTools } from "./tools";
+import { taskReadTools } from "./todoTools";
 
 const STEPS = 6;
 
@@ -29,7 +30,8 @@ const fail = (status: number, message: string) => Response.json({ message }, { s
 export async function find(req: Request, server: Server, pick: typeof model = model): Promise<Response> {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail(400, "Bad request: q");
-  const notes = new Notes(server), todo = new Todo(server), all = tools(notes, todo);
+  const notes = new NoteService(server), todo = new TaskService(server);
+  const all = { ...noteReadTools(notes), ...taskReadTools(notes, todo) };
   let m: Awaited<ReturnType<typeof model>>;
   try { m = await pick(DEFAULT); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);

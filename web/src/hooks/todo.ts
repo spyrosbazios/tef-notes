@@ -11,26 +11,13 @@ import { removeTask as dropTask, saveTask, carryLinks } from "@/core/sync";
 import { localDay } from "@/core/time";
 import { complete, newTask, nextOrder, patchTask, reopen, taskOf, views, type Task, type TaskPatch, type Views } from "@/core/todo";
 import { local } from "@/lib/local";
-import { edited, LOCAL_QUERY, opened, syncing } from "@/lib/sync";
+import { localEdited, readTasks, taskRec, TASKS } from "@/lib/local-records";
+import { LOCAL_QUERY, opened, syncing } from "@/lib/sync";
 import type { TaskRec } from "@/services/todo";
 import { activeLensOf, useActiveLens } from "./lens";
-import { projectLinks } from "./links";
 import { useNow } from "./now";
 
-export const TASKS = ["tasks"] as const;
-
-/** A task as the lists read it. */
-const recOf = (id: string): TaskRec => {
-  const r = local.tasks.get(id)!;
-  return { ...taskOf(r.data), rev: r.rev ?? 0 };
-};
-
-/** Every task not deleted here, by `order`. */
-export function readTasks(): TaskRec[] {
-  return local.tasks.all().filter((r) => !r.deleted).map((r) => recOf(r.id)).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-}
-
-export const projectTasks = (qc: QueryClient) => qc.setQueryData<TaskRec[]>(TASKS, readTasks());
+export { TASKS, readTasks } from "@/lib/local-records";
 
 export const tasksQuery = queryOptions({ queryKey: TASKS, queryFn: async () => { await opened(); return readTasks(); }, ...LOCAL_QUERY });
 
@@ -67,13 +54,6 @@ function held(id: string): Task {
   return taskOf(r.data);
 }
 
-/** The copy changed: shown, and counted for the next sync. */
-function changed(qc: QueryClient, links = false) {
-  projectTasks(qc);
-  if (links) projectLinks(qc);
-  edited();
-}
-
 const open = () => [...local.tasks.all()].filter((r) => !r.deleted && !r.data.done).map((r) => r.data);
 
 /** A new open task at the end of the open ones; under a lens it carries the lens's first tag. Throws on a value the server
@@ -81,16 +61,16 @@ const open = () => [...local.tasks.all()].filter((r) => !r.deleted && !r.data.do
 export async function addTask(qc: QueryClient, fields: TaskPatch & { title: string }): Promise<TaskRec> {
   const t = newTask(recordId(), { order: nextOrder(open()), ...fields, tags: inheritTags(activeLensOf(qc), fields.tags) });
   saveTask(local, t);
-  changed(qc);
-  return recOf(t.id);
+  localEdited(qc, "tasks");
+  return taskRec(t.id);
 }
 
 /** `edit` applied to the task as the copy holds it, and written there. `edit` throws to stop (a value the server would refuse). */
 export async function changeTask(qc: QueryClient, id: string, edit: (t: Task) => Task): Promise<TaskRec> {
   const next = edit(held(id));
   saveTask(local, next);
-  changed(qc);
-  return recOf(id);
+  localEdited(qc, "tasks");
+  return taskRec(id);
 }
 
 export const editTask = (qc: QueryClient, id: string, patch: TaskPatch) => changeTask(qc, id, (t) => patchTask(t, patch));
@@ -98,7 +78,7 @@ export const editTask = (qc: QueryClient, id: string, patch: TaskPatch) => chang
 /** Gone from the lists now, from the server on the next sync, if nobody changed it since (else it comes back). Its links go with it. */
 export async function removeTask(qc: QueryClient, t: TaskRec): Promise<void> {
   dropTask(local, t.id, syncing());
-  changed(qc, true);
+  localEdited(qc, "tasks");
 }
 
 /** Tick or untick. A repeating task is done as it is, and its next round is made with it: a new record, about what the round just
@@ -110,5 +90,5 @@ export async function tickTask(qc: QueryClient, id: string, done: boolean): Prom
     saveTask(local, { ...r.next, order: nextOrder(open()) });
     carryLinks(local, id, r.next.id, recordId);
   }
-  changed(qc, !!r.next);
+  localEdited(qc, "tasks");
 }
