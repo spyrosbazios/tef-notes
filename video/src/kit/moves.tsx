@@ -13,10 +13,18 @@ export function Enter({ at = 0.15, top = 0, children }: { at?: number; top?: num
   return <div style={{ marginTop: top, opacity: p, transform: `translateY(${(1 - p) * 44}px) scale(${0.97 + p * 0.03})`, transformOrigin: "50% 0" }}>{children}</div>;
 }
 
-/** A piece that is not there until `at`, then rises into its place: a chat's next line, a card. */
-export function Arrive({ at, children }: { at: number; children: ReactNode }) {
+/** A piece that is not there until `at`, then makes room for itself and rises into it: a chat's next line, a card. Its
+ *  height opens from nothing, so what is around it glides aside rather than jumping. `gap` is the space the list it joins
+ *  keeps between its pieces (a flex gap, in pixels), which opens with it. */
+export function Arrive({ at, gap = 0, children }: { at: number; gap?: number; children: ReactNode }) {
   const { after, ramp } = useClock();
-  return after(at) ? <div style={rise(ramp(at, 0.4), 14)}>{children}</div> : null;
+  if (!after(at)) return null;
+  const room = ramp(at, 0.3);
+  return (
+    <div style={{ display: "grid", gridTemplateRows: `${room}fr`, marginTop: -gap * (1 - room) }}>
+      <div style={{ minHeight: 0, overflow: room < 1 ? "hidden" : undefined, ...rise(ramp(at + 0.08, 0.35), 14) }}>{children}</div>
+    </div>
+  );
 }
 
 /** A press on the control a screen marks `data-tap="<on>"`, at `at`: a fingertip comes down on it, presses, and leaves a

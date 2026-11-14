@@ -1,11 +1,7 @@
 import { Bell, Calendar, Flag, NotebookText, Plus, Repeat, Star, Tag as TagIcon, Trash2, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib";
-import { Evening, Radio, Tag, TaskRow, WebShell } from "./parts";
-
-const Pill = ({ children, none }: { children: ReactNode; none?: boolean }) => (
-  <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full bg-muted px-2.5 text-sm", none ? "text-faint" : "text-fg")}>{children}</span>
-);
+import { Evening, Pill, Radio, Tag, TaskRow, WebShell } from "./parts";
 
 const FIELDS: { icon: LucideIcon; label: string; value: ReactNode; none?: boolean; clear?: boolean; bare?: boolean; add?: boolean }[] = [
   { icon: Calendar, label: "When", value: "Thursday", clear: true },

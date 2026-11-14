@@ -36,7 +36,7 @@ export function Film() {
     <div className="relative overflow-hidden rounded-2xl border border-line bg-card shadow-lift ring-1 ring-hair">
       <video ref={ref} muted loop playsInline preload="metadata" poster={`${base}film-poster.jpg`} src={`${base}film.mp4`}
         onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onClick={toggle}
-        aria-label="A half-minute film of TEF Notes: Home on the laptop and the phone, the clipper, the assistant, tasks, lenses and themes"
+        aria-label="A short film of TEF Notes: Home on the laptop and the phone, a task typed in, a page clipped from Chrome, the day's tasks, the assistant, lenses and themes"
         className="block aspect-video w-full cursor-pointer" />
       <button type="button" onClick={toggle} aria-label={playing ? "Pause the film" : "Play the film"}
         className="absolute bottom-3 right-3 flex size-10 items-center justify-center rounded-full border border-line bg-glass backdrop-blur transition-colors hover:border-brand-line hover:bg-accent sm:bottom-4 sm:right-4 sm:size-11">
