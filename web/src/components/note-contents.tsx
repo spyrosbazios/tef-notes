@@ -3,7 +3,7 @@
 // to tick with the scroll. Under a mouse a tick shows a card of its heading and the first words under it (Animate UI's own Tooltip:
 // one card that glides from tick to tick) and a click scrolls there. On a phone the ticks are small and fade in while the note
 // scrolls, to say where you are; a finger held at the left edge opens them to a fingertip's step around it, and dragged along the
-// edge it goes through the headings, the note following and the same card beside the finger (hooks/contents.ts `useScrub`).
+// edge it picks a heading, the same card beside the finger, and the note glides there on release (hooks/contents.ts `useScrub`).
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@animate-ui/react/primitives/tooltip";
 import { blur, scale, spring, transition, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AnimatePresence, motion } from "motion/react";

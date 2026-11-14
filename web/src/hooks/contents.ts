@@ -11,6 +11,8 @@ const MIN = 3;
 const GAP = 24, AHEAD = 96;
 /** How long the phone's ticks stay after the last scroll. */
 const LINGER = 1000;
+/** The longest a jump's glide is waited for. */
+const SETTLE = 1200;
 
 const NONE: OutlineItem[] = [];
 
@@ -21,8 +23,8 @@ export type Contents = {
   current: number;
   /** The note scrolled within the last second. */
   scrolling: boolean;
-  /** Scroll to a heading: a glide, or at once (`cut`: under a finger scrubbing, which a glide would trail). */
-  jump: (index: number, how?: "glide" | "cut") => void;
+  /** Glide to a heading. It is the section being read from the start, so the mark goes straight to it, not through the ones passed. */
+  jump: (index: number) => void;
   /** The element the note scrolls in. */
   scroller: RefObject<HTMLElement | null>;
 };
@@ -33,6 +35,8 @@ export function useContents(editor: Editor | null, scroller: RefObject<HTMLEleme
   const outline = useSyncExternalStore(subscribe, () => editor?.outline() ?? NONE);
   const items = outline.length < MIN ? NONE : outline;
   const [current, setCurrent] = useState(0), [scrolling, setScrolling] = useState(false);
+  // A jump under way: the scroll's readings wait until it lands (`scrollend`, or `SETTLE` where a jump moved nothing)
+  const jumping = useRef(0);
 
   useEffect(() => {
     const el = scroller.current;
@@ -40,6 +44,7 @@ export function useContents(editor: Editor | null, scroller: RefObject<HTMLEleme
     let frame = 0, timer = 0;
     const read = () => {
       frame = 0;
+      if (jumping.current) return;
       const line = el.getBoundingClientRect().top + AHEAD;
       let at = 0;
       items.forEach((_, i) => { const h = editor.headingElement(i); if (h && h.getBoundingClientRect().top <= line) at = i; });
@@ -54,19 +59,24 @@ export function useContents(editor: Editor | null, scroller: RefObject<HTMLEleme
       clearTimeout(timer);
       timer = window.setTimeout(() => setScrolling(false), LINGER);
     };
+    const landed = () => { clearTimeout(jumping.current); jumping.current = 0; later(); };
     later();
     el.addEventListener("scroll", scrolled, { passive: true });
+    el.addEventListener("scrollend", landed);
     // Pictures loading and the window resizing move the headings without a scroll
     const sized = new ResizeObserver(later);
     sized.observe(el);
     sized.observe(editor.dom);
-    return () => { el.removeEventListener("scroll", scrolled); sized.disconnect(); cancelAnimationFrame(frame); clearTimeout(timer); };
+    return () => { el.removeEventListener("scroll", scrolled); el.removeEventListener("scrollend", landed); sized.disconnect(); cancelAnimationFrame(frame); clearTimeout(timer); };
   }, [editor, items, scroller]);
 
-  const jump = (index: number, how: "glide" | "cut" = "glide") => {
+  const jump = (index: number) => {
     const el = scroller.current, h = editor?.headingElement(index);
     if (!el || !h) return;
-    el.scrollTo({ top: el.scrollTop + h.getBoundingClientRect().top - el.getBoundingClientRect().top - GAP, behavior: how === "cut" || calm() ? "auto" : "smooth" });
+    clearTimeout(jumping.current);
+    jumping.current = window.setTimeout(() => { jumping.current = 0; }, SETTLE);
+    setCurrent(index);
+    el.scrollTo({ top: el.scrollTop + h.getBoundingClientRect().top - el.getBoundingClientRect().top - GAP, behavior: calm() ? "auto" : "smooth" });
   };
 
   return { items, current: Math.min(current, Math.max(0, items.length - 1)), scrolling, jump, scroller };
@@ -89,8 +99,9 @@ export type Scrub = {
 };
 
 /** The scrub in progress, null when there is none. A finger held still at the left edge opens the rail around it, the section
- *  being read under the finger; dragged, the note goes to each heading passed, and stays where the finger lifts. Android's back
- *  gesture is a swipe inward from that edge: a hold and a drag along it are neither. */
+ *  being read under the finger; dragged, it picks a heading while the note holds still (its scrolling is off for the scrub), and
+ *  the note glides there when the finger lifts: back on the tick it began on, nothing moves. Android's back gesture is a swipe
+ *  inward from that edge: a hold and a drag along it are neither, and a touch the system takes over picks nothing. */
 export function useScrub(contents: Contents, on: boolean): Scrub | null {
   const [scrub, setScrub] = useState<Scrub | null>(null);
   const latest = useRef(contents);
@@ -100,7 +111,7 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
   useEffect(() => {
     const el = scroller.current;
     if (!on || !el || !count) return;
-    let timer = 0, start: { x: number; y: number } | null = null, held: Scrub | null = null;
+    let timer = 0, start: { x: number; y: number } | null = null, held: Scrub | null = null, from = 0;
     const indexAt = (y: number, s: Scrub) => Math.max(0, Math.min(count - 1, Math.floor((y - el.getBoundingClientRect().top - s.top) / s.row)));
     const open = () => {
       if (!start) return;
@@ -110,15 +121,22 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
       const top = Math.max(MARGIN, Math.min(box.height - MARGIN - count * row, at - (current + 0.5) * row));
       held = { index: 0, row, top, height: box.height };
       held.index = indexAt(start.y, held);
+      from = current;
+      el.style.overflowY = "hidden";     // no scroll of the browser's own under the scrub, one already begun included
       haptic("tick");
-      if (held.index !== current) latest.current.jump(held.index, "cut");
       setScrub(held);
     };
     const stop = () => {
       clearTimeout(timer);
       start = null;
-      if (held) { held = null; setScrub(null); }
+      if (!held) return null;
+      const { index } = held;
+      held = null;
+      el.style.overflowY = "";
+      setScrub(null);
+      return index;
     };
+    const lift = () => { const index = stop(); if (index !== null && index !== from) latest.current.jump(index); };
     const down = (e: TouchEvent) => {
       stop();
       const t = e.touches[0];
@@ -129,12 +147,11 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
     const move = (e: TouchEvent) => {
       const t = e.touches[0];
       if (held) {
-        e.preventDefault();     // the note stays under the finger: only the rail's headings move it
+        e.preventDefault();
         const index = indexAt(t.clientY, held);
         if (index === held.index) return;
         held = { ...held, index };
         haptic("tap");
-        latest.current.jump(index, "cut");
         setScrub(held);
       } else if (start && Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP) stop();
     };
@@ -142,14 +159,14 @@ export function useScrub(contents: Contents, on: boolean): Scrub | null {
     const menu = (e: Event) => { if (start) e.preventDefault(); };
     el.addEventListener("touchstart", down, { passive: true });
     el.addEventListener("touchmove", move, { passive: false });
-    el.addEventListener("touchend", stop);
+    el.addEventListener("touchend", lift);
     el.addEventListener("touchcancel", stop);
     el.addEventListener("contextmenu", menu);
     return () => {
       stop();
       el.removeEventListener("touchstart", down);
       el.removeEventListener("touchmove", move);
-      el.removeEventListener("touchend", stop);
+      el.removeEventListener("touchend", lift);
       el.removeEventListener("touchcancel", stop);
       el.removeEventListener("contextmenu", menu);
     };
