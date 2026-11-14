@@ -1,7 +1,7 @@
 // The native companion's feeds (src/companion.ts): rows worked out here, so a companion only draws them.
 import { describe, expect, it } from "bun:test";
 import { choices, describe as describeResult, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
-import { DEFAULT_LOOK, FEED_LIMITS, helloOf, newTaskOf, notesFeed, ownerLook, shareClip, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
+import { DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, newTaskOf, notesFeed, ownerLook, shareClip, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
 import { fit, lookSize } from "../src/photos";
@@ -17,7 +17,9 @@ const feed = (tasks: Task[], list: "today" | "inbox" | "upcoming", lens: Lens | 
 
 describe("the look", () => {
   it("is the owner's theme and accent, the lens's over them", () => {
-    expect(DEFAULT_LOOK).toEqual({ scheme: THEMES.oled.scheme, ...THEMES.oled.C });
+    expect(DEFAULT_LOOK).toEqual({ scheme: THEMES.oled.scheme, ...THEMES.oled.C, muted: "#f1f1f512", soft: "#b39bff1a", scrim: "#0000008c" });
+    expect(hex8("rgba(255, 0, 16, 1)")).toBe("#ff0010ff");
+    expect(() => hex8("#fff")).toThrow();
     expect(ownerLook({ theme: "nord", accent: "rose" }, null)).toMatchObject({ scheme: "dark", bg: THEMES.nord.C.bg, brand: ACCENTS.rose.dark });
     expect(ownerLook({ theme: "nord", accent: "rose" }, work)).toMatchObject({ scheme: "light", bg: THEMES.light.C.bg, brand: ACCENTS.teal.light });
   });

@@ -2,7 +2,7 @@
 // rules are the core's (packages/core/test/companion.test.ts); here, that they are read through the owner's lens and
 // colours and that a tick and a new task land as the app's own would.
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import type { Hello, NotesFeed, TasksFeed } from "@/core/companion";
+import { DEFAULT_LOOK, type Hello, type NotesFeed, type TasksFeed } from "@/core/companion";
 import { serializeNote } from "@/core/notes";
 import { DEFAULT_PREFS } from "@/core/prefs";
 import { ACCENTS, THEMES } from "@/core/theme";
@@ -27,7 +27,7 @@ const lensOn = () => {
 
 describe("hello", () => {
   it("answers with the defaults before any preference is saved", async () => {
-    expect(await (await helloRoute(pb)).json() as Hello).toEqual({ app: "tefnotes", contract: 1, look: { scheme: "dark", ...THEMES.oled.C }, summary: false, tag: null });
+    expect(await (await helloRoute(pb)).json() as Hello).toEqual({ app: "tefnotes", contract: 1, look: DEFAULT_LOOK, summary: false, tag: null });
   });
   it("answers in the owner's theme, the lens's accent, the summary box as left", async () => {
     lensOn();
