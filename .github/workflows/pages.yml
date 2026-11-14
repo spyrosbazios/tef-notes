@@ -1,15 +1,18 @@
 name: Pages
 
 # The marketing page (site/) at https://spyrosbazios.github.io/tef-notes/. The repo's Pages source must be "GitHub Actions"
-# (Settings > Pages). The page imports the palette and fonts from packages/core and assets/, so those trigger it too.
+# (Settings > Pages). The page imports the palette and fonts from packages/core and assets/, so those trigger it too, and it
+# shows the promo film (video/), which film.yml renders first and this build takes into the page's public files.
 on:
   push:
     branches: [main]
     paths:
       - "site/**"
+      - "video/**"
       - "packages/core/**"
       - "assets/**"
       - ".github/workflows/pages.yml"
+      - ".github/workflows/film.yml"
   workflow_dispatch:
 
 # Pages deploys one at a time; a newer push waits for the running one rather than cancelling a half-published site.
@@ -21,11 +24,20 @@ permissions:
   contents: read
 
 jobs:
+  film:
+    uses: ./.github/workflows/film.yml
+
   build:
+    needs: film
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+      # film.mp4 and film-poster.jpg, where the build looks for them (site/vite.config.ts).
+      - uses: actions/download-artifact@v8
+        with:
+          name: film
+          path: site/public
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.9"

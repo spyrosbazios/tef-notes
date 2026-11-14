@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -53,9 +54,12 @@ import app.tefnotes.companion.SettingsActivity
 import app.tefnotes.companion.Store
 import app.tefnotes.companion.Switches
 import app.tefnotes.companion.Sync
+import app.tefnotes.companion.Tokens
 import app.tefnotes.companion.Unreachable
 import app.tefnotes.companion.lensesJson
 import app.tefnotes.companion.withoutTask
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.delay
 
 object Keys {
     /** A tasks widget's list (Contract.kt TASK_LISTS); Today until the owner picks another. */
@@ -64,6 +68,8 @@ object Keys {
     val Feed = stringPreferencesKey("feed")
     /** The last try to read the feed found no server: what is drawn may be old. */
     val Stale = booleanPreferencesKey("stale")
+    /** The tasks just ticked, shown ticked for a moment before they leave (`TickAction`). */
+    val Ticked = stringSetPreferencesKey("ticked")
 }
 
 object Widgets {
@@ -77,7 +83,12 @@ object Widgets {
      *  passed over: the others still get theirs. */
     private suspend fun show(context: Context, id: GlanceId, widget: GlanceAppWidget, feed: String?) {
         try {
-            updateAppWidgetState(context, id) { if (feed != null) it[Keys.Feed] = feed; it[Keys.Stale] = feed == null }
+            updateAppWidgetState(context, id) {
+                if (feed != null) it[Keys.Feed] = feed
+                it[Keys.Stale] = feed == null
+                // A tick whose wait was cut off (the process ended) is not left showing: only the ones still waiting stay.
+                it[Keys.Ticked] = it[Keys.Ticked].orEmpty().intersect(lingering)
+            }
             widget.update(context, id)
         } catch (_: IllegalArgumentException) { }
     }
@@ -98,10 +109,28 @@ object Widgets {
         for (id in ids) show(context, id, NotesWidget(), feed)
     }
 
-    /** A task ticked on one widget leaves them all at once, before the server has heard. */
-    suspend fun dropTask(context: Context, task: String) {
+    /** The tasks whose tick is waiting out its moment, in this process. */
+    private val lingering: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    fun isLingering(task: String) = task in lingering
+
+    /** A task shown ticked on every widget (`on`), or as it was again when the tick is taken back. */
+    suspend fun linger(context: Context, task: String, on: Boolean) {
+        if (on) lingering += task else lingering -= task
         for (id in tasks(context)) {
-            updateAppWidgetState(context, id) { s -> s[Keys.Feed]?.let { s[Keys.Feed] = withoutTask(it, task) } }
+            updateAppWidgetState(context, id) { s -> s[Keys.Ticked] = if (on) s[Keys.Ticked].orEmpty() + task else s[Keys.Ticked].orEmpty() - task }
+            TasksWidget().update(context, id)
+        }
+    }
+
+    /** A ticked task leaves every widget, before the server has heard. */
+    suspend fun dropTask(context: Context, task: String) {
+        lingering -= task
+        for (id in tasks(context)) {
+            updateAppWidgetState(context, id) { s ->
+                s[Keys.Feed]?.let { s[Keys.Feed] = withoutTask(it, task) }
+                s[Keys.Ticked] = s[Keys.Ticked].orEmpty() - task
+            }
             TasksWidget().update(context, id)
         }
     }
@@ -111,10 +140,16 @@ class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) = Sync.now(context)
 }
 
-/** A tick: the row goes at once, the server hears with the next sync (Sync.kt), now or when it is back in reach. */
+/** A tick, as the web app's: the task shows ticked for a moment (core's TICK_MS), and a second tap inside it takes the
+ *  tick back with nothing written. Then the row leaves, and the server hears with the next sync (Sync.kt), now or when it
+ *  is back in reach. */
 class TickAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val task = parameters[Task] ?: return
+        if (Widgets.isLingering(task)) return Widgets.linger(context, task, false)
+        Widgets.linger(context, task, true)
+        delay(Tokens.TICK_MS)
+        if (!Widgets.isLingering(task)) return          // taken back meanwhile
         Store.addTick(context, task)
         Widgets.dropTask(context, task)
         Sync.now(context)

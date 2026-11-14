@@ -1,5 +1,6 @@
 import { ArrowRight, GitBranch, Globe, Smartphone, SquareTerminal, Sparkles, Puzzle } from "lucide-react";
 import { REPO } from "@/lib";
+import { Film } from "./Film";
 import { PhoneHome } from "./mock/PhoneHome";
 import { WebHome } from "./mock/WebHome";
 import { BrowserFrame, PhoneFrame, Reveal, ScrollStage } from "./ui";
@@ -48,9 +49,15 @@ export function Hero() {
         }>
           <Reveal delay={150} className="relative mx-auto mt-16 max-w-5xl sm:mt-20">
             <div className="pointer-events-none absolute -inset-x-10 -bottom-10 -top-6 -z-10 rounded-[3rem] bg-glow-soft blur-3xl" aria-hidden="true" />
-            <BrowserFrame label="TEF Notes on the web: Home, with the day's tasks, the month ahead and every note" className="w-[92%] sm:w-[90%]"><WebHome /></BrowserFrame>
-            <PhoneFrame label="TEF Notes on the phone: Home, with the days strip, the day's tasks and the notes"
-              className="absolute -bottom-8 right-0 w-[27%] min-w-[96px] max-w-[250px] sm:-bottom-12 md:right-[-1%] animate-float"><PhoneHome /></PhoneFrame>
+            {/* The stage's screen is the promo film in a build that has it (the published page: vite.config.ts __FILM__).
+                A build without one, the Dockerfile's or a local one, shows Home drawn on both screens, the film's own first shot. */}
+            {__FILM__ ? <Film /> : (
+              <>
+                <BrowserFrame label="TEF Notes on the web: Home, with the day's tasks, the month ahead and every note" className="w-[92%] sm:w-[90%]"><WebHome /></BrowserFrame>
+                <PhoneFrame label="TEF Notes on the phone: Home, with the days strip, the day's tasks and the notes"
+                  className="absolute -bottom-8 right-0 w-[27%] min-w-[96px] max-w-[250px] sm:-bottom-12 md:right-[-1%] animate-float"><PhoneHome /></PhoneFrame>
+              </>
+            )}
           </Reveal>
         </ScrollStage>
       </div>

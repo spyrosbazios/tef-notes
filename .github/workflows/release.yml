@@ -1,9 +1,9 @@
 name: Release
 
 # A tag vX.Y.Z on main is the release (CONTRIBUTING.md, Versioning): the tag is the repo's one version, read by
-# scripts/version.sh. This builds the extension zip and the Android companion's APK and attaches them to a GitHub release
-# whose notes are CHANGELOG.md's section for the version. The server image is docker.yml's. The phone's app is the web app,
-# installed from Chrome; the APK is the optional companion beside it (android/README.md).
+# scripts/version.sh. This builds the extension zip and the Android companion's APK, renders the promo film (film.yml), and
+# attaches them to a GitHub release whose notes are CHANGELOG.md's section for the version. The server image is docker.yml's.
+# The phone's app is the web app, installed from Chrome; the APK is the optional companion beside it (android/README.md).
 on:
   push:
     tags: ["v*"]
@@ -109,9 +109,13 @@ jobs:
           path: tef-notes-companion-*.apk
           if-no-files-found: error
 
+  film:
+    name: Promo film
+    uses: ./.github/workflows/film.yml
+
   release:
     name: GitHub release
-    needs: [version, extension, android]
+    needs: [version, extension, android, film]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -122,6 +126,13 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      # The film's artifact is film.mp4 and its still: the release carries the film, under the version's name.
+      - name: Name the film
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mv dist/film.mp4 "dist/tef-notes-film-$VERSION.mp4"
+          rm dist/film-poster.jpg
       # The notes are CHANGELOG.md's "## X.Y.Z - date" section, without its heading; a tag with none fails the release.
       - name: Release notes
         env:

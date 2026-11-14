@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContractTest {
-    private val look = """{"scheme":"light","bg":"#ffffff","card":"#f4f4f5","raised":"#e4e4e7","line":"#d4d4d8","fg":"#18181b","dim":"#52525b","faint":"#a1a1aa","brand":"#6d28d9","up":"#15803d","down":"#b91c1c","warn":"#b45309"}"""
+    private val look = """{"scheme":"light","bg":"#ffffff","card":"#f4f4f5","raised":"#e4e4e7","line":"#d4d4d8","fg":"#18181b","dim":"#52525b","faint":"#a1a1aa","brand":"#6d28d9","up":"#15803d","down":"#b91c1c","warn":"#b45309","muted":"#18181b12","soft":"#6d28d91a","scrim":"#0000008c"}"""
 
     @Test
     fun aLookNeedsEveryColour() {
@@ -16,6 +16,9 @@ class ContractTest {
         assertEquals(false, l.dark)
         assertEquals(0xFFFFFFFF.toInt(), l.bg)
         assertEquals(0xFF6D28D9.toInt(), l.brand)
+        assertEquals(0x1A6D28D9, l.soft)
+        assertEquals(0x8C000000.toInt(), l.scrim)
+        assertNull(lookOf(JSONObject(look).apply { remove("scrim") }))
         assertNull(lookOf(JSONObject(look).put("brand", "violet")))
         assertNull(lookOf(JSONObject(look).apply { remove("line") }))
         assertNull(colorOf("#fff"))

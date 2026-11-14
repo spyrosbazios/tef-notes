@@ -14,7 +14,7 @@ The last refresh is the newest commit whose subject starts with `Promo:`.
 
 ```sh
 last=$(git log -1 --format=%H --grep='^Promo:' main)
-git log --oneline ${last:+$last..}main -- . ':!site' ':!README.md'
+git log --oneline ${last:+$last..}main -- . ':!site' ':!video' ':!README.md'
 ```
 
 If nothing user-facing landed in that range (only refactors, tests, docs, chores), **stop**. Report "no drift" and
@@ -42,6 +42,10 @@ Rank what you find. Promo shows the strongest few features. It is not a changelo
   `web/src/components/`, never as screenshots (`site/README.md`). Change a mock only when its screen visibly changed
   in a way the page relies on, such as a removed tab or a renamed view. A new feature that needs a new mock or `Peek`
   is a **proposal**: describe it in the report and don't build it unasked.
+- **The film** (`video/`) draws these same screens, so a mock you change changes the film too. Keep a mock's props and
+  its `data-tap` marks (a scene drives the screen through them), and after touching `mock/` or `look.css` run the
+  `promo-video` skill's step 5: its stills show whether each scene still fits. What the film shows and says is that
+  skill's to decide, not this one's.
 - Demo content stays fictional. Colours come from the page's tokens and icons from lucide. Paths go through Vite's
   `base`.
 
@@ -59,7 +63,8 @@ every section you touched, at desktop width and at 390 px.
 
 One commit whose subject starts with `Promo:` (this is the marker step 1 reads), for example
 `Promo: README and site cover places and voice input`. Merge it to main and push. GitHub Pages
-(`.github/workflows/pages.yml`) republishes the site on a push to main that touches `site/`. Stop instead if the
+(`.github/workflows/pages.yml`) republishes the site, with the film re-rendered if its screens changed, on a push to
+main that touches `site/`. Stop instead if the
 live checkout is dirty.
 
 ## Report

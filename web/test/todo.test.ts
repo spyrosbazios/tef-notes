@@ -16,8 +16,13 @@ let ids = 0;
 const net = async <T>(f: () => T): Promise<T> => { if (server.down) throw new TypeError("network"); return f(); };
 
 const noteRec = (r: { rec: string; path: string; text: string; rev: number }) => ({ ...r, kind: "note" as const, updated: "2026-11-01T10:00:00.000Z" });
+// A faked module is the whole process's, not this file's: a test file run after this one imports the fake too. So it keeps
+// what the service has beside its calls (`withNote`, which is pure); without it, those files found no such export whenever
+// the runner happened to take this file first.
+const service = await import("@/services/notes");
 mock.module("@/services/notes", () => ({
-  list: () => net(() => { lists++; return [...server.notes.values()].map((r) => ({ rec: r.rec, path: r.path, rev: r.rev, kind: "note" })); }),
+  ...service,
+  list:() => net(() => { lists++; return [...server.notes.values()].map((r) => ({ rec: r.rec, path: r.path, rev: r.rev, kind: "note" })); }),
   get: (rec: string) => net(() => { const r = server.notes.get(rec); return r ? noteRec(r) : null; }),
   read: (path: string) => net(() => { const r = [...server.notes.values()].find((x) => x.path === path); return r ? noteRec(r) : null; }),
   create: (path: string, text: string) => net(() => {

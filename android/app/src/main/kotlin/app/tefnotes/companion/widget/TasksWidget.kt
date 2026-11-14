@@ -51,19 +51,19 @@ class TasksWidget : GlanceAppWidget() {
             when {
                 feed == null -> Unread(context, look, stale)
                 feed.sections.isEmpty() -> Message(look, "Nothing here", open(feed.url))
-                else -> Rows(feed, look)
+                else -> Rows(feed, look, state[Keys.Ticked].orEmpty())
             }
         }
     }
 }
 
 @Composable
-private fun Rows(feed: TasksFeed, look: Look) = LazyColumn(GlanceModifier.fillMaxSize()) {
+private fun Rows(feed: TasksFeed, look: Look, ticked: Set<String>) = LazyColumn(GlanceModifier.fillMaxSize()) {
     for (section in feed.sections) {
         if (section.label.isNotEmpty()) item {
             Text(section.label, GlanceModifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 2.dp), text(look.dim, 12, bold = true), maxLines = 1)
         }
-        items(section.tasks) { TaskRow(it, look) }
+        items(section.tasks) { TaskRow(it, look, it.id in ticked) }
     }
     if (feed.more > 0) item {
         Text("${feed.more} more in TEF Notes", GlanceModifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable(open(feed.url)), text(look.dim, 12))
@@ -71,11 +71,13 @@ private fun Rows(feed: TasksFeed, look: Look) = LazyColumn(GlanceModifier.fillMa
 }
 
 @Composable
-private fun TaskRow(task: FeedTask, look: Look) = Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-    Button(R.drawable.ic_box, "Done", look.dim, actionRunCallback<TickAction>(actionParametersOf(TickAction.Task to task.id)))
+private fun TaskRow(task: FeedTask, look: Look, ticked: Boolean) = Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    // Just ticked: shown ticked and faded for its moment, the box taking the tick back.
+    val tick = actionRunCallback<TickAction>(actionParametersOf(TickAction.Task to task.id))
+    if (ticked) Button(R.drawable.ic_done, "Undo", look.brand, tick) else Button(R.drawable.ic_box, "Done", look.dim, tick)
     Column(GlanceModifier.defaultWeight().padding(vertical = 6.dp).clickable(open(task.url))) {
-        Text(task.title, style = text(look.fg, 14), maxLines = 2)
-        if (task.detail.isNotEmpty()) Text(task.detail, style = text(if (task.late) look.down else look.dim, 12), maxLines = 1)
+        Text(task.title, style = text(if (ticked) look.faint else look.fg, 14), maxLines = 2)
+        if (task.detail.isNotEmpty()) Text(task.detail, style = text(if (ticked) look.faint else if (task.late) look.down else look.dim, 12), maxLines = 1)
     }
 }
 

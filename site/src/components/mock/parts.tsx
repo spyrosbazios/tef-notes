@@ -1,7 +1,8 @@
 // The pieces the drawn screens are built from, each a copy in structure of the app's own (web/src/components/rail.tsx,
 // home.tsx, planned.tsx, note-list.tsx, task-row.tsx, tag-badge.tsx, assistant/; the phone's (tabs)/_layout.tsx, ui/home.tsx,
 // ui/days.tsx, ui/lens.tsx, ui/note-tile.tsx). Colours are the page's tokens, which are the app's; icons are lucide's, as in
-// the app. Photos are drawn stand-ins in the note colours (index.css `.pic`), never pictures.
+// the app. Photos are drawn stand-ins in the note colours (look.css `.pic`), never pictures. A `data-tap` names a control the
+// promo film presses (video/src/kit/moves.tsx `Tap`); the page makes nothing of it.
 import {
   ArrowUp, BatteryFull, Bell, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleCheckBig, Eye, Flag, Focus,
   History, House, Inbox, ListChecks, Mic, Moon, NotebookText, Pin, Plus, Repeat, Search, Settings, Signal, Sparkles,
@@ -203,7 +204,7 @@ export function TaskRow({ task, selected }: { task: DemoTask; selected?: boolean
   ].filter(Boolean);
   return (
     <div className={cn("flex items-start gap-3 rounded-xl px-3 py-2", selected && "bg-muted")}>
-      <span className="mt-0.5"><Radio on={task.done} size={18} /></span>
+      <span className="mt-0.5" data-tap={`tick ${task.title}`}><Radio on={task.done} size={18} /></span>
       <div className="min-w-0 flex-1">
         <p className={cn("text-[15px] leading-snug", task.done ? "text-faint line-through decoration-faint" : "text-fg")}>{task.title}</p>
         {meta.length ? <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-faint">{meta}</div> : null}
@@ -346,7 +347,7 @@ export function ConfirmCard({ title, why, tasks }: { title: string; why?: string
         {tasks.map((t, i) => <p key={t.title}>{i + 1}. {t.title}{line(t) ? <span className="text-dim"> ({line(t)})</span> : null}</p>)}
       </div>
       <div className="flex gap-2 text-sm font-medium">
-        <span className="flex h-8 flex-1 items-center justify-center rounded-full bg-brand text-bg">Add them</span>
+        <span data-tap="approve" className="flex h-8 flex-1 items-center justify-center rounded-full bg-brand text-bg">Add them</span>
         <span className="flex h-8 flex-1 items-center justify-center rounded-full bg-raised text-fg">Not now</span>
       </div>
     </div>
@@ -371,32 +372,34 @@ export function AssistantHeader({ close, phone }: { close?: boolean; phone?: boo
 }
 
 /** What the assistant sees of the page, and the composer (assistant/panel.tsx): the field, then a row of Attach, the model and
- *  effort pill, the mic and the round Send, which waits for a message. */
-export function AssistantComposer({ sees, ready }: { sees: string; ready?: boolean }) {
+ *  effort pill, the mic and the round Send, which waits for a message: a `draft` is one being typed, the caret after it. */
+export function AssistantComposer({ sees, ready, draft }: { sees: string; ready?: boolean; draft?: string }) {
   return (
     <div className="shrink-0 border-t border-line px-3 pb-3 pt-3">
       <p className="flex items-center gap-1.5 px-1 pb-1.5 text-xs text-faint"><Eye className="size-3.5" /><span className="truncate">{sees}</span></p>
       <div className="rounded-3xl border border-line bg-card p-2">
-        <p className="min-h-9 px-2 py-1.5 text-sm text-faint">Ask, or tap the mic and say what to note</p>
+        {draft
+          ? <p className="min-h-9 px-2 py-1.5 text-sm">{draft}<span className="ml-px inline-block h-4 w-px translate-y-[3px] bg-brand" /></p>
+          : <p className="min-h-9 px-2 py-1.5 text-sm text-faint">Ask, or tap the mic and say what to note</p>}
         <div className="flex items-center gap-1 pt-1 text-dim">
           <span className="flex size-8 items-center justify-center rounded-full"><Plus className="size-4" /></span>
           <span className="flex-1" />
           <span className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium">deepseek-flash<span className="font-normal text-faint">Normal</span><ChevronDown className="size-3 text-faint" /></span>
           <span className="flex size-8 items-center justify-center rounded-full"><Mic className="size-4" /></span>
-          <span className={cn("flex size-8 items-center justify-center rounded-full bg-brand text-bg", !ready && "opacity-50")}><ArrowUp className="size-4" /></span>
+          <span data-tap="send" className={cn("flex size-8 items-center justify-center rounded-full bg-brand text-bg", !ready && !draft && "opacity-50")}><ArrowUp className="size-4" /></span>
         </div>
       </div>
     </div>
   );
 }
 
-/** The web assistant's dock: its header; the chat; what it sees of the page; the composer. */
-export function Dock({ sees, children }: { sees: string; children: ReactNode }) {
+/** The web assistant's dock: its header; the chat; what it sees of the page; the composer, with a `draft` in it if one is given. */
+export function Dock({ sees, draft, children }: { sees: string; draft?: string; children: ReactNode }) {
   return (
     <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-line bg-bg">
       <AssistantHeader close />
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-5">{children}</div>
-      <AssistantComposer sees={sees} />
+      <AssistantComposer sees={sees} draft={draft} />
     </aside>
   );
 }
@@ -456,7 +459,7 @@ export function HomeHeader({ lens, searching }: { lens?: string; searching?: boo
   return (
     <div className="flex h-11 items-center gap-1 pl-4 pr-2">
       <span className="flex min-w-0 flex-1">
-        <span className={cn("flex h-11 items-center gap-2.5 pr-2", lens ? "text-brand" : "text-dim")}>
+        <span data-tap="lens" className={cn("flex h-11 items-center gap-2.5 pr-2", lens ? "text-brand" : "text-dim")}>
           <Mark className="h-7" />
           <span className="text-[15px] font-extrabold tracking-tight">{lens ?? "All"}</span>
           <ChevronDown className="size-4" />

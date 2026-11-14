@@ -8,27 +8,32 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import app.tefnotes.companion.Api
+import app.tefnotes.companion.ButtonKind
 import app.tefnotes.companion.LensChoice
 import app.tefnotes.companion.OpenActivity
 import app.tefnotes.companion.Refused
 import app.tefnotes.companion.Sheet
+import app.tefnotes.companion.SheetControl
 import app.tefnotes.companion.Store
 import app.tefnotes.companion.Sync
+import app.tefnotes.companion.TfButton
 import app.tefnotes.companion.Unreachable
 import app.tefnotes.companion.lensChoicesOf
 import kotlinx.coroutines.launch
 
 class LensActivity : ComponentActivity() {
+    private val sheet = SheetControl()
     private var busy by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,11 +46,11 @@ class LensActivity : ComponentActivity() {
             return finish()
         }
         setContent {
-            Sheet(Store.look(this), "Lens", ::finish) {
-                for (lens in lenses) {
+            Sheet(Store.look(this), "Lens", sheet, ::leave) {
+                for (lens in lenses) Box(Modifier.padding(bottom = 8.dp)) {
                     // The one on is the filled button; tapping it leaves things as they are.
-                    if (lens.on) Button(::finish, Modifier.fillMaxWidth()) { Text(lens.name) }
-                    else FilledTonalButton({ pick(lens) }, Modifier.fillMaxWidth(), enabled = !busy) { Text(lens.name) }
+                    if (lens.on) TfButton(sheet::close, Modifier.fillMaxWidth()) { Text(lens.name) }
+                    else TfButton({ pick(lens) }, Modifier.fillMaxWidth(), ButtonKind.Secondary, enabled = !busy) { Text(lens.name) }
                 }
             }
         }
@@ -64,8 +69,14 @@ class LensActivity : ComponentActivity() {
             }
             // The widgets are drawn again from the server, under the lens now on.
             Sync.now(this@LensActivity)
-            finish()
+            sheet.close()
         }
+    }
+
+    /** The sheet is off the screen: the window goes with no move of its own. */
+    private fun leave() {
+        overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        finish()
     }
 
     private fun failed(why: String) {

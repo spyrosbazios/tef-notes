@@ -1,0 +1,6 @@
+@import "tailwindcss";
+/* The site's look: its faces, colour names, note colours, drawn pictures and grid. The film sets --tf-* itself (kit/Stage.tsx). */
+@import "../../site/src/look.css";
+
+/* The classes of the screens the film shows are written in the site's files. */
+@source "../../site/src/components";

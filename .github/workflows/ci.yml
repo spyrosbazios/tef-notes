@@ -130,6 +130,30 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
 
+  # The promo film's code and its storyboard's rules; film.yml renders it.
+  video:
+    name: Film - lint, typecheck, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: video
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('video/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun test
+
   extension:
     name: Extension - lint, typecheck, unsigned build
     runs-on: ubuntu-latest

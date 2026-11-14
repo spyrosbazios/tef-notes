@@ -14,15 +14,20 @@ const val APP = "tefnotes"
 
 // ---- the look
 
-/** The owner's colours, each as ARGB. */
+/** The owner's colours, each as ARGB: the palette, and the washes the sheets are drawn with (`muted` a quiet fill,
+ *  `soft` the brand's under something chosen, `scrim` what dims the screen under a sheet). */
 data class Look(
     val dark: Boolean, val bg: Int, val card: Int, val raised: Int, val line: Int, val fg: Int, val dim: Int,
-    val faint: Int, val brand: Int, val up: Int, val down: Int, val warn: Int,
+    val faint: Int, val brand: Int, val up: Int, val down: Int, val warn: Int, val muted: Int, val soft: Int, val scrim: Int,
 )
 
-/** `#rrggbb` as opaque ARGB; null when it is not one. */
-fun colorOf(hex: String?): Int? =
-    hex?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) }?.let { (0xFF000000 or it.substring(1).toLong(16)).toInt() }
+/** `#rrggbb` (opaque) or `#rrggbbaa` as ARGB; null when it is neither. */
+fun colorOf(hex: String?): Int? = when {
+    hex == null -> null
+    Regex("^#[0-9a-fA-F]{6}$").matches(hex) -> (0xFF000000 or hex.substring(1).toLong(16)).toInt()
+    Regex("^#[0-9a-fA-F]{8}$").matches(hex) -> ((hex.substring(7).toLong(16) shl 24) or hex.substring(1, 7).toLong(16)).toInt()
+    else -> null
+}
 
 /** A `Look` from its JSON; null when a colour is missing, so a half-read look is never drawn. */
 fun lookOf(j: JSONObject?): Look? {
@@ -33,7 +38,8 @@ fun lookOf(j: JSONObject?): Look? {
         bg = c("bg") ?: return null, card = c("card") ?: return null, raised = c("raised") ?: return null,
         line = c("line") ?: return null, fg = c("fg") ?: return null, dim = c("dim") ?: return null,
         faint = c("faint") ?: return null, brand = c("brand") ?: return null, up = c("up") ?: return null,
-        down = c("down") ?: return null, warn = c("warn") ?: return null,
+        down = c("down") ?: return null, warn = c("warn") ?: return null, muted = c("muted") ?: return null,
+        soft = c("soft") ?: return null, scrim = c("scrim") ?: return null,
     )
 }
 

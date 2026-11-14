@@ -16,6 +16,9 @@ const CHOICES: [LucideIcon, string, string?][] = [
   [ClipboardPlus, "New task"],
 ];
 
+/** The owner's own note on the clip. */
+export const NOTE = "The three near the apartment";
+
 /** A section as ui.css draws it: a card with its small capitals heading. */
 const Section = ({ title, children, className }: { title?: string; children: ReactNode; className?: string }) => (
   <section className={cn("mt-2.5 rounded-[10px] border border-line bg-card px-3 pb-3 pt-2.5", className)}>
@@ -32,8 +35,9 @@ const Field = ({ children, tall, typed }: { children: string; tall?: boolean; ty
 
 /** A strip of Chrome: the address bar, the extensions' corner with the mark lit, and the popup hanging from it. The
  *  popup is a copy in structure of extension/src/popup.html and ui.css: the brand, the page, its tags (picked, and
- *  offered with their chance), the details (a title, a note, the summary box), and where to save. */
-export function ClipperPopup() {
+ *  offered with their chance), the details (a title, a note, the summary box), and where to save. `note` is the note as far
+ *  as it has been typed. */
+export function ClipperPopup({ note = NOTE }: { note?: string }) {
   return (
     <div className="flex h-full w-full flex-col bg-raised">
       <div className="flex h-11 shrink-0 items-center gap-2 px-3">
@@ -63,13 +67,13 @@ export function ClipperPopup() {
         </Section>
         <Section title="Details">
           <Field>Title for a new note or task (optional)</Field>
-          <Field tall typed>The three near the apartment</Field>
+          <Field tall typed>{note}</Field>
           <p className="mt-2.5 flex items-center gap-2"><span className="flex size-[13px] items-center justify-center rounded-[3px] bg-brand text-bg"><svg viewBox="0 0 24 24" className="size-2.5" fill="none" stroke="currentColor" strokeWidth={4}><path d="M20 6 9 17l-5-5" /></svg></span>Add a summary</p>
         </Section>
         <Section title="Save to">
           <div className="flex flex-col gap-1.5">
             {CHOICES.map(([I, label, hint], i) => (
-              <div key={label} className={cn("flex h-[34px] items-center gap-2 rounded-lg border px-3.5", i === 0 ? "border-brand bg-accent font-semibold" : "border-line bg-raised")}>
+              <div key={label} data-tap={`save ${i}`} className={cn("flex h-[34px] items-center gap-2 rounded-lg border px-3.5", i === 0 ? "border-brand bg-accent font-semibold" : "border-line bg-raised")}>
                 <I className={cn("size-4 shrink-0", i === 0 ? "text-brand" : "text-dim")} /><span className="flex-1 truncate">{label}</span>{hint ? <span className="text-dim">{hint}</span> : null}
               </div>
             ))}

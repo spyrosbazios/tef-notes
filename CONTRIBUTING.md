@@ -48,6 +48,8 @@ Each module's README has its setup and commands:
 - `cli`: [cli/README.md](cli/README.md)
 - `extension`: [extension/README.md](extension/README.md)
 - `android`: [android/README.md](android/README.md)
+- `site` and `video` (the public page and the promo film drawn from its screens): [site/README.md](site/README.md),
+  [video/README.md](video/README.md); a change to a screen in `site/src/components/mock/` is checked in both
 
 Run the checks of every module you touched, and of `packages/core` if you changed it (all clients depend on it).
 Format, then lint, type-check, test and build, in that order.
@@ -70,5 +72,5 @@ The whole repository has one semver version, and the git tag is its only source:
 extension's manifest reads it from there.
 
 To release: move the `## Unreleased` entries of `CHANGELOG.md` under `## X.Y.Z - date`, commit to `main`, then tag
-`vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and the Android companion's APK and attaches them to a GitHub release
+`vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and the Android companion's APK, renders the promo film, and attaches them to a GitHub release
 whose notes are that changelog section; `docker.yml` publishes the server images.

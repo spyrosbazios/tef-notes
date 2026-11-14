@@ -66,7 +66,8 @@ android {
     }
 }
 
-/** Runs scripts/generate.ts: the colours, icons and brand mark as resources, from packages/core and lucide. */
+/** Runs scripts/generate.ts: the colours, icons, brand mark and fonts as resources, and the motion tokens as Kotlin, from
+ *  packages/core, lucide and Animate UI. */
 abstract class GenerateTefNotes : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -78,6 +79,9 @@ abstract class GenerateTefNotes : DefaultTask() {
     @get:OutputDirectory
     abstract val res: DirectoryProperty
 
+    @get:OutputDirectory
+    abstract val kotlin: DirectoryProperty
+
     @get:Inject
     abstract val exec: ExecOperations
 
@@ -85,7 +89,7 @@ abstract class GenerateTefNotes : DefaultTask() {
     fun generate() {
         exec.exec {
             workingDir = workDir.get().asFile
-            commandLine("bun", "scripts/generate.ts", res.get().asFile.path)
+            commandLine("bun", "scripts/generate.ts", res.get().asFile.path, kotlin.get().asFile.path)
         }
     }
 }
@@ -96,11 +100,12 @@ androidComponents {
             val core = rootDir.resolve("../packages/core/src")
             sources.from(
                 rootDir.resolve("scripts"), rootDir.resolve("bun.lock"), rootDir.resolve("../assets/fonts"),
-                core.resolve("theme.ts"), core.resolve("brand.ts"), core.resolve("companion.ts"),
+                core.resolve("theme.ts"), core.resolve("brand.ts"), core.resolve("companion.ts"), core.resolve("tick.ts"),
             )
             workDir.set(rootDir)
         }
         variant.sources.res?.addGeneratedSourceDirectory(generate, GenerateTefNotes::res)
+        variant.sources.kotlin?.addGeneratedSourceDirectory(generate, GenerateTefNotes::kotlin)
     }
 }
 
