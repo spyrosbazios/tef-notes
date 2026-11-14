@@ -15,6 +15,7 @@ to it. See the security model in [../README.md](../README.md).
 | `POST` | `/agent/chat` | Streams a chat turn. Body: `id`, `messages`, `model`, `writesWithoutAsking`, and optional `context` (below) |
 | `GET` | `/agent/search` | Notes by words and meaning, `q` and `limit` (1 to 30): the chat's `search_notes`, no model call (`src/search.ts`; contract `packages/core/src/find.ts` `SearchHit`); the CLI's `search` |
 | `GET` | `/agent/models` | The models; `provider` names the server's; `available` is true when its key is read |
+| `GET` | `/agent/ocr` | Scanned PDFs: `on`, the `languages` they are read in, pages `read` and `waiting`, `failedPages`, `failedPdfs`, the last `problem`; or `on: false` and `why` (`src/ocr.ts`, [../README.md](../README.md) "Scanned PDFs") |
 | `GET` | `/agent/push/key` | The VAPID public key for `pushManager.subscribe`; 404 while push is off (`src/push.ts`, [../README.md](../README.md) "Push reminders") |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Store or forget a browser's push subscription (`packages/core/src/push.ts` is the contract) |
 | `GET` | `/agent/places/suggest`, `/agent/places/place`, `/agent/places/map` | A task's place search: suggestions as you type, the place picked, its map picture in the app's theme, over OpenStreetMap with no key (`src/places.ts`, contract `packages/core/src/places.ts`) |
@@ -89,6 +90,8 @@ Claude Code, Codex and other coding agents reach the notes through the CLI, driv
 | `TEF_NOTES_PROVIDER` | `deepseek` | The model provider (`src/models.ts` `PROVIDERS`) |
 | `TEF_NOTES_MODEL` | the provider's | The default model |
 | `TZ` | system zone | The day used in the prompt and for a new note's name |
+| `TEF_NOTES_OCR` | `eng` | The languages scanned PDFs are read in, Tesseract's codes joined by `+`; empty: off. Needs `tesseract` on the `PATH` (the image has it; from source, install it), else off |
+| `TEF_NOTES_DATA` | `./data` | Derived data: the search vectors and their model, PDF tile pictures, what OCR read and its language data |
 
 Without the provider's key (`llm`) a chat is refused; without `exa` the web tools are left out.
 

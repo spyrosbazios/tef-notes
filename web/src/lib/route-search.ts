@@ -32,9 +32,11 @@ const list = (v: unknown): string[] | undefined => {
   return items.length ? items : undefined;
 };
 
-/** Every screen of the shell: the note laid over it (`?note=<id>`, its filename's id) and the open task (`?t=<id>`, its record id). */
-export type ShellSearch = { note?: string; t?: string };
-export const shellSearch = (raw: Raw): ShellSearch => ({ note: text(raw.note), t: text(raw.t) });
+/** Every screen of the shell: the note laid over it (`?note=<id>`, its filename's id), the open task (`?t=<id>`, its record id)
+ *  and `ask=1`, the assistant opened for a message (a companion's widget, core/companion.ts `ASK_URL`): the shell opens it and
+ *  drops the word, so it never stays in an address. */
+export type ShellSearch = { note?: string; t?: string; ask?: "1" };
+export const shellSearch = (raw: Raw): ShellSearch => ({ note: text(raw.note), t: text(raw.t), ask: text(raw.ask) === "1" ? "1" : undefined });
 
 /** Home and the Notes page: their notes under every one of these tags; `archived=1` lists the archived notes instead. */
 export type HomeSearch = { tags?: string[]; archived?: "1" };

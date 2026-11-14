@@ -1,11 +1,13 @@
 // A note's PDFs as text: the pages, the context's preview of the open note's, read_attachment, and that reading one
-// taints the chat like the web does.
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+// taints the chat like the web does. Scanned pages: read by OCR (a stand-in for Tesseract), in the background and when
+// asked for.
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
 import { parseNote } from "@/core/notes";
 import { fromWeb } from "../src/tools";
 import { Notes } from "../src/notes";
-import { pageRange, pages, pagesRoute, preview, PREVIEW_CHARS, thumbRoute } from "../src/pdfs";
+import { Ocr, useOcr, type Reader } from "../src/ocr";
+import { allPdfs, pageRange, pages, pagesRoute, preview, PREVIEW_CHARS, readNow, readScans, thumbRoute } from "../src/pdfs";
 import { Todo } from "../src/todo";
 import { tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
@@ -36,12 +38,23 @@ const run = async (name: string, input: object) =>
 describe("pdfs", () => {
   it("reads a PDF's text page by page", async () => {
     const [a] = [...pb.attachments.values()];
-    expect(await pages(server, { rec: a.id, name: a.name, file: a.file })).toEqual(["Page one rent 900", "Page two deposit", "Page three keys", "Page four signed"]);
+    expect(await pages(server, { rec: a.id, name: a.name, file: a.file })).toEqual(["Page one rent 900", "Page two deposit", "Page three keys", "Page four signed"].map((text) => ({ text })));
   });
 
   it("marks each page and cuts a range at the cap", () => {
-    expect(pageRange(["a", "", "c"], 2, 9, 1000)).toEqual({ text: "--- page 2 ---\n(no text on this page)\n\n--- page 3 ---\nc", cut: false });
-    expect(pageRange(["x".repeat(50)], 1, 1, 20)).toEqual({ text: "--- page 1 ---\nxxxxx", cut: true });
+    expect(pageRange([{ text: "a" }, { text: "" }, { text: "c" }], 2, 9, 1000)).toEqual({ text: "--- page 2 ---\n(no text on this page)\n\n--- page 3 ---\nc", cut: false });
+    expect(pageRange([{ text: "x".repeat(50) }], 1, 1, 20)).toEqual({ text: "--- page 1 ---\nxxxxx", cut: true });
+  });
+
+  it("says on a page's line when its text is OCR's, and how a scanned page without text stands", () => {
+    const all = [{ text: "clear", scan: 91 }, { text: "faint", scan: 40 }, { text: "", scan: "wait" as const }, { text: "", scan: "failed" as const }, { text: "", scan: 0 }];
+    expect(pageRange(all, 1, 5, 1000).text).toBe([
+      "--- page 1 (scanned, read by OCR: expect small errors) ---\nclear",
+      "--- page 2 (scanned, read by OCR, poorly: much of it may be wrong or missing) ---\nfaint",
+      "--- page 3 ---\n(scanned page, not read yet: read_attachment waits for it)",
+      "--- page 4 ---\n(scanned page: it couldn't be read)",
+      "--- page 5 ---\n(no text on this page)",
+    ].join("\n\n"));
   });
 
   it("previews the first two pages of the open note's PDFs, quoted, and says how to read the rest", async () => {
@@ -93,5 +106,74 @@ describe("pdfs", () => {
     expect(await (await get(`note=${id}&name=lease.pdf`)).json()).toEqual({ pages: 4 });
     expect((await get(`note=${id}&name=nope.pdf`)).status).toBe(404);
     expect((await get(`note=a/b&name=lease.pdf`)).status).toBe(400);
+  });
+});
+
+describe("scanned pages", () => {
+  const TEXT = "A page with text of its own: sixty characters or so, which is enough to count as one";
+  /** Tesseract's stand-in: every page reads as "scan <n>", the first one faintly; `asked` is what it was sent. */
+  let asked: number[][] = [];
+  const reader: Reader = async (_url, list, got) => { asked.push(list); for (const page of list) got({ page, text: `scan ${page}`, conf: page === 1 ? 40 : 90 }); };
+  let o: Ocr;
+  const scan = () => { const [a] = [...pb.attachments.values()]; return { rec: a.id, name: a.name, file: a.file }; };
+
+  beforeEach(() => {
+    asked = [];
+    useOcr(o = new Ocr(reader, "test"));
+    pb.attachments.clear();
+    pb.attach(id, "lease.pdf", makePdf(["", TEXT, ""]));       // pages 1 and 3 are scans
+  });
+  afterEach(() => useOcr(null));
+
+  it("reads as not read yet, then as what OCR made of it; a page with text of its own is left alone", async () => {
+    expect(await pages(server, scan())).toEqual([{ text: "", scan: "wait" }, { text: TEXT }, { text: "", scan: "wait" }]);
+    await readNow(server, scan(), 1, 3);
+    expect(asked).toEqual([[1, 3]]);
+    expect(await pages(server, scan())).toEqual([{ text: "scan 1", scan: 40 }, { text: TEXT }, { text: "scan 3", scan: 90 }]);
+    await readNow(server, scan(), 1, 3);
+    expect(asked).toEqual([[1, 3]]);                           // read once
+  });
+
+  it("the background reads every stored PDF's scans once, and forgets a PDF that is gone", async () => {
+    pb.attach(id, "text.pdf", makePdf([TEXT]));
+    await readScans(server);
+    await o.idle();
+    expect(asked).toEqual([[1, 3]]);
+    expect(o.status()).toMatchObject({ read: 2, waiting: 0, failedPages: 0, failedPdfs: 0 });
+    await readScans(server);
+    await o.idle();
+    expect(asked).toEqual([[1, 3]]);                           // both files settled: nothing is opened again
+    pb.attachments.clear();
+    await readScans(server);
+    expect(o.status().read).toBe(0);
+  });
+
+  it("gives up at once on a PDF that can't be opened", async () => {
+    pb.attachments.clear();
+    pb.attach(id, "broken.pdf", new TextEncoder().encode("not a PDF"));
+    await readScans(server);
+    await o.idle();
+    expect(asked).toEqual([]);
+    expect(o.status().failedPdfs).toBe(1);
+  });
+
+  it("read_attachment waits for the scans in its range and marks them", async () => {
+    const r = await run("read_attachment", { path: PATH, name: "lease.pdf" });
+    expect(r.text).toBe(`--- page 1 (scanned, read by OCR, poorly: much of it may be wrong or missing) ---\nscan 1\n\n--- page 2 ---\n${TEXT}\n\n--- page 3 (scanned, read by OCR: expect small errors) ---\nscan 3`);
+  });
+
+  it("the open note's preview starts its scans and doesn't wait for them", async () => {
+    useOcr(o = new Ocr(async (_url, list, got) => { await Bun.sleep(20); for (const page of list) got({ page, text: `scan ${page}`, conf: 90 }); }, "test"));
+    expect(await preview(server, { id, path: PATH })).toContain("(scanned page, not read yet: read_attachment waits for it)");
+    await o.idle();
+    expect(await preview(server, { id, path: PATH })).toContain("scan 1");
+  });
+
+  it("names a PDF anew for the search index once its scans are read, so its note is embedded again", async () => {
+    const notes = [{ path: PATH, text: "" }], key = async () => (await allPdfs(server, notes))[0]!.key;
+    const before = await key();
+    await readNow(server, scan(), 1, 3);
+    expect(await key()).toBe(`${before}#2`);
+    expect(await (await allPdfs(server, notes))[0]!.pages()).toEqual(["scan 1", TEXT, "scan 3"]);
   });
 });

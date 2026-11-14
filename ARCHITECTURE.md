@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-15 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -179,8 +179,15 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   (bekko-embedding-v1-a8m, MIT) runs in the agent on the CPU, so a Greek question finds an English note; no key, nothing
   leaves the host. Each note is cut into chunks and embedded when its text changes; the vectors and the model live in the
   agent's `agent_data` volume (derived: deleting it costs one re-embed). The two rankings are fused by reciprocal rank.
-  A note's PDFs are embedded with it (first 50 pages; a scanned one has no text). A match inside a PDF returns only its
-  name, never its text: reading it is `read_attachment`, which taints like the web.
+  A note's PDFs are embedded with it (first 50 pages; a scanned page as OCR read it, below). A match inside a PDF returns
+  only its name, never its text: reading it is `read_attachment`, which taints like the web.
+- A scanned PDF page (one with under 50 characters of its own) is read by OCR (`src/ocr.ts`): Tesseract, in the
+  languages of `TEF_NOTES_OCR`, run by a child process per PDF (`src/ocr-run.ts`, which draws the page at 200 dpi) so a
+  chat is never held up. Every minute the agent queues the scans of PDFs attached since (`src/pdfs.ts` `readScans`, the
+  first 50 pages of each); `read_attachment` has the pages it was asked for read ahead of that queue and waits for them.
+  What was read lives in `ocr.sqlite` in `agent_data` (derived; a deleted PDF's text goes with it; other languages read
+  everything again). The page's line tells the model the text is OCR's, and when it read poorly. Setup and limits:
+  `server/README.md`, "Scanned PDFs".
 - Writes ask first: each write is a confirm card (AI SDK tool approval) unless you turned the cards off. The chat draws
   notes and tasks as cards: every write's result carries its `card`, and `show_items` is how the agent puts
   what it found in front of you. Card shapes (`NoteCard`, `TaskCard`) and builders are in

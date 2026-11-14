@@ -72,7 +72,7 @@ describe("Semantic over PDFs", () => {
     expect(r).toEqual([{ path: "notes/a.md", score: expect.any(Number), snippet: '(matched inside its PDF "insurance.pdf": read_attachment to read it)' }]);
   });
 
-  it("re-embeds a note when a PDF is attached; a scanned one (no text) adds nothing", async () => {
+  it("re-embeds a note when a PDF is attached; a scanned one not read yet (no text) adds nothing", async () => {
     let calls = 0;
     const s = new Semantic(async (t) => { calls += t.length; return fakeEmbed(t); });
     const a = note("notes/a.md", "Papers", "x");
@@ -83,5 +83,12 @@ describe("Semantic over PDFs", () => {
     await s.sync([a], [doc("notes/a.md", "r1/scan.pdf", "scan.pdf", "")]);
     expect(calls).toBe(2);
     expect(await s.near([a], "dentist", 5, [doc("notes/a.md", "r1/scan.pdf", "scan.pdf", "")])).toEqual([]);
+  });
+
+  it("finds a note by its scanned PDF once OCR has read it: the PDF comes back under a new key", async () => {
+    const s = new Semantic(fakeEmbed), a = note("notes/a.md", "Papers", "x");
+    expect(await s.near([a], "dentist", 5, [doc("notes/a.md", "r1/scan.pdf", "scan.pdf", "")])).toEqual([]);
+    const r = await s.near([a], "dentist", 5, [doc("notes/a.md", "r1/scan.pdf#1", "scan.pdf", "dentist invoice")]);
+    expect(r.map((n) => n.path)).toEqual(["notes/a.md"]);
   });
 });

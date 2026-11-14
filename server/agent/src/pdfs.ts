@@ -1,14 +1,17 @@
 // A note's PDFs as text for the agent: the first pages of each ride in the <context> when the note is open on screen
-// (agent.ts), and read_attachment (tools.ts) reads any range of pages. The text is pdf.js's (unpdf), extracted once
-// per stored file and kept in memory: an attachment's stored file never changes (a new upload is a new file name).
-// A scanned PDF has no text layer and reads as empty pages. A PDF is someone else's text, like a web page: whatever
-// the model reads of one taints the chat (guard.ts), so a write after it always asks.
+// (agent.ts), and read_attachment (tools.ts) reads any range of pages. A page's text is the PDF's own (pdf.js, through
+// unpdf), extracted once per stored file and kept in memory: an attachment's stored file never changes (a new upload is
+// a new file name). A scanned page has none of its own: its text is what OCR read off its picture (ocr.ts), which the
+// background does for every stored PDF (`readScans`) and read_attachment waits for (`readNow`); until then, and with
+// OCR off, it reads as empty. A PDF is someone else's text, like a web page: whatever the model reads of one taints the
+// chat (guard.ts), so a write after it always asks.
 import { extractText, getDocumentProxy, renderPageAsImage } from "unpdf";
 import type { UIMessage } from "ai";
 import { isPdf, PDF } from "@/core/photos";
 import { parseNote } from "@/core/notes";
 import * as pb from "@/core/pocketbase";
-import type { Doc } from "./semantic";
+import { ocr } from "./ocr";
+import { MAX_PAGES, type Doc } from "./semantic";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -19,23 +22,94 @@ export const READ_CHARS = 30_000;
 const KEPT = 32;                            // stored files whose text stays in memory
 
 export type Pdf = { rec: string; name: string; file: string };
+/** A page as the agent reads it. `scan`: the page has no text of its own, and `text` is what OCR read off it, this sure
+ *  of it (0–100); "wait": not read yet; "failed": it couldn't be. */
+export type Page = { text: string; scan?: number | "wait" | "failed" };
+
+/** A page with fewer characters of its own than this is a scan: a picture of a page, with at most a page number, a stamp
+ *  or the scanning app's watermark as text. A real page that short is read by OCR too, off its clean drawing. */
+const SCAN_BELOW = 50;
+const isScan = (text: string) => text.replace(/\s+/g, "").length < SCAN_BELOW;
+/** Below this, OCR was mostly guessing (a photo of a page, a faint copy), and the page says so. */
+const UNSURE = 60;
+/** read_attachment waits for at most this many scanned pages a call (about what its character cap holds), this long. */
+const ASK_PAGES = 12, ASK_MS = 60_000;
+
+/** The stored file's name in OCR's books, and where its bytes are. */
+const sourceOf = (server: pb.Server, p: Pick<Pdf, "rec" | "file">) => ({ key: `${p.rec}/${p.file}`, url: pb.photoUrl(server, p) });
+
+/** The PDF itself can't be read (it wants a password, it is broken): no retry will change that. */
+export class Unreadable extends Error {}
 
 const cache = new Map<string, Promise<string[]>>();
 
-/** The PDF's text, one string per page, whitespace runs folded. */
-export function pages(server: pb.Server, p: Pdf): Promise<string[]> {
+/** The PDF's own text, one string per page, whitespace runs folded. */
+function own(server: pb.Server, p: Pdf): Promise<string[]> {
   const key = `${p.rec}/${p.file}`, hit = cache.get(key);
   if (hit) { cache.delete(key); cache.set(key, hit); return hit; }        // newest last: the oldest goes first
   const run = (async () => {
     const res = await fetch(pb.photoUrl(server, p));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const doc = await getDocumentProxy(new Uint8Array(await res.arrayBuffer()));
-    const { text } = await extractText(doc, { mergePages: false });
-    return text.map((t) => t.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim());
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    try {
+      const { text } = await extractText(await getDocumentProxy(bytes), { mergePages: false });
+      return text.map((t) => t.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim());
+    } catch (e) {
+      throw new Unreadable((e as Error).message);
+    }
   })();
   run.catch(() => cache.delete(key));       // a failure is tried again next time
   cache.set(key, run);
   while (cache.size > KEPT) cache.delete(cache.keys().next().value!);
+  return run;
+}
+
+/** The PDF's pages: each its own text, a scanned one what OCR has read of it so far. */
+export async function pages(server: pb.Server, p: Pdf): Promise<Page[]> {
+  const text = await own(server, p), o = ocr();
+  if (!o) return text.map((t) => ({ text: t }));
+  const read = o.stored(sourceOf(server, p).key);
+  return text.map((t, i) => {
+    if (!isScan(t)) return { text: t };
+    const r = read.get(i + 1);
+    return !r ? { text: t, scan: "wait" } : r.conf < 0 ? { text: t, scan: "failed" } : { text: r.text || t, scan: r.conf };
+  });
+}
+
+/** Has the scanned pages among `from`..`to` read now, ahead of the background, and waits for them at most `ms`: a page
+ *  takes seconds, and what isn't back by then reads as not read yet, still on its way. No-op with OCR off. */
+export async function readNow(server: pb.Server, p: Pdf, from: number, to: number, ms = ASK_MS): Promise<void> {
+  const o = ocr();
+  if (!o) return;
+  const text = await own(server, p), src = sourceOf(server, p), had = o.stored(src.key), ask: number[] = [];
+  for (let n = Math.max(1, from); n <= Math.min(to, text.length) && ask.length < ASK_PAGES; n++) if (isScan(text[n - 1]!) && !had.has(n)) ask.push(n);
+  if (ask.length) await Promise.race([o.want(src, ask), Bun.sleep(ms)]);
+}
+
+let sweep: Promise<void> | undefined;
+
+/** The background's pass: queues the unread scanned pages of every stored PDF (the first MAX_PAGES of each, what search
+ *  indexes; later ones are read when asked for), and forgets what was read of PDFs that are gone. One pass at a time. */
+export function readScans(server: pb.Server): Promise<void> {
+  const o = ocr();
+  if (!o) return Promise.resolve();
+  if (sweep) return sweep;
+  const run = (async () => {
+    const all = (await pb.photos(server)).filter((p) => isPdf(p.name));
+    o.keep(new Set(all.map((p) => sourceOf(server, p).key)));
+    for (const p of all) {
+      const src = sourceOf(server, p);
+      if (o.settled(src.key) || o.queued(src.key)) continue;
+      let text: string[];
+      try { text = await own(server, p); } catch (e) {
+        if (e instanceof Unreadable) o.settle(src.key, e.message);       // else PocketBase didn't answer: the next pass
+        continue;
+      }
+      o.queue(src, text.slice(0, MAX_PAGES).flatMap((t, i) => (isScan(t) ? [i + 1] : [])));
+    }
+  })();
+  sweep = run;
+  run.catch(() => {}).finally(() => { if (sweep === run) sweep = undefined; });
   return run;
 }
 
@@ -44,20 +118,27 @@ export async function pdfsOf(server: pb.Server, note: string): Promise<Pdf[]> {
   return (await pb.photos(server, note)).filter((p) => isPdf(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
 }
 
-/** Every note's PDFs for the search index (semantic.ts), from one listing of the attachments; text read on demand. */
+/** Every note's PDFs for the search index (semantic.ts), from one listing of the attachments; text read on demand. A
+ *  PDF's key carries how many of its scanned pages OCR has read, so its note is embedded again as they come in. */
 export async function allPdfs(server: pb.Server, notes: { path: string; text: string }[]): Promise<Doc[]> {
-  const byId = new Map(notes.map((n) => [parseNote(n.path, n.text).id, n.path]));
+  const byId = new Map(notes.map((n) => [parseNote(n.path, n.text).id, n.path])), read = ocr()?.counts();
   return (await pb.photos(server)).flatMap((p) => {
-    const path = isPdf(p.name) && byId.get(p.note);
-    return path ? [{ path, key: `${p.rec}/${p.file}`, name: p.name, pages: () => pages(server, p) }] : [];
+    const path = isPdf(p.name) && byId.get(p.note), key = `${p.rec}/${p.file}`, n = read?.get(key);
+    return path ? [{ path, key: n ? `${key}#${n}` : key, name: p.name, pages: async () => (await pages(server, p)).map((x) => x.text) }] : [];
   });
 }
 
-/** Pages `from`..`to` (1-based, inclusive) as one text, each under a `--- page N ---` line, cut at `max` characters. */
-export function pageRange(all: string[], from: number, to: number, max: number) {
+/** Pages `from`..`to` (1-based, inclusive) as one text, each under a `--- page N ---` line that says when the text is
+ *  OCR's, cut at `max` characters. */
+export function pageRange(all: Page[], from: number, to: number, max: number) {
   const last = Math.min(to, all.length);
   let text = "";
-  for (let i = from; i <= last; i++) text += `${i > from ? "\n\n" : ""}--- page ${i} ---\n${all[i - 1] || "(no text on this page)"}`;
+  for (let i = from; i <= last; i++) {
+    const p = all[i - 1]!;
+    const how = typeof p.scan !== "number" || !p.text ? "" : p.scan < UNSURE ? " (scanned, read by OCR, poorly: much of it may be wrong or missing)" : " (scanned, read by OCR: expect small errors)";
+    const none = p.scan === "wait" ? "(scanned page, not read yet: read_attachment waits for it)" : p.scan === "failed" ? "(scanned page: it couldn't be read)" : "(no text on this page)";
+    text += `${i > from ? "\n\n" : ""}--- page ${i}${how} ---\n${p.text || none}`;
+  }
   return text.length > max ? { text: text.slice(0, max), cut: true } : { text, cut: false };
 }
 
@@ -71,6 +152,7 @@ export async function preview(server: pb.Server, note: { id: string; path: strin
   const parts = await Promise.all(list.map(async (p, i) => {
     if (i >= PREVIEW_PDFS) return `${q(p.name)}: not previewed (read_attachment reads it)`;
     try {
+      void readNow(server, p, 1, PREVIEW_PAGES, 0).catch(() => {});      // the note is open: its scans go first, unwaited
       const all = await pages(server, p);
       const { text, cut } = pageRange(all, 1, PREVIEW_PAGES, PREVIEW_CHARS);
       const more = all.length > PREVIEW_PAGES || cut ? ` — the rest: read_attachment` : "";

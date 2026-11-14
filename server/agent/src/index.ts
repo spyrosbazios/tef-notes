@@ -2,11 +2,12 @@
 // PocketBase's JS hooks can't stream. Served same-origin under /agent/* by a reverse proxy on a private network (e.g.
 // a tunnel such as `tailscale serve`); no sign-in, like PocketBase: that network is the gate, so it listens on loopback only on the host.
 import { chat } from "./agent";
-import { addTaskRoute, helloRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
+import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
 import { drawingPictureRoute } from "./drawing-picture";
 import { find } from "./find";
 import { catalog } from "./models";
-import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
+import { ocrRoute, startOcr } from "./ocr";
+import { allPdfs, pagesRoute, readScans, thumbRoute } from "./pdfs";
 import { mapRoute, placeRoute, suggestRoute } from "./places";
 import { NoteService } from "./application/notes";
 import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
@@ -33,6 +34,7 @@ Bun.serve({
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
     "/agent/drawing-picture": { POST: (req) => drawingPictureRoute(req) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
+    "/agent/ocr": { GET: () => ocrRoute() },
     "/agent/places/suggest": { GET: (req) => suggestRoute(req) },
     "/agent/places/place": { GET: (req) => placeRoute(req) },
     "/agent/places/map": { GET: (req) => mapRoute(req) },
@@ -45,6 +47,7 @@ Bun.serve({
     "/agent/companion/tasks": { GET: (req) => tasksRoute(req, server), POST: (req) => addTaskRoute(req, server) },
     "/agent/companion/tasks/:id/done": { POST: (req) => tickRoute(server, req.params.id) },
     "/agent/companion/notes": { GET: () => notesRoute(server) },
+    "/agent/companion/lens": { POST: (req) => lensRoute(req, server) },
   },
   fetch: () => new Response("Not found", { status: 404 }),
   error: (e) => {
@@ -60,6 +63,14 @@ const warm = () => new NoteService(server).list().then(async (n) => semantic().s
   .catch((e) => console.error(`agent: indexing notes by meaning failed: ${(e as Error).message}`));
 void warm();
 setInterval(warm, WARM);
+
+/** Scanned PDFs (ocr.ts): every minute, the ones attached since are queued for reading. */
+const SCANS = 60_000;
+if (startOcr()) {
+  const scans = () => readScans(server).catch((e) => console.error(`agent: looking for scanned PDFs failed: ${(e as Error).message}`));
+  void scans();
+  setInterval(scans, SCANS);
+}
 
 startReminders(server);
 

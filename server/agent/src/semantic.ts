@@ -3,8 +3,9 @@
 // finds "Toyota service". search_notes fuses it with the word search (notes.ts `search`) by reciprocal rank.
 // The vectors are derived data: a sqlite file in TEF_NOTES_DATA (the agent's volume) keeps a restart from re-embedding
 // every note; deleting it costs one re-embed. A note is re-embedded when its title, body or PDFs changed (a hash).
-// A note's PDFs are embedded with it (their first MAX_PAGES pages; a scanned one has no text). A PDF is someone else's
-// text (pdfs.ts), so a match inside one hands back no snippet of it: only its name, and read_attachment, which taints.
+// A note's PDFs are embedded with it (their first MAX_PAGES pages; a scanned page as OCR read it, ocr.ts, once it has).
+// A PDF is someone else's text (pdfs.ts), so a match inside one hands back no snippet of it: only its name, and
+// read_attachment, which taints.
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +14,9 @@ import type { Meta } from "./application/notes";
 
 /** MIT, 8M active parameters, 100+ languages, mean-pooled 384-dim vectors (its 1_Pooling config). */
 export const MODEL = "hotchpotch/bekko-embedding-v1-a8m";
-const CHUNK = 1000, MAX_CHUNKS = 40, MAX_PAGES = 50, BATCH = 16;
+const CHUNK = 1000, MAX_CHUNKS = 40, BATCH = 16;
+/** A PDF's pages that are embedded, which are also the ones OCR reads in the background (pdfs.ts `readScans`). */
+export const MAX_PAGES = 50;
 /** The table's shape; another is dropped and rebuilt (the rows are derived). */
 const SCHEMA = 2;
 /** What counts as near, measured on real notes: a related note scores ~0.28–0.40, an unrelated one up to ~0.24, so
@@ -104,7 +107,7 @@ export class Semantic {
         let pages: string[];
         try { pages = await d.pages(); } catch (e) { console.error(`agent: indexing ${d.name} failed: ${(e as Error).message}`); continue; }
         const text = pages.slice(0, MAX_PAGES).join("\n\n").trim();
-        if (!text) continue;                                  // scanned: no text layer
+        if (!text) continue;                                  // scanned and not read yet, or nothing on it
         for (const c of chunks(`${n.title} — ${d.name}`, text)) { texts.push(c); srcs.push(d.name); }
       }
       const vecs: Float32Array[] = [];

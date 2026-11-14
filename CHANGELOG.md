@@ -13,6 +13,11 @@ version is one semver number for the whole repository, set by the git tag (see [
   back. Its sheets move as the web app's do (the same timings, drag down to close) and a task ticked on the widget
   lingers a moment, a second tap taking the tick back. The APK is attached to each release.
 - Server: `/agent/companion/*`, the feeds and the two task writes a native companion uses.
+- Scanned PDFs are read: a PDF page with no text of its own is read by Tesseract inside the agent, in the background
+  and at once when the assistant asks for it, so the assistant can read a scan and search by meaning finds its note. The
+  assistant is told which pages are OCR's and which read poorly. `TEF_NOTES_OCR` in `.env` names the languages
+  (`ell+eng`; default `eng`, empty turns it off), their data is downloaded on first use, and `GET /agent/ocr` says how
+  far it has got. Nothing leaves the server.
 - Site: a short film of the app (`video/`), drawn in code from the page's own screens: Home on both screens, a task
   that tags itself as it is typed, a page clipped from Chrome, the day's tasks, the assistant asked about the day and
   asked to find notes and add tasks, lenses and themes. It plays as the page's hero and is attached to each release.

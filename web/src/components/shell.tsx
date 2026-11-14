@@ -11,7 +11,7 @@
 // drawing its own header (lens, search), the Tasks tab the list with its own switcher (task-list.tsx), Ask the dock opened whole. From `md` to
 // `lg` the app bar's buttons are the touch way to everything the keys do: Views, Assistant (a), Search (/ and ⌘K), New note or task (n, q).
 import { Command as CommandIcon, Menu, Plus, Sparkles } from "lucide-react";
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useNavigate, useSearch } from "@tanstack/react-router";
 import { spring, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -36,7 +36,8 @@ import { INSETS, ShellContext, startOf, type ShellActions } from "@/hooks/shell"
 import { typing } from "@/lib/keys";
 import { TAB_BAR } from "@/lib/tabs";
 import { landed, leaving } from "@/lib/morph";
-import { isTaskView, titleOf, usePlace } from "@/lib/nav";
+import { isTaskView, linkOf, titleOf, usePlace } from "@/lib/nav";
+import { useAssistant } from "@/hooks/assistant";
 import { cn } from "@/lib/utils";
 
 /** A note's page laid over the screen it was opened from. On a phone it covers the tab bar (kept, hidden, under it) and keeps clear of
@@ -80,6 +81,13 @@ export function Shell() {
 
   // A drawing is open over its note's page: the note left (closed, another opened), the drawing goes too
   useEffect(() => { if (openedNow() && openedNow()?.noteId !== note) closeDrawing(); }, [note]);
+
+  // Opened to ask the assistant (`?ask=1`, a companion's widget): the word leaves the address first, so the phone's Ask
+  // step is pushed over the plain screen and a step back doesn't open it again
+  const asked = useSearch({ from: "/_app", select: (s) => s.ask === "1" }), navigate = useNavigate(), { show } = useAssistant();
+  useEffect(() => {
+    if (asked) void navigate({ ...linkOf(view, { note, task }), replace: true }).then(() => show());
+  }, [asked, navigate, view, note, task, show]);
 
   const kind = view.kind;
   // The `q` key on a note's page adds a task as Home's would, not as the list behind the note does

@@ -73,6 +73,11 @@ class Api(private val origin: String) {
         json("POST", "/agent/companion/tasks", JSONObject().put("title", title).put("list", list))
     }
 
+    /** The lens `id` on for every screen of the owner's; "" for none. */
+    suspend fun setLens(id: String) {
+        json("POST", "/agent/companion/lens", JSONObject().put("lens", id))
+    }
+
     suspend fun tick(id: String) {
         json("POST", "/agent/companion/tasks/${URLEncoder.encode(id, "UTF-8")}/done")
     }

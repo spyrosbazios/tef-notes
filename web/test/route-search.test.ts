@@ -50,6 +50,8 @@ describe("the validators", () => {
     expect(shellSearch({ t: { x: 1 } }).t).toBeUndefined();
     expect(shellSearch({ note: "20261102-garage" })).toEqual({ note: "20261102-garage", t: undefined });
     expect(shellSearch({})).toEqual({ note: undefined, t: undefined });
+    expect(shellSearch({ ask: "1" }).ask).toBe("1");
+    expect(shellSearch({ ask: "yes" }).ask).toBeUndefined();
   });
 
   test("Settings takes only a section it has", () => {

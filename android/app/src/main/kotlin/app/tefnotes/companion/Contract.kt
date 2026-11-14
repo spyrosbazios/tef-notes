@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** The contract this build draws (companion.ts COMPANION_CONTRACT). */
-const val CONTRACT = 1
+const val CONTRACT = 2
 const val APP = "tefnotes"
 
 // ---- the look
@@ -55,12 +55,27 @@ fun helloOf(j: JSONObject): Hello? {
 
 // ---- the feeds
 
+/** A lens a widget can turn on (companion.ts `LensChoice`). `id`: "" is none. `on`: the one on now. */
+data class LensChoice(val id: String, val name: String, val on: Boolean)
+
+/** What a widget's heading offers (companion.ts `Switches`). `lenses`: empty when there is none to switch to. `ask`: where
+ *  the web app opens with the assistant ready. */
+data class Switches(val lenses: List<LensChoice>, val ask: String)
+
+private fun choices(a: JSONArray?) = a.list { LensChoice(it.optString("id"), it.optString("name"), it.optBoolean("on")) }
+private fun switchesOf(j: JSONObject) = Switches(choices(j.optJSONArray("lenses")), j.optString("ask"))
+
+/** The choices as the JSON they came in, and back: how a widget hands them to its picker. */
+fun lensesJson(lenses: List<LensChoice>): String =
+    JSONArray().apply { for (l in lenses) put(JSONObject().put("id", l.id).put("name", l.name).put("on", l.on)) }.toString()
+fun lensChoicesOf(json: String?): List<LensChoice> = try { choices(json?.let(::JSONArray)) } catch (_: Exception) { emptyList() }
+
 data class FeedTask(val id: String, val title: String, val detail: String, val late: Boolean, val url: String)
 data class TaskSection(val label: String, val tasks: List<FeedTask>)
-data class TasksFeed(val title: String, val url: String, val sections: List<TaskSection>, val more: Int, val look: Look?)
+data class TasksFeed(val title: String, val url: String, val sections: List<TaskSection>, val more: Int, val look: Look?, val switches: Switches)
 
 data class FeedNote(val id: String, val title: String, val peek: String, val pinned: Boolean, val url: String, val bg: Int?, val fg: Int?)
-data class NotesFeed(val title: String, val url: String, val notes: List<FeedNote>, val more: Int, val look: Look?)
+data class NotesFeed(val title: String, val url: String, val notes: List<FeedNote>, val more: Int, val look: Look?, val switches: Switches)
 
 private fun <T> JSONArray?.list(of: (JSONObject) -> T): List<T> =
     if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it)?.let(of) }
@@ -77,7 +92,7 @@ fun tasksFeedOf(json: String?): TasksFeed? {
                 FeedTask(t.optString("id"), t.optString("title"), t.optString("detail"), t.optBoolean("late"), t.optString("url"))
             })
         },
-        j.optInt("more"), lookOf(j.optJSONObject("look")),
+        j.optInt("more"), lookOf(j.optJSONObject("look")), switchesOf(j),
     )
 }
 
@@ -102,7 +117,7 @@ fun notesFeedOf(json: String?): NotesFeed? {
             FeedNote(n.optString("id"), n.optString("title"), n.optString("peek"), n.optBoolean("pinned"), n.optString("url"),
                 colorOf(color?.optString("bg")), colorOf(color?.optString("fg")))
         },
-        j.optInt("more"), lookOf(j.optJSONObject("look")),
+        j.optInt("more"), lookOf(j.optJSONObject("look")), switchesOf(j),
     )
 }
 

@@ -1,5 +1,6 @@
 // What the two widgets share: where each keeps what it draws (Glance's per-widget state: the feed as the server sent it,
-// whether it is out of date, and for a tasks widget its list), the frame and the actions. A widget is drawn by the
+// whether it is out of date, and for a tasks widget its list), the frame (its heading's lens switch and assistant button
+// are the feed's own, companion.ts `Switches`) and the actions. A widget is drawn by the
 // launcher from a description, so everything here is Glance's, not the app's own Compose: the system's typeface, and the
 // owner's colours from the feed's own look.
 package app.tefnotes.companion.widget
@@ -51,9 +52,11 @@ import app.tefnotes.companion.R
 import app.tefnotes.companion.Refused
 import app.tefnotes.companion.SettingsActivity
 import app.tefnotes.companion.Store
+import app.tefnotes.companion.Switches
 import app.tefnotes.companion.Sync
 import app.tefnotes.companion.Tokens
 import app.tefnotes.companion.Unreachable
+import app.tefnotes.companion.lensesJson
 import app.tefnotes.companion.withoutTask
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.delay
@@ -168,15 +171,23 @@ internal fun Button(icon: Int, label: String, color: Int, onClick: Action) =
         Image(ImageProvider(icon), label, GlanceModifier.size(18.dp), colorFilter = ColorFilter.tint(tint(color)))
     }
 
-/** A widget: the mark and its heading (which opens the web app there), a refresh, `add` when it has something to add,
- *  and under them `content`. */
+/** The picker of the lens on (LensActivity), given the feed's choices. */
+private fun pickLens(switches: Switches): Action =
+    actionStartActivity<LensActivity>(actionParametersOf(ActionParameters.Key<String>(LensActivity.LENSES) to lensesJson(switches.lenses)))
+
+/** A widget: its heading (which opens the web app there) after the lens switch, in the brand's colour while a lens is on,
+ *  or the mark when there is no lens to switch to; the assistant, a refresh, `add` when it has something to add, and
+ *  under them `content`. `switches`: the feed's, null before any feed. */
 @Composable
-internal fun Frame(look: Look, title: String, url: String, stale: Boolean, add: Action?, content: @Composable () -> Unit) =
+internal fun Frame(look: Look, title: String, url: String, stale: Boolean, switches: Switches?, add: Action?, content: @Composable () -> Unit) =
     Column(GlanceModifier.fillMaxSize().appWidgetBackground().background(tint(look.bg)).cornerRadius(22.dp)) {
-        Row(GlanceModifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(ImageProvider(R.drawable.ic_mark), null, GlanceModifier.size(18.dp), colorFilter = ColorFilter.tint(tint(look.brand)))
-            Text(title, GlanceModifier.defaultWeight().padding(start = 8.dp).clickable(open(url)), text(look.fg, 15, bold = true), maxLines = 1)
+        val pick = switches?.takeIf { it.lenses.isNotEmpty() }
+        Row(GlanceModifier.fillMaxWidth().padding(start = if (pick == null) 14.dp else 4.dp, end = 6.dp, top = 6.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (pick == null) Image(ImageProvider(R.drawable.ic_mark), null, GlanceModifier.size(18.dp), colorFilter = ColorFilter.tint(tint(look.brand)))
+            else Button(R.drawable.ic_lens, "Lens", if (pick.lenses.any { it.on && it.id.isNotEmpty() }) look.brand else look.dim, pickLens(pick))
+            Text(title, GlanceModifier.defaultWeight().padding(start = if (pick == null) 8.dp else 0.dp).clickable(open(url)), text(look.fg, 15, bold = true), maxLines = 1)
             if (stale) Image(ImageProvider(R.drawable.ic_offline), "Not up to date", GlanceModifier.size(16.dp), colorFilter = ColorFilter.tint(tint(look.warn)))
+            if (switches != null && switches.ask.isNotEmpty()) Button(R.drawable.ic_ask, "Ask the assistant", look.dim, open(switches.ask))
             Button(R.drawable.ic_refresh, "Refresh", look.dim, actionRunCallback<RefreshAction>())
             if (add != null) Button(R.drawable.ic_add, "New task", look.brand, add)
         }

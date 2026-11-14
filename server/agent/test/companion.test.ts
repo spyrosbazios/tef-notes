@@ -8,7 +8,7 @@ import { DEFAULT_PREFS } from "@/core/prefs";
 import { ACCENTS, THEMES } from "@/core/theme";
 import { localDay } from "@/core/time";
 import { newTask, type Task } from "@/core/todo";
-import { addTaskRoute, helloRoute, notesRoute, tasksRoute, tickRoute } from "../src/companion";
+import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "../src/companion";
 import { fakePb } from "./fake-pb";
 
 const TODAY = localDay();
@@ -27,7 +27,7 @@ const lensOn = () => {
 
 describe("hello", () => {
   it("answers with the defaults before any preference is saved", async () => {
-    expect(await (await helloRoute(pb)).json() as Hello).toEqual({ app: "tefnotes", contract: 1, look: DEFAULT_LOOK, summary: false, tag: null });
+    expect(await (await helloRoute(pb)).json() as Hello).toEqual({ app: "tefnotes", contract: 2, look: DEFAULT_LOOK, summary: false, tag: null });
   });
   it("answers in the owner's theme, the lens's accent, the summary box as left", async () => {
     lensOn();
@@ -100,5 +100,33 @@ describe("the notes", () => {
     const f = await (await notesRoute(pb)).json() as NotesFeed;
     expect(f.notes[0]).toEqual({ id: "b", title: "Note b", peek: "Some words.", pinned: true, url: "/note/b" });
     expect(f.notes.map((n) => n.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("the lens", () => {
+  const pick = (lens: unknown) => lensRoute(new Request("http://x/agent/companion/lens", { method: "POST", body: JSON.stringify({ lens }) }), pb);
+  it("a feed offers the lenses, the one on marked", async () => {
+    lensOn();
+    expect((await list("today")).lenses).toEqual([{ id: "", name: "No lens", on: false }, { id: "w", name: "Work", on: true }]);
+    expect((await (await notesRoute(pb)).json() as NotesFeed).ask).toBe("/?ask=1");
+  });
+  it("is turned off and on in the owner's preferences, the others kept", async () => {
+    lensOn();
+    expect((await pick("")).status).toBe(200);
+    expect(pb.prefs[0].data).toMatchObject({ lens: null, theme: "nord", clip: { summary: true } });
+    expect((await list("inbox")).title).toBe("Inbox");
+    await pick("w");
+    expect(pb.prefs[0].data.lens).toBe("w");
+  });
+  it("makes the record when no preference was saved yet", async () => {
+    pb.lenses.push({ id: "w", name: "Work", tags: ["work"], exclude: [], accent: "", theme: "" });
+    await pick("w");
+    expect(pb.prefs).toHaveLength(1);
+    expect(pb.prefs[0]).toMatchObject({ key: "owner", data: { lens: "w" } });
+  });
+  it("refuses a lens that is gone, and a body that names none", async () => {
+    expect((await pick("nope")).status).toBe(404);
+    expect((await pick(3)).status).toBe(400);
+    expect(pb.prefs).toHaveLength(0);
   });
 });
