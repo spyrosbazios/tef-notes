@@ -198,8 +198,9 @@ is `packages/core/src/sync.ts` (the logic, tested over a fake server in
   (which keeps the replaced text to restore). A task is merged field by field, this side winning a field both
   changed, so it never conflicts. A new note whose path another device took first goes up as `-2`. Links are a set of ids: an
   add is idempotent, a delete is a tombstone, and an add whose end is gone from the server is dropped.
-- **Shown:** `src/components/offline-bar.tsx` says so while the server can't be reached and "N changes waiting" while rows are
-  unsent (online, after a few seconds, so a save doesn't flash it). Offline state is `src/lib/net.ts`: the browser says so, or a
+- **Shown:** `src/components/sync-notice.tsx`, a pill floating over the top of the page (it takes no room, so nothing moves),
+  says "Offline" once the server has been out of reach for a few seconds (a dropped stream on returning to the app doesn't flash
+  it) and "N changes waiting" when the last sync failed to send them; changes only waiting their turn are not shown. Offline state is `src/lib/net.ts`: the browser says so, or a
   request or the realtime stream could not reach the server. Coming back, the realtime feed reconnects and a sync runs.
 - **Kept besides:** the query cache keeps tags, lenses, the photo lists and link previews (`persistable` in
   `src/lib/persist.ts`; a new kind of query is not kept until added there), for up to 7 days. Attachment files, their thumbnails
