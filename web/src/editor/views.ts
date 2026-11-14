@@ -6,22 +6,32 @@ import type { EditorView, NodeView, ViewMutationRecord } from "prosemirror-view"
 /** The URL to show for an image's `src`, or null when there is none (yet): a photo the server doesn't list. */
 export type ResolveImage = (src: string) => string | null;
 
+/** The Delete button on a picture's corner (a photo here, a PDF's page or a drawing in ./files): one tap takes it out of
+ *  the note, an ordinary edit (Undo brings it back). The focus stays where it was, so a phone's keyboard doesn't come up. */
+export function cornerDelete(title: string, remove: () => void): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "pm-corner-delete";
+  btn.type = "button";
+  btn.contentEditable = "false";
+  btn.dataset.icon = "delete";
+  btn.title = title;
+  btn.setAttribute("aria-label", title);
+  btn.addEventListener("click", (e) => { e.preventDefault(); remove(); });
+  return btn;
+}
+
+/** Whether an event is a corner Delete button's own: the editor then neither selects nor opens what it sits on. */
+export const onCornerDelete = (e: Event) => e.target instanceof HTMLElement && e.target.classList.contains("pm-corner-delete");
+
 export class ImageView implements NodeView {
   dom = document.createElement("span");
   private img = document.createElement("img");
-  private del = document.createElement("button");
+  private del: HTMLButtonElement;
 
   constructor(private node: Node, private view: EditorView, private getPos: () => number | undefined, private resolve: () => ResolveImage, readonly views: Set<ImageView>) {
     this.dom.className = "pm-image";
     this.dom.contentEditable = "false";
-    // Delete: the photo out of the note with one tap, an ordinary edit (Undo brings it back). The focus stays where it
-    // was, so a phone's keyboard doesn't come up for it.
-    this.del.className = "pm-image-delete";
-    this.del.type = "button";
-    this.del.dataset.icon = "delete";
-    this.del.title = "Delete the picture from the note";
-    this.del.setAttribute("aria-label", this.del.title);
-    this.del.addEventListener("click", (e) => { e.preventDefault(); this.remove(); });
+    this.del = cornerDelete("Delete the picture from the note", () => this.remove());
     this.img.draggable = false;
     this.img.decoding = "async";
     this.img.addEventListener("error", () => this.show(null));
@@ -64,7 +74,7 @@ export class ImageView implements NodeView {
   }
 
   /** The button's presses are its own: the editor neither selects the photo nor opens it. */
-  stopEvent(e: Event) { return e.target === this.del; }
+  stopEvent(e: Event) { return onCornerDelete(e); }
 
   destroy() { this.views.delete(this); }
 }
