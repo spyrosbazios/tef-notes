@@ -15,6 +15,12 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 - Web: the reading progress bar at the top of a note; the contents rail shows the place instead.
 
+### Fixed
+
+- Web editor: a pasted link shows as its card alone. The caret goes to the line under it, so the address no longer
+  stays above the card; a note that is only a link opens that way too, and a tap under the card types on a new line,
+  not into the address. The address shows again only while the caret is on it.
+
 ## 0.11.1 - 2026-11-12
 
 ### Changed
