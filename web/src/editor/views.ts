@@ -1,5 +1,5 @@
-// The two nodes the browser draws for us: a photo (shown through the page's resolver, kept as the file's path)
-// and a task item (a live checkbox). Plain DOM, no framework.
+// The two nodes the browser draws for us: a photo (shown through the page's resolver, kept as the file's path, a
+// Delete button on its corner) and a task item (a live checkbox). Plain DOM, no framework.
 import type { Node } from "prosemirror-model";
 import type { EditorView, NodeView, ViewMutationRecord } from "prosemirror-view";
 
@@ -9,10 +9,19 @@ export type ResolveImage = (src: string) => string | null;
 export class ImageView implements NodeView {
   dom = document.createElement("span");
   private img = document.createElement("img");
+  private del = document.createElement("button");
 
-  constructor(private node: Node, private resolve: () => ResolveImage, readonly views: Set<ImageView>) {
+  constructor(private node: Node, private view: EditorView, private getPos: () => number | undefined, private resolve: () => ResolveImage, readonly views: Set<ImageView>) {
     this.dom.className = "pm-image";
     this.dom.contentEditable = "false";
+    // Delete: the photo out of the note with one tap, an ordinary edit (Undo brings it back). The focus stays where it
+    // was, so a phone's keyboard doesn't come up for it.
+    this.del.className = "pm-image-delete";
+    this.del.type = "button";
+    this.del.dataset.icon = "delete";
+    this.del.title = "Delete the picture from the note";
+    this.del.setAttribute("aria-label", this.del.title);
+    this.del.addEventListener("click", (e) => { e.preventDefault(); this.remove(); });
     this.img.draggable = false;
     this.img.decoding = "async";
     this.img.addEventListener("error", () => this.show(null));
@@ -23,20 +32,26 @@ export class ImageView implements NodeView {
   /** Point the picture at what the resolver says now; the placeholder when it says nothing. */
   refresh() { this.show(this.resolve()(this.node.attrs.src)); }
 
+  private remove() {
+    const at = this.getPos();
+    if (this.view.isDestroyed || at == null) return;
+    this.view.dispatch(this.view.state.tr.delete(at, at + this.node.nodeSize));
+  }
+
   private show(url: string | null) {
     if (url) {
       this.img.src = url;
       this.img.dataset.src = this.node.attrs.src;        // what a click hands to the viewer: the file's own path, not the URL it is shown from
       this.img.alt = this.node.attrs.alt;
       this.img.title = this.node.attrs.title ?? "";
-      this.dom.replaceChildren(this.img);
+      this.dom.replaceChildren(this.img, this.del);
     } else {
       const gap = document.createElement("span");
       gap.className = "pm-image-missing";
       gap.setAttribute("role", "img");
       gap.setAttribute("aria-label", "Photo not available");
       gap.textContent = this.node.attrs.alt || "Photo";
-      this.dom.replaceChildren(gap);
+      this.dom.replaceChildren(gap, this.del);
     }
   }
 
@@ -47,6 +62,9 @@ export class ImageView implements NodeView {
     if (moved) this.refresh();
     return true;
   }
+
+  /** The button's presses are its own: the editor neither selects the photo nor opens it. */
+  stopEvent(e: Event) { return e.target === this.del; }
 
   destroy() { this.views.delete(this); }
 }
