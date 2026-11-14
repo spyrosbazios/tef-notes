@@ -79,7 +79,8 @@ button at the corner opens it (`assistant/fab.tsx`).
 
 Below `md` (768px) the app is the phone layout. The shell (`components/shell.tsx`) swaps the rail and the app bar for the phone's bottom tabs
 (`components/tab-bar.tsx`: Home, Tasks, Notes, Ask, Settings in the owner's order, a floating pill with the front tab's label on a capsule; hidden on a note
-page, with a task open and under the on-screen keyboard, `hooks/keyboard.ts`). A note's page is a layer over whatever screen it was opened
+page and under the on-screen keyboard, `hooks/keyboard.ts`). A task opens in a drawer over the screen it was picked on
+(`components/task-drawer.tsx`: Home, the assistant, a note, a search; a bottom sheet here, a panel from the right from `md`, where a task list shows it beside the list instead), so closing it is a step back to that screen as it was. A note's page is a layer over whatever screen it was opened
 from (`NoteLayer` in `components/shell.tsx`; Home, a task list or Settings): that screen stays matched and mounted under it, `invisible`
 and `inert` (Routing, below), so Back finds it as it was, with no tiles entering again, no
 pictures reloaded and the scroll where it was left; the focus goes into the note and back to the tile. Tasks goes back to the list last in front. Ask is the
@@ -109,9 +110,9 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 | Route | File | Screen | Search |
 |---|---|---|---|
 | (root) | `__root.tsx` | `components/frame.tsx`: the assistant's chat, toasts, update toast, devtools in dev; 404 `components/not-found.tsx` | |
-| (layout) | `_app.tsx` | `components/shell.tsx`: rail, app bar, tabs, dock, palette, and the note over the screen | `note` |
+| (layout) | `_app.tsx` | `components/shell.tsx`: rail, app bar, tabs, dock, palette, the note over the screen and the open task's drawer | `note`, `t` (task id) |
 | `/` | `_app/index.tsx` | Home; a bare launch goes on to the chosen start screen (`lib/start.ts`, `beforeLoad`) | `tags` (a comma list) |
-| `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list and the task beside it | `t` (task id) |
+| `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list, and from `md` the open task beside it | |
 | `/notes` | `_app/notes.tsx` | `notes-page.tsx`: the notes alone (its tab off until turned on in Settings → Layout) | `tags` (a comma list) |
 | `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
 | `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |
@@ -121,7 +122,7 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
   wider) while rail, bars and dock hold still; `note-open`/`note-close` slide the note's layer (`data-vt="note"`) up and back down on
   a phone and fade it from `md`, the direction read from `?note=` coming or going (Back, the note's Back and links alike);
   `note-grow`/`note-shrink` grow it out of the tile it was opened from and back (`lib/morph.ts`); `note-swap` crossfades one note
-  for another; `whole` for the share page; a tag-filter change or a task opened or closed (`?t=`: the phone's sheet has its own motion) has none. Animate UI's Page Transition for TanStack Router is a
+  for another; `whole` for the share page; a tag-filter change or a task opened or closed (`?t=`: the drawer has its own motion) has none. Animate UI's Page Transition for TanStack Router is a
   registry file (shadcn CLI), which this app doesn't take (package only), so the CSS uses its tokens' timings instead. The screen
   under a note stays mounted and keeps its scroll.
 

@@ -19,7 +19,7 @@ import type { Task } from "@/core/todo";
 import type { RowDrag } from "@/hooks/drag";
 import { useLeaving } from "@/hooks/presence";
 import { useSwipe } from "@/hooks/swipe";
-import type { linkOf } from "@/lib/nav";
+import type { TaskLink } from "@/lib/nav";
 import { DELETE_WIDTH, WHEN_WIDTH } from "@/lib/swipe";
 import { whenState } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ export function TaskRowView({ task, today, checked, leaving, selected, doomed, n
   /** Set when the row can be dragged to another place in its list. */
   drag?: RowDrag;
   /** Where the row's title leads: the task open beside its list. */
-  link: ReturnType<typeof linkOf>;
+  link: TaskLink;
   onTick: () => void; onOpen: () => void; onSchedule: (s: Schedule | null) => void; onDue: (day: string | null) => void; onDelete: () => void;
 }) {
   const [menu, setMenu] = useState(false), [picking, setPicking] = useState(false);

@@ -16,7 +16,7 @@ import { toggleTask, useLingering } from "@/hooks/linger";
 import { useNotePictures } from "@/hooks/thumbs";
 import { Mosaic } from "../note-pictures";
 import { useTasks, useToday } from "@/hooks/todo";
-import { homeOfTask, useNav } from "@/lib/nav";
+import { useNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { Rise } from "./rise";
 
@@ -78,7 +78,7 @@ function TaskView({ card, today, onTick, gone }: { card: TaskCard; today: string
   const when = whenLabel(card, today);
   const overdue = !!card.due && card.due < today;
   return (
-    <Shell onOpen={() => showTask(homeOfTask(card), card.id)} gone={gone} label={card.title}>
+    <Shell onOpen={() => showTask(card.id)} gone={gone} label={card.title}>
       <div className="flex items-start gap-3 px-3 py-2.5">
         <TickBox checked={checked} disabled={!onTick} aria-label={checked ? `Mark "${card.title}" not done` : `Mark "${card.title}" done`}
           onClick={(e) => { e.stopPropagation(); onTick?.(); }} onKeyDown={(e) => e.stopPropagation()} className="mt-0.5" />

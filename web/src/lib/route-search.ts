@@ -32,17 +32,13 @@ const list = (v: unknown): string[] | undefined => {
   return items.length ? items : undefined;
 };
 
-/** Every screen of the shell: the note laid over it (`?note=<id>`, its filename's id). */
-export type ShellSearch = { note?: string };
-export const shellSearch = (raw: Raw): ShellSearch => ({ note: text(raw.note) });
+/** Every screen of the shell: the note laid over it (`?note=<id>`, its filename's id) and the open task (`?t=<id>`, its record id). */
+export type ShellSearch = { note?: string; t?: string };
+export const shellSearch = (raw: Raw): ShellSearch => ({ note: text(raw.note), t: text(raw.t) });
 
 /** Home and the Notes page: their notes under every one of these tags; `archived=1` lists the archived notes instead. */
 export type HomeSearch = { tags?: string[]; archived?: "1" };
 export const homeSearch = (raw: Raw): HomeSearch => ({ tags: list(raw.tags), archived: text(raw.archived) === "1" ? "1" : undefined });
-
-/** A task list: the task open beside it (its record id). */
-export type ListSearch = { t?: string };
-export const listSearch = (raw: Raw): ListSearch => ({ t: text(raw.t) });
 
 /** Settings' sections, in their order (settings-pane.tsx draws each). */
 export const SETTINGS_SECTIONS = ["appearance", "layout", "agent", "voice", "reminders", "tags", "transfer", "maintenance"] as const;

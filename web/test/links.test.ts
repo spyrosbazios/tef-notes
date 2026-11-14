@@ -1,8 +1,8 @@
 // The web app's questions of the links (lib/links.ts): a task's notes as the cache has them, a note's tasks, a task row's
-// summary, and where a task opens.
+// summary.
 import { describe, expect, test } from "bun:test";
 import type { Link } from "@/core/record-links";
-import { linkedNoteIds, noteSummary, notesFor, taskView, tasksFor } from "@/lib/links";
+import { linkedNoteIds, noteSummary, notesFor, tasksFor } from "@/lib/links";
 import type { NoteRec } from "@/services/notes";
 
 const about = (id: string, task: string, note: string): Link => ({ id, from: { type: "task", id: task }, to: { type: "note", id: note }, role: "about" });
@@ -42,15 +42,5 @@ describe("a note's tasks", () => {
     expect(tasksFor([...links, about("l8", "t1", "n1")], "n1", tasks).map((t) => t.id)).toEqual(["t1", "t2", "t3"]);
     expect(tasksFor(links, "n1", [{ id: "t2" }]).map((t) => t.id)).toEqual(["t2"]);
     expect(tasksFor(links, "n9", tasks)).toEqual([]);
-  });
-});
-
-describe("where a task opens", () => {
-  const t = { done: "", when: "" };
-  test("Logbook, Today, Upcoming, else Inbox", () => {
-    expect(taskView({ ...t, done: "2026-11-01", when: "2026-11-02" }, "2026-11-02")).toEqual({ kind: "logbook" });
-    expect(taskView({ ...t, when: "2026-11-02" }, "2026-11-02")).toEqual({ kind: "today" });
-    expect(taskView({ ...t, when: "2026-11-03" }, "2026-11-02")).toEqual({ kind: "upcoming" });
-    expect(taskView(t, "2026-11-02")).toEqual({ kind: "inbox" });
   });
 });

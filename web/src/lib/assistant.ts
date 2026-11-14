@@ -7,7 +7,7 @@ import { editWords } from "@/core/drawing";
 import { contextFilter, type Lens } from "@/core/lens";
 import { isNotePath } from "@/core/notes";
 import type { Held } from "@/editor";
-import { homeOfTask, isTaskView, titleOf, type View } from "@/lib/nav";
+import { titleOf, type View } from "@/lib/nav";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
 
@@ -29,7 +29,7 @@ export function webView(v: AssistantView): View | null {
   return kind === "ask" ? null : kind === "notes" || kind === "home" || kind === "pinned" ? { kind: "home" } : kind === "memory" ? { kind: "settings", section: "agent" } : { kind };
 }
 
-/** The URL's state: the open note's id and the open task's id (a task opens only in a task list). */
+/** The URL's state: the open note's id and the open task's id. */
 export type Where = { view: View; open?: string; task?: string };
 
 /** What the cache holds. */
@@ -44,7 +44,7 @@ export function pageContext(at: Where, held: Cached, selection: string, lens?: L
   const out: AssistantContext = { view: assistantView(at.view) };
   const note = at.open ? held.notes?.find((n) => n.note.id === at.open) : undefined;
   if (note) out.note = { path: note.path, title: note.note.title, rev: note.rev };
-  const task = at.task && !at.open && isTaskView(at.view) ? held.tasks?.find((t) => t.id === at.task) : undefined;   // an open note hides the task
+  const task = at.task ? held.tasks?.find((t) => t.id === at.task) : undefined;   // over a note it is the drawer in front of it
   if (task) out.task = { id: task.id, title: task.title };
   const words = selection.trim(), text = words.slice(0, LIMITS.selection);
   if (text) out.selection = text;
@@ -67,7 +67,7 @@ export type UiHost = {
   task: (id: string) => Promise<TaskRec | undefined>;
   nav: {
     openNote: (id: string) => void;
-    showTask: (v: View, id: string) => void;
+    showTask: (id: string) => void;
     goView: (v: View) => void;
   };
   /** `go_view` to the chat: the dock is there already, open it. */
@@ -96,7 +96,7 @@ export async function runUiTool(name: AppTool, input: unknown, host: UiHost): Pr
     case "open_task": {
       const t = await host.task(str(i.id));
       if (!t) return uiError(`No task ${str(i.id) || "(none named)"}.`);
-      host.nav.showTask(homeOfTask(t), t.id);
+      host.nav.showTask(t.id);
       return UI_OK;
     }
     case "go_view": {

@@ -109,7 +109,7 @@ function WeekView({ w }: { w: WeekWidget }) {
                   <ul className="space-y-0.5">
                     {d.top.map((t) => (
                       <li key={t.id}>
-                        <button type="button" onClick={() => showTask({ kind: list }, t.id)} title={t.title}
+                        <button type="button" onClick={() => showTask(t.id)} title={t.title}
                           className="line-clamp-2 w-full text-left text-[13px] leading-snug text-fg hover:underline">{t.title}</button>
                       </li>
                     ))}

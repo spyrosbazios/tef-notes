@@ -233,7 +233,7 @@ export function NoteList({ onNew, scrollId }: { onNew: () => void; scrollId: str
   const tile = (t: NoteRec, key: string) => {
     const on = picked.includes(t.path), menuPaths = on ? picked : [t.path];
     return (
-      <Tile key={key} id={key} n={t} link={noteLink(t.note.id, { view })} now={now} selecting={selecting} selected={on} menuPaths={menuPaths}
+      <Tile key={key} id={key} n={t} link={noteLink(t.note.id, view)} now={now} selecting={selecting} selected={on} menuPaths={menuPaths}
         onPick={(e) => pick(t.path, e)} onCheck={() => check(t.path)} onTag={filterTag}
         onTags={() => ask("tags", menuPaths)} onDelete={() => ask("delete", menuPaths)} />
     );

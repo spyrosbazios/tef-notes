@@ -1,9 +1,8 @@
 // What the web app asks of the links (core/record-links.ts), pure: the notes a task is about as the cache has them, the tasks
-// that link to a note, and the task list a task opens in.
+// that link to a note.
 import { backlinks, linksFrom, notesOfTask, type Link } from "@/core/record-links";
 import type { Task } from "@/core/todo";
 import type { NoteRec } from "@/services/notes";
-import type { View } from "./nav";
 
 /** The notes a task is about, in link order, each with the link that names it; `unseen` counts those the cache has no note
  *  for yet (made on another device a moment ago). */
@@ -36,9 +35,3 @@ export function noteSummary(links: readonly Link[], taskId: string, titles: Read
 /** The record ids of the notes a task is about already: what the picker leaves out. */
 export const linkedNoteIds = (links: readonly Link[], taskId: string) => new Set(notesOfTask(links, taskId));
 
-/** The task list a task opens in, beside it: the Logbook once done, else the list Things puts it in. */
-export function taskView(t: Pick<Task, "done" | "when">, today: string): View {
-  if (t.done) return { kind: "logbook" };
-  if (t.when) return { kind: t.when <= today ? "today" : "upcoming" };
-  return { kind: "inbox" };
-}
