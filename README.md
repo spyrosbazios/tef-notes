@@ -46,7 +46,8 @@ Search and discuss your notes, or ask the assistant to add a task or edit a note
 them, or have them rewritten in place as an edit you can undo. Ask for a diagram and it draws it on the open
 Excalidraw canvas, checks its own work and leaves it for you to keep. It sees the page you are on and shows changes for approval
 before saving by default. Choose your model provider, including a local model through
-Ollama. Auto-tagging and web search are optional too.
+Ollama. Scanned PDFs are read on your server too, so the assistant can read them and search can find their notes.
+Auto-tagging and web search are optional too.
 
 ### Keep control of your data
 
@@ -105,7 +106,7 @@ need a push key and your `TZ`: [Push reminders](server/README.md#push-reminders)
 |---|---|
 | **Web** | Included in the server build; open your server’s URL on a laptop. [Web guide](web/README.md) |
 | **Phone** | Open your server’s HTTPS address in Chrome on Android and choose **Install app**. It works offline, is in the Share sheet of other apps and sends task reminders as notifications. [Web guide](web/README.md#offline) |
-| **Android companion** | Optional, beside the installed app: home-screen widgets for tasks and notes, Save to TEF Notes in the share sheet and over selected text, a New task tile. Install the APK from the [releases](https://github.com/spyrosbazios/tef-notes/releases). [Companion guide](android/README.md) |
+| **Android companion** | Optional, beside the installed app: home-screen widgets for tasks and notes with lens switching and a shortcut to the assistant, Save to TEF Notes in the share sheet and over selected text, a New task tile. Install the APK from the [releases](https://github.com/spyrosbazios/tef-notes/releases). [Companion guide](android/README.md) |
 | **Chrome clipper** | Build and sign it with the server, then install from its private HTTPS origin. [Clipper guide](extension/README.md) |
 | **CLI** | Run `tefnotes` with Bun to read, edit and export notes and tasks. [CLI guide](cli/README.md) |
 | **Coding agents** | Claude Code, Codex and others drive the CLI through the `tefnotes` skill. [Skill](skills/tefnotes/SKILL.md) |
