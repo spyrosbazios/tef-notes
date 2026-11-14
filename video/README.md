@@ -1,6 +1,6 @@
 # TEF Notes film
 
-The promo film: about half a minute, 1920 × 1080, silent, captioned. It is code, rendered by
+The promo film: about three quarters of a minute, 1920 × 1080, silent, captioned. It is code, rendered by
 [Remotion](https://www.remotion.dev), and it draws the screens the site draws (`../site/src/components/mock/`), so a
 screen changed there is changed here. Nothing is recorded and no video file is committed.
 
@@ -14,16 +14,19 @@ screen changed there is changed here. Nothing is recorded and no video file is c
 ## How it is put together
 
 - **The script is data.** `src/storyboard.ts` is the film: the opening, the shots (a scene, its eyebrow and caption, its
-  seconds, its slot, the release it is `since`, and `why` it holds the slot) and the closing. `RULES` there is the budget:
-  36 seconds, 4 pinned scenes, 2 rotating ones, a scene of 3 to 6 seconds, a caption of 7 words. `test/storyboard.test.ts`
-  holds the storyboard to it, so a cut that breaks a rule fails before anything renders.
+  seconds, its chapter and slot, the release it is `since`, and `why` it holds the slot) and the closing. `RULES` there is
+  the budget: 45 seconds, 6 pinned scenes, 2 rotating ones, a scene of 3 to 6 seconds, a caption of 7 words. `CHAPTERS` is
+  the order: what the app is, how things get in, working through them, asking the assistant, making it one's own.
+  `test/storyboard.test.ts` holds the storyboard to both, so a cut that breaks a rule fails before anything renders.
 - **A scene is one file** in `src/scenes/`, named in `src/scenes/index.ts`. It takes its shot and draws one thing: a
   layout (`Split`, `Wide`), a site screen in its frame, and a few moves with their times.
 - **The kit** (`src/kit/`) is the whole vocabulary. `clock.ts`: a scene's time, with `ramp`, `after` and `typed`.
   `moves.tsx`: `Enter` (a device comes on), `Arrive` (a piece appears), `Tap` (a press on the control a screen marks
   `data-tap`, found on the page each frame). `Scene.tsx`: the layouts and the caption. `Stage.tsx`: the ground, in a theme.
+  `Asked.tsx`: a turn with the assistant played in its dock, which is all a scene about the assistant is.
 - **A screen is driven through its props.** The site's mocks take what a scene changes over time, defaulting to what the
-  page shows: `ClipperPopup`'s `note`, `PhoneTasks`' `tasks`, `AskDock`'s `turn` and `draft`.
+  page shows: `ClipperPage`'s `note` and `open`, `PhoneNewTask`'s `title` and `tags`, `PhoneTasks`' `tasks`, `AskDock`'s
+  `turn` and `draft`. The turns the assistant's scenes play are `Turns.tsx` there.
 
 ## Invariants
 

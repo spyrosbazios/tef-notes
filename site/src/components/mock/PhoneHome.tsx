@@ -1,4 +1,5 @@
 import { ArrowDownUp, Plus, Tags } from "lucide-react";
+import type { ReactNode } from "react";
 import { BoxWords, Days, Evening, HomeHeader, NOTES, NoteTile, PhoneShell, TaskRow, Tool, type DemoNote, type DemoTask } from "./parts";
 
 type View = { tasks: DemoTask[]; evening?: DemoTask; notes: DemoNote[]; count: number };
@@ -33,8 +34,8 @@ const LENSES: Record<"Home" | "Work", View> = {
 };
 
 /** Home as the installed app draws it (web/src/components/home.tsx below `md`): the mark (the lens) and Search, the days strip, the
- *  task box at a fixed height, then every note in two columns. */
-export function PhoneHome({ lens = "Home" }: { lens?: "Home" | "Work" }) {
+ *  task box at a fixed height, then every note in two columns. `over` is what lies over the page: a sheet (NewTask.tsx). */
+export function PhoneHome({ lens = "Home", over }: { lens?: "Home" | "Work"; over?: ReactNode }) {
   const v = LENSES[lens];
   const cols = [v.notes.filter((_, i) => i % 2 === 0), v.notes.filter((_, i) => i % 2 === 1)];
   return (
@@ -65,6 +66,7 @@ export function PhoneHome({ lens = "Home" }: { lens?: "Home" | "Work" }) {
           {cols.map((c, i) => <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">{c.map((n) => <NoteTile key={n.title} note={n} maxTags={2} />)}</div>)}
         </div>
       </div>
+      {over}
     </PhoneShell>
   );
 }

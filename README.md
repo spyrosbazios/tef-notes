@@ -70,8 +70,8 @@ Switch the lens to change your focus. A new note or task inherits the lens’s f
 
 *A one-minute tour with sample data. The assistant interaction uses the real agent.*
 
-There is also [a half-minute film](https://spyrosbazios.github.io/tef-notes/) of the app at the top of the site, drawn
-in code and re-cut with each release.
+There is also [a short film](https://spyrosbazios.github.io/tef-notes/) of the app at the top of the site, drawn in
+code and re-cut with each release.
 
 ## Get started
 

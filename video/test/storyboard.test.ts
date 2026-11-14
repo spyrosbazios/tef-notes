@@ -2,7 +2,7 @@
 // rules, so a cut that breaks one fails before anything is rendered.
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { CLOSING, FPS, frames, OPENING, POSTER, RULES, STORYBOARD, timeline } from "../src/storyboard";
+import { CHAPTERS, CLOSING, FPS, frames, OPENING, POSTER, RULES, STORYBOARD, timeline } from "../src/storyboard";
 
 const here = (p: string) => new URL(p, import.meta.url);
 const words = (s: string) => s.trim().split(/\s+/).length;
@@ -22,6 +22,12 @@ test("every length is a whole number of frames", () => {
 test("the pinned scenes are all there, and the rotating ones no more than their slots", () => {
   expect(STORYBOARD.filter((s) => s.slot === "pinned")).toHaveLength(RULES.pinned);
   expect(STORYBOARD.filter((s) => s.slot === "rotating").length).toBeLessThanOrEqual(RULES.rotating);
+});
+
+test("the film opens on what the app is, and its chapters never run backwards", () => {
+  const order = STORYBOARD.map((s) => CHAPTERS.indexOf(s.chapter));
+  expect(order[0]).toBe(0);
+  expect(order).toEqual([...order].sort((a, b) => a - b));
 });
 
 test("a scene plays once, and has its file", () => {

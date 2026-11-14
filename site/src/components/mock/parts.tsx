@@ -214,6 +214,14 @@ export function TaskRow({ task, selected }: { task: DemoTask; selected?: boolean
   );
 }
 
+/** A task as the chat shows it (web/src/components/assistant/cards.tsx): its row in a card of its own. */
+export const ChatTask = ({ task }: { task: DemoTask }) => <div className="overflow-hidden rounded-2xl border border-line bg-card py-0.5"><TaskRow task={task} /></div>;
+
+/** A task field's value (web/src/components/task-fields.tsx `chip`): a tonal pill, faint while the field is unset. */
+export const Pill = ({ children, none }: { children: ReactNode; none?: boolean }) => (
+  <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full bg-muted px-2.5 text-sm", none ? "text-faint" : "text-fg")}>{children}</span>
+);
+
 /** This Evening's heading inside a list; on the phone a title over a hairline (task-list.tsx). */
 export const Evening = ({ phone }: { phone?: boolean }) => (
   <p className={cn("flex items-center font-semibold", phone ? "mx-3 mb-1 mt-5 gap-2 border-b border-line pb-2 text-[15px] font-extrabold" : "gap-1.5 px-3 pb-1 pt-5 text-sm")}>
@@ -347,7 +355,7 @@ export function ConfirmCard({ title, why, tasks }: { title: string; why?: string
         {tasks.map((t, i) => <p key={t.title}>{i + 1}. {t.title}{line(t) ? <span className="text-dim"> ({line(t)})</span> : null}</p>)}
       </div>
       <div className="flex gap-2 text-sm font-medium">
-        <span data-tap="approve" className="flex h-8 flex-1 items-center justify-center rounded-full bg-brand text-bg">Add them</span>
+        <span className="flex h-8 flex-1 items-center justify-center rounded-full bg-brand text-bg">Add them</span>
         <span className="flex h-8 flex-1 items-center justify-center rounded-full bg-raised text-fg">Not now</span>
       </div>
     </div>
@@ -393,12 +401,17 @@ export function AssistantComposer({ sees, ready, draft }: { sees: string; ready?
   );
 }
 
-/** The web assistant's dock: its header; the chat; what it sees of the page; the composer, with a `draft` in it if one is given. */
+/** The web assistant's dock: its header; the chat; what it sees of the page; the composer, with a `draft` in it if one is given.
+ *  The chat keeps to its foot as it grows, as the app's does while a reply arrives: a turn that fits starts at the top, a
+ *  longer one has run up under the header. (A reversed column: the spacer, first, lies at the foot.) */
 export function Dock({ sees, draft, children }: { sees: string; draft?: string; children: ReactNode }) {
   return (
     <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-line bg-bg">
       <AssistantHeader close />
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-5">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col-reverse overflow-hidden px-4 py-5">
+        <div className="min-h-0 flex-1" />
+        <div className="flex shrink-0 flex-col gap-4">{children}</div>
+      </div>
       <AssistantComposer sees={sees} draft={draft} />
     </aside>
   );

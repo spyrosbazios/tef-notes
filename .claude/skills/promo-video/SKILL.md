@@ -43,12 +43,27 @@ does not wait for a replacement.
 
 Most releases have no candidate that qualifies. That is the normal result, not a failure.
 
-**Which slot.** The budget is fixed: 36 seconds, 4 pinned scenes, 2 rotating. The pinned scenes are what the app is
-(both screens, capture, the assistant, tasks) and change only when the app's own centre does. A candidate competes for
-a rotating slot against the two shots holding one: read each one's `why` and `since`. It takes the weaker one's slot
-only if it is stronger on how much changes on screen, how many people would care, and how new it is. If it is not,
-nothing changes, and the report names the candidate and why it lost. Never make the film longer, never add a scene
-beyond the slots, never cut a scene under `RULES.scene.min` to fit another in.
+**Which slot.** The budget is fixed: 45 seconds, 6 pinned scenes, 2 rotating. The pinned scenes are what the app is
+(both screens; a task typed in, tagging itself; a page clipped from Chrome; the day's tasks; the assistant asked about
+the day, and asked to find notes and act on them) and change only when the app's own centre does. A candidate
+competes for a rotating slot against the two shots holding one: read each one's `why` and `since`. It takes the weaker
+one's slot only if it is stronger on how much changes on screen, how many people would care, and how new it is. If it
+is not, nothing changes, and the report names the candidate and why it lost. Never make the film longer, never add a
+scene beyond the slots, never cut a scene under `RULES.scene.min` to fit another in.
+
+**Where it plays.** The film's order is the picture of the app it leaves in the viewer's head, so it follows
+`CHAPTERS` in the storyboard: what the app is, how things get into it, working through them, asking the assistant,
+making it one's own. A scene has one chapter and plays with it. A new scene joins its chapter, never the end of the
+film because it is the newest, and the test fails a storyboard whose chapters run backwards.
+
+**How a scene shows its feature.** Spyros's rules from the first cut (2026-11-14):
+
+- Show what the app does for its owner, not a safeguard around it. The assistant's scenes show what it answers with
+  (a day's plan, the notes it found) and what it does (tasks added), not that it asks before it writes.
+- Something that lives inside another program is shown inside it. The clipper plays in a Chrome window, on the page
+  being clipped, opened from the toolbar: on its own, nobody can tell what it is.
+- What the app does by itself is worth a scene when the viewer can watch it happen (tags landing on a task as it is
+  typed).
 
 **Which words change.** Re-read every eyebrow and caption against the app. A number in a caption is checked against
 the code ("Sixteen themes" is `THEME_NAMES.length`). `OPENING` is the site's hero headline and `CLOSING` the README's
@@ -66,12 +81,16 @@ what a newcomer will be weighed against. The voice is the site's: short, concret
   scene that left loses its file and its entry in the same commit: no unused scene is kept.
 - A scene is a layout (`Split`: the words left, one device right; `Wide`: the words on top, a wide shot under them), a
   site screen in its frame (`PhoneFrame`, `BrowserFrame`, `Peek`), and moves: `Enter`, `Arrive`, `Tap`, and the clock's
-  `typed`, `after` and `ramp`. Read `scenes/Ask.tsx` first; it uses all of them.
+  `typed`, `after` and `ramp`. Read `scenes/Clip.tsx` first: a screen driven through its props, and two presses.
+- A scene about the assistant is `kit/Asked.tsx` with a turn and its times (`scenes/Day.tsx` is the whole of one). The
+  turn, what is asked and the reply a piece at a time, is a `Turn` in `site/src/components/mock/Turns.tsx`; what the
+  assistant answers with is drawn in `mock/Widgets.tsx`, each a copy of its widget in
+  `web/src/components/assistant/widgets.tsx`, and its step lines are worded as `core/agent.ts` `gist` words them.
 - Time comes from `useClock()` only. No CSS transition or animation class, no timer, no `Math.random()`: a frame has
   to draw the same on its own, in any order.
 - Reuse a screen in `site/src/components/mock/`. When a scene needs the screen in a state over time, give the mock a
-  prop whose default is what the page shows (as `ClipperPopup`'s `note`, `PhoneTasks`' `tasks`, `AskDock`'s `turn` and
-  `draft`), and put `data-tap="<name>"` on a control a `Tap` presses.
+  prop whose default is what the page shows (as `ClipperPage`'s `note` and `open`, `PhoneNewTask`'s `title` and `tags`,
+  `PhoneTasks`' `tasks`, `AskDock`'s `turn` and `draft`), and put `data-tap="<name>"` on a control a `Tap` presses.
 - When no mock draws the feature, draw one in `mock/` under `site/README.md`'s rules: a copy in structure of the real
   `web/src/components/`, fictional content, the page's tokens, lucide's icons. The film may use it at once; whether the
   page shows it too stays `promo-refresh`'s proposal.

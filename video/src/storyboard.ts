@@ -9,9 +9,9 @@ export const SIZE = { width: 1920, height: 1080 } as const;
 /** What the film is cut to. A new feature takes a slot from another scene; it never makes the film longer. */
 export const RULES = {
   /** The whole film, the opening and the closing included, runs no longer than this. */
-  seconds: 36,
+  seconds: 45,
   /** The scenes that stay from release to release: what the app is. */
-  pinned: 4,
+  pinned: 6,
   /** The scenes for what is newer: at most this many, the weakest out when a stronger one arrives. */
   rotating: 2,
   /** One scene shows one thing, in this many seconds. */
@@ -21,10 +21,17 @@ export const RULES = {
   eyebrowWords: 3,
 } as const;
 
+/** The order the film goes in, which is the picture of the app it leaves: what it is, how things get into it, working
+ *  through them, asking the assistant, and making it one's own. A scene belongs to one chapter and plays with it; the
+ *  chapters never run backwards, so a new scene joins its chapter, never the end of the film. */
+export const CHAPTERS = ["what", "in", "do", "ask", "yours"] as const;
+export type Chapter = (typeof CHAPTERS)[number];
+
 export type Slot = "pinned" | "rotating";
 
 export type Shot = {
   scene: SceneName;
+  chapter: Chapter;
   slot: Slot;
   /** The small line over the caption: where this is, or what it is called. */
   eyebrow: string;
@@ -42,32 +49,42 @@ export const OPENING = { seconds: 3, line: "One notebook for your", accent: "who
 
 export const STORYBOARD: Shot[] = [
   {
-    scene: "Home", slot: "pinned", seconds: 4.5, since: "0.1.0",
+    scene: "Home", chapter: "what", slot: "pinned", seconds: 4, since: "0.1.0",
     eyebrow: "Laptop and phone", caption: "Notes and tasks, in one place.",
     why: "The establishing shot: what the app is, on both its screens, before any feature.",
   },
   {
-    scene: "Clip", slot: "pinned", seconds: 5, since: "0.1.0",
-    eyebrow: "Chrome clipper", caption: "Save a page where it belongs.",
-    why: "Capture is half the app, and the suggested note is what a bookmark never does.",
+    scene: "NewTask", chapter: "in", slot: "pinned", seconds: 4.5, since: "0.1.0",
+    eyebrow: "New task", caption: "Type a task. It tags itself.",
+    why: "The plainest way in, and the tags landing by themselves show that the app files what it is given.",
   },
   {
-    scene: "Ask", slot: "pinned", seconds: 6, since: "0.1.0",
-    eyebrow: "Assistant", caption: "It asks before it writes.",
-    why: "The assistant reads the open note, and the card to approve is the promise the app makes about it.",
+    scene: "Clip", chapter: "in", slot: "pinned", seconds: 5, since: "0.1.0",
+    eyebrow: "Chrome clipper", caption: "Clip a page to the right note.",
+    why: "The other way in, from the web: seen inside Chrome, with the note it suggests, which a bookmark never does.",
   },
   {
-    scene: "Tasks", slot: "pinned", seconds: 4.5, since: "0.1.0",
+    scene: "Tasks", chapter: "do", slot: "pinned", seconds: 4, since: "0.1.0",
     eyebrow: "Tasks", caption: "Today, this evening, done.",
-    why: "Tasks are the other half of the app; ticking one is its smallest whole story.",
+    why: "What happens to what went in: the day's list, and ticking a task is its smallest whole story.",
   },
   {
-    scene: "Lens", slot: "rotating", seconds: 4.5, since: "0.10.0",
+    scene: "Day", chapter: "ask", slot: "pinned", seconds: 5.5, since: "0.7.0",
+    eyebrow: "Assistant", caption: "Ask about your day.",
+    why: "The assistant has read the tasks, and it answers with a plan drawn as the app draws things, not with a paragraph.",
+  },
+  {
+    scene: "Find", chapter: "ask", slot: "pinned", seconds: 6, since: "0.7.0",
+    eyebrow: "Assistant", caption: "It finds notes and adds tasks.",
+    why: "The assistant has read the notes too and acts on them: the two halves of the app meeting in one request.",
+  },
+  {
+    scene: "Lens", chapter: "yours", slot: "rotating", seconds: 4.5, since: "0.10.0",
     eyebrow: "Lenses", caption: "Switch the lens. See only work.",
     why: "One tap changes every list and the app's colour: nothing else here shows as much in so little time.",
   },
   {
-    scene: "Themes", slot: "rotating", seconds: 5, since: "0.5.0",
+    scene: "Themes", chapter: "yours", slot: "rotating", seconds: 5, since: "0.5.0",
     eyebrow: "Themes", caption: "Sixteen themes. Pick yours.",
     why: "The most visual scene there is, and it ends the film on the app's own colours.",
   },
