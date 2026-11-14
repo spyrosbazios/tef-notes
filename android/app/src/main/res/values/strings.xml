@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TEF Notes Companion</string>
+    <string name="save">Save to TEF Notes</string>
+    <string name="new_task">New task</string>
+    <string name="tasks_widget">Tasks</string>
+    <string name="tasks_widget_about">A task list from TEF Notes: tick, open or add a task.</string>
+    <string name="notes_widget">Notes</string>
+    <string name="notes_widget_about">Your pinned and latest notes from TEF Notes.</string>
+</resources>

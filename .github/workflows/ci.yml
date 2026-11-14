@@ -152,3 +152,35 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run build
+
+  android:
+    name: Android companion - typecheck, tests, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # the version is the latest tag (scripts/version.sh)
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/tefnotes
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle.sh', 'android/*.gradle.kts', 'android/app/build.gradle.kts') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+      # The build's resources come from packages/core and lucide (scripts/generate.ts).
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      # Signed with the runner's debug key: this checks that it builds; the release signs its own.
+      - run: ./gradle.sh --no-daemon testDebugUnitTest lintRelease assembleRelease

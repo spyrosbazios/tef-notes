@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The settings screen: the app's ground until the first frame is drawn (the default look's, android/scripts/generate.ts). -->
+    <style name="Screen" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/tf_bg</item>
+    </style>
+
+    <!-- A sheet over whatever the owner was looking at (the share, the new task, a widget's list). -->
+    <style name="Sheet" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.55</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.InputMethod</item>
+    </style>
+</resources>

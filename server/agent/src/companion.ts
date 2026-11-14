@@ -1,0 +1,55 @@
+// The native companion's routes (the contract is packages/core/src/companion.ts): the feeds its widgets draw and the two
+// writes they make, a tick and a new task. Everything is read fresh on each request and shaped by the core, so the
+// companion holds no rules: it is told what to draw, where each row opens in the web app, and in which colours. The
+// writes go through the agent's own task store (todo.ts): a rev compare-and-swap, a repeating task rolled over.
+import { helloOf, newTaskOf, notesFeed, ownerLook, taskListOf, tasksFeed } from "@/core/companion";
+import { activeLens, inheritTags, type Lens } from "@/core/lens";
+import * as pb from "@/core/pocketbase";
+import { PREFS_KEY, prefsOf, type Prefs } from "@/core/prefs";
+import { localDay } from "@/core/time";
+import { Notes } from "./notes";
+import { Todo } from "./todo";
+
+const refuse = (status: number, error: string) => Response.json({ error }, { status });
+
+/** The owner's preferences (none saved yet: the defaults) and the lens they have on. */
+async function owner(server: pb.Server): Promise<{ prefs: Prefs; lens: Lens | null }> {
+  const [saved, lenses] = await Promise.all([
+    pb.call(server, `collections/prefs/records?filter=${encodeURIComponent(`key = ${pb.lit(PREFS_KEY)}`)}&perPage=1&skipTotal=1`),
+    pb.lenses.list(server),
+  ]);
+  const prefs = prefsOf(saved.items?.[0]?.data);
+  return { prefs, lens: activeLens(lenses, prefs.lens) };
+}
+
+export async function helloRoute(server: pb.Server): Promise<Response> {
+  const { prefs, lens } = await owner(server);
+  return Response.json(helloOf(prefs, lens));
+}
+
+export async function tasksRoute(req: Request, server: pb.Server): Promise<Response> {
+  const [{ prefs, lens }, tasks] = await Promise.all([owner(server), new Todo(server).tasks()]);
+  return Response.json(tasksFeed(tasks, taskListOf(new URL(req.url).searchParams.get("list")), localDay(), lens, ownerLook(prefs, lens)));
+}
+
+export async function notesRoute(server: pb.Server): Promise<Response> {
+  const [{ prefs, lens }, notes] = await Promise.all([owner(server), new Notes(server).list()]);
+  return Response.json(notesFeed(notes, lens, prefs));
+}
+
+/** A new open task, after the last one: planned for today when added from Today, tagged as the lens on tags what is made. */
+export async function addTaskRoute(req: Request, server: pb.Server): Promise<Response> {
+  const task = newTaskOf(await req.json().catch(() => null));
+  if (!task) return refuse(400, "A task needs a title.");
+  const { lens } = await owner(server);
+  const r = await new Todo(server).addTask({ title: task.title, when: task.list === "today" ? localDay() : "", tags: inheritTags(lens) });
+  return "error" in r ? refuse(502, r.error) : Response.json({ id: r.id });
+}
+
+/** A tick. One already ticked (on another screen, since the widget drew it) stays as it is: the wish is met. */
+export async function tickRoute(server: pb.Server, id: string): Promise<Response> {
+  const todo = new Todo(server);
+  if (!(await todo.task(id))) return refuse(404, "That task is gone.");
+  const r = await todo.completeTask(id, true);
+  return "error" in r ? refuse(409, r.error) : Response.json({ ok: true });
+}

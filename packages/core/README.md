@@ -15,6 +15,7 @@ TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECT
 | `pocketbase.ts`, `http.ts`, `tags.ts` | The PocketBase client with the `rev` compare-and-swap, tag calls |
 | `assistant.ts` | The always-on assistant's contract: the page context a client sends with each message, and the UI tools (`open_note`, `open_task`, `go_view`) the client does itself |
 | `agent.ts`, `clip.ts`, `share.ts`, `handoff.ts` | The chat agent's card shapes and wording, the clip contract, share-to-agent, "Ask about this" |
+| `companion.ts` | The native companion's contract (`android/`): the feeds its widgets draw, the owner's colours, its two task writes |
 | `theme.ts`, `page-theme.ts` | The palettes: the one home of colour |
 | `brand.ts` | The brand mark's outline, generated from `assets/mark.svg` by `assets/icons.ts` |
 

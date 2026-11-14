@@ -14,6 +14,7 @@ that most changes have to respect. Security reports go through [SECURITY.md](SEC
 | `web/` | The web app; on a phone, the installed PWA |
 | `cli/` | The `tefnotes` command |
 | `extension/` | The Chrome clipper |
+| `android/` | The Android companion: widgets, the share sheet, a tile (Kotlin) |
 | `site/` | The public marketing page |
 | `assets/` | Fonts, the logo SVGs, the app icon |
 
@@ -22,9 +23,10 @@ Clone the whole repository: every module imports `packages/core`.
 ## Rules
 
 - **`packages/core` stays dependency-free and shared.** No runtime dependencies, no platform APIs. If two clients need the
-  same logic, it goes there; never copy it into a client. (`server/pb_hooks/lib/notes.js` is the one deliberate copy,
-  because hooks are plain JS, and a test keeps it in step.)
-- **Package managers are fixed per module**: bun everywhere (`packages/core`, `server/agent`, `web`, `cli`, `extension`). Do not add a second lockfile to a module.
+  same logic, it goes there; never copy it into a client. (Two deliberate copies, each kept in step by a test: `server/pb_hooks/lib/notes.js`,
+  because the hooks are plain JS, and the few rules in `android/`'s `Contract.kt`, because it is Kotlin; its cases are
+  `packages/core/test/companion-cases.json`.)
+- **Package managers are fixed per module**: bun everywhere (`packages/core`, `server/agent`, `web`, `cli`, `extension`, and `android`'s build script; the app itself is Gradle's). Do not add a second lockfile to a module.
 - **`web/src/components/ui/` is shadcn's output.** Add components with `bunx --bun shadcn@latest add <name>`; never
   hand-edit them.
 - **Migrations are append-only.** A schema change is a new file in `server/pb_migrations/`; never edit one that has
@@ -45,6 +47,7 @@ Each module's README has its setup and commands:
 - `web`: [web/README.md](web/README.md)
 - `cli`: [cli/README.md](cli/README.md)
 - `extension`: [extension/README.md](extension/README.md)
+- `android`: [android/README.md](android/README.md)
 
 Run the checks of every module you touched, and of `packages/core` if you changed it (all clients depend on it).
 Format, then lint, type-check, test and build, in that order.
@@ -67,5 +70,5 @@ The whole repository has one semver version, and the git tag is its only source:
 extension's manifest reads it from there.
 
 To release: move the `## Unreleased` entries of `CHANGELOG.md` under `## X.Y.Z - date`, commit to `main`, then tag
-`vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and attaches it to a GitHub release
+`vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the extension zip and the Android companion's APK and attaches them to a GitHub release
 whose notes are that changelog section; `docker.yml` publishes the server images.

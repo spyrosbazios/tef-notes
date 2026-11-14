@@ -1,0 +1,15 @@
+{
+  "name": "tefnotes-android",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "generate": "bun scripts/generate.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.9",
+    "lucide": "1.65.0",
+    "typescript": "6.0.3"
+  }
+}

@@ -177,6 +177,8 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `POST` | `/agent/transcribe?keep=S` | Voice input: raw mono 16 kHz float32 samples in, `{ text }` out, through the `stt` service; the model stays loaded `S` seconds once idle. `/agent/transcribe/warm?keep=S` loads it ahead. 404 without `TEF_NOTES_STT`. Contract: `packages/core/src/voice.ts`. |
 | `GET` | `/agent/push/key` | `{ publicKey }` a browser subscribes to push with; 404 while push is off (the agent sidecar). |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Stores a browser's `PushSubscription` (and a `label`), the same endpoint again replacing it, a new one beyond 20 devices a 409; `DELETE` takes `{ endpoint }`. Shapes: `packages/core/src/push.ts`. |
+| `GET` | `/agent/companion/hello`, `/agent/companion/tasks?list=`, `/agent/companion/notes` | What the native companion (`android/`) draws: the owner's colours, a task list and the notes, ready to draw, under the lens on. Contract: `packages/core/src/companion.ts`. |
+| `POST` | `/agent/companion/tasks`, `/agent/companion/tasks/:id/done` | The companion's two writes: a new task (`{ title, list? }`) and a tick, a repeating task rolled over. |
 
 Cron jobs: `autotag` every minute (evaluates up to 50 notes per run) and `link_previews_prune` daily.
 

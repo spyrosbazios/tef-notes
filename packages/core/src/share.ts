@@ -21,7 +21,8 @@ const isUrl = (s: string) => /^https?:\/\/\S+$/.test(s);
 export function fromPost(p: { title: string; text: string; url: string; files: readonly { name: string; type: string }[] }): Shared | null {
   const title = p.title.trim(), url = [p.url.trim(), p.text, p.title].map((s) => (isUrl(s.trim()) ? s.trim() : firstUrl(s))).find(Boolean) ?? null;
   let text = p.text.trim();
-  if (url && text.replace(url, "").trim() === (isUrl(title) ? "" : title)) text = "";
+  const rest = url ? text.replace(url, "").trim() : text;
+  if (url && (!rest || rest === title)) text = "";
   const images: SharedImage[] = [], pdfs: SharedPdf[] = [];
   p.files.forEach((f, i) => {
     if (f.type === PDF || isPdf(f.name)) pdfs.push({ uri: String(i), name: f.name });

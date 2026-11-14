@@ -1,12 +1,12 @@
 # tefnotes: agent notes
 
 **TEF Notes**: self-hosted notes and tasks: a PocketBase server (`server/`) with a chat agent beside it
-(`server/agent/`), a web app (`web/`, installed as a PWA on the phone), a CLI (`cli/`) and a Chrome clipper (`extension/`),
-all sharing `packages/core/`. What it is and how to run it: `README.md`. The note format, tasks, the write contract and
+(`server/agent/`), a web app (`web/`, installed as a PWA on the phone), a CLI (`cli/`), a Chrome clipper (`extension/`) and an Android
+companion (`android/`: widgets, the share sheet, a tile; never a second client), all sharing `packages/core/`. What it is and how to run it: `README.md`. The note format, tasks, the write contract and
 the server's jobs: `ARCHITECTURE.md` (not repeated here). Rules for changes: `CONTRIBUTING.md`. Security model: `SECURITY.md`.
-Each module has its own `README.md`; `extension/` also has an `AGENTS.md`.
+Each module has its own `README.md`; `extension/` and `android/` also have an `AGENTS.md`.
 
-<!-- reviewed: 2026-11-11 -->
+<!-- reviewed: 2026-11-14 -->
 
 ## Where facts live
 
@@ -43,6 +43,8 @@ Each module has its own `README.md`; `extension/` also has an `AGENTS.md`.
 | `packages/core/src/theme.ts` | The themes (`THEMES`): the web app's, the site's and the extension's CSS variables are generated from it | ⭐ colours |
 | `web/src/services/` | The web app's transport (axios), errors mapped to the core's `Conflict` | |
 | `web/vite-boot.ts` + `server/pb_hooks/manifest.pb.js` | The launch in the chosen theme: index.html's inline boot script paints the stored theme and accent before any script loads, under a layer of the theme's ground (no mark: Android's splash has just shown the icon) that `web/src/lib/splash.ts` fades once the router's first screen is on; the manifest Android builds the installed app's splash from is served by the server, at its one address, with the owner's theme's ground (`lib/manifest.js` over the build's `manifest-colors.json`, `packages/core/vite.ts`); Chrome remints the app a day or two after the theme changes | |
+| `packages/core/src/companion.ts` + `server/agent/src/companion.ts` | The native companion's contract (Android now, an iPhone one after): the `/agent/companion` routes, the feeds a widget draws (a task list, the notes: rows, labels, the address each opens in the web app), the owner's colours (`Look`), a new task and a tick, a share as a clip. The server works everything out; a companion only draws. The few rules a companion copies are named in the header and checked against `packages/core/test/companion-cases.json` by both sides | ⭐ the companion contract |
+| `android/AGENTS.md` | The companion app: its invariants (no rules, no screens, no colours of its own), its build, what bit | |
 | `extension/AGENTS.md` | The clipper's clip contract, its build and the signed CRX (`extension/scripts/crx.ts`) | |
 | `site/README.md` | The public marketing page: a static Vite build deployed on its own (any static host, or its Dockerfile from the repo root); palette and fonts from `@/core/theme` and `assets/`; the app screens drawn in code (`src/components/mock/`), never screenshots | |
 | `assets/` | The brand's fonts (Atkinson Hyperlegible, OFL), the logo SVGs, the app icon; `bun assets/icons.ts` regenerates `icon.png` and `packages/core/src/brand.ts` (needs `server/agent` deps installed) | |
@@ -70,6 +72,7 @@ cd packages/core && bun test && bun run typecheck      # the shared core
 cd web && bun install && bun run build                 # tsc + vite; `bun run lint` is oxlint; `bun test`
 cd cli && bun install && bun run typecheck             # the CLI
 cd extension && bun install && bun run build           # -> extension/dist; `bun run typecheck`, `bun run lint`
+cd android && bun install && ./gradle.sh testDebugUnitTest lintRelease assembleRelease   # JAVA_HOME, ANDROID_HOME; android/README.md
 cd server/agent && bun install && bun test && bun run typecheck
 ```
 
@@ -82,6 +85,7 @@ cd server/agent && bun install && bun test && bun run typecheck
 | `cli/` | Terminal access for the user and coding agents: notes and tasks | A second copy of client logic: it imports `@/core/*` |
 | `web/` | The laptop's UI: shadcn animated by Animate UI's npm package (`web/README.md` "Motion"), TanStack Query, TanStack Router (file routes, `web/README.md` "Routing"), axios services, the assistant dock over the server's agent; served by PocketBase from `pb_public` | Talking to anything but the server. Note format, merge, ids, the Ask wording, colours of its own: all from `@/core/*`; a model key |
 | `extension/` | The browser's "Save to TEF Notes": reads the page, or fetches the picture and downscales it, shows the server's suggestions, takes an optional note, saves where the user picks | Filing logic (the server's), any key or sign-in, colours of its own: all from `@/core/theme` |
+| `android/` | Android's entry points the web app can't have: the Tasks and Notes widgets, "Save to TEF Notes" in the share sheet and over selected text, the New task tile and shortcut; what waits while the server is out of reach | A screen of the app's (a tap opens the web app); a rule of its own (what a feed lists and how is `@/core/companion`, on the server); a colour, icon or font of its own; any key or sign-in |
 | `site/` | The public page: copy, device frames, the app screens it draws | Talking to any server; a palette, font or icon set of its own: all from `@/core/theme`, `assets/` and lucide |
 
 ## Footguns that actually bit

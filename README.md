@@ -102,6 +102,7 @@ need a push key and your `TZ`: [Push reminders](server/README.md#push-reminders)
 |---|---|
 | **Web** | Included in the server build; open your server’s URL on a laptop. [Web guide](web/README.md) |
 | **Phone** | Open your server’s HTTPS address in Chrome on Android and choose **Install app**. It works offline, is in the Share sheet of other apps and sends task reminders as notifications. [Web guide](web/README.md#offline) |
+| **Android companion** | Optional, beside the installed app: home-screen widgets for tasks and notes, Save to TEF Notes in the share sheet and over selected text, a New task tile. Install the APK from the [releases](https://github.com/spyrosbazios/tef-notes/releases). [Companion guide](android/README.md) |
 | **Chrome clipper** | Build and sign it with the server, then install from its private HTTPS origin. [Clipper guide](extension/README.md) |
 | **CLI** | Run `tefnotes` with Bun to read, edit and export notes and tasks. [CLI guide](cli/README.md) |
 | **Coding agents** | Claude Code, Codex and others drive the CLI through the `tefnotes` skill. [Skill](skills/tefnotes/SKILL.md) |

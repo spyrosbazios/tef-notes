@@ -5,6 +5,17 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- Android companion (`android/`), an optional app beside the installed web app: Tasks and Notes widgets in your theme
+  and lens, Save to TEF Notes in the share sheet and over selected text, a New task quick-settings tile and launcher
+  shortcut. What is saved with the server out of reach is sent when it is back. The APK is attached to each release.
+- Server: `/agent/companion/*`, the feeds and the two task writes a native companion uses.
+
+### Fixed
+
+- Sharing: a link shared with its title no longer saves the link a second time as the clipped text.
+
 ## 0.11.1 - 2026-11-12
 
 ### Changed

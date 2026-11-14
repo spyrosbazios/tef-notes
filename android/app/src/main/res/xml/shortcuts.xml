@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_task"
+        android:enabled="true"
+        android:icon="@drawable/ic_newtask"
+        android:shortcutShortLabel="@string/new_task">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="app.tefnotes.companion.TaskActivity"
+            android:targetPackage="app.tefnotes.companion" />
+    </shortcut>
+</shortcuts>

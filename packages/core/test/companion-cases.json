@@ -1,0 +1,417 @@
+{
+  "share": [
+    {
+      "name": "a browser's share: the title as the subject, the link as the text",
+      "in": {
+        "text": "https://example.com/a?b=1",
+        "subject": "Example Domain",
+        "picture": false
+      },
+      "clip": {
+        "url": "https://example.com/a?b=1",
+        "title": "Example Domain"
+      }
+    },
+    {
+      "name": "the title and the link together in the text say no more than the link",
+      "in": {
+        "text": "Example Domain https://example.com/a",
+        "subject": "Example Domain",
+        "picture": false
+      },
+      "clip": {
+        "url": "https://example.com/a",
+        "title": "Example Domain"
+      }
+    },
+    {
+      "name": "words around a link are kept as the selection",
+      "in": {
+        "text": "Read this: https://example.com/a. It is good",
+        "subject": "",
+        "picture": false
+      },
+      "clip": {
+        "url": "https://example.com/a",
+        "title": "",
+        "selection": "Read this: https://example.com/a. It is good"
+      }
+    },
+    {
+      "name": "a sentence's full stop is not the link's",
+      "in": {
+        "text": "See https://w.org/A_(b)).",
+        "subject": "",
+        "picture": false
+      },
+      "clip": {
+        "url": "https://w.org/A_(b)",
+        "title": "",
+        "selection": "See https://w.org/A_(b))."
+      }
+    },
+    {
+      "name": "selected text with no link",
+      "in": {
+        "text": "  a quote\nover two lines  ",
+        "subject": "",
+        "picture": false
+      },
+      "clip": {
+        "url": "",
+        "title": "",
+        "selection": "a quote\nover two lines"
+      }
+    },
+    {
+      "name": "a link given as the subject is the page, not its title",
+      "in": {
+        "text": "",
+        "subject": "https://example.com/x",
+        "picture": false
+      },
+      "clip": {
+        "url": "https://example.com/x",
+        "title": ""
+      }
+    },
+    {
+      "name": "a picture alone",
+      "in": {
+        "text": "",
+        "subject": "",
+        "picture": true
+      },
+      "clip": {
+        "url": "",
+        "title": "",
+        "image": {
+          "src": ""
+        }
+      }
+    },
+    {
+      "name": "a picture with its words",
+      "in": {
+        "text": "The receipt",
+        "subject": "",
+        "picture": true
+      },
+      "clip": {
+        "url": "",
+        "title": "",
+        "selection": "The receipt",
+        "image": {
+          "src": ""
+        }
+      }
+    },
+    {
+      "name": "nothing shared",
+      "in": {
+        "text": "  ",
+        "subject": "",
+        "picture": false
+      },
+      "clip": null
+    },
+    {
+      "name": "a subject alone is not a share",
+      "in": {
+        "text": "",
+        "subject": "Only a title",
+        "picture": false
+      },
+      "clip": null
+    }
+  ],
+  "stored": [
+    {
+      "width": 4000,
+      "height": 3000,
+      "size": {
+        "width": 1600,
+        "height": 1200
+      }
+    },
+    {
+      "width": 3000,
+      "height": 4000,
+      "size": {
+        "width": 1200,
+        "height": 1600
+      }
+    },
+    {
+      "width": 1600,
+      "height": 900,
+      "size": {
+        "width": 1600,
+        "height": 900
+      }
+    },
+    {
+      "width": 640,
+      "height": 480,
+      "size": {
+        "width": 640,
+        "height": 480
+      }
+    },
+    {
+      "width": 1601,
+      "height": 1601,
+      "size": {
+        "width": 1600,
+        "height": 1600
+      }
+    }
+  ],
+  "look": [
+    {
+      "width": 4000,
+      "height": 3000,
+      "size": {
+        "width": 768,
+        "height": 576
+      }
+    },
+    {
+      "width": 600,
+      "height": 400,
+      "size": {
+        "width": 600,
+        "height": 400
+      }
+    },
+    {
+      "width": 300,
+      "height": 200,
+      "size": {
+        "width": 420,
+        "height": 280
+      }
+    },
+    {
+      "width": 3000,
+      "height": 300,
+      "size": {
+        "width": 1568,
+        "height": 157
+      }
+    },
+    {
+      "width": 0,
+      "height": 0,
+      "size": {
+        "width": 768,
+        "height": 768
+      }
+    }
+  ],
+  "choices": [
+    {
+      "name": "the pick first, the others best first, then a new note and a new task",
+      "suggestions": {
+        "suggestions": [
+          {
+            "kind": "note",
+            "path": "notes/a.md",
+            "title": "Recipes",
+            "p": 0.6
+          },
+          {
+            "kind": "task",
+            "id": "t1",
+            "title": "Shopping",
+            "p": 0.3
+          }
+        ],
+        "pick": {
+          "kind": "task",
+          "id": "t1"
+        }
+      },
+      "picture": false,
+      "choices": [
+        {
+          "target": {
+            "kind": "task",
+            "id": "t1"
+          },
+          "label": "Add to task Shopping",
+          "hint": "30%"
+        },
+        {
+          "target": {
+            "kind": "note",
+            "path": "notes/a.md"
+          },
+          "label": "Append to Recipes",
+          "hint": "60%"
+        },
+        {
+          "target": {
+            "kind": "new"
+          },
+          "label": "New note"
+        },
+        {
+          "target": {
+            "kind": "newtask"
+          },
+          "label": "New task"
+        }
+      ]
+    },
+    {
+      "name": "a new note first when that is the pick",
+      "suggestions": {
+        "suggestions": [
+          {
+            "kind": "note",
+            "path": "notes/a.md",
+            "title": "Recipes",
+            "p": 0.126
+          }
+        ],
+        "pick": {
+          "kind": "new"
+        }
+      },
+      "picture": false,
+      "choices": [
+        {
+          "target": {
+            "kind": "new"
+          },
+          "label": "New note"
+        },
+        {
+          "target": {
+            "kind": "note",
+            "path": "notes/a.md"
+          },
+          "label": "Append to Recipes",
+          "hint": "13%"
+        },
+        {
+          "target": {
+            "kind": "newtask"
+          },
+          "label": "New task"
+        }
+      ]
+    },
+    {
+      "name": "a picture: a task keeps only a link, a new task a note of its own",
+      "suggestions": {
+        "suggestions": [
+          {
+            "kind": "task",
+            "id": "t1",
+            "title": "Shopping",
+            "p": 0.5
+          }
+        ],
+        "pick": {
+          "kind": "task",
+          "id": "t1"
+        }
+      },
+      "picture": true,
+      "choices": [
+        {
+          "target": {
+            "kind": "task",
+            "id": "t1"
+          },
+          "label": "Add to task Shopping",
+          "hint": "50%, link only"
+        },
+        {
+          "target": {
+            "kind": "new"
+          },
+          "label": "New note"
+        },
+        {
+          "target": {
+            "kind": "newtask"
+          },
+          "label": "New task",
+          "hint": "picture in a linked note"
+        }
+      ]
+    },
+    {
+      "name": "nothing suggested",
+      "suggestions": {
+        "suggestions": [],
+        "pick": {
+          "kind": "new"
+        }
+      },
+      "picture": false,
+      "choices": [
+        {
+          "target": {
+            "kind": "new"
+          },
+          "label": "New note"
+        },
+        {
+          "target": {
+            "kind": "newtask"
+          },
+          "label": "New task"
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "result": {
+        "kind": "note",
+        "path": "notes/a.md",
+        "title": "A",
+        "action": "created"
+      },
+      "line": "Created a new note",
+      "notice": null
+    },
+    {
+      "result": {
+        "kind": "note",
+        "path": "notes/a.md",
+        "title": "A",
+        "action": "appended",
+        "summary": "added"
+      },
+      "line": "Appended to a note",
+      "notice": null
+    },
+    {
+      "result": {
+        "kind": "task",
+        "id": "t",
+        "title": "T",
+        "action": "created",
+        "summary": "skipped"
+      },
+      "line": "Created a new task",
+      "notice": "Saved without a summary: there was no text to write it from."
+    },
+    {
+      "result": {
+        "kind": "task",
+        "id": "t",
+        "title": "T",
+        "action": "appended",
+        "summary": "failed"
+      },
+      "line": "Added to a task",
+      "notice": "Saved without a summary: it couldn't be written."
+    }
+  ]
+}

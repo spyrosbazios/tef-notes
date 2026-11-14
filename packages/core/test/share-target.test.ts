@@ -12,6 +12,7 @@ describe("Android's form as a share", () => {
   it("finds the link in text, in title, or in url", () => {
     expect(fromPost({ ...none, text: U })).toEqual({ text: "", url: U, images: [], pdfs: [], title: null });
     expect(fromPost({ ...none, title: "A page", text: `A page\n${U}` })).toEqual({ text: "", url: U, images: [], pdfs: [], title: "A page" });
+    expect(fromPost({ ...none, title: "A page", text: U })).toEqual({ text: "", url: U, images: [], pdfs: [], title: "A page" });
     expect(fromPost({ ...none, text: `Look at this: ${U}.` })).toMatchObject({ url: U, text: `Look at this: ${U}.` });
     expect(fromPost({ ...none, title: U })).toMatchObject({ url: U, title: null });
     expect(fromPost({ ...none, url: U, text: "words" })).toMatchObject({ url: U, text: "words" });

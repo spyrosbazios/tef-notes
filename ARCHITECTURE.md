@@ -10,7 +10,8 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
 ```
  Web app     ─┐                          ┌─ PocketBase (collections, rev hook, jobs, routes) ─ pb_data/
  CLI         ─┼─ reverse proxy ─ HTTP ───┤        also serves the web app and the extension
- Clipper     ─┘  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
+ Clipper     ─┤  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
+ Companion   ─┘                                   /agent/companion/* (the Android app's widgets)
                                           └─ stt (python): speech to text, reached by the agent only
 ```
 
@@ -216,6 +217,7 @@ JS VM: a handler sees none of its file's top-level scope, so shared code is `req
 | `POST /api/tefnotes/tags/describe` | `tags.pb.js` | The model drafts a tag's description; returned, never saved (the hourly job below saves its own) |
 | `GET /api/tefnotes/link-preview?url=` | `link-preview.pb.js` | Page title, description and picture for link cards; cached in `link_previews` |
 | `POST /agent/chat`, `GET /agent/models`, `GET /agent/search` | `server/agent/` | The chat agent and its search by meaning (a separate process) |
+| `GET /agent/companion/hello`, `tasks`, `notes`; `POST /agent/companion/tasks`, `tasks/:id/done` | `server/agent/src/companion.ts` | What the native companion (`android/`) draws and its two writes: feeds ready to draw, in the owner's colours and under the lens on. Contract: `packages/core/src/companion.ts` |
 
 **Auto-tagger** (`autotag.pb.js`, `lib/autotag.js`). A cron that runs every minute asks JEV about notes not yet
 evaluated at their current `rev` and tag definitions, looking at up to 3 of a note's photos (`lib/images.js`). Every tag it

@@ -1,8 +1,9 @@
 name: Release
 
 # A tag vX.Y.Z on main is the release (CONTRIBUTING.md, Versioning): the tag is the repo's one version, read by
-# scripts/version.sh. This builds the extension zip and attaches it to a GitHub release whose notes are CHANGELOG.md's
-# section for the version. The server image is docker.yml's. The phone gets the web app installed from Chrome, so no APK.
+# scripts/version.sh. This builds the extension zip and the Android companion's APK and attaches them to a GitHub release
+# whose notes are CHANGELOG.md's section for the version. The server image is docker.yml's. The phone's app is the web app,
+# installed from Chrome; the APK is the optional companion beside it (android/README.md).
 on:
   push:
     tags: ["v*"]
@@ -60,9 +61,57 @@ jobs:
           path: tef-notes-extension-*.zip
           if-no-files-found: error
 
+  # The companion's APK, signed with the repository's own key: Android installs an update only over the same signature, so
+  # an APK signed with a runner's throwaway debug key would strand everyone who installed it. Without the signing key's
+  # four repository secrets (the keystore file as base64, its password, the key's alias and the key's password) no APK is
+  # attached, and the run says so.
+  android:
+    name: Android companion APK
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEF_NOTES_VERSION: ${{ needs.version.outputs.version }}
+      KEYSTORE_BASE64: ${{ secrets.TEF_NOTES_KEYSTORE_BASE64 }}
+    steps:
+      - id: key
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then echo "present=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::No signing key is set for this repository: this release has no Android APK"; fi
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.present
+      - uses: oven-sh/setup-bun@v2
+        if: steps.key.outputs.present
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-java@v6
+        if: steps.key.outputs.present
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Build
+        if: steps.key.outputs.present
+        working-directory: android
+        env:
+          TEF_NOTES_KEYSTORE: ${{ runner.temp }}/release.jks
+          TEF_NOTES_KEYSTORE_PASSWORD: ${{ secrets.TEF_NOTES_KEYSTORE_PASSWORD }}
+          TEF_NOTES_KEY_ALIAS: ${{ secrets.TEF_NOTES_KEY_ALIAS }}
+          TEF_NOTES_KEY_PASSWORD: ${{ secrets.TEF_NOTES_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$TEF_NOTES_KEYSTORE"
+          bun install --frozen-lockfile
+          ./gradle.sh --no-daemon testDebugUnitTest lintRelease assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/tef-notes-companion-$TEF_NOTES_VERSION.apk"
+      - uses: actions/upload-artifact@v7
+        if: steps.key.outputs.present
+        with:
+          name: android
+          path: tef-notes-companion-*.apk
+          if-no-files-found: error
+
   release:
     name: GitHub release
-    needs: [version, extension]
+    needs: [version, extension, android]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
