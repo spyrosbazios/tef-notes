@@ -86,6 +86,14 @@ class ContractTest {
     }
 
     @Test
+    fun theTagsRoutesAnswer() {
+        val t = clipTagsOf(JSONObject("""{"tags":[{"name":"work","p":0.91},{"name":"home","p":0},{"p":0.5}],"picked":["work"]}"""))
+        assertEquals(ClipTags(listOf(ScoredTag("work", 0.91), ScoredTag("home", 0.0)), listOf("work")), t)
+        assertEquals(ClipTags(emptyList(), emptyList()), clipTagsOf(JSONObject("{}")))
+        assertEquals("91%", percent(0.91))
+    }
+
+    @Test
     fun theServersAddress() {
         assertEquals("https://notes.example.ts.net", serverAddress(" Notes.Example.ts.net/ "))
         assertEquals("https://notes.example.ts.net:8443", serverAddress("https://notes.example.ts.net:8443/today?t=1"))

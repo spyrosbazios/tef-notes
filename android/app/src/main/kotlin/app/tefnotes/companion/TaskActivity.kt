@@ -28,7 +28,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class TaskActivity : ComponentActivity() {
     private var title by mutableStateOf("")
@@ -82,8 +84,8 @@ class TaskActivity : ComponentActivity() {
         }
     }
 
-    private fun later(): String {
-        Outbox.addTask(this, title.trim(), list)
+    private suspend fun later(): String {
+        withContext(Dispatchers.IO) { Outbox.addTask(this@TaskActivity, title.trim(), list) }
         return "Saved. It is added when the server is reachable"
     }
 

@@ -20,6 +20,7 @@ import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
@@ -46,9 +47,11 @@ import app.tefnotes.companion.Api
 import app.tefnotes.companion.Look
 import app.tefnotes.companion.OpenActivity
 import app.tefnotes.companion.R
+import app.tefnotes.companion.Refused
 import app.tefnotes.companion.SettingsActivity
 import app.tefnotes.companion.Store
 import app.tefnotes.companion.Sync
+import app.tefnotes.companion.Unreachable
 import app.tefnotes.companion.withoutTask
 
 object Keys {
@@ -64,29 +67,32 @@ object Widgets {
     private suspend fun tasks(context: Context) = GlanceAppWidgetManager(context).getGlanceIds(TasksWidget::class.java)
     private suspend fun notes(context: Context) = GlanceAppWidgetManager(context).getGlanceIds(NotesWidget::class.java)
 
-    /** Every widget's feed read again. A task ticked on a widget and not yet sent stays out of what is drawn. */
+    /** A feed asked for; null when the server couldn't be reached or refused. */
+    private suspend fun read(ask: suspend () -> String): String? = try { ask() } catch (_: Unreachable) { null } catch (_: Refused) { null }
+
+    /** One widget given its feed, or, with none, left as it is and marked as maybe old. A widget removed meanwhile is
+     *  passed over: the others still get theirs. */
+    private suspend fun show(context: Context, id: GlanceId, widget: GlanceAppWidget, feed: String?) {
+        try {
+            updateAppWidgetState(context, id) { if (feed != null) it[Keys.Feed] = feed; it[Keys.Stale] = feed == null }
+            widget.update(context, id)
+        } catch (_: IllegalArgumentException) { }
+    }
+
+    /** Every widget's feed read again, each on its own: one that can't be read leaves the others fresh. A task ticked on
+     *  a widget and not yet sent stays out of what is drawn. */
     suspend fun refresh(context: Context, api: Api) {
         val ticked = Store.ticks(context)
-        val lists = mutableMapOf<String, String>()
+        val lists = mutableMapOf<String, String?>()
         for (id in tasks(context)) {
-            val list = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[Keys.List] ?: "today"
-            val feed = lists.getOrPut(list) { ticked.fold(api.tasks(list), ::withoutTask) }
-            updateAppWidgetState(context, id) { it[Keys.Feed] = feed; it[Keys.Stale] = false }
-            TasksWidget().update(context, id)
+            val list = try { getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[Keys.List] ?: "today" } catch (_: IllegalArgumentException) { continue }
+            if (list !in lists) lists[list] = read { ticked.fold(api.tasks(list), ::withoutTask) }
+            show(context, id, TasksWidget(), lists[list])
         }
         val ids = notes(context)
         if (ids.isEmpty()) return
-        val feed = api.notes()
-        for (id in ids) {
-            updateAppWidgetState(context, id) { it[Keys.Feed] = feed; it[Keys.Stale] = false }
-            NotesWidget().update(context, id)
-        }
-    }
-
-    /** The server couldn't be reached: each widget keeps what it has, and says it may be old. */
-    suspend fun stale(context: Context) {
-        for (id in tasks(context)) { updateAppWidgetState(context, id) { it[Keys.Stale] = true }; TasksWidget().update(context, id) }
-        for (id in notes(context)) { updateAppWidgetState(context, id) { it[Keys.Stale] = true }; NotesWidget().update(context, id) }
+        val feed = read { api.notes() }
+        for (id in ids) show(context, id, NotesWidget(), feed)
     }
 
     /** A task ticked on one widget leaves them all at once, before the server has heard. */

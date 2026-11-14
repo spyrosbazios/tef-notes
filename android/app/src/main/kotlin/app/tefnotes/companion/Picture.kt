@@ -12,7 +12,7 @@ import android.util.Base64
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
-import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -39,9 +39,9 @@ suspend fun readPicture(context: Context, uri: Uri): Picture? = withContext(Disp
         val to = lookSize(full.width, full.height)
         val small = flat.scale(to.width, to.height)
         Picture(jpeg(flat, STORED_QUALITY), Base64.encodeToString(jpeg(small, LOOK_QUALITY), Base64.NO_WRAP), small)
-    } catch (_: IOException) {
-        null
-    } catch (_: SecurityException) {
-        null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null          // whatever the other app's provider threw, there is no picture to show for it
     }
 }

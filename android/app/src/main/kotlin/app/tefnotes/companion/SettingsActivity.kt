@@ -141,7 +141,7 @@ class SettingsActivity : ComponentActivity() {
         for (entry in waiting) Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(entry.what, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-                entry.refused?.let { Text("The server refused it: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                entry.refused?.let { Text("Not sent: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
             if (entry.refused != null) TextButton({ Outbox.discard(entry); waiting = Outbox.list(this@SettingsActivity) }) { Text("Discard") }
         }

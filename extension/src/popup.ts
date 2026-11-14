@@ -11,7 +11,7 @@
 // Enter or Space picks, Ctrl/Cmd+Enter in the title or note saves to the top option, Escape closes.
 import "virtual:tefnotes-theme.css";
 import "./ui.css";
-import { type Choice, choices, type ClipResult, type ClipTags, describe, type Suggestions, summaryNotice, type Target, titled } from "@/core/clip";
+import { type Choice, choices, type ClipResult, type ClipTags, describe, type Suggestions, summaryNotice, type Target, titled, unpickedTags } from "@/core/clip";
 import { type Page, readTab, save, SetupError, suggest, tagsFor } from "./clip";
 import { take } from "./handoff";
 import { draw, icon, mark } from "./icons";
@@ -82,8 +82,6 @@ function drawPage(page: Page) {
   pageBox.replaceChildren(draw(icon.page, 16), text);
 }
 
-/** Offered beside the picked chips: a tag JEV gives at least this chance that is not picked. */
-const OFFER = 0.3;
 const tags: { all: ClipTags["tags"]; picked: string[]; touched: boolean; asking: number; state: "busy" | "ready" | "fail" } =
   { all: [], picked: [], touched: false, asking: 0, state: "busy" };
 
@@ -114,9 +112,8 @@ function drawTags() {
     s.textContent = tags.state === "fail" ? "Couldn't tag the page. Add tags below." : "No tags.";
     tagsBox.replaceChildren(s);
   } else tagsBox.replaceChildren(...tags.picked.map((t) => chip(t, "on")));
-  const rest = tags.all.filter((t) => !tags.picked.includes(t.name));
-  offeredBox.replaceChildren(...rest.filter((t) => t.p >= OFFER).map((t) => chip(t.name, "offer", `${Math.round(t.p * 100)}%`)));
-  const more = rest.filter((t) => t.p < OFFER).map((t) => t.name).sort((a, b) => a.localeCompare(b));
+  const { offered, more } = unpickedTags(tags.all, tags.picked);
+  offeredBox.replaceChildren(...offered.map((t) => chip(t.name, "offer", `${Math.round(t.p * 100)}%`)));
   const first = new Option("Add a tag…", "");
   first.disabled = true;
   addTag.replaceChildren(first, ...more.map((n) => new Option(n, n)));

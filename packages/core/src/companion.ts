@@ -6,8 +6,8 @@
 // lets a second one be written in another language without a second copy of the rules.
 //
 // What a companion does copy is small, and checked: how a share reads as a clip (`shareClip`), the sizes a picture is
-// sent at (photos.ts `fit`, `lookSize`), the choices a clip offers and what its save says (clip.ts `choices`, `describe`,
-// `summaryNotice`). They run before the server is reached, or beside its answer. test/companion-cases.json holds the
+// sent at (photos.ts `fit`, `lookSize`), the choices a clip offers, its tags and what its save says (clip.ts `choices`,
+// `unpickedTags`, `savedTags`, `describe`, `summaryNotice`). They run before the server is reached, or beside its answer. test/companion-cases.json holds the
 // cases; this core's tests and each companion's run the same file.
 //
 // Routes, all under /agent/companion (server/agent/src/companion.ts), errors `{error}`:

@@ -56,6 +56,21 @@ class CasesTest {
         same(c.getJSONArray("choices"), made, c.getString("name"))
     }
 
+    private fun JSONArray.strings() = (0 until length()).map { getString(it) }
+    private fun JSONArray.scored() = (0 until length()).map { getJSONObject(it).let { t -> ScoredTag(t.getString("name"), t.getDouble("p")) } }
+
+    @Test
+    fun theTagsNotPicked() = each("tags") { c ->
+        val u = unpickedTags(c.getJSONArray("all").scored(), c.getJSONArray("picked").strings())
+        assertEquals(c.getString("name"), c.getJSONArray("offered").scored(), u.offered)
+        assertEquals(c.getString("name"), c.getJSONArray("more").strings(), u.more)
+    }
+
+    @Test
+    fun theTagsASaveSends() = each("saved") { c ->
+        assertEquals(c.getJSONArray("tags").strings(), savedTags(c.getJSONArray("picked").strings(), c.getJSONArray("made").strings()))
+    }
+
     @Test
     fun whatASaveSays() = each("results") { c ->
         val r = clipResultOf(c.getJSONObject("result"))

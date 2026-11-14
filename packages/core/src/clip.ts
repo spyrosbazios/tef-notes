@@ -55,6 +55,21 @@ export const saveBody = (page: ClipPage, line: string | undefined, target: Targe
  *  the ones preselected (every sure one, else the best likely one). The owner's choice goes back as the save's `tags`. */
 export type ClipTags = { tags: { name: string; p: number }[]; picked: string[] };
 
+/** Offered beside the picked tags: one JEV gives at least this chance. */
+export const TAG_OFFER = 0.3;
+
+/** The tags not picked, as the owner is shown them: `offered` the likely ones, best first as the route sent them, to add
+ *  with a tap; `more` every other defined tag by name, for a list. */
+export function unpickedTags(all: ClipTags["tags"], picked: readonly string[]): { offered: ClipTags["tags"]; more: string[] } {
+  const rest = all.filter((t) => !picked.includes(t.name));
+  return { offered: rest.filter((t) => t.p >= TAG_OFFER), more: rest.filter((t) => t.p < TAG_OFFER).map((t) => t.name).sort((a, b) => a.localeCompare(b)) };
+}
+
+/** The tags a save sends: the owner's picks, then `made` (what the lens on tags a new note or task with, share.ts
+ *  `clipTags`), each once, ignoring case. */
+export const savedTags = (picked: readonly string[], made: readonly string[]): string[] =>
+  [...picked, ...made].filter((t, i, all) => all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i);
+
 /** Whether a save sends the picture's bytes: a clip of a picture to a note, a new note or a new task, never to an
  *  existing task. */
 export const sendsFile = (page: ClipPage, target: Target) => !!page.image && target.kind !== "task";

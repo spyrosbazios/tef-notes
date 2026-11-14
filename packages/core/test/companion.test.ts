@@ -1,6 +1,6 @@
 // The native companion's feeds (src/companion.ts): rows worked out here, so a companion only draws them.
 import { describe, expect, it } from "bun:test";
-import { choices, describe as describeResult, summaryNotice, type ClipResult, type Suggestions } from "../src/clip";
+import { choices, describe as describeResult, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
 import { DEFAULT_LOOK, FEED_LIMITS, helloOf, newTaskOf, notesFeed, ownerLook, shareClip, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
@@ -122,6 +122,11 @@ describe("the rules a companion copies", () => {
   });
   for (const c of cases.choices as unknown as { name: string; suggestions: Suggestions; picture: boolean; choices: unknown }[])
     it(`the choices: ${c.name}`, () => expect(choices(c.suggestions, c.picture)).toEqual(c.choices as ReturnType<typeof choices>));
+  for (const c of cases.tags as { name: string; all: ClipTags["tags"]; picked: string[]; offered: ClipTags["tags"]; more: string[] }[])
+    it(`the tags not picked: ${c.name}`, () => expect(unpickedTags(c.all, c.picked)).toEqual({ offered: c.offered, more: c.more }));
+  it("the tags a save sends: the picks, then what the lens tags, each once", () => {
+    for (const c of cases.saved) expect(savedTags(c.picked, c.made)).toEqual(c.tags);
+  });
   it("what a save says", () => {
     for (const c of cases.results as unknown as { result: ClipResult; line: string; notice: string | null }[]) {
       expect(describeResult(c.result)).toBe(c.line);

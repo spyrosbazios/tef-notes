@@ -413,5 +413,120 @@
       "line": "Added to a task",
       "notice": "Saved without a summary: it couldn't be written."
     }
+  ],
+  "tags": [
+    {
+      "name": "the likely ones offered best first, the rest by name",
+      "all": [
+        {
+          "name": "work",
+          "p": 0.9
+        },
+        {
+          "name": "home",
+          "p": 0.4
+        },
+        {
+          "name": "ideas",
+          "p": 0.3
+        },
+        {
+          "name": "Zeta",
+          "p": 0.1
+        },
+        {
+          "name": "alpha",
+          "p": 0.29
+        }
+      ],
+      "picked": [
+        "work"
+      ],
+      "offered": [
+        {
+          "name": "home",
+          "p": 0.4
+        },
+        {
+          "name": "ideas",
+          "p": 0.3
+        }
+      ],
+      "more": [
+        "alpha",
+        "Zeta"
+      ]
+    },
+    {
+      "name": "a picked tag is in neither, however unlikely",
+      "all": [
+        {
+          "name": "work",
+          "p": 0.9
+        },
+        {
+          "name": "home",
+          "p": 0.05
+        }
+      ],
+      "picked": [
+        "home",
+        "work"
+      ],
+      "offered": [],
+      "more": []
+    },
+    {
+      "name": "nothing scored: every tag in the list",
+      "all": [
+        {
+          "name": "b",
+          "p": 0
+        },
+        {
+          "name": "a",
+          "p": 0
+        }
+      ],
+      "picked": [],
+      "offered": [],
+      "more": [
+        "a",
+        "b"
+      ]
+    }
+  ],
+  "saved": [
+    {
+      "picked": [
+        "work",
+        "Ideas"
+      ],
+      "made": [
+        "ideas"
+      ],
+      "tags": [
+        "work",
+        "Ideas"
+      ]
+    },
+    {
+      "picked": [],
+      "made": [
+        "work"
+      ],
+      "tags": [
+        "work"
+      ]
+    },
+    {
+      "picked": [
+        "a"
+      ],
+      "made": [],
+      "tags": [
+        "a"
+      ]
+    }
   ]
 }
