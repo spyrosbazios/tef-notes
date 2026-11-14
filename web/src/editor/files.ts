@@ -3,12 +3,15 @@
 // like any link, and a tap on it hands the href to the caller (which opens the file) instead of placing the cursor.
 // A drawing's chip sits under the drawing itself, the PNG kept beside it, shown full width when the page can show it; a
 // PDF's under its first page, the server's picture of it (`pdfPage`), with its page count (`pdfPages`) on it once known:
-// so the note reads like the document, or shows the diagram, not an icon of it.
+// so the note reads like the document, or shows the diagram, not an icon of it. That picture carries a Delete button on its
+// corner, as a photo does (./views): a tap takes the link out of the note.
 import type { Mark, Node } from "prosemirror-model";
+import type { EditorView } from "prosemirror-view";
 import { Plugin } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import { attachmentLink, drawingPreview, isDrawing, isPdf } from "@/core/photos";
 import { schema } from "./markdown";
+import { cornerDelete, onCornerDelete } from "./views";
 import type { ResolveImage } from "./views";
 
 export const FILE_CHIP = "file-chip", DRAWING_CHIP = "drawing-chip", DRAWING_PAGE = "drawing-page", PDF_PAGE = "pdf-page", PDF_COUNT = "pdf-count";
@@ -46,16 +49,28 @@ function thumb(url: string, href: string, label: string) {
   return img;
 }
 
+/** Take the file link starting at `from` out of the note: every run of text under that same link. */
+function removeLink(view: EditorView, from: number | undefined, href: string) {
+  if (view.isDestroyed || from === undefined) return;
+  const $from = view.state.doc.resolve(from), block = $from.parent;
+  let to = from;
+  for (let i = $from.index(); i < block.childCount; i++) {
+    if (schema.marks.link.isInSet(block.child(i).marks)?.attrs.href !== href) break;
+    to += block.child(i).nodeSize;
+  }
+  if (to > from) view.dispatch(view.state.tr.delete(from, to));
+}
+
 /** A PDF's first page, its page count on its corner once `count` answers, or a drawing (`className` DRAWING_PAGE). A picture
  *  that can't be had (yet) goes: just the chip. */
-function page(url: string, href: string, label: string, count: Promise<number | null> | undefined, className = PDF_PAGE) {
+function page(url: string, href: string, label: string, count: Promise<number | null> | undefined, remove: () => void, className = PDF_PAGE) {
   const box = document.createElement("span");
   box.className = className;
   box.contentEditable = "false";
   box.dataset.href = href;
   const img = thumb(url, href, label);
   img.onerror = () => box.remove();
-  box.append(img);
+  box.append(img, cornerDelete(className === PDF_PAGE ? "Delete the PDF from the note" : "Delete the drawing from the note", remove));
   count?.then((n) => {
     if (!n) return;
     const tag = document.createElement("span");
@@ -77,9 +92,9 @@ function chips(doc: Node, resolve: ResolveImage, pdfPage: PdfPage | undefined, c
         const href: string = run.mark.attrs.href, label = doc.textBetween(run.from, run.to);
         out.push(Decoration.inline(run.from, run.to, { class: kindOf(href) ?? FILE_CHIP, "data-href": href }));
         const url = isDrawingLink(href) ? resolve(drawingPreviewSrc(href)) : null;
-        if (url) out.push(Decoration.widget(run.from, () => page(url, href, label, undefined, DRAWING_PAGE), { side: -1, key: `drawing\n${url}`, ignoreSelection: true }));
+        if (url) out.push(Decoration.widget(run.from, (view, getPos) => page(url, href, label, undefined, () => removeLink(view, getPos(), href), DRAWING_PAGE), { side: -1, key: `drawing\n${url}`, ignoreSelection: true, stopEvent: onCornerDelete }));
         const first = isPdfLink(href) ? pdfPage?.(href) : null;
-        if (first) out.push(Decoration.widget(run.from, () => page(first, href, label, counted(href)), { side: -1, key: `page\n${first}`, ignoreSelection: true }));
+        if (first) out.push(Decoration.widget(run.from, (view, getPos) => page(first, href, label, counted(href), () => removeLink(view, getPos(), href)), { side: -1, key: `page\n${first}`, ignoreSelection: true, stopEvent: onCornerDelete }));
       }
       run = null;
     };

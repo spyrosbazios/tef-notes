@@ -206,14 +206,14 @@
      the viewport (a tall one never needs more than the screen), rounded as the read view's are. A tap or click opens it. */
   .pm-editor .pm-image { @apply my-0.5 inline-block max-w-full align-top leading-none; }
   .pm-editor .pm-image img { @apply block h-auto w-auto max-w-full cursor-zoom-in rounded-xl object-contain; max-height: min(70vh, 125vw); }
-  /* Its Delete button (src/editor/views.ts): a round trash on the top right corner. Always there on a touch screen; with a
-     mouse, only while the pointer is on the photo. */
-  .pm-editor .pm-image { @apply relative; }
-  .pm-editor .pm-image-delete { @apply absolute right-1.5 top-1.5 flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-line bg-card text-dim shadow-sm transition hover:border-destructive/40 hover:text-destructive focus-visible:outline-2 focus-visible:outline-brand/60; }
-  .pm-editor .pm-image-delete::before { content: ""; @apply block size-4 shrink-0 bg-current; mask: var(--tool-icon) center / contain no-repeat; }
+  /* The Delete button on a picture's corner (src/editor/views.ts `cornerDelete`): a photo's, a PDF's first page's, a drawing's.
+     A round trash, top right. Always there on a touch screen; with a mouse, only while the pointer is on the picture. */
+  .pm-editor :is(.pm-image, .pdf-page, .drawing-page) { @apply relative; }
+  .pm-editor .pm-corner-delete { @apply absolute right-1.5 top-1.5 flex size-8 cursor-pointer select-none items-center justify-center rounded-full border border-line bg-card text-dim shadow-sm transition hover:border-destructive/40 hover:text-destructive focus-visible:outline-2 focus-visible:outline-brand/60; }
+  .pm-editor .pm-corner-delete::before { content: ""; @apply block size-4 shrink-0 bg-current; mask: var(--tool-icon) center / contain no-repeat; }
   @media (hover: hover) {
-    .pm-editor .pm-image-delete { @apply opacity-0; }
-    .pm-editor .pm-image:hover .pm-image-delete, .pm-editor .pm-image-delete:focus-visible { @apply opacity-100; }
+    .pm-editor .pm-corner-delete { @apply opacity-0; }
+    .pm-editor :is(.pm-image, .pdf-page, .drawing-page):hover .pm-corner-delete, .pm-editor .pm-corner-delete:focus-visible { @apply opacity-100; }
   }
   .pm-editor .pm-image-missing { @apply flex min-h-24 w-56 max-w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line px-3 py-4 text-faint text-xs leading-snug; }
   .pm-editor .pm-image-missing::before {
@@ -261,7 +261,7 @@
   .pm-editor a[data-note] { @apply cursor-pointer hover:decoration-2; }
   /* A link's Copy, Read, Summary and Delete buttons (src/editor/link-tools.ts), after the link in the prose and on its card: small
      pills, quiet until hovered so a note's prose stays prose. The icon is lucide's (book-open, sparkles) as a mask; the trash is
-     a photo's Delete button's too. */
+     a picture's corner Delete button's too. */
   .pm-editor .pm-link-tools { @apply mx-1 inline-flex gap-1 align-[1px]; }
   .pm-editor .pm-link-tool {
     @apply inline-flex cursor-pointer select-none items-center gap-1 whitespace-nowrap rounded-full border border-line bg-card px-2 py-px font-sans text-xs font-medium leading-5 text-dim transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand focus-visible:outline-2 focus-visible:outline-brand/60 disabled:cursor-default;
