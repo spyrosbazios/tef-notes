@@ -76,7 +76,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const drawing = useOpened(n.note.id);     // the drawing open over the note, the owner's or the agent's (hooks/drawing.ts)
   const scroller = useRef<HTMLDivElement>(null);
   const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text
-  const title = useRef<HTMLInputElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
+  const title = useRef<HTMLTextAreaElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
   const addFiles = useAddFiles(n.note.id);
   const note = n.note;
 
@@ -197,9 +197,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
       <div className="relative min-h-0 flex-1">
       <div ref={scroller} data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
-          <input ref={title} value={d.title} onChange={(e) => d.setTitle(e.target.value)} aria-label="Title" placeholder="Title"
+          <textarea ref={title} rows={1} value={d.title} onChange={(e) => d.setTitle(e.target.value.replace(/\s*\n\s*/g, " "))} aria-label="Title" placeholder="Title"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
-            className="w-full bg-transparent font-extrabold text-3xl tracking-tight outline-none placeholder:text-faint" />
+            className="field-sizing-content block w-full resize-none break-words bg-transparent font-extrabold text-3xl leading-tight tracking-tight outline-none placeholder:text-faint" />
           <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-faint">
             {note.archived ? <span className="flex items-center gap-1"><Archive className="size-3" /> Archived</span> : null}
             <span className="tabular-nums">{note.created}</span>
