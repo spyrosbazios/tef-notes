@@ -36,10 +36,20 @@ export const COMPANION_APP = "tefnotes";
 
 // ---- the look
 
-/** The owner's colours: the palette of their theme with their accent, or the lens's when one is on (#rrggbb each). */
-export type Look = Palette & { scheme: Theme["scheme"] };
+/** The owner's colours: the palette of their theme with their accent, or the lens's when one is on (#rrggbb each), and
+ *  the three washes a companion's own sheets are drawn with (theme.ts's tints, as #rrggbbaa): `muted` a quiet fill,
+ *  `soft` the brand's wash under something chosen, `scrim` what dims the screen under a sheet. */
+export type Look = Palette & { scheme: Theme["scheme"]; muted: string; soft: string; scrim: string };
 
-export const lookOf = (t: Theme): Look => ({ scheme: t.scheme, ...t.C });
+/** `rgba(r, g, b, a)`, as theme.ts writes a tint, as #rrggbbaa: a form every platform reads. */
+export function hex8(rgba: string): string {
+  const m = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(rgba);
+  if (!m) throw new Error(`Not a tint: ${rgba}`);
+  return `#${[+m[1], +m[2], +m[3], Math.round(+m[4] * 255)].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+}
+
+export const lookOf = (t: Theme): Look =>
+  ({ scheme: t.scheme, ...t.C, muted: hex8(t.TINT.muted), soft: hex8(t.TINT["brand-soft"]), scrim: hex8(t.TINT.scrim) });
 
 /** The look the web app has now: the lens's theme and accent over the owner's own. */
 export const ownerLook = (prefs: Pick<Prefs, "theme" | "accent">, lens: Lens | null): Look =>
