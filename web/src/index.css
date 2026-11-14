@@ -178,6 +178,17 @@
   .md th, .md td { @apply border border-line px-2 py-1; }
   .md img { @apply rounded-xl max-w-full max-h-[480px]; }
 
+  /* A list's peek at a note (components/peek.tsx): the same prose, small and tight, clamped by its container */
+  .md.peek { @apply text-[13px] leading-snug text-inherit; }
+  .md.peek > * + * { @apply mt-1; }
+  .md.peek :is(h1, h2, h3, h4, h5, h6) { @apply mt-1.5 text-[13px] font-semibold first:mt-0; }
+  .md.peek .peek-link { @apply text-brand; }
+  .md.peek li.task-list-item { @apply gap-1.5; }
+  .md.peek input[type="checkbox"] { @apply pointer-events-none mt-[2px] size-3.5; }
+  .md.peek :is(pre, code) { @apply text-[12px]; }
+  .md.peek pre { @apply rounded-lg p-2; }
+  .md.peek table { @apply text-[12px]; }
+
   /* The editor (src/editor): the same prose as above, drawn live in a contenteditable. ProseMirror's own rules first. */
   .pm-editor { @apply relative min-h-[40vh] outline-none whitespace-pre-wrap break-words; font-variant-ligatures: none; }
   .pm-editor pre { @apply whitespace-pre-wrap; }

@@ -13,13 +13,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject }
 import { between, toggled } from "@/core/bulk";
 import { groupNotes } from "@/core/note-groups";
 import { NOTE_SORT_LABEL, NOTE_SORTS, sortNotes, type NoteSort } from "@/core/note-sort";
-import { fold, snippetOf } from "@/core/notes";
+import { previewOf } from "@/core/agent";
+import { fold } from "@/core/notes";
 import { matchesTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { BulkBar, DeleteDialog, TagsDialog, TileMenu } from "@/components/note-actions";
 import { NoteGroup } from "@/components/note-groups";
 import { Loaded } from "@/components/loaded";
 import { Masonry } from "@/components/masonry";
+import { Peek } from "@/components/peek";
 import { TagBadge } from "@/components/tag-badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -74,7 +76,7 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
   /** A hold or right-click, given where, in place of the tile's own menu (search's menu sits at the finger). */
   onHold?: (at: { x: number; y: number }) => void;
 }) {
-  const snippet = useMemo(() => why || snippetOf(n.note.body, 280), [why, n.note.body]);
+  const peek = useMemo(() => (why ? "" : previewOf(n.note.body, n.note.title)), [why, n.note.body, n.note.title]);
   const [ref, pictures, more] = useNotePictures<HTMLDivElement>(n.note.id, n.note.body);
   const [menu, setMenu] = useState(false);
   const phone = useNarrow(), touch = useTouch();
@@ -112,7 +114,8 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
       <Mosaic sources={pictures} more={more} className={pictures.length > 2 ? "h-44" : "h-32"} />
       <div className="flex flex-col gap-1.5 p-3">
         <h3 className="line-clamp-2 font-semibold text-[15px] leading-snug">{n.note.title}</h3>
-        {snippet ? <p className={cn("line-clamp-6 text-[13px] leading-snug", why ? "" : tint ? "opacity-85" : "text-dim")}>{why ? <Sparkles className="mr-1 inline size-3 opacity-70" /> : null}{snippet}</p> : null}
+        {why ? <p className="line-clamp-6 text-[13px] leading-snug"><Sparkles className="mr-1 inline size-3 opacity-70" />{why}</p>
+          : peek ? <Peek md={peek} className={cn("line-clamp-6 overflow-hidden", tint ? "opacity-85" : "text-dim")} /> : null}
         {n.note.tags.length ? (
           <span className="flex flex-wrap gap-1 max-md:[&>*:nth-child(n+3)]:hidden">
             {n.note.tags.map((t) => <TagBadge key={t} name={t} onClick={() => onTag(t)} />)}
