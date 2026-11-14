@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-11 -->
+<!-- reviewed: 2026-11-15 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -32,6 +32,8 @@ of it is the only gate.
 - Memory for voice input: about 650 MB free while a clip is transcribed (the model is unloaded after the idle time set in
   the app). The model (~460 MB) is downloaded from huggingface.co on first use into the `stt_data` volume, so the host
   needs to reach it once; without voice input, nothing is downloaded (see Voice input).
+- Scanned PDFs are read by Tesseract inside the agent: its language data (a few MB a language) is downloaded from
+  raw.githubusercontent.com on first use into the `agent_data` volume (see Scanned PDFs).
 - To build from source, or the extension: BuildKit (the signing key is a build secret) and the whole repository cloned,
   because the build context is the repo root (the web app, extension and agent share `packages/core` and `assets/`).
 - bun, only to run the tests (see Development).
@@ -40,7 +42,7 @@ of it is the only gate.
 
 ```sh
 cd server
-cp .env.example .env              # then edit it: at least TZ
+cp .env.example .env              # then edit it: at least TZ, and TEF_NOTES_OCR if your scanned PDFs aren't in English
 mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<TEF_NOTES_PROVIDER> for another model provider
 # put each provider's key, alone, in keys/<provider>/api-key (see AI providers); all optional
 docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes, tef-notes-agent and tef-notes-stt
@@ -53,6 +55,7 @@ The superuser is for the admin UI at `/_/`; the apps themselves need no account.
 curl -s http://localhost:8097/api/health          # PocketBase is up
 curl -s http://localhost:8097/ | grep '<title>'   # the web app, same origin
 curl -s http://localhost:8098/agent/models        # the agent; "available": true when the provider's key is read
+curl -s http://localhost:8098/agent/ocr           # scanned PDFs: "on": true and the languages they are read in
 ```
 
 Use your proxy's origin instead of `localhost` to test the path the clients take.
@@ -80,6 +83,7 @@ result.
 | `TEF_NOTES_LLM_URL` | the provider's | Its API root, e.g. another Qwen region. |
 | `TEF_NOTES_OLLAMA_URL` | | Ollama only: where it serves (`http://host.docker.internal:11434` for one on the Docker host). |
 | `TEF_NOTES_STT` | `http://stt:8099` | Where the agent reaches the speech-to-text service for voice input. Set it empty (`TEF_NOTES_STT=`) to turn voice input off: the apps hide their mic and the routes answer 404. |
+| `TEF_NOTES_OCR` | `eng` | The languages scanned PDFs are read in: Tesseract's codes joined by `+`, the main one first (`ell+eng`, `deu+eng`). Set it empty (`TEF_NOTES_OCR=`) to turn it off. See Scanned PDFs. |
 
 Deployment-specific additions (labels for a dashboard, extra networks, resource limits) go in
 `docker-compose.override.yml`, which Compose merges over the base file on its own and git ignores. Copy
@@ -154,6 +158,46 @@ The image is `ghcr.io/spyrosbazios/tef-notes-stt` (amd64 and arm64), published w
 source it is `stt/Dockerfile`, built by `docker-compose.build.yml` like the rest. Contract: `packages/core/src/voice.ts`;
 the agent's half: `agent/src/transcribe.ts`.
 
+## Scanned PDFs
+
+A PDF page with no text of its own (a scan, a photo of a page) is read by [Tesseract](https://github.com/tesseract-ocr/tesseract)
+in the agent, so the assistant can read it (`read_attachment`, the open note's first pages) and search by meaning finds
+its note. Nothing leaves the server, and there is nothing to set up beyond the languages:
+
+```sh
+# server/.env: the languages your scanned documents are in, the main one first
+TEF_NOTES_OCR=ell+eng             # Greek and English; deu+eng, fra, spa+eng, chi_sim ... (default: eng)
+docker compose up -d
+```
+
+The codes are Tesseract's, three letters each: [every language it has](https://tesseract-ocr.github.io/tessdoc/Data-Files-in-different-versions.html).
+Name each language your documents use: a page is read with all of them at once, and a language left out comes back as
+wrong letters.
+
+- **Check it**: `docker compose logs agent | grep scanned` says `agent: scanned PDFs are read by Tesseract (ell+eng)`,
+  or why not (a code Tesseract doesn't have, a download that failed). `curl -s http://localhost:8098/agent/ocr` answers
+  `{"on":true,"languages":["ell","eng"],"read":57,"waiting":0,"failedPages":0,"failedPdfs":0,"problem":""}`: pages
+  read, pages still to read, pages and PDFs that couldn't be (a PDF that wants a password can't), and the last failure.
+- **First use downloads each language's data** (`<code>.traineddata`, a few MB) from raw.githubusercontent.com, pinned
+  to one commit of [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast), into the `agent_data` volume under
+  `tessdata/`. A server with no way out: put the files there yourself.
+- **It works in the background**, a page at a time on one core at low priority: every minute the agent looks for PDFs
+  attached since and reads the scanned pages among each one's first 50 (what search indexes); a later page is read when
+  the assistant asks for it, and a page the assistant is waiting for goes ahead of the rest. On a 4-core N100 a page
+  takes 1 to 5 seconds. The first start after an upgrade reads the PDFs you already have.
+- **What it reads well**: printed pages scanned flat. A photo of a page, a faint copy and handwriting come out poorly;
+  the assistant is told which pages are OCR's and which of those read poorly, so it can say so instead of guessing.
+- **What it keeps**: the text it read, in `ocr.sqlite` in the `agent_data` volume. It is derived: deleting it costs one
+  re-read, and a PDF deleted from its note takes its text along within a minute.
+- **Changing the languages** reads every scanned page again, in the new ones.
+- **Turning it off**: `TEF_NOTES_OCR=` (empty) in `.env`, then `docker compose up -d`. A scanned PDF then has no text
+  for the assistant or search, as a PDF the agent can't open has.
+- **Not read**: photos (the assistant looks at a picture itself), and a PDF attached to a chat message rather than to a
+  note (file it in a note first).
+
+The agent's half: `agent/src/ocr.ts` (the queue and what was read), `agent/src/ocr-run.ts` (the process that draws a
+page and runs Tesseract), `agent/src/pdfs.ts` (which pages are scans).
+
 ## The write contract
 
 Every write to a note or task carries the `rev` it was based on, and `pb_hooks/rev.pb.js` refuses it if the
@@ -175,6 +219,7 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `POST` | `/agent/chat` | Streams a chat turn (the agent sidecar, not PocketBase). |
 | `GET` | `/agent/models` | Lists the provider's models and whether its key is present (the agent sidecar). |
 | `POST` | `/agent/transcribe?keep=S` | Voice input: raw mono 16 kHz float32 samples in, `{ text }` out, through the `stt` service; the model stays loaded `S` seconds once idle. `/agent/transcribe/warm?keep=S` loads it ahead. 404 without `TEF_NOTES_STT`. Contract: `packages/core/src/voice.ts`. |
+| `GET` | `/agent/ocr` | Scanned PDFs: whether they are read, in which languages, pages read and waiting, what failed (the agent sidecar; see Scanned PDFs). |
 | `GET` | `/agent/push/key` | `{ publicKey }` a browser subscribes to push with; 404 while push is off (the agent sidecar). |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Stores a browser's `PushSubscription` (and a `label`), the same endpoint again replacing it, a new one beyond 20 devices a 409; `DELETE` takes `{ endpoint }`. Shapes: `packages/core/src/push.ts`. |
 | `GET` | `/agent/companion/hello`, `/agent/companion/tasks?list=`, `/agent/companion/notes` | What the native companion (`android/`) draws: the owner's colours, a task list and the notes, ready to draw, under the lens on. Contract: `packages/core/src/companion.ts`. |
@@ -201,10 +246,11 @@ cd server
 docker compose pull                         # the release in TEF_NOTES_VERSION (default: the latest)
 docker compose up -d                        # recreates what changed: web, hooks, migrations, the agent
 docker compose logs --tail 20 pocketbase    # migrations applied, no hook errors
-docker compose logs --tail 20 agent         # "agent: listening", no "not saved" lines
+docker compose logs --tail 20 agent         # "agent: listening", "agent: scanned PDFs are read by Tesseract (...)", no "not saved" lines
 docker compose logs --tail 20 stt           # "stt: listening on 8099"; after a first dictation, "stt: loaded ..."
 curl -s http://localhost:8097/api/health
 curl -s http://localhost:8098/agent/models
+curl -s http://localhost:8098/agent/ocr     # "on": true; "waiting" falls to 0 as the scanned pages are read
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary '' http://localhost:8098/agent/transcribe   # 200: voice input on
 ```
 

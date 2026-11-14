@@ -130,7 +130,7 @@ it. See the [backup guide](server/README.md#backups).
 
 | Start here | What it covers |
 |---|---|
-| [Server setup](server/README.md) | Installation, private proxy, configuration, voice input, upgrades and backups |
+| [Server setup](server/README.md) | Installation, private proxy, configuration, voice input, scanned PDFs, upgrades and backups |
 | [Security](SECURITY.md) | Network access, AI data handling and vulnerability reports |
 | [AI providers](docs/ai-providers.md) | Optional models and keys, auto-tagging and web search |
 | [Chat agent](server/agent/README.md) | Assistant context, approval cards, widgets and external harnesses |

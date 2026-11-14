@@ -6,7 +6,8 @@ import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute 
 import { drawingPictureRoute } from "./drawing-picture";
 import { find } from "./find";
 import { catalog } from "./models";
-import { allPdfs, pagesRoute, thumbRoute } from "./pdfs";
+import { ocrRoute, startOcr } from "./ocr";
+import { allPdfs, pagesRoute, readScans, thumbRoute } from "./pdfs";
 import { mapRoute, placeRoute, suggestRoute } from "./places";
 import { Notes } from "./notes";
 import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
@@ -33,6 +34,7 @@ Bun.serve({
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
     "/agent/drawing-picture": { POST: (req) => drawingPictureRoute(req) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
+    "/agent/ocr": { GET: () => ocrRoute() },
     "/agent/places/suggest": { GET: (req) => suggestRoute(req) },
     "/agent/places/place": { GET: (req) => placeRoute(req) },
     "/agent/places/map": { GET: (req) => mapRoute(req) },
@@ -61,6 +63,14 @@ const warm = () => new Notes(server).list().then(async (n) => semantic().sync(n,
   .catch((e) => console.error(`agent: indexing notes by meaning failed: ${(e as Error).message}`));
 void warm();
 setInterval(warm, WARM);
+
+/** Scanned PDFs (ocr.ts): every minute, the ones attached since are queued for reading. */
+const SCANS = 60_000;
+if (startOcr()) {
+  const scans = () => readScans(server).catch((e) => console.error(`agent: looking for scanned PDFs failed: ${(e as Error).message}`));
+  void scans();
+  setInterval(scans, SCANS);
+}
 
 startReminders(server);
 

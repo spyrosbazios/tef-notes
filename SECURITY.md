@@ -1,6 +1,6 @@
 # Security
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-15 -->
 
 ## The model: no sign-in, a private network
 
@@ -30,6 +30,9 @@ on every device would add friction without keeping out anyone the network does n
   typed by name alone sends nothing.
 - Voice input stays on your server: the browser posts the recording to your agent, which hands it to the `stt` container
   on the compose network (no port on the host); neither keeps it, and the text goes only into the field you dictated into.
+- Scanned PDFs are read on your server: Tesseract runs inside the agent, and the text it read stays in the agent's
+  data volume until the PDF is deleted. The only traffic is the one-time download of each language's data file from
+  raw.githubusercontent.com (pinned to one commit).
 - The link-preview and clip-image routes fetch URLs from your server. They refuse private and loopback addresses at every
   redirect hop; report any bypass. The push route posts to a subscribed browser's push-service URL (https, and its name
   resolved and checked as public before every send); it stores at most 20 devices.
