@@ -13,7 +13,8 @@ screen and no task screen; everything it shows comes from your server ready to d
 - **Notes widget**: your pinned notes, then the latest, each in its own colour.
 - **Save to TEF Notes** in the share sheet (a link, text or one picture) and in the menu over selected text in any
   app. The server suggests the notes and open tasks it fits, as for the [Chrome clipper](../extension/README.md); you
-  pick one, or a new note or task.
+  pick one, or a new note or task. Its tags come the same way: the server's picks are on (a tap takes one off), the
+  likely ones are offered, and any other tag you have defined is in a list.
 - **New task**: a quick-settings tile and a shortcut on the launcher icon.
 - **Offline**: a share or a new task made with the server out of reach waits on the phone and is sent when it is back;
   a tick on a widget does the same. Settings lists what waits.

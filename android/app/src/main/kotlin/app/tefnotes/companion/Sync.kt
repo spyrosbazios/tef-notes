@@ -17,32 +17,33 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.tefnotes.companion.widget.Widgets
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     // One run at a time, whichever piece of work it is: a clip's save is not sent twice by two runs side by side.
     override suspend fun doWork(): Result = running.withLock {
         val context = applicationContext
         val api = Store.server(context)?.let(::Api) ?: return Result.success()
-        val sent = try {
-            for (id in Store.ticks(context)) {
-                // A refusal for good (the task is gone) meets the wish as far as it can be met.
-                try { api.tick(id) } catch (e: Refused) { if (e.again) throw e }
-                Store.dropTick(context, id)
-            }
-            Outbox.send(context, api)
-            true
-        } catch (_: Unreachable) { false } catch (_: Refused) { false }
-        try {
-            Store.keep(context, api.hello())
-            Widgets.refresh(context, api)
-        } catch (_: Unreachable) {
-            Widgets.stale(context)
-        } catch (_: Refused) {
-            Widgets.stale(context)
+        // A send and the note that it was sent go together: stopped between the two (the system ends the work, the last
+        // widget is removed), the next run would send it again, and a repeating task ticked twice rolls over twice.
+        val sent = withContext(NonCancellable) {
+            try {
+                for (id in Store.ticks(context)) {
+                    // A refusal for good (the task is gone) meets the wish as far as it can be met.
+                    try { api.tick(id) } catch (e: Refused) { if (e.again) throw e }
+                    Store.dropTick(context, id)
+                }
+                Outbox.send(context, api)
+                true
+            } catch (_: Unreachable) { false } catch (_: Refused) { false } catch (_: IOException) { false }
         }
+        try { Store.keep(context, api.hello()) } catch (_: Unreachable) { } catch (_: Refused) { }
+        Widgets.refresh(context, api)
         when {
             sent -> Result.success()
             inputData.getBoolean(AGAIN, false) -> Result.retry()

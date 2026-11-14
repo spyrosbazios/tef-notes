@@ -1,8 +1,10 @@
 // "Save to TEF Notes", from the share sheet (a link, text, one picture) and from the menu over selected text in any app.
 // The server's two steps, as the extension and the web app's share page take them (extension/AGENTS.md "Contract"):
 // suggest where it fits, then save where the owner picks. A new note and a new task are offered at once, the rest when
-// the server has answered; an added note asks again. With the server out of reach, the clip waits in the outbox
-// (Outbox.kt) as a new note.
+// the server has answered; an added note asks again. Tags are asked for beside the suggestions, as the clipper's are:
+// the server's picks are on, the likely ones offered, any other defined tag in a list; once the owner has changed them
+// they are no longer asked for again. With the server out of reach, the clip waits in the outbox (Outbox.kt) as a new
+// note.
 package app.tefnotes.companion
 
 import android.content.Intent
@@ -15,7 +17,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,11 +28,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,9 +56,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 class ClipActivity : ComponentActivity() {
@@ -60,17 +71,25 @@ class ClipActivity : ComponentActivity() {
     /** The server can't be reached: the clip can only be kept for later. */
     private var offline by mutableStateOf(false)
     private var note by mutableStateOf("")
+    /** Every defined tag as the server scored it; the ones on; whether the owner changed them (then they stay theirs). */
+    private var tags by mutableStateOf(emptyList<ScoredTag>())
+    private var picked by mutableStateOf(emptyList<String>())
+    private var touched = false
+    private var tagging by mutableStateOf(true)
     private var summary by mutableStateOf(false)
     private var saving by mutableStateOf<Target?>(null)
     private var done by mutableStateOf<String?>(null)
     private var notice by mutableStateOf<String?>(null)
     private var ask: Job? = null
+    private var askTags: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val server = Store.server(this)
-        val image = if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java) else null
+        // A picture is read through its provider only (a content address): never a file path another app names.
+        val image = if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true)
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)?.takeIf { it.scheme == "content" } else null
         val words = (if (intent.action == Intent.ACTION_PROCESS_TEXT) intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT) else intent.getCharSequenceExtra(Intent.EXTRA_TEXT))?.toString() ?: ""
         val shared = shareClip(words, intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: "", image != null)
         if (server == null || shared == null) {
@@ -100,8 +119,32 @@ class ClipActivity : ComponentActivity() {
         }
     }
 
+    /** Asks which tags the clip belongs under, after `pause`; not once the owner has changed them. */
+    private fun tag(api: Api, pause: Long) {
+        if (touched) return
+        askTags?.cancel()
+        askTags = lifecycleScope.launch {
+            delay(pause)
+            tagging = true
+            try {
+                val t = api.tags(suggestBody(page, note, null))
+                tags = t.tags
+                if (!touched) picked = t.picked
+            } catch (_: Unreachable) { } catch (_: Refused) { }      // no tags to offer: the clip is saved without
+            tagging = false
+        }
+    }
+
+    private fun pick(name: String, on: Boolean) {
+        touched = true
+        askTags?.cancel()
+        tagging = false
+        picked = if (on) picked + name else picked - name
+    }
+
     /** Asks where the clip fits, after `pause` (a note being typed asks once the typing stops). */
     private fun suggest(api: Api, pause: Long) {
+        tag(api, pause)
         ask?.cancel()
         ask = lifecycleScope.launch {
             delay(pause)
@@ -121,13 +164,17 @@ class ClipActivity : ComponentActivity() {
     private fun save(api: Api, target: Target) {
         if (saving != null) return
         ask?.cancel()
+        askTags?.cancel()
+        asking = false
+        tagging = false
         saving = target
-        val payload = saveBody(page, suggestions.line, target, note, summary, listOfNotNull(Store.tag(this).takeIf { target.makes }))
+        val sent = savedTags(picked, listOfNotNull(Store.tag(this).takeIf { target.makes }))
+        val payload = saveBody(page, suggestions.line, target, note, summary, sent)
         val jpeg = picture?.stored.takeIf { sendsFile(page, target) }
         lifecycleScope.launch {
             try {
                 val r = api.save(payload, jpeg)
-                finished(describe(r), summaryNotice(r))
+                finished(describe(r), summaryNotice(r), sent)
             } catch (e: Refused) {
                 if (e.again) later(payload, jpeg) else {
                     saving = null
@@ -140,13 +187,13 @@ class ClipActivity : ComponentActivity() {
     }
 
     private suspend fun later(payload: JSONObject, jpeg: ByteArray?) {
-        Outbox.addClip(this, payload, jpeg, page.title.ifEmpty { page.url }.ifEmpty { page.selection ?: "A picture" })
+        withContext(Dispatchers.IO) { Outbox.addClip(this@ClipActivity, payload, jpeg, page.title.ifEmpty { page.url }.ifEmpty { page.selection ?: "A picture" }) }
         finished("Saved for later", "It is sent when the server is reachable.")
     }
 
-    private suspend fun finished(said: String, about: String?) {
+    private suspend fun finished(said: String, about: String?, tagged: List<String> = emptyList()) {
         done = said
-        notice = about
+        notice = listOfNotNull(tagged.takeIf { it.isNotEmpty() }?.let { "Tagged ${it.joinToString(", ")}" }, about).joinToString("\n").ifEmpty { null }
         Sync.now(this)
         delay(if (about == null) CLOSE_MS else CLOSE_NOTICE_MS)
         finish()
@@ -168,6 +215,7 @@ class ClipActivity : ComponentActivity() {
                 }
             }
         }
+        Tags()
         OutlinedTextField(
             note, { note = it; if (!offline) suggest(api, TYPING_MS) }, Modifier.fillMaxWidth(), placeholder = { Text("Add a note (optional)") }, maxLines = 4,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -196,6 +244,29 @@ class ClipActivity : ComponentActivity() {
         choices(suggestions, page.picture).forEachIndexed { i, choice -> Option(choice, i == 0 && !asking, api) }
     }
 
+    /** The tags on (a tap takes one off), the likely ones (a tap puts one on) and a list of every other defined tag.
+     *  Nothing while there is no tag to show: none defined, or the server not reached. */
+    @Composable
+    private fun Tags() {
+        if (tags.isEmpty() && !tagging) return
+        val rest = unpickedTags(tags, picked)
+        var listed by remember { mutableStateOf(false) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Tags", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (tagging) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (name in picked) InputChip(true, { pick(name, false) }, { Text(name) }, trailingIcon = { Glyph(R.drawable.ic_close, "Remove", LocalContentColor.current, 16.dp) })
+            for (t in rest.offered) AssistChip({ pick(t.name, true) }, { Text("${t.name} ${percent(t.p)}") }, leadingIcon = { Glyph(R.drawable.ic_add, "Add", LocalContentColor.current, 16.dp) })
+            if (rest.more.isNotEmpty()) Box {
+                AssistChip({ listed = true }, { Text("Add a tag") }, leadingIcon = { Glyph(R.drawable.ic_add, null, LocalContentColor.current, 16.dp) })
+                DropdownMenu(listed, { listed = false }) {
+                    for (name in rest.more) DropdownMenuItem({ Text(name) }, { pick(name, true); listed = false })
+                }
+            }
+        }
+    }
+
     @Composable
     private fun Option(choice: Choice, top: Boolean, api: Api) {
         val icon = when (choice.target) {
@@ -213,8 +284,10 @@ class ClipActivity : ComponentActivity() {
             }
         }
         val padding = ButtonDefaults.ContentPadding
-        if (top) Button({ save(api, choice.target) }, Modifier.fillMaxWidth(), enabled = saving == null, contentPadding = padding) { content() }
-        else FilledTonalButton({ save(api, choice.target) }, Modifier.fillMaxWidth(), enabled = saving == null, contentPadding = padding) { content() }
+        // A picture still being read has no bytes to send yet.
+        val ready = saving == null && (!page.picture || picture != null)
+        if (top) Button({ save(api, choice.target) }, Modifier.fillMaxWidth(), enabled = ready, contentPadding = padding) { content() }
+        else FilledTonalButton({ save(api, choice.target) }, Modifier.fillMaxWidth(), enabled = ready, contentPadding = padding) { content() }
     }
 
     @Composable

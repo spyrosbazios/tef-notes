@@ -8,8 +8,9 @@ version is one semver number for the whole repository, set by the git tag (see [
 ### Added
 
 - Android companion (`android/`), an optional app beside the installed web app: Tasks and Notes widgets in your theme
-  and lens, Save to TEF Notes in the share sheet and over selected text, a New task quick-settings tile and launcher
-  shortcut. What is saved with the server out of reach is sent when it is back. The APK is attached to each release.
+  and lens, Save to TEF Notes in the share sheet and over selected text (with the clipper's suggestions and tags), a
+  New task quick-settings tile and launcher shortcut. What is saved with the server out of reach is sent when it is
+  back. The APK is attached to each release.
 - Server: `/agent/companion/*`, the feeds and the two task writes a native companion uses.
 - Web: a note with three headings or more has a contents rail at its left: a tick per heading, the section being read
   marked. Under a mouse a tick shows the heading and its first words, and a click goes there; on a phone the ticks show

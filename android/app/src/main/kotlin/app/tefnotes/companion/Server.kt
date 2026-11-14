@@ -78,6 +78,9 @@ class Api(private val origin: String) {
 
     suspend fun suggest(body: JSONObject): Suggestions = suggestionsOf(json("POST", "/api/tefnotes/clip/suggest", body))
 
+    /** Every defined tag scored for the clip (the suggest step's body; the picture is not looked at). */
+    suspend fun tags(body: JSONObject): ClipTags = clipTagsOf(json("POST", "/api/tefnotes/clip/tags", body))
+
     /** The save: the payload as the form's `@jsonPayload`, the picture's JPEG as its `file` part. */
     suspend fun save(payload: JSONObject, jpeg: ByteArray?): ClipResult {
         val boundary = "tefnotes-${UUID.randomUUID()}"

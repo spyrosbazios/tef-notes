@@ -4,6 +4,7 @@
 // packages/core/test/companion-cases.json, by CasesTest. Pure: no Android here, so the JVM tests cover it.
 package app.tefnotes.companion
 
+import java.text.Collator
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -185,7 +186,7 @@ data class Choice(val target: Target, val label: String, val hint: String?)
  *  `choices`). `picture`: an existing task keeps only a link to it, a new task the picture in a note of its own. */
 fun choices(s: Suggestions, picture: Boolean): List<Choice> {
     val rest = s.suggestions.map { x ->
-        val pct = "${Math.round(x.p * 100)}%"
+        val pct = percent(x.p)
         if (x.target is Target.Task) Choice(x.target, "Add to task ${x.title}", if (picture) "$pct, link only" else pct)
         else Choice(x.target, "Append to ${x.title}", pct)
     }
@@ -194,6 +195,38 @@ fun choices(s: Suggestions, picture: Boolean): List<Choice> {
     val top = rest.find { it.target == s.pick }
     return if (top != null) listOf(top) + rest.filter { it !== top } + fresh + task else listOf(fresh) + rest + task
 }
+
+/** A defined tag and the chance the server gives that the clip belongs under it. */
+data class ScoredTag(val name: String, val p: Double)
+
+/** The clip/tags route's answer: every defined tag, best first, and the ones preselected. */
+data class ClipTags(val tags: List<ScoredTag>, val picked: List<String>)
+
+fun clipTagsOf(j: JSONObject): ClipTags {
+    val picked = j.optJSONArray("picked")
+    return ClipTags(
+        j.optJSONArray("tags").list { ScoredTag(it.optString("name"), it.optDouble("p", 0.0)) }.filter { it.name.isNotEmpty() },
+        if (picked == null) emptyList() else (0 until picked.length()).map { picked.optString(it) }.filter { it.isNotEmpty() },
+    )
+}
+
+/** Offered beside the picked tags: one given at least this chance (clip.ts TAG_OFFER). */
+private const val TAG_OFFER = 0.3
+
+/** The tags not picked: `offered` the likely ones, to add with a tap; `more` every other by name, for a list. */
+data class Unpicked(val offered: List<ScoredTag>, val more: List<String>)
+
+fun unpickedTags(all: List<ScoredTag>, picked: List<String>): Unpicked {
+    val rest = all.filter { it.name !in picked }
+    return Unpicked(rest.filter { it.p >= TAG_OFFER }, rest.filter { it.p < TAG_OFFER }.map { it.name }.sortedWith(Collator.getInstance()))
+}
+
+/** The tags a save sends: the owner's picks, then what the lens on tags a new note or task with, each once, ignoring
+ *  case (clip.ts `savedTags`). */
+fun savedTags(picked: List<String>, made: List<String>): List<String> = (picked + made).distinctBy { it.lowercase() }
+
+/** A chance as the owner reads it. */
+fun percent(p: Double) = "${Math.round(p * 100)}%"
 
 /** The suggest request's body. `note`: the owner's words, context for where it goes. */
 fun suggestBody(page: ClipPage, note: String, look: String?): JSONObject =

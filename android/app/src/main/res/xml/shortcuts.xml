@@ -3,7 +3,7 @@
     <shortcut
         android:shortcutId="new_task"
         android:enabled="true"
-        android:icon="@drawable/ic_newtask"
+        android:icon="@drawable/ic_shortcut_newtask"
         android:shortcutShortLabel="@string/new_task">
         <intent
             android:action="android.intent.action.VIEW"
