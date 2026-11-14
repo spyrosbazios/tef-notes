@@ -11,6 +11,7 @@ import { DrawingLayer } from "@/components/drawing-layer";
 import { FormatTools } from "@/components/format-tools";
 import { Swatches } from "@/components/note-actions";
 import { MicButton } from "@/components/mic-button";
+import { ContentsButton, ContentsRail } from "@/components/note-contents";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Editor } from "@/editor";
+import { useContents } from "@/hooks/contents";
 import { dictateInto } from "@/hooks/dictation";
 import { openDrawing, useOpened } from "@/hooks/drawing";
 import { useDraft, type Status } from "@/hooks/draft";
@@ -41,7 +43,6 @@ import { attachable, useAddFiles } from "@/hooks/photos";
 import { noteHref, useNav } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { noteScroll } from "@/lib/scroll";
-import { ScrollProgress, ScrollProgressContainer, ScrollProgressProvider } from "@animate-ui/react/primitives/scroll-progress";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
 import type { NoteRec } from "@/services/notes";
@@ -73,6 +74,8 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const [confirm, setConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const drawing = useOpened(n.note.id);     // the drawing open over the note, the owner's or the agent's (hooks/drawing.ts)
+  const scroller = useRef<HTMLDivElement>(null);
+  const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text and the phone's sheet
   const title = useRef<HTMLInputElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
   const addFiles = useAddFiles(n.note.id);
   const note = n.note;
@@ -153,6 +156,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         <Turns className={cn("ml-2 shrink-0 place-items-start text-xs", d.status !== "error" && "max-sm:hidden")} aria-live="polite" state={d.status} states={STATUS} />
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
+        <ContentsButton contents={contents} />
         <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
         <DropdownMenu>
           <Tooltip>
@@ -191,10 +195,8 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         </DropdownMenu>
       </header>
 
-      <ScrollProgressProvider>
       <div className="relative min-h-0 flex-1">
-      <ScrollProgress aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 origin-left bg-brand" />
-      <ScrollProgressContainer data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
+      <div ref={scroller} data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
           <input ref={title} value={d.title} onChange={(e) => d.setTitle(e.target.value)} aria-label="Title" placeholder="Title"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
@@ -213,9 +215,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             </>
           )}
         </div>
-      </ScrollProgressContainer>
       </div>
-      </ScrollProgressProvider>
+      <ContentsRail contents={contents} />
+      </div>
 
       {narrow && keyboard && tools ? (
         <div className="flex h-11 shrink-0 items-center overflow-x-auto border-t border-line bg-bg px-2">{tools}</div>

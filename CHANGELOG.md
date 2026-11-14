@@ -5,6 +5,16 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- Web: a note with three headings or more has a contents rail at its left: a tick per heading, the section being read
+  marked. Under a mouse a tick shows the heading and its first words, and a click goes there; on a phone the ticks show
+  while scrolling and a Contents button in the note's bar lists the headings.
+
+### Removed
+
+- Web: the reading progress bar at the top of a note; the contents rail shows the place instead.
+
 ## 0.11.1 - 2026-11-12
 
 ### Changed

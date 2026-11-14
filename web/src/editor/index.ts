@@ -19,6 +19,7 @@ import { linkCards } from "./link-cards";
 import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
 import type { Summarize } from "./link-tools";
+import { outlineOf, sameOutline, type OutlineItem } from "./outline";
 import { slashMenu } from "./slash";
 import { ImageView, ListItemView } from "./views";
 import { noteLinkPath } from "@/core/links";
@@ -27,7 +28,7 @@ import type { ResolveImage } from "./views";
 
 export { normalizeBody };
 export { isDrawingLink } from "./files";
-export type { CommandName, Held, PdfPage, PdfPages, ResolveImage, ResolveLink, Summarize };
+export type { CommandName, Held, OutlineItem, PdfPage, PdfPages, ResolveImage, ResolveLink, Summarize };
 
 /** A picture the note shows, for the viewer: an image, or a drawing's preview. `src` is the file's own path (`../attachments/<id>/<name>`). */
 export type GalleryItem = { src: string; alt: string };
@@ -75,6 +76,10 @@ export type Editor = {
   setResolveImage(resolve: ResolveImage): void;
   /** Every picture the note shows, in order: its images and the previews of its drawings. */
   gallery(): GalleryItem[];
+  /** The note's headings in order (./outline). The same array until one of them, or the words under it, changes. */
+  outline(): OutlineItem[];
+  /** The outline's heading at `index`, on the page: what a jump scrolls to, and what tells which section is being read. */
+  headingElement(index: number): HTMLElement | null;
   /** A toolbar or shortcut action. `link` takes an href, or none to take the link off. False when it doesn't apply here. */
   run(name: CommandName, arg?: string): boolean;
   isActive(name: CommandName): boolean;
@@ -126,6 +131,16 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   let resolve: ResolveImage = options.resolveImage ?? ((src) => src);
   let last = "", touched = false, dragging = false;
   const images = new Set<ImageView>(), listeners = new Set<() => void>();
+  // `now` is the outline as the document stands; `shown` the array handed out, kept while it would draw the same
+  let outlined: { doc: Node; now: OutlineItem[]; shown: OutlineItem[] } | null = null;
+  const outline = () => {
+    const doc = view.state.doc;
+    if (outlined?.doc !== doc) {
+      const now = outlineOf(doc);
+      outlined = { doc, now, shown: outlined && sameOutline(outlined.shown, now) ? outlined.shown : now };
+    }
+    return outlined;
+  };
 
   /** The note's pictures in order, from the document: what a tap on one pages through. */
   const gallery = (doc: Node): GalleryItem[] => {
@@ -270,6 +285,13 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     },
 
     gallery: () => gallery(view.state.doc),
+
+    outline: () => outline().shown,
+    headingElement(index) {
+      const item = outline().now[index];
+      const el = item ? view.nodeDOM(item.pos) : null;
+      return el instanceof HTMLElement ? el : null;
+    },
 
     run(name, arg) {
       const ok = name === "link" ? setLink(arg ?? null)(view.state, view.dispatch) : commands[name](view.state, view.dispatch, view);
