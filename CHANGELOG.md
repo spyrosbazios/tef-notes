@@ -10,7 +10,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Android companion (`android/`), an optional app beside the installed web app: Tasks and Notes widgets in your theme
   and lens, Save to TEF Notes in the share sheet and over selected text (with the clipper's suggestions and tags), a
   New task quick-settings tile and launcher shortcut. What is saved with the server out of reach is sent when it is
-  back. The APK is attached to each release.
+  back. Its sheets move as the web app's do (the same timings, drag down to close) and a task ticked on the widget
+  lingers a moment, a second tap taking the tick back. The APK is attached to each release.
 - Server: `/agent/companion/*`, the feeds and the two task writes a native companion uses.
 - Site: a half-minute film of the app (`video/`), drawn in code from the page's own screens: Home on both screens, the
   clipper, the assistant, tasks, lenses and themes. It plays in the page's new film section and is attached to each
