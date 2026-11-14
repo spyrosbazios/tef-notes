@@ -4,8 +4,6 @@ import { Brand } from "./ui";
 
 const LINKS = [
   ["Features", "#features"],
-  // The film's section is there only in a build that has the film (Film.tsx)
-  ...(__FILM__ ? ([["Film", "#film"]] as const) : []),
   ["Sneak peeks", "#peeks"],
   ["Clipper", "#clipper"],
   ["Your keys", "#keys"],

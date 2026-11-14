@@ -108,7 +108,7 @@ two minutes) and embed `video/out/film.mp4` in the report, so Spyros can watch i
 
 One commit whose subject starts with `Video:` (the marker step 1 reads), for example
 `Video: voice input takes the lens scene's slot`. Merge it to main and push; stop instead if the live checkout is
-dirty. The push runs `pages.yml`, which renders the film (`film.yml`) and publishes it in the site's `#film` section;
+dirty. The push runs `pages.yml`, which renders the film (`film.yml`) and publishes it as the site's hero;
 the next tag attaches it to the release. Check the run: `gh run list --workflow=pages.yml --limit 1`.
 
 ## Report

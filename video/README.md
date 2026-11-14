@@ -40,7 +40,7 @@ screen changed there is changed here. Nothing is recorded and no video file is c
 ## Where it goes
 
 `.github/workflows/film.yml` renders it, cached under a key of everything it is drawn from. `pages.yml` calls that and
-puts the film in the site's `#film` section; `release.yml` calls it and attaches `tef-notes-film-X.Y.Z.mp4` to the
+makes the film the site's hero; `release.yml` calls it and attaches `tef-notes-film-X.Y.Z.mp4` to the
 release. What a release changes in the cut is `.claude/skills/promo-video/SKILL.md`.
 
 <!-- reviewed: 2026-11-14 -->
