@@ -177,8 +177,10 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     ],
   });
 
+  // What the plugins keep true of the document (a paragraph to type in at its end) holds from the start, not from the first edit
+  const opened = stateFor(parse(options.markdown));
   const view: EditorView = new EditorView(el, {
-    state: stateFor(parse(options.markdown)),
+    state: opened.apply(opened.tr.setMeta("addToHistory", false)),
     attributes: { class: "md pm-editor", spellcheck: "true", "aria-label": "Note body", role: "textbox", "aria-multiline": "true" },
     nodeViews: {
       image: (node) => new ImageView(node, () => resolve, images),

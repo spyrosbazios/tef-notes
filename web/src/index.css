@@ -224,9 +224,12 @@
   .pm-editor .pm-card-host { @apply min-w-0 truncate; }
   .pm-editor .pm-card-tools { @apply ml-auto flex shrink-0 items-center gap-1; }
   .pm-editor .pm-card-icon { @apply m-0 size-3.5 shrink-0 rounded-sm; }
-  /* The link line a card stands for: hidden while the caret is elsewhere, so the card is the link (link-cards.ts). */
+  /* The link line a card stands for: hidden, so the card is the link; shown again under the caret, in the editor that
+     has the focus (link-cards.ts). */
   .pm-editor p.pm-card-line { @apply hidden; }
   .pm-editor p.pm-card-line + .pm-card, .pm-editor p.pm-card-line + .pm-video { @apply mt-1; }
+  .pm-editor.ProseMirror-focused p.pm-card-line-caret { @apply block; }
+  .pm-editor.ProseMirror-focused p.pm-card-line-caret + .pm-card, .pm-editor.ProseMirror-focused p.pm-card-line-caret + .pm-video { @apply mt-2; }
   /* A card with its summary under it: one tile, the card on top and the summary's blockquote as its lower half. */
   .pm-editor .pm-card.pm-card-joined { @apply rounded-b-none; }
   .pm-editor blockquote.pm-card-summary { @apply mt-0 max-w-2xl rounded-t-none rounded-b-xl border border-t-0 border-line bg-card px-3 py-2.5 text-[14px]; }

@@ -1,10 +1,15 @@
-// A paragraph that is only a URL (bare, or one labelled link) is drawn as a card, its own line hidden until the caret is on it, always (the URL alone until the page answers): picture, title, description, site, as Notion and
-// Outline unfurl a pasted link. The card is a widget decoration, not a node: the note stays the one line of markdown
-// it was, a `[text](url)` link inside a sentence stays a link, and delete the line and the card is gone.
+// A paragraph that is only a URL (bare, or one labelled link) is drawn as a card, always (the URL alone until the page
+// answers): picture, title, description, site, as Notion and Outline unfurl a pasted link. The card is a widget
+// decoration, not a node: the note stays the one line of markdown it was, a `[text](url)` link inside a sentence stays a
+// link, and delete the line and the card is gone.
+// The line itself is hidden under its card, and shown again only to edit it: the caret on it, in the editor that has the
+// focus. So the caret is kept off a line nobody is typing: a URL that arrives whole (pasted) sends it to the line after,
+// and a note never ends on a card's line, where a tap under the card would land.
 // Where the page's metadata comes from is the caller's (`resolve`): the server reads it (CORS keeps a browser out).
 import type { Node } from "prosemirror-model";
-import { Plugin } from "prosemirror-state";
-import type { EditorState } from "prosemirror-state";
+import { isHistoryTransaction } from "prosemirror-history";
+import { Plugin, TextSelection } from "prosemirror-state";
+import type { EditorState, Transaction } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import type { LinkPreview } from "@/core/pocketbase";
@@ -50,6 +55,49 @@ function bareUrls(doc: Node): { url: string; end: number; from: number }[] {
     if (url) out.push({ url, from: offset, end: offset + n.nodeSize });
   });
   return out;
+}
+
+const blank = (n: Node | null | undefined) => n?.type.name === "paragraph" && n.content.size === 0;
+
+/** These are edits of the owner's: not an undo or a redo, not a body that came from elsewhere. */
+const edited = (trs: readonly Transaction[]) =>
+  trs.some((tr) => tr.docChanged) && !trs.some((tr) => isHistoryTransaction(tr) || tr.getMeta("addToHistory") === false);
+
+/** The caret, when it closes a card's line at the top of the note. */
+function closing(state: EditorState) {
+  const { $from, empty } = state.selection;
+  return empty && $from.depth === 1 && $from.parentOffset === $from.parent.content.size && cardUrl($from.parent) ? $from : null;
+}
+
+/** The position after the card line the caret closes, when the edit put its whole URL on an empty line at once (a
+ *  paste, the keyboard's clipboard). Typed, a URL grows a letter at a time and stays under the caret. null otherwise. */
+function arrived(old: EditorState, state: EditorState): number | null {
+  const was = old.selection.$from, now = closing(state);
+  return now && old.selection.empty && was.depth === 1 && was.index(0) === now.index(0) && blank(was.parent) ? now.after(1) : null;
+}
+
+/** The empty line that was already under a card's line when Enter at its end made another: one is enough. */
+function spare(old: EditorState, state: EditorState): { from: number; to: number } | null {
+  const was = closing(old), now = state.selection.$from;
+  if (!was || !state.selection.empty || now.depth !== 1 || now.index(0) !== was.index(0) + 1 || !blank(now.parent)) return null;
+  if (state.doc.childCount !== old.doc.childCount + 1 || !state.doc.child(was.index(0)).eq(was.parent)) return null;
+  const from = now.after(1), next = state.doc.nodeAt(from);
+  return next && blank(next) ? { from, to: from + next.nodeSize } : null;
+}
+
+/** What keeps the caret off a card's line (see the top), and one empty line under it: null when there is nothing to do. */
+function settled(trs: readonly Transaction[], old: EditorState, state: EditorState): Transaction | null {
+  const tr = state.tr, paragraph = state.schema.nodes.paragraph;
+  if (edited(trs)) {
+    const after = arrived(old, state), extra = spare(old, state);
+    if (after !== null) {
+      if (!blank(tr.doc.nodeAt(after))) tr.insert(after, paragraph.create());
+      tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
+    } else if (extra) tr.delete(extra.from, extra.to);
+  }
+  const last = tr.doc.lastChild;
+  if (last && cardUrl(last)) tr.insert(tr.doc.content.size, paragraph.create());
+  return tr.docChanged || tr.selectionSet ? tr : null;
 }
 
 const safe = (u: string) => /^https?:\/\//i.test(u);
@@ -194,15 +242,18 @@ export function linkCards(resolve: ResolveLink, open: (url: string) => void, rea
       view = v;
       return { destroy() { timers.forEach(clearTimeout); timers.clear(); view = null; } };
     },
+    appendTransaction: settled,
     props: {
       decorations(state) {
         want(state);
         const out: Decoration[] = [];
         const { from: selFrom, to: selTo } = state.selection;
         for (const { url, from, end } of bareUrls(state.doc)) {
-          // The line itself is hidden under its card or player: the card is the link. The caret on it (arrows, a click
-          // where it sits, a selection across it) shows it again to edit, and the note's markdown never changes.
-          if (selTo < from || selFrom > end) out.push(Decoration.node(from, end, { class: "pm-card-line" }));
+          // The line itself is hidden under its card or player: the card is the link. The caret on it (arrows, a
+          // selection across it) shows it again to edit, while the editor has the focus (the stylesheet's rule, which
+          // knows that), and the note's markdown never changes.
+          const caret = selTo >= from && selFrom <= end;
+          out.push(Decoration.node(from, end, { class: caret ? "pm-card-line pm-card-line-caret" : "pm-card-line" }));
           const v = youtubeVideo(url);
           if (v) {
             out.push(Decoration.widget(end, () => video(url, v), { key: `video:${url}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
