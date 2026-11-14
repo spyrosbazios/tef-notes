@@ -16,8 +16,10 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
 | `Server.kt` | The server's address and last look (`Store`), the requests (`Api`), `Unreachable` and `Refused` | |
 | `Sync.kt`, `Outbox.kt` | The one background job; what waits to be sent | |
 | `ClipActivity.kt`, `TaskActivity.kt`, `SettingsActivity.kt`, `OpenActivity.kt`, `TaskTile.kt` | The share sheet, the new task, the settings, the way into the web app, the tile | |
+| `Ui.kt` | The pieces every screen is made of, drawn as the web app's phone forms are: the sheet (the web's drawer), button, field, tag chip, tick box, spinner | |
+| `Motion.kt` + generated `Tokens.kt` | How things move: Animate UI's tokens as Compose specs, and the web app's recipes (press, swap, panels, unfold, shake, rows coming and going) | ⭐ motion |
 | `widget/` | The two widgets, their per-widget state (`Keys`), frame and actions; the Tasks widget's list picker | |
-| `scripts/generate.ts` | Colours, icons (lucide), the brand mark and fonts as resources, written at build time into `app/build` | |
+| `scripts/generate.ts` | Colours, icons (lucide), the brand mark and fonts as resources, and `Tokens.kt` (Animate UI's motion tokens from its npm package at the version the web app uses, core's `TICK_MS`), written at build time into `app/build` | |
 | `gradle.sh` | The pinned Gradle version and its checksum | |
 
 ## Invariants
@@ -29,6 +31,10 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
 - **No screens of the app's.** A tap opens the web app (`OpenActivity`) at a `url` the server sent.
 - **No colour, icon or font of its own.** Colours are the feed's `look`, or the generated default (`R.color.tf_*`);
   icons are lucide through `scripts/generate.ts` (`ICONS`); nothing generated is committed or edited.
+- **No motion of its own.** A screen moves as the web app does (`../web/README.md` "Motion"): every duration, curve,
+  spring and scale is a `Tokens` value through `Motion.kt`, never a number at the call site, and never Material's own
+  (no ripple, no stock sheet or chip). A new movement is a recipe in `Motion.kt` named for the web's. Bump
+  `@animate-ui/react` in `package.json` with the web's.
 - **Only https, and no sign-in**: the same gate as every client (`../SECURITY.md`). Never allow cleartext.
 - **Nothing the owner saved is dropped.** Out of reach, it waits (`Outbox`, the pending ticks in `Store`); refused for
   good, it stays in Settings until discarded.
@@ -37,6 +43,10 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
 
 ## Footguns
 
+- A sheet's window is clear and still (`themes.xml` `Sheet`): the sheet draws its own dimming and slides itself, so the
+  activity finishes only once it is off the screen (`SheetControl.close()`, never `finish()` straight).
+- Testing on the owner's phone over adb: install and read logs only. Key events and `am start` land on whatever they
+  have open (a Back press closed a browser tab, 2026-11-14).
 - The unit tests cover `Contract.kt` only. The widgets, the sheets and the sync are checked by hand on a phone: there
   is no emulator on the build host and no instrumented test.
 - Android's `JSONObject.optString` answers the text "null" for a JSON null; the JVM test library answers "". Only

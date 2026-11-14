@@ -46,7 +46,8 @@ object Store {
         bg = context.getColor(R.color.tf_bg), card = context.getColor(R.color.tf_card), raised = context.getColor(R.color.tf_raised),
         line = context.getColor(R.color.tf_line), fg = context.getColor(R.color.tf_fg), dim = context.getColor(R.color.tf_dim),
         faint = context.getColor(R.color.tf_faint), brand = context.getColor(R.color.tf_brand), up = context.getColor(R.color.tf_up),
-        down = context.getColor(R.color.tf_down), warn = context.getColor(R.color.tf_warn),
+        down = context.getColor(R.color.tf_down), warn = context.getColor(R.color.tf_warn), muted = context.getColor(R.color.tf_muted),
+        soft = context.getColor(R.color.tf_soft), scrim = context.getColor(R.color.tf_scrim),
     )
 
     /** "Add a summary", as the owner last left it in the app. */

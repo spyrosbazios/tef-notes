@@ -19,7 +19,9 @@ screen and no task screen; everything it shows comes from your server ready to d
 - **Offline**: a share or a new task made with the server out of reach waits on the phone and is sent when it is back;
   a tick on a widget does the same. Settings lists what waits.
 
-Widgets follow your theme, accent and the lens you have on, and show what the web app shows under that lens.
+Widgets follow your theme, accent and the lens you have on, and show what the web app shows under that lens. The
+sheets move as the web app's do: they slide up with its timing, drag down to close, and a ticked task lingers a moment
+(tap its box again to take the tick back).
 
 ## Requirements
 
@@ -40,11 +42,12 @@ your own builds.
 ## Build
 
 You need a JDK 17, the Android SDK (platform 37, build-tools 36) and [bun](https://bun.sh), with the whole repository
-cloned: the build reads the palette and the brand mark from `../packages/core` and the fonts from `../assets`.
+cloned: the build reads the palette and the brand mark from `../packages/core`, the fonts from `../assets` and the
+motion values from the Animate UI package the web app uses.
 
 ```sh
 cd android
-bun install                      # lucide, for the icons
+bun install                      # lucide for the icons, Animate UI for the motion values
 export JAVA_HOME=...             # a JDK 17
 export ANDROID_HOME=...          # the Android SDK
 ./gradle.sh testDebugUnitTest    # the unit tests

@@ -1,20 +1,20 @@
-// A new task, from the quick-settings tile, the launcher's shortcut or a widget's plus: a title, the list it goes to,
-// and it is gone. With the server out of reach the task waits in the outbox (Outbox.kt) and is added when it can be.
+// A new task, from the quick-settings tile, the launcher's shortcut or a widget's plus: the web app's New task sheet cut
+// down to a title and the list it goes to. With the server out of reach the task waits in the outbox (Outbox.kt) and is
+// added when it can be.
 package app.tefnotes.companion
 
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,9 +33,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class TaskActivity : ComponentActivity() {
+    private val sheet = SheetControl()
+    private val shake = Shake()
     private var title by mutableStateOf("")
     private var list by mutableStateOf("inbox")
     private var busy by mutableStateOf(false)
+    /** What the server said when it refused the task; shown under the field, which shakes once. */
+    private var refused by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -48,17 +52,21 @@ class TaskActivity : ComponentActivity() {
         if (intent.getStringExtra(LIST) == "today") list = "today"
         setContent {
             val focus = remember { FocusRequester() }
-            Sheet(Store.look(this), "New task", ::finish) {
-                OutlinedTextField(
-                    title, { title = it }, Modifier.fillMaxWidth().focusRequester(focus), placeholder = { Text("What needs doing?") }, singleLine = true,
+            Sheet(Store.look(this), "New task", sheet, ::leave, footer = {
+                TfButton(sheet::close, Modifier.weight(1f), ButtonKind.Ghost, round = true) { Text("Cancel") }
+                TfButton(::add, Modifier.weight(1f), enabled = title.isNotBlank() && !busy, round = true) {
+                    Swap(if (busy) "Adding…" else "Add to ${listLabel(list)}") { Text(it, maxLines = 1) }
+                }
+            }) {
+                TfField(
+                    title, { title = it; refused = null }, "What needs doing?", Modifier.focusRequester(focus), invalid = refused != null, shake = shake.x,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { add() }),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((name, label) in TASK_LISTS.filter { it.first != "upcoming" }.reversed())
-                        FilterChip(list == name, { list = name }, { Text(label) })
+                Unfolding(refused != null) { Text(refused ?: "", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((name, label) in TASK_LISTS.filter { it.first != "upcoming" }.reversed()) TagChip(label, list == name, { list = name })
                 }
-                Button(::add, Modifier.fillMaxWidth(), enabled = title.isNotBlank() && !busy) { Text("Add task") }
             }
             LaunchedEffect(Unit) { focus.requestFocus() }
         }
@@ -73,14 +81,15 @@ class TaskActivity : ComponentActivity() {
                 "Added to ${listLabel(list)}"
             } catch (e: Refused) {
                 // A no for good: the sheet stays as it is, so nothing typed is lost.
-                if (!e.again) return@launch refused(e)
+                if (!e.again) return@launch no(e)
                 later()
             } catch (_: Unreachable) {
                 later()
             }
             Sync.now(this@TaskActivity)
+            window.decorView.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
             Toast.makeText(this@TaskActivity, said, Toast.LENGTH_SHORT).show()
-            finish()
+            sheet.close()
         }
     }
 
@@ -89,9 +98,17 @@ class TaskActivity : ComponentActivity() {
         return "Saved. It is added when the server is reachable"
     }
 
-    private fun refused(e: Refused) {
+    private suspend fun no(e: Refused) {
         busy = false
-        Toast.makeText(this, e.message, Toast.LENGTH_LONG).show()
+        refused = e.message
+        window.decorView.performHapticFeedback(HapticFeedbackConstants.REJECT)
+        shake.go()
+    }
+
+    /** The sheet is off the screen: the window goes with no move of its own. */
+    private fun leave() {
+        overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        finish()
     }
 
     companion object { const val LIST = "list" }
