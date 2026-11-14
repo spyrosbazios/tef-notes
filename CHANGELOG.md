@@ -5,6 +5,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.12.0 - 2026-11-15
+
 ### Added
 
 - Android companion (`android/`), an optional app beside the installed web app: Tasks and Notes widgets in your theme
@@ -25,6 +27,15 @@ version is one semver number for the whole repository, set by the git tag (see [
   marked. Under a mouse a tick shows the heading and its first words, and a click goes there; on a phone the ticks show
   while scrolling, and a finger held at the left edge, then dragged, takes the note through its headings.
 
+### Changed
+
+- Android widgets: tap the heading to switch the shared lens or open the assistant.
+- Web: tasks open in a drawer over their previous screen; note previews render Markdown and long titles wrap.
+- Web: connection notices appear as a floating pill after sustained offline time or a failed sync.
+- Shared note, task and link requests now use one protocol; application services are separate from assistant cards, and web sync has an explicit lifecycle.
+- Assistant tool policies live beside their tools. Chat history is versioned and keeps historical tool inputs and outputs when schemas change.
+- CI checks module boundaries and tests the write contract, application services and chat persistence against real PocketBase.
+
 ### Removed
 
 - Web: the reading progress bar at the top of a note; the contents rail shows the place instead.
@@ -35,6 +46,9 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Web editor: a pasted link shows as its card alone. The caret goes to the line under it, so the address no longer
   stays above the card; a note that is only a link opens that way too, and a tap under the card types on a new line,
   not into the address. The address shows again only while the caret is on it.
+- Web editor: photos, PDF previews and drawings have corner Delete buttons.
+- Web: New chat works when the current chat is empty; the assistant no longer opens the phone keyboard unasked, and any upward scroll leaves a streaming answer.
+- Notes: continuing to type after a concurrent save preserves the longer edit instead of reporting a conflict.
 
 ## 0.11.1 - 2026-11-12
 
