@@ -223,6 +223,16 @@ describe("merge", () => {
     expect(merge3(base, base.replace("d\n", "d\nmine\n"), base.replace("d\n", "d\ntheirs\n"))).toBeNull();
     expect(merge3(base, base.replace("a\nb\nc\n", "x\n"), base.replace("b\n", "B\n"))).toBeNull();
   });
+
+  it("takes the longer of an edit grown on the other: typing that went on after a save the server already has", () => {
+    const base = "# t\n\nthis is a test\n";
+    const saved = base + "\ntrying to find a bug\n";
+    const typed = saved + "\nthis is a code blovk\n";
+    expect(merge3(base, typed, saved)).toBe(typed);
+    expect(merge3(base, saved, typed)).toBe(typed);
+    expect(merge3(base, base + "\nthis is a co", base + "\nthis is a code block")).toBe(base + "\nthis is a code block");
+    expect(merge3(base, base + "\nmine\n", base + "\ntheirs\n")).toBeNull();
+  });
 });
 
 describe("reconcile", () => {

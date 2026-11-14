@@ -78,7 +78,7 @@ const ANSWER = "The app does it and answers; if it can't (no such note), it says
 /** No `execute`: the client does these (`ask_choice` the owner does, by tapping). Only offered when the request has a context (`uiToolsFor`). */
 export const uiTools = {
   open_note: tool({ description: `Open a note in the app for the owner. ${ANSWER}`, inputSchema: input.open_note }),
-  open_task: tool({ description: `Open a task in the app, beside its list. ${ANSWER}`, inputSchema: input.open_task }),
+  open_task: tool({ description: `Open a task in the app, in a drawer over the screen the owner is on. ${ANSWER}`, inputSchema: input.open_task }),
   go_view: tool({ description: `Go to a place in the app: all notes, the pinned ones, a tag's notes, a task list, memory or settings. ${ANSWER}`, inputSchema: input.go_view }),
   ask_choice: tool({
     description: "Put a question with 2 to 6 buttons in the chat and wait for the owner's tap: a free slot to book, when to move a task (Today, Tomorrow, Next week), which tags, what to do with a list of overdue tasks. The answer is `{ chosen: [the ids] }` (one id unless `multi`), or `{ error }` if it can't be shown. It changes nothing by itself: make the change with the usual tool afterwards, which asks as it always does. Ask once and stop: the turn goes on with their tap.",

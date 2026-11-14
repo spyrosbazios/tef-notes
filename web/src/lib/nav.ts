@@ -1,17 +1,18 @@
 // The app's places in the router's terms (router.ts, routes/): Home `/` (its tag filter `?tags=a,b`, its archived notes `?archived=1`), the task lists `/inbox`
-// `/today` `/upcoming` `/logbook` (the task open beside one `?t=<id>`), `/notes` (the notes alone, `?tags=` too), `/settings` (`?section=`), and a note laid over any of
-// them as `?note=<id>` (the id is the filename's, which never changes, so a link survives a retitle). `/note/<id>`, the link the
+// `/today` `/upcoming` `/logbook`, `/notes` (the notes alone, `?tags=` too), `/settings` (`?section=`), and a note laid over any of
+// them as `?note=<id>` (the id is the filename's, which never changes, so a link survives a retitle). The open task is `?t=<id>` on any of them: a drawer over
+// the screen it was opened from (task-drawer.tsx), which stays as it is underneath, or the pane beside its list in a wide window (`taskInDrawer`). `/note/<id>`, the link the
 // phone and "Copy link" use, is a route that redirects to Home with the note open (routes/note.$id.tsx). `View` is the place
 // without the open note or task: what the assistant, the palette and the rail speak. Navigation goes through the router only;
 // `useNav` is its verbs, typed against the route tree.
 import { fold } from "@/core/notes";
 import type { SettingsSection } from "@/lib/route-search";
-import { linkOptions, useCanGoBack, useLocation, useMatch, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
+import { linkOptions, useCanGoBack, useLocation, useMatch, useNavigate, useRouter, useSearch, type HistoryState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 
 declare module "@tanstack/react-router" {
   interface HistoryState {
-    /** Set on the entry `showTask` pushes: the task was opened from another screen, so closing it goes back there. */
+    /** Set on the entry opening a task pushes (`taskLink`): closing the task is a step back, to the screen as it was. */
     taskFrom?: boolean;
     /** Set on the entry the phone's Ask tab pushes (assistant/dock.tsx `useAskStep`): the dock is open on it, and only on it. */
     ask?: boolean;
@@ -32,8 +33,9 @@ export const isNotesView = (v: View): v is NotesView => v.kind === "home" || v.k
 /** A view that lists tasks, not notes: a Things list. Its list is the task list, with the open task beside it. */
 export const isTaskView = (v: View): v is { kind: TaskView } => (TASK_VIEWS as readonly string[]).includes(v.kind);
 
-/** The list a task is opened in when the view it was found from has none of it: the Logbook once done, else the Inbox. */
-export const homeOfTask = (t: { done?: string }): View => (t.done ? { kind: "logbook" } : { kind: "inbox" });
+/** How the open task shows: a drawer over the screen, but for a task list in a wide window with no note over it, where it is
+ *  the pane beside the list (task-screen.tsx). `narrow`: the window is phone-width. */
+export const taskInDrawer = (at: { view: View; note?: string }, narrow: boolean): boolean => narrow || !!at.note || !isTaskView(at.view);
 
 /** The view at a path (anything else is Home); Home's and Notes' tags and archive, and Settings' section, from its search. */
 export function viewOf(path: string, search: { tags?: readonly string[]; archived?: boolean; section?: SettingsSection } = {}): View {
@@ -50,15 +52,15 @@ const TITLES: Record<View["kind"], string> = {
 };
 export const titleOf = (v: View) => TITLES[v.kind];
 
-/** What is open on a view: the task beside a task list, the note over any of them. */
+/** What is open on a view: the task, the note over it. */
 export type Open = { task?: string; note?: string };
 
 /** Where a view is, as the router's typed link, with what is open on it. */
 export function linkOf(v: View, { task, note }: Open = {}) {
   switch (v.kind) {
-    case "home": return linkOptions({ to: "/", search: { tags: v.tags, archived: v.archived ? "1" : undefined, note } });
-    case "notes": return linkOptions({ to: "/notes", search: { tags: v.tags, archived: v.archived ? "1" : undefined, note } });
-    case "settings": return linkOptions({ to: "/settings", search: { section: v.section, note } });
+    case "home": return linkOptions({ to: "/", search: { tags: v.tags, archived: v.archived ? "1" : undefined, t: task, note } });
+    case "notes": return linkOptions({ to: "/notes", search: { tags: v.tags, archived: v.archived ? "1" : undefined, t: task, note } });
+    case "settings": return linkOptions({ to: "/settings", search: { section: v.section, t: task, note } });
     case "inbox": return linkOptions({ to: "/inbox", search: { t: task, note } });
     case "today": return linkOptions({ to: "/today", search: { t: task, note } });
     case "upcoming": return linkOptions({ to: "/upcoming", search: { t: task, note } });
@@ -72,22 +74,28 @@ export type AppLink = ReturnType<typeof linkOf>;
 /** A note's address to hand out (Copy link, a note's link to another): `/note/<id>`, which opens it over Home. */
 export const noteHref = (id: string) => `/note/${encodeURIComponent(id)}`;
 
-/** A note laid over the screen on view (`under`, with its open task), which stays where it is; from anywhere else (the share
- *  page), over Home. */
-export const noteLink = (id: string, under: { view: View; task?: string } | null): AppLink =>
-  linkOf(under?.view ?? { kind: "home" }, { task: under?.task, note: id });
+/** A note laid over the screen on view (`under`), which stays where it is; from anywhere else (the share page), over Home.
+ *  The open task steps aside (a step back finds it again): over a note, `?t=` is a task opened from that note. */
+export const noteLink = (id: string, under: View | null): AppLink => linkOf(under ?? { kind: "home" }, { note: id });
 
-/** Where the app is: the view on screen, the note over it, the task open beside its list. */
+/** A task opened from where the app is (`at`), which stays as it is under it. The first one pushes an entry marked `taskFrom`,
+ *  so closing is a step back; another opened while one is (the next row of a list) takes that entry over. The rest of the
+ *  entry's state is kept: on the phone's Ask step (`ask`) the assistant stays in front, under the drawer. */
+export function taskLink(id: string, at: { view: View; note?: string; task?: string }) {
+  return { ...linkOf(at.view, { task: id, note: at.note }), replace: !!at.task, state: (s: HistoryState): HistoryState => ({ ...s, taskFrom: at.task ? !!s.taskFrom : true }) };
+}
+export type TaskLink = ReturnType<typeof taskLink>;
+
+/** Where the app is: the view on screen, the note over it, the open task. */
 export function usePlace(): { view: View; note: string | undefined; task: string | undefined } {
   const path = useLocation({ select: (l) => l.pathname });
   // Each route's own validated search: the loose one (`strict: false`) merges the raw query in, a `tags` still a string
-  const search = useSearch({ strict: false });
   const home = useSearch({ from: "/_app/", shouldThrow: false }), notes = useSearch({ from: "/_app/notes", shouldThrow: false });
   const tags = (home ?? notes)?.tags?.join(","), archived = (home ?? notes)?.archived === "1";
   const section = useSearch({ from: "/_app/settings", shouldThrow: false })?.section;
   const view = useMemo(() => viewOf(path, { tags: tags?.split(","), archived, section }), [path, tags, archived, section]);
-  const note = useSearch({ from: "/_app", shouldThrow: false })?.note;
-  return { view, note, task: isTaskView(view) && typeof search.t === "string" ? search.t : undefined };
+  const shell = useSearch({ from: "/_app", shouldThrow: false });
+  return { view, note: shell?.note, task: shell?.t };
 }
 
 export function useNav() {
@@ -95,24 +103,22 @@ export function useNav() {
   const navigate = useNavigate(), canGoBack = useCanGoBack(), router = useRouter();
   const taskFrom = useLocation({ select: (l) => !!l.state.taskFrom });
   const inShell = !!useMatch({ from: "/_app", shouldThrow: false });
-  const here = inShell ? { view, task } : null;
   return {
     view, open: note, task,
     /** A note, over the screen it was found from. */
-    openNote: (id: string) => navigate(noteLink(id, here)),
+    openNote: (id: string) => navigate(noteLink(id, inShell ? view : null)),
     /** The way back from a note: where the app came from, else the screen under it (a note opened by its address). */
     leaveNote: () => {
       if (canGoBack) router.history.back();
-      else void navigate({ ...linkOf(view, { task }), replace: true });
+      else void navigate({ ...linkOf(view), replace: true });
     },
-    /** A task opened beside its list (null closes it). */
-    openTask: (id: string | null) => navigate(linkOf(view, { task: id ?? undefined })),
-    /** A task opened in a task list of `v`, from a view that has none (a note's linked tasks, a card in the assistant). */
-    showTask: (v: View, id: string) => navigate({ ...linkOf(v, { task: id }), state: { taskFrom: true } }),
-    /** Closing the open task: back where it was opened from when `showTask` brought it, else its list. */
+    /** A task's link from here (a row's `<a>`), and the same as a verb: over this screen, or beside its list (`taskInDrawer`). */
+    taskLink: (id: string) => taskLink(id, { view, note, task }),
+    showTask: (id: string) => navigate(taskLink(id, { view, note, task })),
+    /** Closing the open task: a step back when opening it was a step, else (a task opened by its address) the screen without it. */
     closeTask: () => {
       if (taskFrom && canGoBack) router.history.back();
-      else void navigate(linkOf(view));
+      else void navigate({ ...linkOf(view, { note }), replace: true, state: true });
     },
     goView: (v: View) => navigate(linkOf(v)),
     /** The notes (the Notes page's when on it, else Home's) under exactly these tags, the archive kept as it is. */

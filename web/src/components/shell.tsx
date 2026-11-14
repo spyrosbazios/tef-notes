@@ -1,10 +1,11 @@
 // The laptop's layout: rail | page | assistant, all in view from a wide window, where the phone shows one screen at a time. The page
 // is the router's (`Outlet`: routes/_app/, Home, the task lists, Notes, Settings); a note is laid over it (`?note=<id>`, note-page.tsx) with
 // no rail, and the screen it was opened from stays matched and mounted underneath, hidden and inert, so closing the note finds it
-// exactly as it was: no reload of the tiles, no scroll to restore. A task opens beside its list (task-screen.tsx). The assistant is a
+// exactly as it was: no reload of the tiles, no scroll to restore. A task opens in a drawer over the screen it was picked on
+// (task-drawer.tsx), or beside its list in a wide window (task-screen.tsx). The assistant is a
 // dock on the right (components/assistant/dock.tsx), mounted here once so it outlives every screen. Narrower windows fold the rail
-// into a sheet and lay the dock over the page, and on a phone-width one the list and the task take turns. An open task brings its
-// own bar, so the narrow app bar steps aside and its back and menu buttons sit in that bar. Installed on a phone it is the whole
+// into a sheet and lay the dock over the page. A task open beside its list brings its
+// own bar, so the narrow app bar steps aside and its menu button sits in that bar. Installed on a phone it is the whole
 // screen (`h-dvh`, which follows the keyboard: index.html's `interactive-widget`), padded by the safe-area insets.
 // Below `md` it is the phone's: the bottom tabs (tab-bar.tsx: Home, Tasks, Notes, Ask, Settings, as the owner set them) instead of the rail and the app bar, Home
 // drawing its own header (lens, search), the Tasks tab the list with its own switcher (task-list.tsx), Ask the dock opened whole. From `md` to
@@ -23,6 +24,7 @@ import { Palette } from "@/components/palette";
 import { QuickAdd, type Start } from "@/components/quick-add";
 import { Rail } from "@/components/rail";
 import { TabBar } from "@/components/tab-bar";
+import { TaskDrawer } from "@/components/task-drawer";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { dockNow, setDock, useDock } from "@/hooks/dock";
@@ -103,12 +105,12 @@ export function Shell() {
   const actions = useMemo<ShellActions>(() => ({ newNote, add: setAdding, openMenu: () => setMenu(true) }), [newNote]);
 
   const search = () => { setMenu(false); setPalette(true); };
-  const tasks = isTaskView(view), focus = tasks && !!task;
-  // The phone's bottom tabs: on every screen but an open task (a screen of its own, with a Back), and under the keyboard. A note's page
+  const tasks = isTaskView(view), focus = tasks && !!task && !onNote;
+  // The phone's bottom tabs: on every screen, but under the keyboard (an open task is a drawer over them). A note's page
   // is another: its layer covers the tabs, which stay mounted (hidden) under it. The bar floats over the page, which runs on under it
   // and the bottom inset (the bar takes the inset as its own padding); every phone page's scroller ends `--under-tabs` lower, so its
   // last row can scroll up clear of the pill
-  const bar = !focus && (onNote || !keyboard);
+  const bar = onNote || !keyboard;
 
   return (
     <ShellContext.Provider value={actions}>
@@ -150,6 +152,7 @@ export function Shell() {
 
           <Palette open={palette} onOpenChange={setPalette} onNew={newNote} />
           <QuickAdd initial={adding} onClose={() => setAdding(null)} />
+          <TaskDrawer />
         </div>
         {/* The pill inside is what a route change names (`data-vt="tabs"`, tab-bar.tsx), not this strip */}
         {bar ? <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}

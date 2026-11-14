@@ -28,7 +28,7 @@ const param = (l: Where, key: string): string | undefined => {
  *    list picked (`list-back` when it sits before the one left, in the tabs' order), the rest crossfading as `view`;
  *  - another screen or settings section: `view`, the page's crossfade (quick on a phone: a tab must feel instant), the
  *    rail, the bars and the dock still around it; to or from the share page, outside the shell: `whole`, the window's;
- *  - the same list under other tags, or a task opened or closed (`?t=`: the phone's task sheet has its own
+ *  - the same list under other tags, or a task opened or closed (`?t=`: the task's drawer has its own
  *    motion): none, the tiles move in place. */
 /** Where a path's task list sits in the tabs' order, or -1 for any other screen. */
 const listAt = (pathname: string): number => TASK_VIEWS.findIndex((k) => pathname === `/${k}`);

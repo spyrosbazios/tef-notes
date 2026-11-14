@@ -11,10 +11,20 @@ version is one semver number for the whole repository, set by the git tag (see [
   and lens, Save to TEF Notes in the share sheet and over selected text, a New task quick-settings tile and launcher
   shortcut. What is saved with the server out of reach is sent when it is back. The APK is attached to each release.
 - Server: `/agent/companion/*`, the feeds and the two task writes a native companion uses.
+- Web: a note with three headings or more has a contents rail at its left: a tick per heading, the section being read
+  marked. Under a mouse a tick shows the heading and its first words, and a click goes there; on a phone the ticks show
+  while scrolling, and a finger held at the left edge, then dragged, takes the note through its headings.
+
+### Removed
+
+- Web: the reading progress bar at the top of a note; the contents rail shows the place instead.
 
 ### Fixed
 
 - Sharing: a link shared with its title no longer saves the link a second time as the clipped text.
+- Web editor: a pasted link shows as its card alone. The caret goes to the line under it, so the address no longer
+  stays above the card; a note that is only a link opens that way too, and a tap under the card types on a new line,
+  not into the address. The address shows again only while the caret is on it.
 
 ## 0.11.1 - 2026-11-12
 

@@ -11,6 +11,7 @@ import { DrawingLayer } from "@/components/drawing-layer";
 import { FormatTools } from "@/components/format-tools";
 import { Swatches } from "@/components/note-actions";
 import { MicButton } from "@/components/mic-button";
+import { ContentsRail } from "@/components/note-contents";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Editor } from "@/editor";
+import { useContents } from "@/hooks/contents";
 import { dictateInto } from "@/hooks/dictation";
 import { openDrawing, useOpened } from "@/hooks/drawing";
 import { useDraft, type Status } from "@/hooks/draft";
@@ -41,7 +43,6 @@ import { attachable, useAddFiles } from "@/hooks/photos";
 import { noteHref, useNav } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { noteScroll } from "@/lib/scroll";
-import { ScrollProgress, ScrollProgressContainer, ScrollProgressProvider } from "@animate-ui/react/primitives/scroll-progress";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
 import type { NoteRec } from "@/services/notes";
@@ -73,7 +74,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const [confirm, setConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const drawing = useOpened(n.note.id);     // the drawing open over the note, the owner's or the agent's (hooks/drawing.ts)
-  const title = useRef<HTMLInputElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text
+  const title = useRef<HTMLTextAreaElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
   const addFiles = useAddFiles(n.note.id);
   const note = n.note;
 
@@ -191,14 +194,12 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         </DropdownMenu>
       </header>
 
-      <ScrollProgressProvider>
       <div className="relative min-h-0 flex-1">
-      <ScrollProgress aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 origin-left bg-brand" />
-      <ScrollProgressContainer data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
+      <div ref={scroller} data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
-          <input ref={title} value={d.title} onChange={(e) => d.setTitle(e.target.value)} aria-label="Title" placeholder="Title"
+          <textarea ref={title} rows={1} value={d.title} onChange={(e) => d.setTitle(e.target.value.replace(/\s*\n\s*/g, " "))} aria-label="Title" placeholder="Title"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
-            className="w-full bg-transparent font-extrabold text-3xl tracking-tight outline-none placeholder:text-faint" />
+            className="field-sizing-content block w-full resize-none break-words bg-transparent font-extrabold text-3xl leading-tight tracking-tight outline-none placeholder:text-faint" />
           <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-faint">
             {note.archived ? <span className="flex items-center gap-1"><Archive className="size-3" /> Archived</span> : null}
             <span className="tabular-nums">{note.created}</span>
@@ -213,9 +214,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             </>
           )}
         </div>
-      </ScrollProgressContainer>
       </div>
-      </ScrollProgressProvider>
+      <ContentsRail contents={contents} />
+      </div>
 
       {narrow && keyboard && tools ? (
         <div className="flex h-11 shrink-0 items-center overflow-x-auto border-t border-line bg-bg px-2">{tools}</div>

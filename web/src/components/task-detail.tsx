@@ -1,10 +1,10 @@
 // The open task, as Things' card: its title and notes, a checklist, and each thing it can say about itself in a row of
 // its own: When, deadline, repeat, reminder, tags, where (where-card.tsx), the notes it is about. Every change is one field
 // written at the task's rev (hooks/todo.ts), redone on the newer record when it moved; the notes are links (hooks/links.ts),
-// outside the rev. Below `md` the card is a bottom sheet over its list (the shadcn drawer), as the phone opens a task, and
-// its pickers (components/pick.tsx) are sheets over it.
+// outside the rev. The card is drawn beside its list (task-screen.tsx) or in a drawer over the screen (task-drawer.tsx), where
+// below `md` its pickers (components/pick.tsx) are sheets over it.
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Calendar, ChevronDown, Flag, MapPin, Menu, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
+import { Bell, Calendar, Flag, MapPin, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { dayLabel, whenLabel } from "@/core/dates";
 import { readsAsMarkdown, withLineBreaks } from "@/core/task-notes";
@@ -14,19 +14,17 @@ import { Checklist } from "@/components/checklist";
 import { DraftTextarea } from "@/components/draft-field";
 import { Markdown } from "@/components/markdown";
 import { TagEditor } from "@/components/tag-editor";
-import { InSheet, Pick } from "@/components/pick";
+import { Pick } from "@/components/pick";
 import { WhenPick } from "@/components/when-picker";
 import { DeleteTask } from "@/components/task-delete";
 import { PlacePick, WhereCard } from "@/components/where-card";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { TickBox } from "@/components/tick-box";
 import { toggleTask, useLingering } from "@/hooks/linger";
-import { useNarrow } from "@/hooks/media";
 import { addLink, removeLink, useLinks } from "@/hooks/links";
 import { useLensSorted, useSorted } from "@/hooks/notes";
-import { changeTask, editTask, useToday } from "@/hooks/todo";
+import { changeTask, editTask, useTasks, useToday } from "@/hooks/todo";
 import { linkedNoteIds, notesFor } from "@/lib/links";
 import { useNav } from "@/lib/nav";
 import { report } from "@/lib/report";
@@ -114,17 +112,16 @@ function TaskNotes({ task, onSave }: { task: TaskRec; onSave: (notes: string) =>
   );
 }
 
-export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?: React.ReactNode; onGone: () => void }) {
+function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?: React.ReactNode; onGone: () => void }) {
   const qc = useQueryClient();
   const today = useToday();
-  const narrow = useNarrow(), { closeTask } = useNav();
   const lingering = useLingering();
   const [confirm, setConfirm] = useState(false);
   const checked = lingering.get(task.id)?.checked ?? !!task.done;
   const when = whenLabel(task, today);
   const patch = (p: Parameters<typeof editTask>[2]) => report(editTask(qc, task.id, p));
 
-  const card = (
+  return (
     <article className="flex h-full min-h-0 flex-col" aria-label={task.title}>
       <header className="flex h-11 shrink-0 items-center gap-1 px-2 md:h-12 md:border-b md:border-line md:px-4">
         {leading}
@@ -175,24 +172,13 @@ export function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?:
       <DeleteTask task={confirm ? task : null} onClose={() => setConfirm(false)} onGone={onGone} />
     </article>
   );
-  if (!narrow) return card;
-  return (
-    <Drawer open repositionInputs={false} onOpenChange={(o) => { if (!o) closeTask(); }}>
-      <DrawerContent className="data-[vaul-drawer-direction=bottom]:h-[92dvh] data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
-        <DrawerTitle className="sr-only">{task.title}</DrawerTitle>
-        <InSheet value>{card}</InSheet>
-      </DrawerContent>
-    </Drawer>
-  );
 }
 
-/** The close and menu buttons a narrow window needs on the card: below `md` the card is a sheet over the list, closed by this
- *  or by pulling it down; from `md` to `lg` the views menu has no rail to live in. */
-export function DetailLeading({ onBack, onMenu }: { onBack: () => void; onMenu: () => void }) {
-  return (
-    <>
-      <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Close" onClick={onBack}><ChevronDown /></Button>
-      <Button variant="ghost" size="icon-sm" className="max-md:hidden lg:hidden" aria-label="Views" onClick={onMenu}><Menu /></Button>
-    </>
-  );
+/** The card of the task with this id: nothing while the tasks load, a line when it is gone. `leading` starts its bar (the
+ *  drawer's Close, the pane's Views); `onGone`: it was deleted here. */
+export function OpenTask({ id, leading, onGone }: { id: string; leading?: React.ReactNode; onGone: () => void }) {
+  const tasks = useTasks();
+  const t = tasks.data?.find((x) => x.id === id);
+  if (!t) return tasks.isPending ? null : <div className="grid h-full place-items-center text-sm text-faint">This task is gone: deleted on another device.</div>;
+  return <TaskDetail key={t.id} task={t} leading={leading} onGone={onGone} />;
 }

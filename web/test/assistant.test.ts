@@ -40,9 +40,10 @@ describe("the page context", () => {
     expect(c).toEqual({ view: { kind: "home" }, note: { path: "notes/garage.md", title: "Garage", rev: 7 } });
   });
 
-  test("the open task, in a task list; an open note hides it", () => {
+  test("the open task, on any screen; over a note both are sent", () => {
     expect(pageContext({ view: { kind: "today" }, task: "t1" }, held, "")).toEqual({ view: { kind: "today" }, task: { id: "t1", title: "Fix the door" } });
-    expect(pageContext({ view: { kind: "today" }, task: "t1", open: garage.note.id }, held, "").task).toBeUndefined();
+    expect(pageContext({ view: { kind: "home" }, task: "t1" }, held, "").task).toEqual({ id: "t1", title: "Fix the door" });
+    expect(pageContext({ view: { kind: "today" }, task: "t1", open: garage.note.id }, held, "").task).toEqual({ id: "t1", title: "Fix the door" });
   });
 
   test("the open note counts; a record not held is left out; the selection is trimmed", () => {
@@ -70,7 +71,7 @@ function host() {
     task: async (id) => held.tasks.find((t) => t.id === id),
     nav: {
       openNote: (id) => did.push(`note ${id}`),
-      showTask: (v: View, id) => did.push(`task ${id} in ${v.kind}`),
+      showTask: (id) => did.push(`task ${id}`),
       goView: (v: View) => did.push(`view ${v.kind}${v.kind === "home" && v.tags ? ` ${v.tags.join(",")}` : ""}`),
     },
     showAssistant: () => did.push("assistant"),
@@ -81,11 +82,11 @@ function host() {
 }
 
 describe("the UI tools", () => {
-  test("open a note, an open task in the Inbox", async () => {
+  test("open a note, a task", async () => {
     const { h, did } = host();
     expect(await runUiTool("open_note", { path: "notes/garage.md" }, h)).toEqual(UI_OK);
     expect(await runUiTool("open_task", { id: "t1" }, h)).toEqual(UI_OK);
-    expect(did).toEqual([`note ${garage.note.id}`, "task t1 in inbox"]);
+    expect(did).toEqual([`note ${garage.note.id}`, "task t1"]);
   });
 
   test("go to a view; to the chat opens the dock", async () => {

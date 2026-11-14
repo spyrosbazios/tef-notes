@@ -3,14 +3,14 @@
 import { ChevronRight, Circle, CircleCheck, ListTodo } from "lucide-react";
 import { useMemo } from "react";
 import { useLinks } from "@/hooks/links";
-import { useTasks, useToday } from "@/hooks/todo";
-import { taskView, tasksFor } from "@/lib/links";
+import { useTasks } from "@/hooks/todo";
+import { tasksFor } from "@/lib/links";
 import { useNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
 
 export function LinkedTasks({ n, className }: { n: NoteRec; className?: string }) {
-  const links = useLinks().data, tasks = useTasks().data, today = useToday(), { showTask } = useNav();
+  const links = useLinks().data, tasks = useTasks().data, { showTask } = useNav();
   const linked = useMemo(() => tasksFor(links ?? [], n.rec, tasks ?? []), [links, tasks, n.rec]);
   if (!linked.length) return null;
   return (
@@ -21,7 +21,7 @@ export function LinkedTasks({ n, className }: { n: NoteRec; className?: string }
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
         {linked.map((t) => (
           <li key={t.id}>
-            <button type="button" onClick={() => showTask(taskView(t, today), t.id)} title="Open the task"
+            <button type="button" onClick={() => showTask(t.id)} title="Open the task"
               className="group flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted">
               {t.done ? <CircleCheck className="size-4 shrink-0 text-dim" /> : <Circle className="size-4 shrink-0 text-brand" />}
               <span className="min-w-0 flex-1">

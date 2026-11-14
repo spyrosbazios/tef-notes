@@ -100,9 +100,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     note: (path) => find<NoteRec>(qc, NOTES, (n) => n.path === path),
     task: (id) => find<TaskRec>(qc, TASKS, (t) => t.id === id),
     nav: {
-      // Below `md` the dock covers the page, but a navigation leaves the Ask step (dock.tsx `useAskStep`), uncovering what was opened
+      // Below `md` the dock covers the page: a note or a view leaves the Ask step (dock.tsx `useAskStep`), uncovering what was opened; a task is a drawer over the dock
       openNote: (id) => navNow.current.openNote(id),
-      showTask: (v, id) => navNow.current.showTask(v, id),
+      showTask: (id) => navNow.current.showTask(id),
       goView: (v) => navNow.current.goView(v),
     },
     showAssistant: () => setDock({ open: true }),

@@ -19,7 +19,7 @@ import { useAssistant } from "@/hooks/assistant";
 import { useNow } from "@/hooks/now";
 import { setActiveLens, useActiveLens, useLenses } from "@/hooks/lens";
 import { useFinder } from "@/hooks/search";
-import { homeOfTask, titleOf, useNav, type View } from "@/lib/nav";
+import { titleOf, useNav, type View } from "@/lib/nav";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
@@ -92,13 +92,13 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
                   <NoteHit n={n} now={now} why={why} />
                 </CommandItem>
               ))}
-              {foundTasks.map(({ t, why }) => <CommandItem key={t.id} value={`task:${t.id}`} onSelect={() => run(() => showTask(homeOfTask(t), t.id))}>
+              {foundTasks.map(({ t, why }) => <CommandItem key={t.id} value={`task:${t.id}`} onSelect={() => run(() => showTask(t.id))}>
                 <ListTodo /><span className="min-w-0"><span className="block truncate">{t.title}</span><span className="block truncate text-xs">{why}</span></span>
               </CommandItem>)}
             </CommandGroup>
           ) : null}
           {taskHits.length ? <CommandGroup heading="Tasks">
-            {taskHits.map((t) => <CommandItem key={t.id} value={`task:${t.id}`} onSelect={() => run(() => showTask(homeOfTask(t), t.id))}>
+            {taskHits.map((t) => <CommandItem key={t.id} value={`task:${t.id}`} onSelect={() => run(() => showTask(t.id))}>
               <ListTodo /><span className="min-w-0"><span className="block truncate">{t.title}</span><span className="block truncate text-xs text-dim">{t.done ? "Completed · " : ""}{t.notes}</span></span>
             </CommandItem>)}
           </CommandGroup> : null}

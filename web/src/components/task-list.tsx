@@ -11,7 +11,7 @@ import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number
 import { ReducedMotionConfig, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AnimatePresence, motion, type Transition } from "motion/react";
 import { Moon, Plus } from "lucide-react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link as RecordLink } from "@/core/record-links";
@@ -113,7 +113,7 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
 }
 
 /** `embedded`: a list inside Home's task box, which draws the heading and the +: no header, no frame, scrolling inside the box's
- * fixed height, a row opening beside its own list rather than Home's.
+ * fixed height.
  * `focus`: a day Home's planner picked or is hovering: scrolled to that day (or the next one with tasks), its heading lit; `magnify`: the pointer is still on the planner, the day's section stands out.
  * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves.
  * `onView`: Upcoming scrolled by hand: the day whose section is at the top of the list, reported as it changes (the phone's strip follows). */
@@ -121,7 +121,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
   const qc = useQueryClient();
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
-  const { openTask, task: open } = useNav(), navigate = useNavigate();
+  const { taskLink, showTask, closeTask, task: open } = useNav();
   const narrow = useNarrow();
   const lingering = useLingering();
   const records = useTasks().data;
@@ -223,7 +223,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
         notes={noteSummary(links, t.id, noteTitles)}
         showWhen={kind === "today" && !!t.when && t.when < today}
         drag={reorderable && !l ? rowDrag(section, t.id) : undefined}
-        onTick={() => { void toggleTask(qc, t); }} link={linkOf(view, { task: t.id })} onOpen={() => navigate(linkOf(view, { task: t.id }))}
+        onTick={() => { void toggleTask(qc, t); }} link={taskLink(t.id)} onOpen={() => showTask(t.id)}
         onSchedule={(s) => report(editTask(qc, t.id, scheduleOf(s)))} onDue={(d) => report(editTask(qc, t.id, { due: d ?? "" }))} onDelete={() => setDeleting(t.id)} />
     );
   };
@@ -275,7 +275,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
         )}
       </div>
       </ScrollFade>
-      <DeleteTask task={doomed} onClose={() => setDeleting(null)} onGone={() => { if (open === deleting && !embedded) openTask(null); }} />
+      <DeleteTask task={doomed} onClose={() => setDeleting(null)} onGone={() => { if (open === deleting) closeTask(); }} />
     </section>
   );
 }

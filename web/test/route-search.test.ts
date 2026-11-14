@@ -1,7 +1,7 @@
 // The URL's query as the router reads and writes it (src/lib/route-search.ts), and the places it names (src/lib/nav.ts).
 import { describe, expect, test } from "bun:test";
-import { homeSearch, listSearch, parseSearch, settingsSearch, shareSearch, shellSearch, stringifySearch } from "@/lib/route-search";
-import { linkOf, noteLink, viewOf } from "@/lib/nav";
+import { homeSearch, parseSearch, settingsSearch, shareSearch, shellSearch, stringifySearch } from "@/lib/route-search";
+import { linkOf, noteLink, taskInDrawer, taskLink, viewOf } from "@/lib/nav";
 
 describe("the query", () => {
   test("reads every value as a string", () => {
@@ -43,13 +43,13 @@ describe("the validators", () => {
     expect(homeSearch({ archived: "yes" })).toEqual({ tags: undefined, archived: undefined });
   });
 
-  test("a task list's open task and the shell's note are ids, a number's digits kept", () => {
-    expect(listSearch({ t: "abc" })).toEqual({ t: "abc" });
-    expect(listSearch({ t: 123 })).toEqual({ t: "123" });
-    expect(listSearch({ t: "" })).toEqual({ t: undefined });
-    expect(listSearch({ t: { x: 1 } })).toEqual({ t: undefined });
-    expect(shellSearch({ note: "20261102-garage" })).toEqual({ note: "20261102-garage" });
-    expect(shellSearch({})).toEqual({ note: undefined });
+  test("the shell's open task and note are ids, a number's digits kept", () => {
+    expect(shellSearch({ t: "abc" })).toEqual({ t: "abc", note: undefined });
+    expect(shellSearch({ t: 123 }).t).toBe("123");
+    expect(shellSearch({ t: "" }).t).toBeUndefined();
+    expect(shellSearch({ t: { x: 1 } }).t).toBeUndefined();
+    expect(shellSearch({ note: "20261102-garage" })).toEqual({ note: "20261102-garage", t: undefined });
+    expect(shellSearch({})).toEqual({ note: undefined, t: undefined });
   });
 
   test("Settings takes only a section it has", () => {
@@ -73,18 +73,36 @@ describe("places", () => {
     expect(viewOf("/settings", { section: "tags" })).toEqual({ kind: "settings", section: "tags" });
     expect(viewOf("/elsewhere")).toEqual({ kind: "home" });
     expect(viewOf("/notes", { tags: ["a"], archived: true })).toEqual({ kind: "notes", tags: ["a"], archived: true });
-    expect(linkOf({ kind: "notes", archived: true })).toEqual({ to: "/notes", search: { tags: undefined, archived: "1", note: undefined } });
+    expect(linkOf({ kind: "notes", archived: true })).toEqual({ to: "/notes", search: { tags: undefined, archived: "1", t: undefined, note: undefined } });
   });
 
   test("a view is a typed link, with its open task and note", () => {
-    expect(linkOf({ kind: "home", tags: ["a"] })).toEqual({ to: "/", search: { tags: ["a"], archived: undefined, note: undefined } });
+    expect(linkOf({ kind: "home", tags: ["a"] })).toEqual({ to: "/", search: { tags: ["a"], archived: undefined, t: undefined, note: undefined } });
+    expect(linkOf({ kind: "home" }, { task: "t1" })).toEqual({ to: "/", search: { tags: undefined, archived: undefined, t: "t1", note: undefined } });
     expect(linkOf({ kind: "today" }, { task: "t1" })).toEqual({ to: "/today", search: { t: "t1", note: undefined } });
-    expect(linkOf({ kind: "settings", section: "agent" })).toEqual({ to: "/settings", search: { section: "agent", note: undefined } });
+    expect(linkOf({ kind: "settings", section: "agent" })).toEqual({ to: "/settings", search: { section: "agent", t: undefined, note: undefined } });
   });
 
-  test("a note lies over the screen it was opened from, its task kept; from outside the shell, over Home", () => {
-    expect(noteLink("n1", { view: { kind: "today" }, task: "t1" })).toEqual({ to: "/today", search: { t: "t1", note: "n1" } });
-    expect(noteLink("n1", { view: { kind: "home", tags: ["a"] } })).toEqual({ to: "/", search: { tags: ["a"], archived: undefined, note: "n1" } });
-    expect(noteLink("n1", null)).toEqual({ to: "/", search: { tags: undefined, archived: undefined, note: "n1" } });
+  test("a note lies over the screen it was opened from, the open task stepping aside; from outside the shell, over Home", () => {
+    expect(noteLink("n1", { kind: "today" })).toEqual({ to: "/today", search: { t: undefined, note: "n1" } });
+    expect(noteLink("n1", { kind: "home", tags: ["a"] })).toEqual({ to: "/", search: { tags: ["a"], archived: undefined, t: undefined, note: "n1" } });
+    expect(noteLink("n1", null)).toEqual({ to: "/", search: { tags: undefined, archived: undefined, t: undefined, note: "n1" } });
+  });
+
+  test("a task opens over where the app is: the first is a step marked to go back from, the next takes its place", () => {
+    const first = taskLink("t1", { view: { kind: "home", tags: ["a"] }, note: "n1" });
+    expect(first).toMatchObject({ to: "/", search: { tags: ["a"], t: "t1", note: "n1" }, replace: false });
+    expect(first.state({ ask: true })).toEqual({ ask: true, taskFrom: true });
+    const next = taskLink("t2", { view: { kind: "today" }, task: "t1" });
+    expect(next).toMatchObject({ to: "/today", search: { t: "t2" }, replace: true });
+    expect(next.state({ taskFrom: true })).toEqual({ taskFrom: true });
+    expect(next.state({})).toEqual({ taskFrom: false });
+  });
+
+  test("the open task is a drawer, but beside its list in a wide window with no note over it", () => {
+    expect(taskInDrawer({ view: { kind: "home" } }, false)).toBe(true);
+    expect(taskInDrawer({ view: { kind: "today" } }, false)).toBe(false);
+    expect(taskInDrawer({ view: { kind: "today" } }, true)).toBe(true);
+    expect(taskInDrawer({ view: { kind: "today" }, note: "n1" }, false)).toBe(true);
   });
 });

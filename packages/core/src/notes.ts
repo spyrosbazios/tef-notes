@@ -418,6 +418,15 @@ function hunks(a: string[], b: string[]): Hunk[] {
   return out;
 }
 
+/** `long` is `short` with lines added before or after it, or with its last line typed on. */
+function extends_(long: string[], short: string[]): boolean {
+  if (short.length === 0) return true;
+  const n = short.length, k = long.length - n;
+  if (k < 0) return false;
+  const at = (o: number) => short.every((l, i) => long[o + i] === l || (i === n - 1 && o + i < long.length && long[o + i].startsWith(l)));
+  return at(0) || at(k);
+}
+
 /** Line-based 3-way merge: both sides' edits to `base`, or null where they change the same lines. */
 export function merge3(base: string, mine: string, theirs: string): string | null {
   const o = base.split("\n"), out: string[] = [];
@@ -426,7 +435,14 @@ export function merge3(base: string, mine: string, theirs: string): string | nul
   for (const h of hs) {
     const same = prev && h.s === prev.s && h.e === prev.e;
     if (same && h.lines.join("\n") === prev!.lines.join("\n")) continue;     // the same edit on both sides
-    if (same || h.s < at) return null;                                        // two inserts at one spot, or overlap
+    if (same) {
+      // One side's edit grown on the other (typing went on after a save the other side already has): the longer one
+      const [short, long] = h.lines.length < prev!.lines.length ? [h.lines, prev!.lines] : [prev!.lines, h.lines];
+      if (!extends_(long, short)) return null;                                // two different inserts at one spot
+      out.splice(out.length - prev!.lines.length, prev!.lines.length, ...long);
+      continue;
+    }
+    if (h.s < at) return null;                                                // overlap
     out.push(...o.slice(at, h.s), ...h.lines);
     at = h.e; prev = h;
   }

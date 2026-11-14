@@ -24,7 +24,7 @@ import { useActiveLens } from "@/hooks/lens";
 import { useNow } from "@/hooks/now";
 import { useLeaving } from "@/hooks/presence";
 import { useFinder } from "@/hooks/search";
-import { homeOfTask, noteLink, useNav, type View } from "@/lib/nav";
+import { noteLink, useNav, type View } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
@@ -115,7 +115,7 @@ function Drawer({ header, onClose }: { header: ReactNode; onClose: () => void })
   const views = useMemo(() => (f.wanted ? VIEWS.filter((v) => fold(v.label).includes(fold(f.wanted))) : VIEWS), [f.wanted]);
   const go = (v: View | "ask") => { onClose(); if (v === "ask") assistant.show(); else goView(v); };
   const open = (id: string) => openNote(id);
-  const task = (t: TaskRec) => showTask(homeOfTask(t), t.id);
+  const task = (t: TaskRec) => showTask(t.id);
   const ask = (kind: "tags" | "delete", path = menu?.path) => { if (path) setTarget([path]); setDialog(kind); };
   const tiles = (notes: { n: NoteRec; why?: string }[]) => (
     <Tiles notes={notes} now={now} onOpen={(n) => open(n.note.id)} onMenu={menuOf} onTag={choose}
