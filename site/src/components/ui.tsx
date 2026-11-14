@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { MARK_PATH, MARK_VIEWBOX } from "@/core/brand";
 import { themeVars, type Theme } from "@/core/theme";
 import { cn } from "@/lib";
+import { washes } from "../../washes";
 import { PHONE, Screen, WEB, type Crop, type Size } from "./mock/screen";
 
-/** A theme's palette set as --tf-* on one element: everything inside it, written with the same classes as the rest of
- *  the page, draws in that theme. */
-export const scoped = (t: Theme) => Object.fromEntries(Object.entries(themeVars(t)).map(([k, v]) => [`--tf-${k}`, v])) as CSSProperties;
+/** A theme's palette, and the site's washes of it, set as --tf-* on one element: everything inside it, written with the
+ *  same classes as the rest of the page, draws in that theme. */
+export const scoped = (t: Theme) => Object.fromEntries(Object.entries({ ...themeVars(t), ...washes(t) }).map(([k, v]) => [`--tf-${k}`, v])) as CSSProperties;
 
 /** Whether the page is at phone width (under Tailwind's `sm`), followed as the window resizes. */
 export function useNarrow() {

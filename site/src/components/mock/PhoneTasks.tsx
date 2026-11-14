@@ -2,7 +2,7 @@ import { Plus, Star } from "lucide-react";
 import { cn } from "@/lib";
 import { Evening, PhoneShell, TaskRow, type DemoTask } from "./parts";
 
-const TODAY: DemoTask[] = [
+export const TODAY: DemoTask[] = [
   { title: "Book Sintra train tickets", due: "Wednesday", tags: ["travel"] },
   { title: "Pack the carry-on", checklist: [2, 4] },
   { title: "Measure the spare room", note: "Garage and house maintenance" },
@@ -14,8 +14,9 @@ const TODAY: DemoTask[] = [
 const LISTS: [string, number?][] = [["Inbox", 3], ["Today", 7], ["Upcoming"], ["Logbook"]];
 
 /** The Tasks tab on Today (web/src/components/task-list.tsx below `md`): the tabs' header (page-header.tsx) with the list's name and
- *  the + in brand, the lists as tabs under a gliding line, the day's tasks and This Evening, running on under the floating tab bar. */
-export function PhoneTasks() {
+ *  the + in brand, the lists as tabs under a gliding line, the day's tasks (`tasks`, the demo's unless given) and This Evening,
+ *  running on under the floating tab bar. */
+export function PhoneTasks({ tasks = TODAY }: { tasks?: DemoTask[] }) {
   return (
     <PhoneShell tab="Tasks">
       <div className="flex h-11 items-center gap-1 pl-4 pr-2">
@@ -30,7 +31,7 @@ export function PhoneTasks() {
         ))}
       </div>
       <div className="px-2 pt-2">
-        {TODAY.map((t) => <TaskRow key={t.title} task={t} />)}
+        {tasks.map((t) => <TaskRow key={t.title} task={t} />)}
         <Evening phone />
         <TaskRow task={{ title: "Read for twenty minutes", remind: "21:00" }} />
       </div>
