@@ -183,7 +183,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     state: opened.apply(opened.tr.setMeta("addToHistory", false)),
     attributes: { class: "md pm-editor", spellcheck: "true", "aria-label": "Note body", role: "textbox", "aria-multiline": "true" },
     nodeViews: {
-      image: (node) => new ImageView(node, () => resolve, images),
+      image: (node, v, getPos) => new ImageView(node, v, getPos, () => resolve, images),
       list_item: (node, v, getPos) => new ListItemView(node, v, getPos),
     },
     dispatchTransaction(tr) {

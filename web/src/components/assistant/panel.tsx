@@ -98,7 +98,7 @@ function Header({ children }: { children?: ReactNode }) {
 }
 
 function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory: () => void; listing: boolean }) {
-  const { input, setInput, about, setAbout, focusKey, send, stop, newChat } = useAssistant();
+  const { input, setInput, about, setAbout, focusKey, show, send, stop, newChat } = useAssistant();
   const { model, models, unasked } = useModel();
   const { messages, regenerate, status, error, addToolApprovalResponse, addToolOutput } = useChat<UIMessage>({ chat });
   const answer = useCallback((toolCallId: string, output: ChoiceOutput) => { void addToolOutput({ tool: "ask_choice", toolCallId, output }); }, [addToolOutput]);
@@ -179,7 +179,9 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
     <div className="flex h-full min-h-0 flex-col">
       <Header>
         <Button variant={listing ? "secondary" : "ghost"} size="icon" className="shrink-0 text-dim" aria-label="Past chats" aria-pressed={listing} disabled={busy} onClick={onHistory}><History /></Button>
-        <Button variant="ghost" size="icon" className="shrink-0 text-dim" aria-label="New chat" disabled={busy || !messages.length} onClick={newChat}><SquarePen /></Button>
+        {/* A chat with nothing in it is the new chat already: over the chat list the button goes back to it, on it there is nothing to start */}
+        <Button variant="ghost" size="icon" className="shrink-0 text-dim" aria-label="New chat" disabled={busy || (!messages.length && !listing)}
+          onClick={() => (messages.length ? newChat() : show())}><SquarePen /></Button>
       </Header>
 
       {listing ? <ChatList current={chat.id} idle={!busy} onDone={onHistory} /> : (

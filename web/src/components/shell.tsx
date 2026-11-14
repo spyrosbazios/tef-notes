@@ -19,11 +19,11 @@ import { AssistantFab } from "@/components/assistant/fab";
 import { Dock } from "@/components/assistant/dock";
 import { LensChip } from "@/components/lens-switcher";
 import { NotePage } from "@/components/note-page";
-import { OfflineBar } from "@/components/offline-bar";
 import { Palette } from "@/components/palette";
 import { QuickAdd, type Start } from "@/components/quick-add";
 import { Rail } from "@/components/rail";
 import { TabBar } from "@/components/tab-bar";
+import { SyncNotice } from "@/components/sync-notice";
 import { TaskDrawer } from "@/components/task-drawer";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -61,7 +61,6 @@ function NoteLayer({ id, reach }: { id: string; reach: boolean }) {
   useLayoutEffect(() => { landed(); return () => leaving(id); }, [id]);
   return (
     <div data-vt="note" className={cn("absolute inset-0 z-20 flex flex-col bg-bg", reach && "max-md:pb-[env(safe-area-inset-bottom)]")}>
-      <OfflineBar />
       <div className="flex min-h-0 flex-1">
         <main ref={ref} tabIndex={-1} className="min-w-0 flex-1 outline-none"><NotePage id={id} /></main>
       </div>
@@ -130,7 +129,6 @@ export function Shell() {
               </Sheet>
 
               <div className="flex min-w-0 flex-1 flex-col">
-                <OfflineBar />
                 <div className={cn("flex h-12 shrink-0 items-center gap-1 border-b border-line px-2 max-md:hidden lg:hidden", focus && "hidden")}>
                   <Button variant="ghost" size="icon" aria-label="Views" onClick={() => setMenu(true)}><Menu /></Button>
                   <span className="flex-1 truncate font-semibold">{titleOf(view)}</span>
@@ -145,6 +143,7 @@ export function Shell() {
               </div>
             </div>
             {note ? <NoteLayer id={note} reach={bar} /> : null}
+            <SyncNotice />
           </div>
 
           <Dock />
