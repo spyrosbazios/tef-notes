@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "types": ["bun"],
+    "skipLibCheck": true,
+    "strict": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* The film draws the site's screens: `@/` is the site's source, as the site reads it, and `@/core` the shared core.
+       The site's files import react and lucide; those resolve here, as bundler.ts makes them at build, so the check needs
+       no install in site/. */
+    "paths": {
+      "@/core/*": ["../packages/core/src/*"],
+      "@/*": ["../site/src/*"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "lucide-react": ["./node_modules/lucide-react"]
+    },
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "scripts", "test", "bundler.ts", "remotion.config.ts"]
+}

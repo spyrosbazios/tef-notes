@@ -1,6 +1,7 @@
 import { Clipper } from "@/components/Clipper";
 import { Closing } from "@/components/Closing";
 import { Features } from "@/components/Features";
+import { Film } from "@/components/Film";
 import { Fits } from "@/components/Fits";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
@@ -16,6 +17,7 @@ export function App() {
       <main>
         <Hero />
         <Features />
+        <Film />
         <Showcase />
         <Clipper />
         <Keys />

@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut a TEF Notes release end to end - changelog section, commit, tag, push, live redeploy, then the promo refresh so the README and site cover it. Use when Spyros says release, cut a release, tag a version, ship vX.Y.Z, or /release.
+description: Cut a TEF Notes release end to end - changelog section, commit, tag, push, live redeploy, then the promo refresh and the promo film's re-cut so the README, the site and the film cover it. Use when Spyros says release, cut a release, tag a version, ship vX.Y.Z, or /release.
 ---
 
 # Release
@@ -34,8 +34,8 @@ a user, one line per change, no commit hashes. Leave `## Unreleased` empty above
 git commit -am "Release X.Y.Z" && git tag vX.Y.Z && git push origin main vX.Y.Z
 ```
 
-Never move or re-push an existing tag. The tag starts `release.yml` (GitHub release, extension zip) and `docker.yml`
-(GHCR images).
+Never move or re-push an existing tag. The tag starts `release.yml` (GitHub release: the extension zip, the companion's
+APK, the promo film) and `docker.yml` (GHCR images).
 
 ## 4. Redeploy the live server
 
@@ -45,16 +45,20 @@ cd server && TEF_NOTES_VERSION=$(sh ../scripts/version.sh) docker compose up -d 
 
 Without the variable Settings → Maintenance shows 0.0.0. Confirm `scripts/version.sh` printed the new version.
 
-## 5. Promo refresh
+## 5. Promo refresh, then the film
 
 Run the `promo-refresh` skill now, so the README and site cover this release the same day (the weekly scheduled run is
 only a backstop). It decides itself whether there is drift and commits as `Promo: …`.
 
+Then run the `promo-video` skill: it decides whether the release changes the promo film's cut and commits as
+`Video: …`. In this order, because the refresh may change a drawn screen or the headline the film shows. The release
+already carries the film as it was at the tag; a re-cut reaches the site with its own push and the next release.
+
 ## 6. Check the runs
 
-`gh run list --limit 4`: Release, Docker images, CI and (if promo touched `site/`) Pages. Report any failure with
-its first error line.
+`gh run list --limit 5`: Release, Docker images, CI and (if promo touched `site/` or `video/`) Pages, which renders
+the film first. Report any failure with its first error line.
 
 ## Report
 
-The version, the changelog lines, the deploy, what promo changed, the state of the runs.
+The version, the changelog lines, the deploy, what promo changed, what the film's cut did, the state of the runs.

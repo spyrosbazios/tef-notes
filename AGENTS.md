@@ -2,7 +2,8 @@
 
 **TEF Notes**: self-hosted notes and tasks: a PocketBase server (`server/`) with a chat agent beside it
 (`server/agent/`), a web app (`web/`, installed as a PWA on the phone), a CLI (`cli/`), a Chrome clipper (`extension/`) and an Android
-companion (`android/`: widgets, the share sheet, a tile; never a second client), all sharing `packages/core/`. What it is and how to run it: `README.md`. The note format, tasks, the write contract and
+companion (`android/`: widgets, the share sheet, a tile; never a second client), all sharing `packages/core/`. Beside the app: the
+public page (`site/`) and the promo film drawn from its screens (`video/`). What it is and how to run it: `README.md`. The note format, tasks, the write contract and
 the server's jobs: `ARCHITECTURE.md` (not repeated here). Rules for changes: `CONTRIBUTING.md`. Security model: `SECURITY.md`.
 Each module has its own `README.md`; `extension/` and `android/` also have an `AGENTS.md`.
 
@@ -47,6 +48,7 @@ Each module has its own `README.md`; `extension/` and `android/` also have an `A
 | `android/AGENTS.md` | The companion app: its invariants (no rules, no screens, no colours of its own), its build, what bit | |
 | `extension/AGENTS.md` | The clipper's clip contract, its build and the signed CRX (`extension/scripts/crx.ts`) | |
 | `site/README.md` | The public marketing page: a static Vite build deployed on its own (any static host, or its Dockerfile from the repo root); palette and fonts from `@/core/theme` and `assets/`; the app screens drawn in code (`src/components/mock/`), never screenshots | |
+| `video/src/storyboard.ts` + `video/README.md` | The promo film: the storyboard is its script as data (the shots, their words and seconds, `RULES` the budget they are cut to), a scene a file in `video/src/scenes/` made of `video/src/kit/`'s moves over the site's drawn screens, rendered by Remotion in CI (`.github/workflows/film.yml`) into the site's `#film` section and each release. What a release changes in the cut: `.claude/skills/promo-video/SKILL.md` | ⭐ the film |
 | `assets/` | The brand's fonts (Atkinson Hyperlegible, OFL), the logo SVGs, the app icon; `bun assets/icons.ts` regenerates `icon.png` and `packages/core/src/brand.ts` (needs `server/agent` deps installed) | |
 
 ## Working with notes from the laptop
@@ -74,6 +76,7 @@ cd cli && bun install && bun run typecheck             # the CLI
 cd extension && bun install && bun run build           # -> extension/dist; `bun run typecheck`, `bun run lint`
 cd android && bun install && ./gradle.sh testDebugUnitTest lintRelease assembleRelease   # JAVA_HOME, ANDROID_HOME; android/README.md
 cd server/agent && bun install && bun test && bun run typecheck
+cd video && bun install && bun test && bun run typecheck && bun run stills   # the film's frames -> video/out/stills; video/README.md
 ```
 
 ## Ownership
@@ -87,6 +90,7 @@ cd server/agent && bun install && bun test && bun run typecheck
 | `extension/` | The browser's "Save to TEF Notes": reads the page, or fetches the picture and downscales it, shows the server's suggestions, takes an optional note, saves where the user picks | Filing logic (the server's), any key or sign-in, colours of its own: all from `@/core/theme` |
 | `android/` | Android's entry points the web app can't have: the Tasks and Notes widgets, "Save to TEF Notes" in the share sheet and over selected text, the New task tile and shortcut; what waits while the server is out of reach | A screen of the app's (a tap opens the web app); a rule of its own (what a feed lists and how is `@/core/companion`, on the server); a colour, icon or font of its own; any key or sign-in |
 | `site/` | The public page: copy, device frames, the app screens it draws | Talking to any server; a palette, font or icon set of its own: all from `@/core/theme`, `assets/` and lucide |
+| `video/` | The promo film: the storyboard, the scenes, the moves, the render | A screen of its own (the site's `mock/`, driven through props), a recording or a screenshot, a committed video file; motion that is not a function of the frame; a palette, font or icon set of its own |
 
 ## Footguns that actually bit
 
