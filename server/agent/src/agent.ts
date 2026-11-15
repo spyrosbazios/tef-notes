@@ -8,12 +8,13 @@
 // until the client answers it with addToolOutput and resends.
 // While a turn runs, the owner can steer it (steer.ts): their message joins the turn at the next step boundary.
 import { ChatHistoryError, readChatHistory } from "@/core/chat-history";
-import { policyApprovals } from "./tool-policy";
+import { allowed, policyApprovals } from "./tool-policy";
 import {
   createAgentUIStream, createUIMessageStreamResponse, generateId, readUIMessageStream, isStepCount, smoothStream, ToolLoopAgent,
   type InferUITools, type ModelMessage, type UIMessage,
 } from "ai";
 import { z } from "zod";
+import type { Actions } from "@/core/actions";
 import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
 import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
 import { MEMORY, parseNote } from "@/core/notes";
@@ -27,6 +28,7 @@ import { steeringFor } from "./steer";
 import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, sees, Unavailable } from "./models";
+import { ownerPrefs } from "./prefs";
 import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
 import { PLACES, SYSTEM, today, WEB } from "./systemPrompt";
@@ -41,7 +43,6 @@ const Body = z.object({
   id: z.string().min(1).max(64),
   messages: z.array(z.unknown()),
   model: z.string().min(1).max(200),
-  writesWithoutAsking: z.boolean(),
   effort: z.enum(EFFORTS),
   context: Context,                     // the page the assistant is on; absent or unreadable: a plain chat
 });
@@ -63,23 +64,24 @@ async function context(notes: Notes, page: AssistantContext | undefined, files: 
   };
 }
 
-/** Notes are the user's: a write shows a confirm card, unless they turned that off in Settings — and even then once
- *  the chat has read the web or a PDF (`web`), where a page can carry instructions aimed at the agent. A bad path skips
- *  the card: the tool's error goes straight back to the agent. */
-export function approvals(notes: Notes, todo: Todo, writesWithoutAsking: boolean, web = readWeb(notes, todo), files: readonly Attached[] = []) {
-  return policyApprovals(toolPolicies(), { notes, todo, files }, writesWithoutAsking, web);
+/** Notes and tasks are the user's: each write asks, goes ahead or is refused by the owner's rule for its action (`rules`, their
+ *  preferences' `actions`, @/core/actions), and one allowed without asking still asks once the chat has read the web or a PDF
+ *  (`web`), where a page can carry instructions aimed at the agent. A bad path skips the card: the tool's error goes straight back. */
+export function approvals(notes: Notes, todo: Todo, rules: Actions, web = readWeb(notes, todo), files: readonly Attached[] = []) {
+  return policyApprovals(toolPolicies(), { notes, todo, files }, rules, web);
 }
 
 /** `foreign`: someone else's text is in this turn's context (`context`), or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
-async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, writesWithoutAsking: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[]) {
+async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, rules: Actions, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[]) {
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = foreign ? async () => true : read;
   const web = !!(await key("exa")), all = tools(notes, todo, untrusted, files);
-  // Out of the prompt: the web tools without an Exa key, and the tools the client does
-  // itself unless this page can do them
+  // Out of the prompt: the web tools without an Exa key, the tools the client does itself unless this page can do them,
+  // and the writes the owner never allows (a call made anyway is refused by toolApproval)
   const ui = uiToolsFor(page), off = new Set<string>(UI_TOOL_NAMES.filter((n) => !ui.includes(n)));
-  const base = (Object.keys(all) as (keyof Tools)[]).filter((n) => !off.has(n) && (web || !policyFor(n)?.requiresExa));
+  const base = (Object.keys(all) as (keyof Tools)[])
+    .filter((n) => !off.has(n) && (web || !policyFor(n)?.requiresExa) && allowed(policyFor(n), rules));
   return new ToolLoopAgent({
     model: m,
     instructions: `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}`,
@@ -92,7 +94,7 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, w
       ...(stepNumber === 0 && { messages: trim(messages) }),
       ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : { toolChoice: "none" as const }),
     }),
-    toolApproval: approvals(notes, todo, writesWithoutAsking, untrusted, files),
+    toolApproval: approvals(notes, todo, rules, untrusted, files),
     providerOptions,
   });
 }
@@ -103,7 +105,7 @@ const fail = (status: number, message: string) => new Response(message, { status
 export async function chat(req: Request, server: Server, pick: typeof model = model): Promise<Response> {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail(400, `Bad request: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
-  const { id, model: picked, writesWithoutAsking, effort, context: page } = parsed.data;
+  const { id, model: picked, effort, context: page } = parsed.data;
   let history: AgentMessage[];
   try {
     if (!(await exists(server, id))) return fail(404, `No chat ${id}: create it in chats first.`);
@@ -118,7 +120,9 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   // Classify before schema repair: an obsolete input must never erase a past untrusted read.
   const historicalTaint = historyFromWeb(history, new Set([...(await notes.tainted()), ...(await todo.tainted())]), policyFor);
   let agent: ToolLoopAgent<never, Tools>;
-  try { agent = await build(notes, todo, pick, picked, writesWithoutAsking, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
+  // The owner's rules are read here, never taken from the request: no client can turn a card off
+  const rules = (await ownerPrefs(server)).prefs.actions;
+  try { agent = await build(notes, todo, pick, picked, rules, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }

@@ -8,7 +8,8 @@ describe("prefsOf", () => {
   });
   test("keeps what is valid, drops the rest", () => {
     const p = prefsOf({ theme: "nope", phone: { tabs: ["ask", "ask", "bogus", "home"], hidden: ["settings", "tasks"], start: "today" },
-      notes: { grouped: true, collapsed: ["a", 1, "a"], sort: "created" }, agent: { model: "", effort: "deep", unasked: "yes" } });
+      notes: { grouped: true, collapsed: ["a", 1, "a"], sort: "created" }, agent: { model: "", effort: "deep", unasked: "yes" }, actions: { createNote: "auto", deleteNote: "sometimes", bogus: "never" } });
+    expect(p.actions).toEqual({ ...DEFAULT_PREFS.actions, createNote: "auto" });
     expect(p.theme).toBe(DEFAULT_PREFS.theme);
     expect(p.phone.tabs).toEqual(["ask", "home", "tasks", "notes", "settings"]);
     expect(p.phone.hidden).toEqual(["tasks", "notes"]);
@@ -16,7 +17,7 @@ describe("prefsOf", () => {
     expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
     expect(prefsOf({ lens: "" }).lens).toBeNull();
     expect(p.notes).toEqual({ grouped: true, collapsed: ["a"], sort: "created" });
-    expect(p.agent).toEqual({ effort: "deep", unasked: false, newChat: "app" });
+    expect(p.agent).toEqual({ effort: "deep", newChat: "app" });
   });
   test("each layout keeps its own", () => {
     const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"] } });

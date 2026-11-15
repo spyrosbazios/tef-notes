@@ -3,7 +3,8 @@
 // Where a setting is kept (the rule; ask in this order):
 //   1. A choice the owner makes, in Settings or by leaving a view a certain way, is a preference: a field of `Prefs`, kept on
 //      the server (the `prefs` collection: one record keyed `owner`, its `data` this shape) so every device has it.
-//      - The same on every screen (the look, the notes list, the assistant, voice, sharing, the lens on): a key, or a group's field.
+//      - The same on every screen (the look, the notes list, the assistant and what it may do, voice, sharing, the lens on): a key,
+//        or a group's field.
 //      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar): `phone` or `desktop`. A layout
 //        is what the window draws, not what the device is: the phone's below `md` (768px: tabs at the bottom), the desktop's from
 //        it (the rail). A laptop window made narrow is drawn as a phone's, and follows the phone's preferences.
@@ -14,6 +15,7 @@
 // never undo each other's. `prefsOf` reads whatever was stored: an unknown or missing field is its default. A field moved or
 // renamed is a migration of the record (server/pb_migrations/1794600000_prefs_layouts.js is one), never a second reader.
 // Pure and platform-neutral.
+import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";
 import { effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
 import { keepOf, type Keep } from "./voice";
@@ -106,8 +108,10 @@ export type Prefs = {
   accent: AccentName;
   /** The notes list: grouped under its tags, which groups are folded (NO_TAG "" for "No tag"), its sort. */
   notes: { grouped: boolean; collapsed: string[]; sort: NoteSort };
-  /** The assistant: the model picked (none is the server's default), its effort, notes written without asking, when a new chat starts. */
-  agent: { model?: string; effort: Effort; unasked: boolean; newChat: NewChat };
+  /** The assistant: the model picked (none is the server's default), its effort, when a new chat starts. */
+  agent: { model?: string; effort: Effort; newChat: NewChat };
+  /** Which of the assistant's writes ask first, go ahead, or are never allowed (actions.ts); the agent's server enforces them. */
+  actions: Actions;
   /** Voice input: how long the server keeps its speech model loaded once idle, in seconds (voice.ts). */
   voice: { keep: Keep };
   /** A link or picture shared from another app: "Add a summary", as last left. */
@@ -123,7 +127,8 @@ const LAYOUT_DEFAULTS: LayoutPrefs = { start: "home", homeList: "today" };
 export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
-  agent: { effort: effortOf(undefined), unasked: false, newChat: "app" },
+  agent: { effort: effortOf(undefined), newChat: "app" },
+  actions: { ...DEFAULT_ACTIONS },
   voice: { keep: keepOf(undefined) },
   clip: { summary: false },
   lens: null,
@@ -158,9 +163,10 @@ export function prefsOf(raw: unknown): Prefs {
     },
     agent: {
       ...(typeof agent.model === "string" && agent.model ? { model: agent.model } : {}),
-      effort: effortOf(agent.effort), unasked: agent.unasked === true,
+      effort: effortOf(agent.effort),
       newChat: one(NEW_CHATS, agent.newChat, "app"),
     },
+    actions: actionsOf(p.actions),
     voice: { keep: keepOf(voice.keep) },
     clip: { summary: clip.summary === true },
     lens: typeof p.lens === "string" && p.lens ? p.lens : null,

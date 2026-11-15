@@ -6,7 +6,8 @@
 import { helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, taskListOf, tasksFeed } from "@/core/companion";
 import { activeLens, inheritTags, type Lens } from "@/core/lens";
 import * as pb from "@/core/pocketbase";
-import { PREFS_KEY, prefsOf, withPatch, type Prefs } from "@/core/prefs";
+import { PREFS_KEY, withPatch, type Prefs } from "@/core/prefs";
+import { ownerPrefs } from "./prefs";
 import { localDay } from "@/core/time";
 import { NoteService } from "./application/notes";
 import { TaskService } from "./application/todo";
@@ -17,12 +18,8 @@ type Owner = { rec: string | null; prefs: Prefs; lenses: Lens[]; lens: Lens | nu
 
 /** The owner's preferences (none saved yet: the defaults, and no record), their lenses and the one they have on. */
 async function owner(server: pb.Server): Promise<Owner> {
-  const [saved, lenses] = await Promise.all([
-    pb.call(server, `collections/prefs/records?filter=${encodeURIComponent(`key = ${pb.lit(PREFS_KEY)}`)}&perPage=1&skipTotal=1`),
-    pb.lenses.list(server),
-  ]);
-  const record = saved.items?.[0], prefs = prefsOf(record?.data);
-  return { rec: record?.id ?? null, prefs, lenses, lens: activeLens(lenses, prefs.lens) };
+  const [{ rec, prefs }, lenses] = await Promise.all([ownerPrefs(server), pb.lenses.list(server)]);
+  return { rec, prefs, lenses, lens: activeLens(lenses, prefs.lens) };
 }
 
 export async function helloRoute(server: pb.Server): Promise<Response> {

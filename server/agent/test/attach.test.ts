@@ -1,5 +1,6 @@
 // attach_file: a file attached in the chat filed into a note, against a fake PocketBase (fake-pb.ts).
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { DEFAULT_ACTIONS } from "@/core/actions";
 import { attachedBlock, attachedFiles, type Attached } from "@/core/assistant";
 import { parseNote } from "@/core/notes";
 import { approvals } from "../src/agent";
@@ -67,12 +68,12 @@ describe("attach_file", () => {
   });
 
   it("a bad call goes back to the agent without a card", async () => {
-    const ask = approvals(notes, new Todo({ url: pb.url }), false, undefined, [pic]);
+    const ask = approvals(notes, new Todo({ url: pb.url }), DEFAULT_ACTIONS, undefined, [pic]);
     pb.put("notes/a.md", file("A"));
     expect(await run(T, { file: "nope.png", path: "notes/a.md" })).toMatchObject({ error: expect.stringContaining("receipt.jpg") });
     expect(await run(T, { file: "receipt.jpg" })).toMatchObject({ error: expect.stringContaining("either path") });
-    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/nope.md" })).toBe("not-applicable");
-    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/a.md" })).toBe("user-approval");
+    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/nope.md" }, { messages: [] })).toBe("not-applicable");
+    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/a.md" }, { messages: [] })).toBe("user-approval");
     expect(pb.attachments.size).toBe(0);
   });
 });

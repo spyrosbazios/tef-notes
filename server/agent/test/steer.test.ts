@@ -52,7 +52,7 @@ describe("steering", () => {
     replies = [toolCall("read_note", { path: "notes/20261001-shopping.md" }), text("Oat milk it is.")];
     const user: UIMessage = { id: "u1", role: "user", parts: [{ type: "text", text: "what's on shopping?" }] };
     const res = await chat(new Request("http://x/agent/chat", {
-      method: "POST", body: JSON.stringify({ id: "chat1", messages: [user], model: "m", writesWithoutAsking: false, effort: "normal" }),
+      method: "POST", body: JSON.stringify({ id: "chat1", messages: [user], model: "m", effort: "normal" }),
     }), { url: pb.url }, pick);
     const chunks = (await res.text()).split("\n").filter((l) => l.startsWith("data: ") && l !== "data: [DONE]").map((l) => JSON.parse(l.slice(6)) as UIMessageChunk);
     let out: UIMessage | undefined;

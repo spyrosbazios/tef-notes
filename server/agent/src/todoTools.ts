@@ -266,11 +266,11 @@ export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMe
 export const todoPolicies = {
   list_tasks: { approval: "none", result: "records" },
   list_tagged: { approval: "none", result: "records" },
-  add_task: { approval: "write", result: "plain", check: ({ notes, todo }, i) => checkAdd(notes, todo, i) },
-  add_tasks: { approval: "write", result: "plain", check: ({ notes, todo }, i) => checkAddMany(notes, todo, i) },
-  update_task: { approval: "write", result: "plain", check: ({ notes, todo }, i: UpdateInput) => checkUpdate(notes, todo, i) },
-  complete_task: { approval: "write", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
-  delete_task: { approval: "always", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
+  add_task: { approval: "createTask", result: "plain", check: ({ notes, todo }, i) => checkAdd(notes, todo, i) },
+  add_tasks: { approval: "createTask", result: "plain", check: ({ notes, todo }, i) => checkAddMany(notes, todo, i) },
+  update_task: { approval: "editTask", result: "plain", check: ({ notes, todo }, i: UpdateInput) => checkUpdate(notes, todo, i) },
+  complete_task: { approval: "editTask", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
+  delete_task: { approval: "deleteTask", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
 } satisfies Policies<ReturnType<typeof todoTools>>;
 
 /** Read tools shared by chat and search, independent of write-card adapters. */

@@ -1,6 +1,7 @@
 // Settings: the look (theme and accent), each layout's own (where the app opens, Home's list, the phone's tabs, the desktop's
 // sidebar; all the owner's preferences, on the server, hooks/prefs.ts), the agent (which model
-// Ask uses, how hard it thinks, whether it writes notes without asking: preferences too; what it remembers of the owner,
+// Ask uses, how hard it thinks, which of its writes ask first, go ahead or are never allowed: preferences too, enforced by the
+// agent's server, @/core/actions; what it remembers of the owner,
 // agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
 // phone sees them too, and the server tags notes with them itself; notes' own tags are not touched by renaming or deleting a
 // definition), import and export, and maintenance (the server, the offline copy this browser keeps, the version). A window lists the sections beside the page; below `md` the list is the page and a
@@ -9,9 +10,10 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2, Mic, Monitor, Palette, Pencil, Plus, RefreshCw, Settings, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Download, FilePen, FilePlus, FileX, LayoutGrid, ListPlus, ListTodo, ListX, Loader2, Mic, Monitor, Palette, Paperclip, Pencil, Plus, RefreshCw, Settings, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
+import { ACTION_LABEL, ACTIONS, RULE_LABEL, RULES, type Action } from "@/core/actions";
 import { COLORS, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
@@ -444,24 +446,17 @@ function Tags() {
 }
 
 function Agent() {
-  const { models, unasked, newChat, set } = useModel();
+  const { models, newChat, set } = useModel();
   return (
     <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
       <h2 id="agent-h" className={TITLE}>Agent</h2>
-      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys, and the model and the switch below, so every device has the same.</p>
+      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys, and the model and the choices below, so every device has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
           <ModelMenu align="end" />
         </div>
-        <label className="flex items-center gap-3 px-3 py-2.5">
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">Write notes without asking</span>
-            <span className="block text-[13px] leading-snug text-dim">Off: every note it writes waits on a card for your yes. Once a chat has read the web, it asks anyway.</span>
-          </span>
-          <Switch checked={unasked} onCheckedChange={(v) => set({ unasked: v })} aria-label="Write notes without asking" />
-        </label>
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
             <p className="text-sm font-semibold">Start a new chat</p>
@@ -477,8 +472,41 @@ function Agent() {
         ) : null}
       </div>
     </section>
+    <AgentActions />
     <Memory />
     </div>
+  );
+}
+
+const ACTION_ICON: Record<Action, LucideIcon> = {
+  createTask: ListPlus, editTask: ListTodo, deleteTask: ListX, createNote: FilePlus, editNote: FilePen, deleteNote: FileX,
+  files: Paperclip, tags: TagIcon, memory: Brain,
+};
+
+/** Which of the agent's writes wait on a card, go ahead, or are never allowed: one rule per action (@/core/actions), kept in the
+ *  preferences and enforced by the agent's server, so no reply can skip a card. */
+function AgentActions() {
+  const actions = usePrefs().actions;
+  return (
+    <section className="space-y-3" aria-labelledby="actions-h">
+      <h2 id="actions-h" className={HEAD}>What the agent may do</h2>
+      <p className="text-sm text-dim">Ask first: the write waits on a card for your yes. Just do it: no card, unless the chat has read the web or a PDF, when it asks anyway. Never: the agent can't.</p>
+      <ul className="divide-y divide-line rounded-xl border border-line">
+        {ACTIONS.map((a) => {
+          const Icon = ACTION_ICON[a], { name, covers } = ACTION_LABEL[a];
+          return (
+            <li key={a} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+              <Icon className="size-4 shrink-0 text-dim" aria-hidden />
+              <div className="min-w-0 flex-1 basis-40">
+                <p className="text-sm font-semibold">{name}</p>
+                <p className="text-[13px] leading-snug text-dim">{covers}</p>
+              </div>
+              <Choice label={name} value={actions[a]} options={RULES} names={RULE_LABEL} onPick={(v) => setPrefs({ actions: { [a]: v } })} />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

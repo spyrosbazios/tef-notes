@@ -83,5 +83,5 @@ export function fileTools(notes: Notes, files: readonly Attached[]) {
 
 /** Complete policy for this module: adding a tool requires an explicit classification. */
 export const filePolicies = {
-  attach_file: { approval: "always", result: "plain", check: ({ notes, files }, i) => attachProblem(notes, files, i) },
+  attach_file: { approval: "files", result: "plain", check: ({ notes, files }, i) => attachProblem(notes, files, i) },
 } satisfies Policies<ReturnType<typeof fileTools>>;

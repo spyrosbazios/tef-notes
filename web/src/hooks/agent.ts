@@ -27,13 +27,12 @@ export function useModel() {
   const { data } = useModels();
   const prefs = usePrefs().agent;
   const model = useMemo(() => pickModel(data, prefs.model), [data, prefs.model]);
-  return { model, models: data, unasked: prefs.unasked, newChat: prefs.newChat, effort: prefs.effort, set: setAgent };
+  return { model, models: data, newChat: prefs.newChat, effort: prefs.effort, set: setAgent };
 }
 
 /** What a request to the agent carries from the settings, read as it is sent: a reply resumed by a card's
  *  answer goes out without a call of ours, so it can't be handed these. */
 export const settingsNow = (qc: QueryClient) => ({
   model: pickModel(qc.getQueryData<AgentModels>(MODELS), prefsNow().agent.model),
-  writesWithoutAsking: prefsNow().agent.unasked,
   effort: prefsNow().agent.effort,
 });

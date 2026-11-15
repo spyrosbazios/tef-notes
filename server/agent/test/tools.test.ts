@@ -2,6 +2,7 @@
 // every write through the rev compare-and-swap, against a fake PocketBase (fake-pb.ts).
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
+import { DEFAULT_ACTIONS, type Actions } from "@/core/actions";
 import { cardsOf } from "@/core/agent";
 import { parseNote } from "@/core/notes";
 import { approvals } from "../src/agent";
@@ -13,6 +14,11 @@ import { Todo } from "../src/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";
 import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, readWeb, tools, type Line } from "../src/tools";
 import { fakePb } from "./fake-pb";
+
+/** The owner's rules as the old switch left them (pb_migrations/1795000000_agent_actions.js): off is the defaults; on, the
+ *  writes it covered go ahead and deletes and files still ask. */
+const ASKED: Actions = DEFAULT_ACTIONS;
+const UNASKED: Actions = { ...DEFAULT_ACTIONS, createTask: "auto", editTask: "auto", createNote: "auto", editNote: "auto", tags: "auto" };
 
 const pb = fakePb();
 afterAll(() => pb.stop());
@@ -246,7 +252,7 @@ describe("writes", () => {
 
   it("set_place: the confirm card is skipped only for a bad request, which goes back to the agent", async () => {
     const added = await run(T.add_task, { title: "Swim" } as never) as { id: string };
-    const ask = approvals(notes, todo, false).set_place, o = { messages: [] as ModelMessage[] };
+    const ask = approvals(notes, todo, ASKED).set_place, o = { messages: [] as ModelMessage[] };
     expect(await ask({ task: added.id, name: "Home" }, o)).toBe("user-approval");
     expect(await ask({ task: added.id }, o)).toBe("not-applicable");
     expect(await ask({ task: "nope", name: "Home" }, o)).toBe("not-applicable");
@@ -512,9 +518,9 @@ describe("delete_note", () => {
 
   it("always asks, whatever the setting; a bad path goes straight back", async () => {
     pb.notes.set("notes/a.md", { id: "r1", path: "notes/a.md", rev: 1, tainted: false, updated: "2026-10-05 10:00:00.000Z", text: file("A"), title: "A", tags: [] });
-    const ask = approvals(notes, todo, true);
-    expect(await ask.delete_note({ path: "notes/a.md" })).toBe("user-approval");
-    expect(await ask.delete_note({ path: "notes/zz.md" })).toBe("not-applicable");
+    const ask = approvals(notes, todo, UNASKED);
+    expect(await ask.delete_note({ path: "notes/a.md" }, { messages: [] })).toBe("user-approval");
+    expect(await ask.delete_note({ path: "notes/zz.md" }, { messages: [] })).toBe("not-applicable");
   });
 });
 
@@ -564,7 +570,7 @@ describe("cards", () => {
     const model = await T.show_items.toModelOutput!({ toolCallId: "c", input: {} as never, output: r as never });
     const result: ModelMessage = { role: "tool", content: [{ type: "tool-result", toolCallId: "c", toolName: "show_items", output: model }] };
     expect(await web([result])).toBe(true);
-    expect(Object.keys(approvals(notes, todo, false))).not.toContain("show_items");
+    expect(Object.keys(approvals(notes, todo, ASKED))).not.toContain("show_items");
   });
 });
 
@@ -575,7 +581,7 @@ describe("approvals", () => {
 
   it("a write asks, unless writes without asking are on and the chat hasn't read the web; a bad path skips the card", async () => {
     pb.put("notes/a.md", file("a"));
-    const ask = approvals(notes, todo, false), auto = approvals(notes, todo, true);
+    const ask = approvals(notes, todo, ASKED), auto = approvals(notes, todo, UNASKED);
     expect(await ask.append_to_note({ path: "notes/a.md" }, o())).toBe("user-approval");
     expect(await ask.append_to_note({ path: "notes/nope.md" }, o())).toBe("not-applicable");
     expect(await ask.rewrite_note({ path: "notes/a.md", text: "---\nx\n" }, o())).toBe("not-applicable");
@@ -586,7 +592,7 @@ describe("approvals", () => {
   it("a task write asks like a note write; a bad task or value skips the card; a delete always asks; list_tasks never asks", async () => {
     const t = newTask("ff11".padEnd(15, "0"), { title: "Call" });
     pb.tasks.set(t.id, { ...t, rev: 1 });
-    const ask = approvals(notes, todo, false), auto = approvals(notes, todo, true);
+    const ask = approvals(notes, todo, ASKED), auto = approvals(notes, todo, UNASKED);
     expect(await ask.add_task({ title: "x" }, o())).toBe("user-approval");
     expect(await ask.update_task({ id: t.id, when: "2999-01-01" }, o())).toBe("user-approval");
     expect(await ask.complete_task({ id: t.id }, o())).toBe("user-approval");
@@ -600,8 +606,8 @@ describe("approvals", () => {
     expect(await auto.update_task({ id: t.id, notes: "n" }, o())).toBe("not-applicable");
     expect(await auto.add_task({ title: "x" }, o([web]))).toBe("user-approval");
     expect(await auto.complete_task({ id: t.id }, o([web]))).toBe("user-approval");
-    expect(await auto.delete_task({ id: t.id })).toBe("user-approval");
-    expect(await auto.delete_task({ id: "zzzz" })).toBe("not-applicable");
+    expect(await auto.delete_task({ id: t.id }, o())).toBe("user-approval");
+    expect(await auto.delete_task({ id: "zzzz" }, o())).toBe("not-applicable");
     expect("list_tasks" in ask).toBe(false);
   });
 
@@ -610,7 +616,7 @@ describe("approvals", () => {
     const t = newTask("ab12".padEnd(15, "0"), { title: "t" });
     pb.tasks.set(t.id, { ...t, rev: 1 });
     const listed: ModelMessage = { role: "tool", content: [{ type: "tool-result", toolCallId: "l", toolName: "list_tasks", output: { type: "json", value: { tasks: [{ linked: ["notes/w.md"] }] } } }] };
-    expect(await approvals(notes, todo, true).complete_task({ id: t.id }, o([listed]))).toBe("user-approval");
+    expect(await approvals(notes, todo, UNASKED).complete_task({ id: t.id }, o([listed]))).toBe("user-approval");
   });
 
   it("marks a task written with web text in view, in the same write; read back, it counts as the web", async () => {
@@ -622,12 +628,12 @@ describe("approvals", () => {
     expect(pb.tasks.get(b.id)).toMatchObject({ tainted: true, rev: 2 });
     expect(await todo.tainted()).toEqual(new Set([a.id, b.id]));
     const listed: ModelMessage = { role: "tool", content: [{ type: "tool-result", toolCallId: "l", toolName: "list_tasks", output: { type: "json", value: { tasks: [{ id: a.id }] } } }] };
-    expect(await approvals(notes, todo, true).add_task({ title: "x" }, o([listed]))).toBe("user-approval");
+    expect(await approvals(notes, todo, UNASKED).add_task({ title: "x" }, o([listed]))).toBe("user-approval");
   });
 
   it("memory without a card, unless the chat read the web or a note written from it", async () => {
     pb.put("notes/w.md", file("w"), { tainted: true });
-    const a = approvals(notes, todo, true);
+    const a = approvals(notes, todo, UNASKED);
     expect(await a.update_memory({ text: "x" }, o())).toBe("not-applicable");
     expect(await a.update_memory({ text: "x" }, o([web]))).toBe("user-approval");
     expect(await a.update_memory({ text: "x" }, o([readOf("notes/w.md")]))).toBe("user-approval");
@@ -655,9 +661,9 @@ describe("tag definitions", () => {
   });
   it("asks before tag writes, including after reading web content with cards off", async () => {
     for (const name of ["create_tag", "update_tag"] as const) {
-      expect(await approvals(notes, todo, false)[name]({}, { messages: [] })).toBe("user-approval");
-      expect(await approvals(notes, todo, true)[name]({}, { messages: [] })).toBe("not-applicable");
-      expect(await approvals(notes, todo, true)[name]({}, { messages: [web] })).toBe("user-approval");
+      expect(await approvals(notes, todo, ASKED)[name]({}, { messages: [] })).toBe("user-approval");
+      expect(await approvals(notes, todo, UNASKED)[name]({}, { messages: [] })).toBe("not-applicable");
+      expect(await approvals(notes, todo, UNASKED)[name]({}, { messages: [web] })).toBe("user-approval");
     }
   });
 });

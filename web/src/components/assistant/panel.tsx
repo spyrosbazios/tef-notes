@@ -28,6 +28,7 @@ import { SUGGEST } from "@/core/agent";
 import { aboutNotes, askedAbout } from "@/core/handoff";
 import { ATTACH_ACCEPT, ATTACH_MAX, type ChoiceOutput } from "@/core/assistant";
 import { useModel } from "@/hooks/agent";
+import { usePrefs } from "@/hooks/prefs";
 import { useAssistant } from "@/hooks/assistant";
 import { setDock } from "@/hooks/dock";
 import { useActiveLens } from "@/hooks/lens";
@@ -101,7 +102,8 @@ function Header({ children }: { children?: ReactNode }) {
 
 function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory: () => void; listing: boolean }) {
   const { input, setInput, about, setAbout, focusKey, show, send, stop, newChat } = useAssistant();
-  const { model, models, unasked } = useModel();
+  const { model, models } = useModel();
+  const notesAsk = usePrefs().actions.editNote === "ask";
   const { messages, regenerate, status, error, addToolApprovalResponse, addToolOutput } = useChat<UIMessage>({ chat });
   const answer = useCallback((toolCallId: string, output: ChoiceOutput) => { void addToolOutput({ tool: "ask_choice", toolCallId, output }); }, [addToolOutput]);
   const busy = status === "submitted" || status === "streaming";
@@ -194,7 +196,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
                 <div className="space-y-3 pt-4">
                   <p className="text-sm text-dim">
                     {!model && models ? `The server has no ${models.provider} key yet, so the agent is off.`
-                      : `Finds things in your notes, and notes what you tell it. It sees what you have open. ${unasked ? "It writes notes without asking first (Settings)." : "It asks before it writes a note."}`}
+                      : `Finds things in your notes, and notes what you tell it. It sees what you have open. ${notesAsk ? "It asks before it changes a note." : "What it may do without asking is in Settings."}`}
                   </p>
                   {model ? (
                     <div className="flex flex-wrap gap-2">

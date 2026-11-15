@@ -5,6 +5,12 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Changed
+
+- Settings chooses, for each kind of agent write (create, change or delete tasks; create, edit or delete notes; files;
+  tags and lenses; memory), whether it asks first, just does it, or is never allowed. It replaces the one "Write notes
+  without asking" switch, carried over as it was set, and the agent's server enforces it: a reply can't skip a card.
+
 ## 0.12.0 - 2026-11-15
 
 ### Added

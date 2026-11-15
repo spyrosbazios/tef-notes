@@ -61,5 +61,5 @@ export function placeTools(todo: Todo, fromPage: (messages: ModelMessage[]) => P
 /** Complete policy for this module: adding a tool requires an explicit classification. */
 export const placePolicies = {
   find_place: { approval: "none", result: "untrusted" },
-  set_place: { approval: "write", result: "plain", check: ({ todo }, i) => placeProblem(todo, i) },
+  set_place: { approval: "editTask", result: "plain", check: ({ todo }, i) => placeProblem(todo, i) },
 } satisfies Policies<ReturnType<typeof placeTools>>;

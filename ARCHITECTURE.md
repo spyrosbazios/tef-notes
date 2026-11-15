@@ -188,7 +188,10 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   What was read lives in `ocr.sqlite` in `agent_data` (derived; a deleted PDF's text goes with it; other languages read
   everything again). The page's line tells the model the text is OCR's, and when it read poorly. Setup and limits:
   `server/README.md`, "Scanned PDFs".
-- Writes ask first: each write is a confirm card (AI SDK tool approval) unless you turned the cards off. The chat draws
+- Each write belongs to an action (create, change or delete tasks; create, edit or delete notes; files; tags and lenses;
+  memory: `packages/core/src/actions.ts`), and the owner's rule for it in Settings decides: Ask first (a confirm card, AI SDK
+  tool approval), Just do it (no card unless the turn is tainted), or Never (withdrawn from the model, a call refused). The
+  agent reads the rules from the preferences for every turn, never from the request. Defaults: every write asks but memory. The chat draws
   notes and tasks as cards: every write's result carries its `card`, and `show_items` is how the agent puts
   what it found in front of you. Card shapes (`NoteCard`, `TaskCard`) and builders are in
   `packages/core/src/agent.ts`.
