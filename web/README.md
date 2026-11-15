@@ -60,6 +60,23 @@ UI tools (`open_note`, `open_task`, `go_view`) are done through the router (`use
 by itself after a card's answer or a UI tool's (`resumes`). What the agent writes reaches the page through the realtime
 feed, as any client's writes do. A note's "Ask about this" opens the dock with a draft naming it; there is no `/ask` page.
 
+## Talk
+
+The spoken conversation with the assistant, at `/talk` (a tab on the phone, an item in the rail on the desktop, and a pill
+over every other screen while one goes on). It is not a second assistant: one WebSocket at `/agent/talk` runs the same
+tools, cards and write rules as the dock (contract: `packages/core/src/talk.ts`).
+
+- **The microphone** (`lib/mic.ts`) is an AudioWorklet tap with echo cancellation on: the voice plays while it records, and
+  without that the app would hear itself. Frames of 40 ms go up as binary frames; the voice comes back the same way, raw
+  16-bit PCM at 24 kHz, and `lib/talk-voice.ts` plays each frame exactly where the last one ended.
+- **Nothing is decided here.** Whether the owner has finished, whether they only said "mm-hm" over the voice, and whether
+  the sound was them at all, is the server's ear (Fish Audio's). The page draws `part` events as the chat's own messages, so
+  a card in a spoken turn is the card you tap in the dock, and only a tap answers it.
+- **It lives above the routes** (`components/talk/provider.tsx`): an assistant tool can open a note mid-conversation and the
+  conversation goes on; it survives a route change (hence the pill) and ends on `pagehide`.
+- **The dev server proxies its socket**: `/agent` is proxied with `ws: true`, and the proxy sets `X-Forwarded-Host` on the
+  upgrade itself (`vite.config.ts`), because the server refuses a socket whose `Origin` is not its own host.
+
 ## Home and search
 
 Home (`src/components/home.tsx`) is the date, the task box (Today, Inbox and Upcoming as their views draw them, `TaskList

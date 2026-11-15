@@ -5,6 +5,17 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- Talk: a spoken conversation with the assistant, on a tab of its own (and a pill while you are on another screen). Fish
+  Audio's realtime ear decides what a turn is — yours, a "mm-hm" over the voice, or the television — and its streaming
+  voice answers a sentence at a time; the thinking, the cards, the write rules and the taint checks are the chat's own. The
+  conversation is saved as a chat. Off without a Fish Audio key; Settings picks the voice model and the voice. The first
+  audio of a reply takes about 0.2 s through the paid voice model and about 0.6 s through the free one, measured.
+- Voice input is Fish Audio's now, not a speech model on your server: dictation's pieces go to be written down, and Talk is
+  heard and voiced there. Nothing extra runs for it, and nothing more is downloaded. The `stt` container, its image and its
+  volume are gone, along with `TEF_NOTES_STT` and the "Keep the model loaded" setting. Voice needs `TEF_NOTES_KEY_FISH`.
+
 ### Changed
 
 - Settings chooses, for each kind of agent write (create, change or delete tasks; create, edit or delete notes; files;

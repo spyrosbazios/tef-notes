@@ -16,9 +16,9 @@ const lastUser = (ms: UIMessage[]) => { let i = ms.length - 1; while (i >= 0 && 
  *  the client does itself too: the app never answered it). Close each such call as failed; one still streaming its input never reached the model, so it goes. A confirm
  *  card before the newest user message was never answered, or answered with nothing resent: no write ran, so
  *  it's denied. The newest turn's card is still live and stays. */
-export function settle<M extends UIMessage>(ms: M[]): M[] {
+export function settle<M extends UIMessage>(ms: M[], ended = false): M[] {
   const last = lastUser(ms);
-  const stale = (p: Part, i: number) => open(p) || (i < last && awaiting(p));
+  const stale = (p: Part, i: number) => open(p) || ((ended || i < last) && awaiting(p));
   if (!ms.some((m, i) => m.parts.some((p) => stale(p, i)))) return ms;
   return ms.map((m, i) => (!m.parts.some((p) => stale(p, i)) ? m : {
     ...m,

@@ -52,7 +52,7 @@ const Body = z.object({
  *  instructions — those stay byte for byte the same, the prompt cache's prefix. The live screen comes last: it changes
  *  most. `foreign`: whether someone else's text is in it, which taints the turn (approvals): a PDF's, or words selected
  *  in an open note a chat that read the web wrote (its `tainted` column: the selection is that note's text, read back). */
-async function context(notes: Notes, page: AssistantContext | undefined, files: readonly Attached[] = []) {
+export async function context(notes: Notes, page: AssistantContext | undefined, files: readonly Attached[] = []) {
   const memory = (await notes.meta(MEMORY))?.text.trim() || "(empty)";
   const open = page?.note && await notes.meta(page.note.path);
   const pdfs = open ? await preview(notes.server, { id: parseNote(open.path, open.text).id, path: open.path }) : "";

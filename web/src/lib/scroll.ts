@@ -28,4 +28,7 @@ export const taskScroll = (id: string) => of("task", id);
 export const chatScroll = (id: string) => of("chat", id);
 
 /** The scrollers that start at the top when the router has no place for them (another filter, lens, section, note, task or chat). */
-export const SCROLL_TOP = ["home", "notes", "list", "box", "settings", "note", "task", "chat"].map((kind) => `[data-scroll-restoration-id^="${kind}|"]`);
+/** Talk's transcript: one, which follows its newest line. */
+export const talkScroll = of("talk", "log");
+
+export const SCROLL_TOP = ["home", "notes", "list", "box", "settings", "note", "task", "chat", "talk"].map((kind) => `[data-scroll-restoration-id^="${kind}|"]`);

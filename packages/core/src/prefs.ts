@@ -3,7 +3,7 @@
 // Where a setting is kept (the rule; ask in this order):
 //   1. A choice the owner makes, in Settings or by leaving a view a certain way, is a preference: a field of `Prefs`, kept on
 //      the server (the `prefs` collection: one record keyed `owner`, its `data` this shape) so every device has it.
-//      - The same on every screen (the look, the notes list, the assistant and what it may do, voice, sharing, the lens on): a key,
+//      - The same on every screen (the look, the notes list, the assistant and what it may do, the voice, sharing, the lens on): a key,
 //        or a group's field.
 //      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar): `phone` or `desktop`. A layout
 //        is what the window draws, not what the device is: the phone's below `md` (768px: tabs at the bottom), the desktop's from
@@ -18,7 +18,7 @@
 import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";
 import { effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
-import { keepOf, type Keep } from "./voice";
+import { DEFAULT_TALK_MODEL, TALK_MODELS, type TalkModel } from "./talk";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 
 // ---- layouts
@@ -31,18 +31,18 @@ export const LAYOUT_LABEL: Record<Layout, string> = { phone: "Phone", desktop: "
 // ---- the choices
 
 /** The phone's bottom bar: its tabs, in the order the owner put them. Settings is always shown (it is where the bar is set). */
-export const TABS = ["home", "tasks", "notes", "ask", "settings"] as const;
+export const TABS = ["home", "tasks", "notes", "ask", "talk", "settings"] as const;
 export type Tab = (typeof TABS)[number];
-export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", notes: "Notes", ask: "Ask", settings: "Settings" };
-export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask"];
+export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", notes: "Notes", ask: "Ask", talk: "Talk", settings: "Settings" };
+export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask", "talk"];
 /** Tabs off until turned on: Notes, a page of only the notes, which Home already lists under its tasks. */
 const OFF: readonly Tab[] = ["notes"];
 
 /** The desktop's sidebar (the rail): the screens it lists, in its order, each of which can be hidden. Home (the logo), Search, the
  *  lens and Settings are always there (Settings is where the sidebar is set). */
-export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes"] as const;
+export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes", "talk"] as const;
 export type RailItem = (typeof RAIL)[number];
-export const RAIL_LABEL: Record<RailItem, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook", notes: "Notes" };
+export const RAIL_LABEL: Record<RailItem, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook", notes: "Notes", talk: "Talk" };
 /** Off until turned on: Notes, as on the phone. */
 const RAIL_OFF: readonly RailItem[] = ["notes"];
 
@@ -112,8 +112,9 @@ export type Prefs = {
   agent: { model?: string; effort: Effort; newChat: NewChat };
   /** Which of the assistant's writes ask first, go ahead, or are never allowed (actions.ts); the agent's server enforces them. */
   actions: Actions;
-  /** Voice input: how long the server keeps its speech model loaded once idle, in seconds (voice.ts). */
-  voice: { keep: Keep };
+  /** The spoken conversation (talk.ts): the voice model the server speaks through, and the Fish voice it speaks in (its
+   *  voice-model id; empty: the server's own, TEF_NOTES_TALK_VOICE). */
+  talk: { model: TalkModel; voice: string };
   /** A link or picture shared from another app: "Add a summary", as last left. */
   clip: { summary: boolean };
   /** The lens on (its record id; lens.ts), null for the unfiltered app. */
@@ -129,7 +130,7 @@ export const DEFAULT_PREFS: Prefs = {
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), newChat: "app" },
   actions: { ...DEFAULT_ACTIONS },
-  voice: { keep: keepOf(undefined) },
+  talk: { model: DEFAULT_TALK_MODEL, voice: "" },
   clip: { summary: false },
   lens: null,
   phone: { ...LAYOUT_DEFAULTS, tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
@@ -151,7 +152,7 @@ const layoutOf = (l: Record<string, unknown>): LayoutPrefs => ({
 
 /** Whatever was stored as Prefs: the one defensive reader. Tabs keep their stored order, any missing ones appended. */
 export function prefsOf(raw: unknown): Prefs {
-  const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent), voice = obj(p.voice), clip = obj(p.clip);
+  const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent), talk = obj(p.talk), clip = obj(p.clip);
   const phone = obj(p.phone), desktop = obj(p.desktop), tabs = tabsIn(phone.tabs);
   return {
     theme: one(THEME_NAMES, p.theme, DEFAULT_THEME),
@@ -167,7 +168,10 @@ export function prefsOf(raw: unknown): Prefs {
       newChat: one(NEW_CHATS, agent.newChat, "app"),
     },
     actions: actionsOf(p.actions),
-    voice: { keep: keepOf(voice.keep) },
+    talk: {
+      model: TALK_MODELS.find((m) => m === talk.model) ?? DEFAULT_TALK_MODEL,
+      voice: typeof talk.voice === "string" ? talk.voice : "",
+    },
     clip: { summary: clip.summary === true },
     lens: typeof p.lens === "string" && p.lens ? p.lens : null,
     phone: {

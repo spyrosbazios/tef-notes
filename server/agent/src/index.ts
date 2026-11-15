@@ -4,6 +4,7 @@
 import { chat } from "./agent";
 import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
 import { drawingPictureRoute } from "./drawing-picture";
+import { connectFishEar, connectFishVoice } from "./fish";
 import { find } from "./find";
 import { catalog } from "./models";
 import { ocrRoute, startOcr } from "./ocr";
@@ -15,8 +16,9 @@ import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { search } from "./search";
 import { steerRoute } from "./steer";
+import { talkRoute, talkSocket } from "./talk";
 import { semantic } from "./semantic";
-import { transcribe, warmSpeech } from "./transcribe";
+import { transcribe } from "./transcribe";
 
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
 const port = Number(process.env.PORT ?? 8098);
@@ -40,8 +42,8 @@ Bun.serve({
     "/agent/places/map": { GET: (req) => mapRoute(req) },
     "/agent/push/key": { GET: () => keyRoute() },
     "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
+    "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server, { speak: connectFishVoice, hear: connectFishEar() }) },
     "/agent/transcribe": { POST: (req) => transcribe(req) },
-    "/agent/transcribe/warm": { POST: (req) => warmSpeech(req) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/companion/hello": { GET: () => helloRoute(server) },
     "/agent/companion/tasks": { GET: (req) => tasksRoute(req, server), POST: (req) => addTaskRoute(req, server) },
@@ -49,6 +51,7 @@ Bun.serve({
     "/agent/companion/notes": { GET: () => notesRoute(server) },
     "/agent/companion/lens": { POST: (req) => lensRoute(req, server) },
   },
+  websocket: talkSocket,
   fetch: () => new Response("Not found", { status: 404 }),
   error: (e) => {
     console.error(`agent: ${e.message}`);

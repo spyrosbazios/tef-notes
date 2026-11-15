@@ -1,5 +1,5 @@
 // The app's places in the router's terms (router.ts, routes/): Home `/` (its tag filter `?tags=a,b`, its archived notes `?archived=1`), the task lists `/inbox`
-// `/today` `/upcoming` `/logbook`, `/notes` (the notes alone, `?tags=` too), `/settings` (`?section=`), and a note laid over any of
+// `/today` `/upcoming` `/logbook`, `/notes` (the notes alone, `?tags=` too), `/talk` (the spoken conversation), `/settings` (`?section=`), and a note laid over any of
 // them as `?note=<id>` (the id is the filename's, which never changes, so a link survives a retitle). The open task is `?t=<id>` on any of them: a drawer over
 // the screen it was opened from (task-drawer.tsx), which stays as it is underneath, or the pane beside its list in a wide window (`taskInDrawer`). `/note/<id>`, the link the
 // phone and "Copy link" use, is a route that redirects to Home with the note open (routes/note.$id.tsx). `View` is the place
@@ -24,7 +24,7 @@ export type TaskView = (typeof TASK_VIEWS)[number];
 
 export type View =
   | { kind: "home"; tags?: string[]; archived?: true } | { kind: TaskView } | { kind: "notes"; tags?: string[]; archived?: true }
-  | { kind: "settings"; section?: SettingsSection };
+  | { kind: "settings"; section?: SettingsSection } | { kind: "talk" };
 
 /** A view that lists notes under a tag filter: Home and the Notes page. */
 export type NotesView = Extract<View, { kind: "home" | "notes" }>;
@@ -39,6 +39,7 @@ export const taskInDrawer = (at: { view: View; note?: string }, narrow: boolean)
 
 /** The view at a path (anything else is Home); Home's and Notes' tags and archive, and Settings' section, from its search. */
 export function viewOf(path: string, search: { tags?: readonly string[]; archived?: boolean; section?: SettingsSection } = {}): View {
+  if (path === "/talk") return { kind: "talk" };
   if (path === "/settings") return search.section ? { kind: "settings", section: search.section } : { kind: "settings" };
   const task = TASK_VIEWS.find((k) => path === `/${k}`);
   if (task) return { kind: task };
@@ -47,7 +48,7 @@ export function viewOf(path: string, search: { tags?: readonly string[]; archive
 }
 
 const TITLES: Record<View["kind"], string> = {
-  home: "Home", notes: "Notes", settings: "Settings",
+  home: "Home", notes: "Notes", settings: "Settings", talk: "Talk",
   inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook",
 };
 export const titleOf = (v: View) => TITLES[v.kind];
@@ -61,6 +62,7 @@ export function linkOf(v: View, { task, note }: Open = {}) {
     case "home": return linkOptions({ to: "/", search: { tags: v.tags, archived: v.archived ? "1" : undefined, t: task, note } });
     case "notes": return linkOptions({ to: "/notes", search: { tags: v.tags, archived: v.archived ? "1" : undefined, t: task, note } });
     case "settings": return linkOptions({ to: "/settings", search: { section: v.section, t: task, note } });
+    case "talk": return linkOptions({ to: "/talk", search: { note } });
     case "inbox": return linkOptions({ to: "/inbox", search: { t: task, note } });
     case "today": return linkOptions({ to: "/today", search: { t: task, note } });
     case "upcoming": return linkOptions({ to: "/upcoming", search: { t: task, note } });

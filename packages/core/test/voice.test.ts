@@ -1,12 +1,5 @@
 import { expect, test } from "bun:test";
-import { cutOf, DEFAULT_KEEP, joined, keepOf, MAX_PIECE, MIN_PIECE, RATE, spliced, transcriptOf } from "../src/voice";
-
-test("keepOf takes only an offered choice", () => {
-  expect(keepOf(0)).toBe(0);
-  expect(keepOf(900)).toBe(900);
-  expect(keepOf(42)).toBe(DEFAULT_KEEP);
-  expect(keepOf("300")).toBe(DEFAULT_KEEP);
-});
+import { cutOf, joined, MAX_PIECE, MIN_PIECE, RATE, spliced, transcriptOf } from "../src/voice";
 
 test("transcriptOf reads defensively", () => {
   expect(transcriptOf({ text: "  hi there " })).toEqual({ text: "hi there" });

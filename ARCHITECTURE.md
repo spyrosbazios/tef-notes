@@ -11,14 +11,15 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
  Web app     ─┐                          ┌─ PocketBase (collections, rev hook, jobs, routes) ─ pb_data/
  CLI         ─┼─ reverse proxy ─ HTTP ───┤        also serves the web app and the extension
  Clipper     ─┤  (private network)       └─ agent sidecar (bun): /agent/chat, /agent/models, /agent/transcribe
- Companion   ─┘                                   /agent/companion/* (the Android app's widgets)
-                                          └─ stt (python): speech to text, reached by the agent only
+ Companion   ─┘                                   /agent/talk, /agent/companion/* (the Android app's widgets)
+                                                │
+                                          Fish Audio ─┘ speech to text and the spoken voice, reached by the agent only
 ```
 
 - `server/`: PocketBase with JS hooks (`pb_hooks/`) and migrations (`pb_migrations/`). It holds the data, enforces the
   write contract and runs the server-side jobs below. `server/agent/` is the chat agent, a separate bun process because
-  PocketBase hooks cannot stream. `server/stt/` is voice input: a Python service running Parakeet on the CPU, on the
-  compose network only, that the agent's `/agent/transcribe` passes a clip to (`server/README.md`, "Voice input").
+  PocketBase hooks cannot stream. Speech — dictation's transcripts and Talk's ears and voice — is Fish Audio's, reached
+  from the agent with the `fish` key (`server/README.md`, "Voice input" and "Talk").
 - `packages/core/`: dependency-free TypeScript shared by the web app, CLI, extension and agent, imported as
   `@/core/*`. It holds the note format, the merge, the PocketBase client, task logic, agent card shapes and the theme
   palettes. `record-contracts.ts` holds transport-free record types, conflict errors and derived note columns;
@@ -218,10 +219,13 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   into an SVG in the owner's theme (tiles cached in memory). Their policies ask for an identifying User-Agent, light use
   and the credit shown. `set_place` writes a task's `where` from the details by `place_id`, or
   a name alone.
-- Voice input (`src/transcribe.ts`): `POST /agent/transcribe?keep=S` takes a clip as raw mono 16 kHz float32 samples and
-  answers its text from the `stt` service (`TEF_NOTES_STT`); `/agent/transcribe/warm` loads the model as recording
-  starts; `keep` is how long the model stays loaded once idle, the owner's setting (`packages/core/src/prefs.ts`
-  `voice.keep`). Nothing is stored. Contract: `packages/core/src/voice.ts`; without `TEF_NOTES_STT` both answer 404.
+- Voice input (`src/transcribe.ts`): `POST /agent/transcribe` takes a clip as raw mono 16 kHz float32 samples, wraps it in
+  a WAV and has Fish Audio write it down (`src/fish.ts`). Nothing is stored. Contract: `packages/core/src/voice.ts`;
+  without the `fish` key the route answers 404.
+- Talk (`src/talk.ts`, `src/talkAgent.ts`, `src/fish.ts`): one WebSocket at `/agent/talk`. Fish's realtime ear decides what
+  each turn is (the owner's, a backchannel over the voice, or noise) and Fish's streaming voice speaks the reply, while the
+  turn itself is the chat's own agent over the chat's own tools — the same cards, actions rules and taint checks. Billing is
+  the voice's bytes and the ear's seconds, never the whole context again per turn. Contract: `packages/core/src/talk.ts`.
 
 ## Server jobs and routes
 

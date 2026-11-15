@@ -4,8 +4,8 @@
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
-(`agent/`, see [agent/README.md](agent/README.md)), and a Python one for voice input (`stt/`: Parakeet speech to text
-on the CPU, ~650 MB of memory while its model is loaded, unloaded after the idle time set in the app's Settings, Voice).
+(`agent/`, see [agent/README.md](agent/README.md)). Voice input and Talk go out to [Fish Audio](https://fish.audio) from
+there, so the host runs nothing extra for them.
 `docker compose up -d` pulls them as multi-arch (amd64, arm64)
 images from GHCR, the web app already in PocketBase's `pb_public`. The signed Chrome extension is not in them: it needs
 your origin and your key, so you build it yourself ("The browser extension's CRX").
@@ -29,9 +29,7 @@ of it is the only gate.
 ## Requirements
 
 - Docker with Compose. Only `server/` is needed to run the published images.
-- Memory for voice input: about 650 MB free while a clip is transcribed (the model is unloaded after the idle time set in
-  the app). The model (~460 MB) is downloaded from huggingface.co on first use into the `stt_data` volume, so the host
-  needs to reach it once; without voice input, nothing is downloaded (see Voice input).
+- A [Fish Audio](https://fish.audio) key for voice input and Talk (`TEF_NOTES_KEY_FISH`); without one both are off.
 - Scanned PDFs are read by Tesseract inside the agent: its language data (a few MB a language) is downloaded from
   raw.githubusercontent.com on first use into the `agent_data` volume (see Scanned PDFs).
 - To build from source, or the extension: BuildKit (the signing key is a build secret) and the whole repository cloned,
@@ -45,7 +43,7 @@ cd server
 cp .env.example .env              # then edit it: at least TZ, and TEF_NOTES_OCR if your scanned PDFs aren't in English
 mkdir -p keys/typesafe keys/deepseek keys/exa keys/push   # keys/<TEF_NOTES_PROVIDER> for another model provider
 # put each provider's key, alone, in keys/<provider>/api-key (see AI providers); all optional
-docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes, tef-notes-agent and tef-notes-stt
+docker compose up -d              # pulls ghcr.io/spyrosbazios/tef-notes and tef-notes-agent
 docker compose exec pocketbase ./pocketbase superuser create you@example.com 'a-long-password'
 ```
 
@@ -82,7 +80,8 @@ result.
 | `TEF_NOTES_MODEL` | the provider's | The model; Ollama has no default. |
 | `TEF_NOTES_LLM_URL` | the provider's | Its API root, e.g. another Qwen region. |
 | `TEF_NOTES_OLLAMA_URL` | | Ollama only: where it serves (`http://host.docker.internal:11434` for one on the Docker host). |
-| `TEF_NOTES_STT` | `http://stt:8099` | Where the agent reaches the speech-to-text service for voice input. Set it empty (`TEF_NOTES_STT=`) to turn voice input off: the apps hide their mic and the routes answer 404. |
+| `TEF_NOTES_KEY_FISH` | `./keys/fish` | The Fish Audio key (`api-key`), for voice input and Talk. Without it the apps hide their mic and Talk's tab, and `/agent/transcribe` and `/agent/talk` answer 404. |
+| `TEF_NOTES_TALK_VOICE` | | Talk's voice: a Fish voice model id. Empty, Fish's own default; Settings can set one too, and that wins. |
 | `TEF_NOTES_OCR` | `eng` | The languages scanned PDFs are read in: Tesseract's codes joined by `+`, the main one first (`ell+eng`, `deu+eng`). Set it empty (`TEF_NOTES_OCR=`) to turn it off. See Scanned PDFs. |
 
 Deployment-specific additions (labels for a dashboard, extra networks, resource limits) go in
@@ -127,36 +126,47 @@ addresses, or the subscription is deleted.
 
 The mic in the apps (the assistant, a new task, a task's notes, a note's header, search, Settings → Voice) records mono
 16 kHz samples in the browser and, while you talk, cuts them at pauses into pieces of 6–20 s, each posted to the agent's
-`POST /agent/transcribe` as it is cut, which hands it to the `stt` container and returns its text; stopping waits only for
-the last piece. Speech to text is [Parakeet TDT 0.6B v3](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)
-(NVIDIA's model, int8, 25 European languages including Greek and English, pinned to one commit) run by [onnx-asr](https://github.com/istupakov/onnx-asr) on the
-CPU, `stt/app.py`. Nothing is stored: not the recording, not the text, only what lands in the field it was dictated into.
+`POST /agent/transcribe` as it is cut. The agent wraps the piece in a WAV and sends it to [Fish Audio](https://fish.audio)
+(`POST /v1/asr`, `transcribe-1-pro`) and returns its text; stopping waits only for the last piece. The agent keeps
+nothing: not the recording, not the text, only what lands in the field it was dictated into. The recording itself does
+leave the server, for Fish, for as long as the request takes.
 
-- **The model lives in a worker process** that the service starts on the first clip (or when the mic is pressed, which
-  calls `/agent/transcribe/warm` so the clip that follows waits for no load) and kills once it has sat idle for the time
-  set in the app's Settings → Voice (default 5 minutes; "Unload right away" drops it after each clip; up to an hour). A
-  process, because freeing the model in-process left its memory with the allocator. Loaded, it holds about 1.4 GB; the
-  service idle without it, about 60 MB. On a 4-core N100, 10 s of speech takes about 2 s, with 2 threads per clip (more
-  were slower beside the rest of the host).
-- **First use downloads the model** (~670 MB) from huggingface.co into the `stt_data` volume, so the container needs to
-  reach it once; `docker compose logs stt` then shows `stt: loaded ... in Ns` and, per clip, `stt: 8.2s of audio in
-  1.8s`. Deleting the volume costs one download.
-- **Limits**: a clip is at most ten minutes (the apps stop recording there); a clip longer than 25 s (one the app
-  didn't cut) is cut at its pauses by a VAD first, since Parakeet takes 20–30 s at a time. One clip is transcribed at a time.
+- **The key is the switch**: `TEF_NOTES_KEY_FISH` (a directory holding `api-key`), mounted read-only and re-read on every
+  use. Without it `/agent/transcribe` and `/agent/talk` answer 404 and the apps hide their mic and Talk.
+- **Setting one up**: create a key at fish.audio (Get an API key). New accounts start with no credit, which only matters
+  for the paid voice model: `s2.1-pro-free` is the same engine and costs nothing, under Fish's fair-use limits.
+- **Speech to text is billed per audio hour** (about $0.36), so a minute of dictation is well under a cent.
 - **The microphone needs a secure context**: browsers allow `getUserMedia` only on `https://` or `localhost`, so over a
   plain `http://` LAN address the mic is hidden. The reverse proxy's HTTPS origin (Tailscale Serve, Caddy) gives it.
-- **Turning it off**: `TEF_NOTES_STT=` (empty) in `.env`, then `docker compose up -d`; the apps hide their mic and the
-  routes answer 404. The `stt` container may be stopped too (`docker compose stop stt`). Running without it, nothing is
-  downloaded and no memory is used.
-- **Resource limits**: put them in `docker-compose.override.yml` (`mem_limit: 1g` on `stt`, say); a worker killed for
-  memory fails that clip with "The speech model is unavailable right now" and the next clip starts a fresh one.
+- **Turning it off**: leave the key out (or `docker compose up -d` with `TEF_NOTES_KEY_FISH` pointing at nothing).
 - Check it: `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary ''
-  http://localhost:8098/agent/transcribe` answers `200` with voice input on and the service reachable (an empty clip loads
-  no model), `404` when it is off, `502` when the agent cannot reach the `stt` container.
+  http://localhost:8098/agent/transcribe` answers `400` (an empty clip is not samples) with voice input on, `404` without
+  the key, `502` when Fish cannot be reached.
 
-The image is `ghcr.io/spyrosbazios/tef-notes-stt` (amd64 and arm64), published with the others by `docker.yml`; from
-source it is `stt/Dockerfile`, built by `docker-compose.build.yml` like the rest. Contract: `packages/core/src/voice.ts`;
-the agent's half: `agent/src/transcribe.ts`.
+Contract: `packages/core/src/voice.ts`; the agent's half: `agent/src/transcribe.ts`; the client: `agent/src/fish.ts`.
+
+## Talk
+
+A spoken conversation with the same assistant, over one WebSocket at `/agent/talk` (the web app's Talk tab; the contract
+is `packages/core/src/talk.ts`). The agent holds both halves of the speech at Fish Audio and the thinking runs on your
+model provider:
+
+- **The ear** (`wss://api.fish.audio/v1/asr/realtime`, `transcribe-stream-1`) decides what a turn is: the owner taking
+  their turn, an acknowledgement over the voice (a "mm-hm" the assistant keeps talking through), or a noise in the room.
+  It hears the assistant's own lines too, so a follow-up is understood in context. Billed per session second.
+- **The voice** (`wss://api.fish.audio/v1/tts/live`, S2.1 Pro) speaks the reply as it is written, a sentence at a time.
+  Billed per character; the free model costs nothing (Settings → Voice picks it).
+- **The turn** is the chat's own agent over the chat's own tools: a write still asks with a card (Settings → Agent), the
+  web-taint rules still apply, and the UI tools (open a note, go to a view) are done by the app. The conversation is saved
+  as a chat, so it reopens in the text assistant.
+
+Nothing is re-billed per turn, which is what makes this affordable: a ten-minute conversation is a few cents of voice and
+the model tokens any chat would cost. Off without the Fish key; turning it off is the same as voice input.
+
+Measured on this host (2026-11-15, `latency: "balanced"`, first audio for a short clause): **217 ms** through `s2.1-pro`
+and **608 ms** through `s2.1-pro-free` — the free model has no time-to-first-audio guarantee and it shows; what it costs
+is that, not the price. The paid model is about $0.015 a minute of speech. The ear answered a realtime turn with its
+final transcript and `user_turn: true` as soon as the audio ended.
 
 ## Scanned PDFs
 
@@ -218,7 +228,7 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `POST` | `/api/tefnotes/tags/describe` | Drafts a tag's description (`{tag}`) or all tags' (`{all: true}`) from notes carrying it; returned, never saved. |
 | `POST` | `/agent/chat` | Streams a chat turn (the agent sidecar, not PocketBase). |
 | `GET` | `/agent/models` | Lists the provider's models and whether its key is present (the agent sidecar). |
-| `POST` | `/agent/transcribe?keep=S` | Voice input: raw mono 16 kHz float32 samples in, `{ text }` out, through the `stt` service; the model stays loaded `S` seconds once idle. `/agent/transcribe/warm?keep=S` loads it ahead. 404 without `TEF_NOTES_STT`. Contract: `packages/core/src/voice.ts`. |
+| `POST` | `/agent/transcribe` | Voice input: raw mono 16 kHz float32 samples in, `{ text }` out, through Fish Audio. 404 without `TEF_NOTES_KEY_FISH`. Contract: `packages/core/src/voice.ts`. |
 | `GET` | `/agent/ocr` | Scanned PDFs: whether they are read, in which languages, pages read and waiting, what failed (the agent sidecar; see Scanned PDFs). |
 | `GET` | `/agent/push/key` | `{ publicKey }` a browser subscribes to push with; 404 while push is off (the agent sidecar). |
 | `POST`, `DELETE` | `/agent/push/subscribe` | Stores a browser's `PushSubscription` (and a `label`), the same endpoint again replacing it, a new one beyond 20 devices a 409; `DELETE` takes `{ endpoint }`. Shapes: `packages/core/src/push.ts`. |
@@ -247,11 +257,11 @@ docker compose pull                         # the release in TEF_NOTES_VERSION (
 docker compose up -d                        # recreates what changed: web, hooks, migrations, the agent
 docker compose logs --tail 20 pocketbase    # migrations applied, no hook errors
 docker compose logs --tail 20 agent         # "agent: listening", "agent: scanned PDFs are read by Tesseract (...)", no "not saved" lines
-docker compose logs --tail 20 stt           # "stt: listening on 8099"; after a first dictation, "stt: loaded ..."
+docker compose logs --tail 20 agent         # "agent: listening on 8098", and any speech it could not send to Fish
 curl -s http://localhost:8097/api/health
 curl -s http://localhost:8098/agent/models
 curl -s http://localhost:8098/agent/ocr     # "on": true; "waiting" falls to 0 as the scanned pages are read
-curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary '' http://localhost:8098/agent/transcribe   # 200: voice input on
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary '' http://localhost:8098/agent/transcribe   # 400: voice input on (404: no Fish key)
 ```
 
 To check a provider key is present without printing it:

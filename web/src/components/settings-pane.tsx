@@ -19,7 +19,7 @@ import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, ty
 import { Conflict } from "@/core/pocketbase";
 import { HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
 import { undefinedTags, type TagDef } from "@/core/tags";
-import { KEEP_LABEL, KEEPS } from "@/core/voice";
+import { TALK_MODEL_LABEL, TALK_MODELS } from "@/core/talk";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
@@ -46,6 +46,7 @@ import { TAB_ICON } from "@/components/tab-icons";
 import { RAIL_ICON } from "@/components/task-icons";
 import { useLayout, useNarrow } from "@/hooks/media";
 import { useOnline } from "@/hooks/online";
+import { useOffered, useTalkOn } from "@/hooks/talk";
 import { useSyncStatus } from "@/hooks/sync";
 import { usePush } from "@/hooks/push";
 import { clearOffline, keptFiles } from "@/lib/offline";
@@ -279,7 +280,8 @@ function StartRow({ layout }: { layout: Layout }) {
 /** The phone's bottom bar: the tabs dragged into order (a finger after a long press), shown or hidden, and Home and Tasks tapped
  *  open for the list each starts on. */
 function PhoneLayout({ here }: { here: boolean }) {
-  const { tabs, hidden, tabLabels } = usePrefs().phone;
+  const { tabs: stored, hidden, tabLabels } = usePrefs().phone;
+  const offered = useOffered(), tabs = stored.filter(offered);
   const [open, setOpen] = useState<Tab | null>(null);
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ phone: { tabs: movedTab(prefsNow().phone.tabs, id as Tab, over as Tab, after) } }));
   return (
@@ -322,6 +324,7 @@ function PhoneLayout({ here }: { here: boolean }) {
 /** The desktop's: Home's list, and the screens the sidebar lists. */
 function DesktopLayout({ here }: { here: boolean }) {
   const { homeList, hidden } = usePrefs().desktop;
+  const offered = useOffered();
   return (
     <LayoutCard layout="desktop" here={here}>
       <div className="space-y-2.5 px-3 py-2.5">
@@ -333,7 +336,7 @@ function DesktopLayout({ here }: { here: boolean }) {
         <p className="text-[13px] leading-snug text-dim">The screens it lists. A hidden one is still a search away, and can still be where the app opens. Home, Search and Settings always stay.</p>
       </div>
       <ul aria-label="Sidebar" className="divide-y divide-line">
-        {RAIL.map((r) => {
+        {RAIL.filter(offered).map((r) => {
           const shown = !hidden.includes(r), Icon = RAIL_ICON[r];
           return (
             <li key={r}>
@@ -706,30 +709,51 @@ function Reminders() {
   );
 }
 
-/** Voice input: the server's speech model (core/voice.ts), and how long it stays in the server's memory between clips. */
+/** Voice input: the mic, and where it goes — Fish Audio now, not this server's own CPU. */
 function Voice() {
-  const { voice } = usePrefs();
   const [heard, setHeard] = useState("");
   return (
     <section className="space-y-3" aria-labelledby="voice-h">
       <h2 id="voice-h" className={TITLE}>Voice</h2>
-      <p className="text-sm text-dim">Tap the mic in the assistant, a new task, a task's notes, a note or search, and speak English. Your server turns the speech into text with Parakeet, on its own CPU: the recording never leaves it and is not kept.</p>
+      <p className="text-sm text-dim">Tap the mic in the assistant, a new task, a task's notes, a note or search, and speak (Greek or English). Your server sends each piece to Fish Audio to be written down, and keeps neither: no recording, no text. The recording does leave the server, for Fish, for as long as the request takes.</p>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        <Line title="Try it" detail={heard || "Tap the mic and say something."} trailing={<MicButton onText={setHeard} />} />
+      </div>
+      <TalkVoice />
+    </section>
+  );
+}
+
+/** Talk's voice (core/prefs.ts `talk`): which model speaks, and in whose voice. The server speaks through it, so both are a
+ *  choice for every screen; the voice is a Fish voice model's id (fish.audio, any of the public ones or your own). */
+function TalkVoice() {
+  const { talk } = usePrefs();
+  const on = useTalkOn();
+  if (!on) return null;
+  return (
+    <div className="space-y-3">
+      <h3 className={TITLE}>Talk</h3>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
-            <p className="text-sm font-semibold">Keep the model loaded</p>
-            <p className="text-[13px] leading-snug text-dim">The model takes about 650 MB of the server's memory while loaded. Loading it takes a few seconds, and starts the moment you tap the mic. Longer keeps the next dictation instant; shorter frees the memory sooner.</p>
+            <p className="text-sm font-semibold">Voice model</p>
+            <p className="text-[13px] leading-snug text-dim">Both are Fish Audio's S2.1 Pro: the same engine and the same languages either way. The free one is under Fish's fair-use limits and promises no latency; the paid one is billed per character said, at about a cent a minute of speech.</p>
           </div>
-          <div role="radiogroup" aria-label="Keep the model loaded" className="flex flex-wrap gap-2">
-            {KEEPS.map((k) => (
-              <Button key={k} type="button" role="radio" aria-checked={k === voice.keep} size="sm" variant={k === voice.keep ? "default" : "outline"}
-                onClick={() => setPrefs({ voice: { keep: k } })}>{KEEP_LABEL[k]}</Button>
+          <div role="radiogroup" aria-label="Voice model" className="flex flex-wrap gap-2">
+            {TALK_MODELS.map((m) => (
+              <Button key={m} type="button" role="radio" aria-checked={m === talk.model} size="sm" variant={m === talk.model ? "default" : "outline"}
+                onClick={() => setPrefs({ talk: { model: m } })}>{TALK_MODEL_LABEL[m]}</Button>
             ))}
           </div>
         </div>
-        <Line title="Try it" detail={heard || "Tap the mic and say something."} trailing={<MicButton onText={setHeard} />} />
+        <div className="space-y-2 px-3 py-2.5">
+          <Label htmlFor="talk-voice" className="text-sm font-semibold">Voice</Label>
+          <p className="text-[13px] leading-snug text-dim">The id of a Fish voice model, from fish.audio. Empty: the server's own (TEF_NOTES_TALK_VOICE), else Fish's default.</p>
+          <Input id="talk-voice" defaultValue={talk.voice} placeholder="e.g. 8f2b1c…" className="font-mono text-[13px]"
+            onBlur={(e) => { const v = e.target.value.trim(); if (v !== talk.voice) setPrefs({ talk: { voice: v } }); }} />
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -756,7 +780,7 @@ const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
   { id: "layout", label: "Layout", about: "Phone and desktop: start screen, Home's list, tabs, sidebar screens", icon: LayoutGrid, body: Layouts },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
-  { id: "voice", label: "Voice", about: "Dictation, how long the model stays loaded", icon: Mic, body: Voice },
+  { id: "voice", label: "Voice", about: "Dictation, and the voice Talk speaks in", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },
   { id: "tags", label: "Tags", about: "Colours and descriptions", icon: TagIcon, body: Tags },
   { id: "transfer", label: "Import & export", about: "Markdown folders and zips, in and out", icon: ArrowDownUp, body: ImportExport },

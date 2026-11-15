@@ -11,7 +11,7 @@ const CLIENTS: [LucideIcon, string, string][] = [
 const STACK: [LucideIcon, string, string][] = [
   [Database, "PocketBase", "One binary, SQLite inside. Hooks hold the write contract; migrations are the schema."],
   [Zap, "The agent", "A bun sidecar that streams the chat and finds notes by meaning. Your coding agent searches it through the CLI."],
-  [Mic, "Speech to text", "Parakeet on the CPU, in a container of its own. Loads when you tap the mic, unloads once idle."],
+  [Mic, "Speech to text", "Tap the mic and talk; the words land in the field. It leaves the server for Fish Audio to be written down, and is kept nowhere."],
   [Boxes, "One core", "Note format, merge, task rules and palettes, imported by every client."],
   [Container, "One compose", "Three containers from one file; the web app and the extension ride in the server's. Your notes are one directory."],
   [CloudOff, "An offline copy", "The phone keeps notes, tasks and links in the browser, and merges what you wrote offline when it reconnects."],

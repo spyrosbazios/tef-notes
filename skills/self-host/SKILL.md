@@ -32,7 +32,7 @@ free -m                                        # voice input wants ~650 MB free 
 ```
 
 If a port is taken, set `PB_PORT` / `AGENT_PORT` in `.env` in step 2. Short of memory, turn voice input off there
-(`TEF_NOTES_STT=`) instead of letting the speech model fight the rest of the host.
+(leave the `fish` key out) — it is the one thing that sends the owner's voice off the machine.
 
 ## 2. Get the files
 
@@ -57,7 +57,7 @@ directory and `cp .env.example .env`. Every variable has a default; edit `.env` 
 | `TEF_NOTES_URL` | The public origin devices use, i.e. the proxy's address (step 5). Not the loopback one |
 | `TEF_NOTES_VERSION` | The version of the images/builds; see its comment in `.env.example` |
 | `TEF_NOTES_KEY_PUSH`, `TEF_NOTES_VAPID_SUBJECT` | Task reminders as push notifications on the phone: the key directory (default `./keys/push`) and a `mailto:` contact. Empty subject = off. Set `TZ` too. Steps: `server/README.md#push-reminders` |
-| `TEF_NOTES_STT` | Voice input: where the agent reaches the speech-to-text container (default `http://stt:8099`, on). Set it empty, `TEF_NOTES_STT=`, to turn voice input off (mic hidden, nothing downloaded). Depth: `server/README.md#voice-input` |
+| `TEF_NOTES_KEY_FISH` | Fish Audio's key (`keys/fish/api-key`): voice input and Talk. Without it both are off and the apps hide the mic. Depth: `server/README.md#voice-input` |
 | `TEF_NOTES_CRX_KEY` | Extension signing key path, inside `server/` (step 7). Default `./no-crx-key` = no extension |
 
 `docker compose config` renders the result.
@@ -87,8 +87,7 @@ editor), `chmod 644` it." Keys are re-read on every use: a new key needs no rest
 ## 4. Start
 
 Default, pulls the published images `ghcr.io/spyrosbazios/tef-notes`, `ghcr.io/spyrosbazios/tef-notes-agent` and
-`ghcr.io/spyrosbazios/tef-notes-stt` (voice input; its ~460 MB speech model is downloaded from huggingface.co on the first
-dictation, into the `stt_data` volume, never into the image):
+and the voice — dictation and Talk — is Fish Audio's, reached with the `fish` key:
 
 ```sh
 docker compose up -d
@@ -105,7 +104,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```sh
 docker compose logs --tail 20 pocketbase    # migrations applied, no hook errors
 docker compose logs --tail 20 agent         # "agent: listening on 8098", no "not saved" lines
-docker compose logs --tail 5 stt            # "stt: listening on 8099" (voice input)
+docker compose logs --tail 5 agent          # "agent: listening on 8098"; anything it could not send to Fish
 ```
 
 Optional admin UI login at `/_/` (the owner runs this and chooses the password):
@@ -162,14 +161,14 @@ curl -s http://localhost:8097/api/health
 curl -s http://localhost:8097/ | grep '<title>'
 curl -s http://localhost:8098/agent/models    # "available": true when the model provider's key is read
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary '' http://localhost:8098/agent/transcribe
-                                              # 200: voice input on and the stt container reachable; 404: off; 502: stt down
+                                              # 400: voice input on (Fish has the key); 404: no Fish key; 502: Fish unreachable
 docker compose exec -T pocketbase test -s /run/llm/api-key && echo present   # key present, value not printed
 ```
 
 Success: health answers, `/` returns the web app's HTML, and opening the proxy origin in a browser shows the app
 with an empty notes list and no sign-in. Auto-tagging shows a note's `tagged` field filling within a minute or two of a
 typesafe key being present. Voice: in Settings → Voice, "Try it" with the mic; the first dictation after a start downloads
-the model (a minute or so, once) and `docker compose logs stt` then shows `stt: loaded ... in Ns`.
+the key, and the first dictation is slower while Fish's session opens.
 
 ## 7. Point the clients
 
@@ -207,9 +206,10 @@ the model (a minute or so, once) and `docker compose logs stt` then shows `stt: 
   files. Read `docker compose logs --tail 20 pocketbase` after every upgrade.
 - **Changed `.env`, nothing happened**: variables apply when containers are recreated: `docker compose up -d`, not `restart`.
 - **No mic button in the app**: the page is not a secure context (open the HTTPS origin, not `http://<ip>`), or the
-  device has no microphone. **"Voice input is off on this server"**: `TEF_NOTES_STT` is empty in `.env`, or the agent
+  device has no microphone. **"Voice input is off on this server"**: there is no `fish` key in `.env` (`keys/fish/api-key`), or the agent
   image predates 0.5.0; set it (or remove the line) and `docker compose up -d`. **"The speech model is unavailable right
-  now"**: the agent cannot reach the `stt` container or it failed: `docker compose ps stt`, `docker compose logs stt`
+  now"**: Fish refused or could not be reached: `docker compose logs agent` says which, and `curl -s
+  https://api.fish.audio/v1/wallet/self/api-credit -H "Authorization: Bearer $KEY"` says whether the key still works
   (a download error means huggingface.co is unreachable from the container; a worker that died is usually memory: give
   it ~650 MB or set a shorter keep time in Settings → Voice).
 - **Upgrade**: `git pull && docker compose pull && docker compose up -d` (from source: re-run the build command).

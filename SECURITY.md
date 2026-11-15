@@ -28,8 +28,14 @@ on every device would add friction without keeping out anyone the network does n
 - Place search sends what you type in a note's Where, and the assistant's place queries, to OpenStreetMap's public
   services (Photon, Nominatim; the map's tiles by position); the place picked is kept in the note's frontmatter. A place
   typed by name alone sends nothing.
-- Voice input stays on your server: the browser posts the recording to your agent, which hands it to the `stt` container
-  on the compose network (no port on the host); neither keeps it, and the text goes only into the field you dictated into.
+- Voice input leaves your server: the browser posts the recording to your agent, which sends it to Fish Audio to be
+  transcribed. Neither keeps it, and the text goes only into the field you dictated into. Leave the `fish` key out to keep
+  the mic and Talk off entirely.
+- Talk leaves your server too: what you say, and what the assistant says back, go to Fish Audio for as long as a
+  conversation is open; the turns themselves go to your model provider as a chat's do. No audio is stored on your server.
+  A write still asks with a card unless you ruled otherwise in Settings, and only a tap answers one: nothing that is heard
+  counts as a confirmation. Talk's WebSocket has no browser preflight to keep other websites out, so the agent refuses an
+  upgrade whose `Origin` is not the server's own host; a proxy in front must pass `Host` or `X-Forwarded-Host` through.
 - Scanned PDFs are read on your server: Tesseract runs inside the agent, and the text it read stays in the agent's
   data volume until the PDF is deleted. The only traffic is the one-time download of each language's data file from
   raw.githubusercontent.com (pinned to one commit).

@@ -34,5 +34,6 @@ matters for the chat; a small local model may not.
 Whatever you send to a provider leaves your server: note text, photos the auto-tagger looks at, pages you clip. Leave
 a key out to keep that feature off.
 
-Voice input needs no provider and no key: speech is turned into text by a model on your own server, in the `stt`
-container ([Voice input](../server/README.md#voice-input)), and the recording is not kept.
+Voice input and Talk need a Fish Audio key of their own (`TEF_NOTES_KEY_FISH`), not a model provider: Fish writes down what
+you say and speaks the assistant's reply, and nothing runs on your server for it. Without the key both are off
+([Voice input](../server/README.md#voice-input)).

@@ -11,7 +11,7 @@ describe("prefsOf", () => {
       notes: { grouped: true, collapsed: ["a", 1, "a"], sort: "created" }, agent: { model: "", effort: "deep", unasked: "yes" }, actions: { createNote: "auto", deleteNote: "sometimes", bogus: "never" } });
     expect(p.actions).toEqual({ ...DEFAULT_PREFS.actions, createNote: "auto" });
     expect(p.theme).toBe(DEFAULT_PREFS.theme);
-    expect(p.phone.tabs).toEqual(["ask", "home", "tasks", "notes", "settings"]);
+    expect(p.phone.tabs).toEqual(["ask", "home", "tasks", "notes", "talk", "settings"]);
     expect(p.phone.hidden).toEqual(["tasks", "notes"]);
     expect(p.phone.start).toBe("today");
     expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
@@ -41,8 +41,8 @@ test("task lists", () => {
 });
 
 test("shownRail: the sidebar's order, less what is hidden", () => {
-  expect(shownRail({ hidden: ["today", "notes"] })).toEqual(["inbox", "upcoming", "logbook"]);
-  expect(shownRail(DEFAULT_PREFS.desktop)).toEqual(["inbox", "today", "upcoming", "logbook"]);
+  expect(shownRail({ hidden: ["today", "notes"] })).toEqual(["inbox", "upcoming", "logbook", "talk"]);
+  expect(shownRail(DEFAULT_PREFS.desktop)).toEqual(["inbox", "today", "upcoming", "logbook", "talk"]);
 });
 
 test("shownTabs and movedTab", () => {
@@ -64,7 +64,7 @@ describe("changes", () => {
     expect(p.phone).toEqual(DEFAULT_PREFS.phone);
   });
   test("a patch still goes through the reader", () => {
-    expect(withPatch(DEFAULT_PREFS, { phone: { tabs: ["ask"] } }).phone.tabs).toEqual(["ask", "home", "tasks", "notes", "settings"]);
+    expect(withPatch(DEFAULT_PREFS, { phone: { tabs: ["ask"] } }).phone.tabs).toEqual(["ask", "home", "tasks", "notes", "talk", "settings"]);
     expect(withPatch({ ...DEFAULT_PREFS, agent: { ...DEFAULT_PREFS.agent, model: "m" } }, { agent: { model: undefined } }).agent.model).toBeUndefined();
     expect(withPatch({ ...DEFAULT_PREFS, lens: "x" }, { lens: null }).lens).toBeNull();
   });
