@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { sameOrigin, wordsOf } from "../src/talk";
+import { sameOrigin, turnsOf, wordsOf } from "../src/talk";
 
 describe("wordsOf", () => {
   test("says a whole sentence at once, and keeps what follows", () => {
@@ -34,5 +34,60 @@ describe("sameOrigin", () => {
   test("another website is refused: this is what keeps one out of the socket", () => {
     expect(sameOrigin(headers({ origin: "https://evil.example", host: "notes.ts.net:8097" }))).toBe(false);
     expect(sameOrigin(headers({ origin: "not a url", host: "notes.ts.net" }))).toBe(false);
+  });
+});
+
+describe("turnsOf", () => {
+  const harness = () => {
+    const log: string[] = [];
+    const turns = turnsOf({
+      start: (t, sure) => log.push(`start:${t}${sure ? "" : "?"}`),
+      confirm: () => log.push("confirm"),
+      cancel: () => log.push("cancel"),
+    });
+    return { log, turns };
+  };
+
+  test("an eager turn and its committed text are one request: committed only confirms", () => {
+    const { log, turns } = harness();
+    turns.eager("what is on my list today");
+    turns.turn("what is on my list today");
+    expect(log).toEqual(["start:what is on my list today?", "confirm"]);
+  });
+
+  test("a committed turn with no eager before it starts one, confirmed", () => {
+    const { log, turns } = harness();
+    turns.turn("hello");
+    expect(log).toEqual(["start:hello"]);
+  });
+
+  test("committed words that differ from the eager text are a new turn", () => {
+    const { log, turns } = harness();
+    turns.eager("add milk");
+    turns.turn("add milk and eggs");
+    expect(log).toEqual(["start:add milk?", "start:add milk and eggs"]);
+  });
+
+  test("the owner going on cancels the guess, and the next eager turn is a new one", () => {
+    const { log, turns } = harness();
+    turns.eager("add milk");
+    turns.resumed();
+    turns.eager("add milk and eggs");
+    turns.turn("add milk and eggs");
+    expect(log).toEqual(["start:add milk?", "cancel", "start:add milk and eggs?", "confirm"]);
+  });
+
+  test("the same words said again after new speech are a second request", () => {
+    const { log, turns } = harness();
+    turns.eager("yes"); turns.turn("yes");
+    turns.speech();
+    turns.eager("yes"); turns.turn("yes");
+    expect(log).toEqual(["start:yes?", "confirm", "start:yes?", "confirm"]);
+  });
+
+  test("an empty eager text starts nothing", () => {
+    const { log, turns } = harness();
+    turns.eager("  ");
+    expect(log).toEqual([]);
   });
 });
