@@ -57,6 +57,27 @@ export function wordsOf(text: string): { say: string; rest: string } | null {
   return at < MIN_CLAUSE ? null : { say: text.slice(0, at + 1), rest: text.slice(at + 1) };
 }
 
+/** What the ear's turn events become. Fish says one utterance twice: `eager_end_of_turn` (probably over, so the reply starts
+ *  now, unconfirmed) and then `committed` (final). Committed text equal to the utterance already being answered only confirms
+ *  it; anything else is a new turn. `resumed` (the owner went on) and new speech make the utterance forgotten. */
+export function turnsOf(act: { start(text: string, confirmed: boolean): void; confirm(): void; cancel(): void }) {
+  let last: string | null = null;
+  return {
+    speech() { last = null; },
+    eager(text: string) {
+      if (!text.trim() || last === text) return;
+      last = text;
+      act.start(text, false);
+    },
+    resumed() { last = null; act.cancel(); },
+    turn(text: string) {
+      if (last === text) return act.confirm();
+      last = text;
+      act.start(text, true);
+    },
+  };
+}
+
 /** Where a conversation's two sides go: JSON events and voice frames to the app, and hanging up on it. */
 export type Out = { json(e: TalkServerEvent): void; voice(pcm: Uint8Array): void; close(): void };
 
@@ -98,9 +119,9 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   let step = 0, abort: AbortController | undefined;
   const waits = new Map<string, (v: unknown) => void>(), waitOf = new Map<string, string>(), withdrawn = new Set<string>();
   let turn: { assistant?: UIMessage } = {};
-  /** The utterance a turn was started on, and whether the ear has confirmed it is the owner's turn: a turn begun on
+  /** Whether the ear has confirmed it is the owner's turn: a turn begun on
    *  `eager_end_of_turn` may still be resumed, so its words are held back from the voice until `committed` says so. */
-  let lastTurn: string | null = null, confirmed = true, held: string[] = [];
+  let confirmed = true, held: string[] = [];
 
   // ---- the messages
 
@@ -315,29 +336,29 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
 
   // ---- the ear
 
+  // The turn has probably ended: the model starts thinking now, but nothing is said aloud until `committed` confirms it
+  // (a resumed turn was never an answer), and a turn already started on this utterance is not started twice.
+  const turns = turnsOf({
+    start(text, sure) { confirmed = sure; if (sure) held = []; startTurn(text); },
+    confirm,
+    cancel() {
+      abort?.abort(); abort = undefined; turn = {}; step = 0;
+      confirmed = true; held = [];                                    // it was not the owner's turn after all
+    },
+  });
+
   const hear = (e: EarEvent) => {
     switch (e.type) {
       case "started": strikes = 0; break;
       case "speech": {
         out.json({ type: "hearing", speaking: e.on });
-        if (e.on) { if (speaking) interrupt(); lastTurn = null; }      // something is being said: whatever was heard is over
+        if (e.on) { if (speaking) interrupt(); turns.speech(); }       // something is being said: whatever was heard is over
         break;
       }
       case "taken": strikes = 0; break;
-      // The turn has probably ended: the model starts thinking now, but nothing is said aloud until `committed` confirms it
-      // (a resumed turn was never an answer), and a turn already started on this utterance is not started twice.
-      case "eager": if (e.text.trim() && lastTurn !== e.text) { lastTurn = e.text; confirmed = false; startTurn(e.text); } break;
-      case "resumed":
-        abort?.abort(); abort = undefined; turn = {}; step = 0;
-        lastTurn = null; confirmed = true; held = [];                 // it was not the owner's turn after all
-        break;
-      case "turn": {
-        if (!e.yours) break;
-        strikes = 0;
-        if (lastTurn === e.text) confirm();
-        else { lastTurn = e.text; held = []; confirmed = true; startTurn(e.text); }
-        break;
-      }
+      case "eager": turns.eager(e.text); break;
+      case "resumed": turns.resumed(); break;
+      case "turn": if (e.yours) { strikes = 0; turns.turn(e.text); } break;
       case "failed": void lostEar(e.message); break;
     }
   };
