@@ -98,6 +98,9 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   let step = 0, abort: AbortController | undefined;
   const waits = new Map<string, (v: unknown) => void>(), waitOf = new Map<string, string>(), withdrawn = new Set<string>();
   let turn: { assistant?: UIMessage } = {};
+  /** The utterance a turn was started on, and whether the ear has confirmed it is the owner's turn: a turn begun on
+   *  `eager_end_of_turn` may still be resumed, so its words are held back from the voice until `committed` says so. */
+  let lastTurn: string | null = null, confirmed = true, held: string[] = [];
 
   // ---- the messages
 
@@ -149,10 +152,12 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     return opening;
   }
 
-  /** What the app hears: markdown read aloud as the words it is, and Fish told to say it. */
+  /** What the app hears: markdown read aloud as the words it is, and Fish told to say it. A reply to a turn the ear has
+   *  not confirmed yet waits: the owner may still be speaking, and then it was never an answer. */
   async function say(text: string) {
     const clean = text.replace(/[*_`#>|]/g, "").replace(/\s+/g, " ").trim();
     if (!clean || ended) return;
+    if (!confirmed) { held.push(clean); return; }
     try {
       const v = voice ?? await voiceNow();
       v.say(clean);
@@ -267,9 +272,17 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
 
   function finishTurn(text: string) {
     if (text.trim()) ear?.said(text);
+    confirm();                                     // the reply is complete: whatever was held may be said
     speak.flush();
     step = 0; turn = {};
     if (saidBytes && !ended) out.json({ type: "usage", said: saidBytes, cost: costOf(saidBytes, d.sea.model) });
+  }
+
+  /** The ear confirmed the turn is the owner's: what the reply has said so far may be spoken now. */
+  function confirm() {
+    if (confirmed) return;
+    confirmed = true;
+    for (const text of held.splice(0)) void say(text);
   }
 
   function startTurn(text: string) {
@@ -290,7 +303,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     voice?.stop();
     voice = undefined;
     generation++;                                  // a socket still opening belongs to the reply that just ended
-    speak.drop();
+    speak.drop(); held = []; confirmed = true;
     for (const k of [...waits.keys()]) answer(k, CANCELLED);
     markSpeaking(false);
     endsAt = 0;
@@ -303,11 +316,26 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   const hear = (e: EarEvent) => {
     switch (e.type) {
       case "started": strikes = 0; break;
-      case "speech": out.json({ type: "hearing", speaking: e.on }); if (e.on && speaking) interrupt(); break;
+      case "speech": {
+        out.json({ type: "hearing", speaking: e.on });
+        if (e.on) { if (speaking) interrupt(); lastTurn = null; }      // something is being said: whatever was heard is over
+        break;
+      }
       case "taken": strikes = 0; break;
-      case "eager": startTurn(e.text); break;
-      case "resumed": abort?.abort(); abort = undefined; turn = {}; step = 0; break;
-      case "turn": if (e.yours) { strikes = 0; startTurn(e.text); } break;
+      // The turn has probably ended: the model starts thinking now, but nothing is said aloud until `committed` confirms it
+      // (a resumed turn was never an answer), and a turn already started on this utterance is not started twice.
+      case "eager": if (e.text.trim() && lastTurn !== e.text) { lastTurn = e.text; confirmed = false; startTurn(e.text); } break;
+      case "resumed":
+        abort?.abort(); abort = undefined; turn = {}; step = 0;
+        lastTurn = null; confirmed = true; held = [];                 // it was not the owner's turn after all
+        break;
+      case "turn": {
+        if (!e.yours) break;
+        strikes = 0;
+        if (lastTurn === e.text) confirm();
+        else { lastTurn = e.text; held = []; confirmed = true; startTurn(e.text); }
+        break;
+      }
       case "failed": void lostEar(e.message); break;
     }
   };
