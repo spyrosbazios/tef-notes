@@ -163,6 +163,9 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
       v.say(clean);
       v.flush();
       saidBytes += bytesOf(clean);
+      // What it has cost is what went to the voice, so it is counted there: a reply held until the ear confirms it lands here
+      // in a later tick than the turn's end, and a total sent before it would be a cent short every time
+      out.json({ type: "usage", said: saidBytes, cost: costOf(saidBytes, d.sea.model) });
       markSpeaking(true);
     } catch (e) {
       if (ended || (e as Error).message === "interrupted") return;
@@ -275,7 +278,6 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     confirm();                                     // the reply is complete: whatever was held may be said
     speak.flush();
     step = 0; turn = {};
-    if (saidBytes && !ended) out.json({ type: "usage", said: saidBytes, cost: costOf(saidBytes, d.sea.model) });
   }
 
   /** The ear confirmed the turn is the owner's: what the reply has said so far may be spoken now. */
