@@ -41,15 +41,14 @@ export const clipTags = (target: Target, lens: Lens | null | undefined): string[
   target.kind === "new" || target.kind === "newtask" ? inheritTags(lens) : [];
 
 /** The share as a clip for the server's clip routes (core/clip.ts): its link, the page's title, the text as the selection,
- *  one photo as the picture (its bytes are the store's). null when the clip routes can't take it: a PDF, or several
- *  photos, which only a note of its own holds. */
-export function clipOf(s: Shared, pageTitle: string | null): ClipPage | null {
-  if (s.pdfs.length || s.images.length > 1) return null;
+ *  its photos and PDFs as the clip's files (their bytes are the store's, in the share's order: photos, then PDFs). */
+export function clipOf(s: Shared, pageTitle: string | null): ClipPage {
   return {
     url: s.url ?? "",
     title: pageTitle?.trim() || s.title || "",
     ...(s.text && { selection: s.text }),
-    ...(s.images.length && { image: { src: "" } }),
+    ...(s.images.length && { images: s.images.map(() => ({ src: "" })) }),
+    ...(s.pdfs.length && { pdfs: s.pdfs.map((p) => ({ name: p.name })) }),
   };
 }
 

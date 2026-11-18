@@ -6,7 +6,7 @@ The web app's Share page (`web/src/components/share-page.tsx`) calls the same ro
 Root `AGENTS.md` has the server and the note format; this file only what is the extension's. How to build, install and
 release it is in `README.md`, not repeated here.
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-18 -->
 
 ## Contract
 
@@ -15,10 +15,11 @@ Two steps; the server side is `server/pb_hooks/clip.pb.js`, `src/clip.ts` the ex
 `{kind: "note", path}` or `{kind: "task", id}`, both ways; on save also `{kind: "newtask", title?}` (a new task, titled the
 same way; never suggested, always offered last).
 
-1. `POST {server}/api/tefnotes/clip/suggest`, JSON `{url?, title, selection?, text?, note?, image?: {src, alt?, caption?,
-   look}}` (`url` is absent only for what the web app's Share page sends as text or a photo, which then carries a selection or a picture; `text` is `document.body.innerText`, capped at 50000 chars; `note` the user's words, at most 2000, context
-   for where it goes; `image` the picture the menu was opened on: its address, its alt text or title, its figure's
-   caption, and `look`, a base64 JPEG of it, long edge 768, padded to 280 a side, that JEV sees) answers
+1. `POST {server}/api/tefnotes/clip/suggest`, JSON `{url?, title, selection?, text?, note?, images?: [{src, alt?, caption?,
+   look?}], pdfs?: [{name}]}` (`url` is absent only for what the web app's Share page sends as text, photos or PDFs, which then carries a selection or files; `text` is `document.body.innerText`, capped at 50000 chars; `note` the user's words, at most 2000, context
+   for where it goes; `images` the pictures: the extension sends the one the menu was opened on, with its address, its alt text or title, its figure's
+   caption, and `look`, a base64 JPEG of it, long edge 768, padded to 280 a side, that JEV sees, on the first only; the web app's Share page sends one entry per shared photo
+   (`src` "") and `pdfs` one per shared PDF; at most 10 files in all, `CLIP_FILES` in core) answers
    `200 {suggestions: [{kind: "note", path, title, p} | {kind: "task", id, title, p}], pick, line?}` and writes nothing.
    JEV chooses among the pinned and 60 newest notes and the 40 most recently touched open tasks (`TASKS` in
    `lib/clip.js`). `suggestions`: at most 4, best first, each at JEV probability `p` >= 0.05 (below is noise among 100+
@@ -26,11 +27,11 @@ same way; never suggested, always offered last).
    above every other option. `line`: the page's own passage JEV chose as what the page is. Without a key or when JEV fails: no suggestions,
    `pick` is new. A picture TypeSafe refuses (its image input is opt-in and early) is asked about again by its words.
    Typing a note asks again (after a 0.9 s pause, or on leaving the box).
-2. `POST {server}/api/tefnotes/clip`, multipart: `@jsonPayload` = `{url?, title, selection?, line?, note?, image?: {src,
-   alt?, caption?}, target, summary?: true, text?}` (`target` as above, `line` passed back from step 1; `summary` only
-   when the user ticked "Add a summary", and `text` the page's text then, the same 50000 chars as in step 1) and, with `image` and a note, a new
-   note or a new task as target, the `file` part: the JPEG to store (long edge 1600, quality 0.82, `packages/core/src/photos.ts`;
-   an existing task takes none: `sendsFile` in core). Answers `200 {kind: "note", path, title, action: "created" | "appended", summary?}` or `{kind: "task", id, title,
+2. `POST {server}/api/tefnotes/clip`, multipart: `@jsonPayload` = `{url?, title, selection?, line?, note?, images?: [{src,
+   alt?, caption?}], pdfs?: [{name}], target, summary?: true, text?}` (`target` as above, `line` passed back from step 1; `summary` only
+   when the user ticked "Add a summary", and `text` the page's text then, the same 50000 chars as in step 1) and, with `images` or `pdfs` and a note, a new
+   note or a new task as target, one `file` part per file in order: each picture's JPEG to store (long edge 1600, quality 0.82, `packages/core/src/photos.ts`),
+   then each PDF as it is (at most `MAX_PDF`); an existing task takes none: `sendsFiles` in core. Answers `200 {kind: "note", path, title, action: "created" | "appended", summary?}` or `{kind: "task", id, title,
    action: "created" | "appended", note?, summary?}`; no JEV. The body: `![caption or alt](../attachments/<note-id>/<YYYYMMDD-HHMMSS>.jpg)`,
    the page link, the summary (below), the note written up by the server's model (tidied, its language kept, nothing added; as typed
    when that fails), `line` (left out when there is a summary), the selection.
@@ -44,8 +45,7 @@ same way; never suggested, always offered last).
    clients say so when it is not `"added"` (`summaryNotice` in core). No `summary` in the answer: none was asked for. Into a task the same text is added to its `notes` after a blank line, in a rev-bumping
    transaction as a note's append is; a task has no attachments (`attachments.note` relates to notes only), so a picture
    there is an image line `![<caption or alt>](<src>)` (the web app draws it; plain text when `src` is no http address) and its bytes are not kept. `404` if the target no longer
-   exists, `413` if a task's notes would overflow, `400` for a malformed target or an `image` without its `file` (or the
-   reverse; for an existing task, any `file`).
+   exists, `413` if a task's notes would overflow, `400` for a malformed target or files without their `file` parts (a count that differs, or, for an existing task, any `file`).
    A new task (`created`): titled by the owner's `title`, else as a new note would be; its `notes` the same text without the
    picture; the owner's tags; rev 1, after every other task. With a picture, a new note holding the whole clip (picture first)
    is made too, the task linked `about` it (`links`, `packages/core/src/record-links.ts`), and `note` in the answer is its

@@ -24,7 +24,7 @@ const ICONS = {
   check: "Check", add: "Plus", refresh: "RefreshCw", task: "ListTodo", append: "ListPlus", note: "FilePlus",
   newtask: "ClipboardPlus", page: "Globe", pin: "Pin", box: "Circle", close: "X", fail: "CircleAlert", offline: "CloudOff",
   notes: "NotebookText", picture: "Image", settings: "Settings", busy: "LoaderCircle", link: "Link2", done: "CircleCheck",
-  lens: "Focus", ask: "Sparkles",
+  lens: "Focus", ask: "Sparkles", pdf: "FileText",
 } as const;
 
 type Attrs = Record<string, string | number | undefined>;

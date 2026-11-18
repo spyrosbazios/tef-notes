@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-15 -->
+<!-- reviewed: 2026-11-18 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -223,7 +223,7 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `GET` | `/api/tefnotes/link-preview?url=` | Page title, description and picture for link cards, cached in `link_previews` (pruned daily). Fetches only public addresses, checked on every redirect hop. |
 | `POST` | `/api/tefnotes/clip/suggest` | Ranks up to four notes and open tasks a page or picture fits (needs `typesafe`); writes nothing. |
 | `POST` | `/api/tefnotes/clip/tags` | Scores every defined tag for a page and preselects the likely ones (needs `typesafe`); writes nothing. |
-| `POST` | `/api/tefnotes/clip` | Saves a clip to a chosen note, task, new note or new task (a picture then in a new note the task links to): attachment, tidied note, optional summary. |
+| `POST` | `/api/tefnotes/clip` | Saves a clip to a chosen note, task, new note or new task (its pictures and PDFs then in a new note the task links to): attachments, tidied note, optional summary. |
 | `GET` | `/api/tefnotes/clip/image` | Fetches a public picture for the extension, through the same guard as link previews. |
 | `POST` | `/api/tefnotes/tags/describe` | Drafts a tag's description (`{tag}`) or all tags' (`{all: true}`) from notes carrying it; returned, never saved. |
 | `POST` | `/agent/chat` | Streams a chat turn (the agent sidecar, not PocketBase). |

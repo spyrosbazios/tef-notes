@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import lib from "../pb_hooks/lib/notes.js";
 import { appendToNote, newNotePath, parseNote, serializeNote, slugify, withBody, withFlags } from "../../packages/core/src/notes";
 import { noteColumns } from "../../packages/core/src/pocketbase";
-import { linkPath, photoName } from "../../packages/core/src/photos";
+import { linkPath, pdfName, photoName } from "../../packages/core/src/photos";
 
 const P = "notes/20261005-garage-door.md";
 const NOTES = {
@@ -95,6 +95,9 @@ describe("photos", () => {
       expect(lib.photoName(at, taken)).toBe(photoName(at, taken));
     }
     expect(lib.linkPath("20261030-a", "x.jpg")).toBe(linkPath("20261030-a", "x.jpg"));
+    for (const [name, taken] of [["Lease 2026.pdf", new Set()], ["Μίσθωση.PDF", new Set(["misthosi.pdf"])], ["日本.pdf", new Set()], ["note.pdf", new Set()]]) {
+      expect(lib.pdfName(name, taken)).toBe(pdfName(name, taken));
+    }
     expect(lib.idOf("notes/20261030-a.md")).toBe("20261030-a");
   });
 });

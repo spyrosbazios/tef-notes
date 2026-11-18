@@ -1,5 +1,6 @@
 // What was saved with the server out of reach (the phone off its network): a clip or a new task, kept as a file each
-// until the sync (Sync.kt) can send it. A clip waits as its whole save request, so it is sent as it would have been.
+// until the sync (Sync.kt) can send it. A clip waits as its whole save request, so it is sent as it would have been: its
+// payload in the entry, its files (pictures' JPEGs, PDFs) copied beside it, named after it.
 // One the server refuses for good stays, marked with why, until the owner discards it in Settings: nothing the owner
 // saved is dropped silently. A send whose answer was lost is sent again, so a clip can land twice; the other way round
 // would lose it.
@@ -9,6 +10,7 @@ import android.content.Context
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -17,7 +19,11 @@ object Outbox {
 
     private fun dir(context: Context) = File(context.filesDir, "outbox").apply { mkdirs() }
     private fun entries(context: Context): List<File> = dir(context).listFiles { f -> f.extension == "json" }?.sortedBy { it.lastModified() } ?: emptyList()
-    private fun picture(entry: File) = File(entry.parentFile, "${entry.nameWithoutExtension}.jpg")
+    /** The files kept beside an entry: every one named after it. */
+    private fun beside(entry: File): List<File> {
+        val stem = entry.nameWithoutExtension
+        return entry.parentFile?.listFiles { f -> f != entry && (f.name.startsWith("$stem-") || f.name.startsWith("$stem.")) }?.toList() ?: emptyList()
+    }
 
     /** The entry's file written whole or not at all: under another name first, then renamed. */
     private fun write(file: File, entry: JSONObject) {
@@ -26,16 +32,30 @@ object Outbox {
         if (!draft.renameTo(file)) throw IOException("${file.name} could not be written")
     }
 
-    private fun add(context: Context, entry: JSONObject, jpeg: ByteArray? = null) {
+    private fun add(context: Context, entry: JSONObject, parts: List<Part> = emptyList()) {
         val file = File(dir(context), "${System.currentTimeMillis()}-${UUID.randomUUID()}.json")
-        if (jpeg != null) picture(file).writeBytes(jpeg)
-        write(file, entry)
+        val kept = JSONArray()
+        parts.forEachIndexed { i, p ->
+            val copy = File(file.parentFile, "${file.nameWithoutExtension}-${i + 1}.${p.ext}")
+            p.file.copyTo(copy, overwrite = true)
+            kept.put(JSONObject().put("file", copy.name).put("type", p.type))
+        }
+        write(file, if (parts.isEmpty()) entry else entry.put("parts", kept))      // the entry last: it is what makes it wait
+    }
+
+    /** An entry's files, as the save sends them; null when one is gone. */
+    private fun partsOf(file: File, entry: JSONObject): List<Part>? {
+        val kept = entry.optJSONArray("parts") ?: return emptyList()
+        return (0 until kept.length()).map { i ->
+            val p = kept.optJSONObject(i) ?: return null
+            Part(File(file.parentFile, p.optString("file")).takeIf { p.optString("file").isNotEmpty() && it.isFile } ?: return null, p.optString("type"))
+        }
     }
 
     private fun read(file: File): JSONObject? = try { JSONObject(file.readText()) } catch (_: JSONException) { null } catch (_: IOException) { null }
 
-    fun addClip(context: Context, payload: JSONObject, jpeg: ByteArray?, what: String) =
-        add(context, JSONObject().put("kind", "clip").put("what", what).put("payload", payload), jpeg)
+    fun addClip(context: Context, payload: JSONObject, parts: List<Part>, what: String) =
+        add(context, JSONObject().put("kind", "clip").put("what", what).put("payload", payload), parts)
 
     fun addTask(context: Context, title: String, list: String) =
         add(context, JSONObject().put("kind", "task").put("what", title).put("title", title).put("list", list))
@@ -44,9 +64,11 @@ object Outbox {
         read(f)?.let { Waiting(f, it.optString("what"), it.optString("refused").ifEmpty { null }) } ?: Waiting(f, "Something saved", UNREADABLE)
     }
 
-    fun discard(entry: Waiting) {
-        picture(entry.file).delete()
-        entry.file.delete()
+    fun discard(entry: Waiting) = gone(entry.file)
+
+    private fun gone(file: File) {
+        beside(file).forEach { it.delete() }
+        file.delete()
     }
 
     /** Sends what waits, oldest first. Throws Unreachable (or a Refused worth trying again) at the first one that can't go
@@ -59,11 +81,10 @@ object Outbox {
             try {
                 when {
                     entry.optString("kind") == "task" -> api.addTask(entry.optString("title"), entry.optString("list"))
-                    payload != null -> api.save(payload, picture(file).takeIf { it.exists() }?.readBytes())
+                    payload != null -> api.save(payload, partsOf(file, entry) ?: throw Refused(400, "a file of it is gone"))
                     else -> throw Refused(400, UNREADABLE)
                 }
-                picture(file).delete()
-                file.delete()
+                gone(file)
             } catch (e: Refused) {
                 if (e.again) throw e
                 write(file, entry.put("refused", e.message))

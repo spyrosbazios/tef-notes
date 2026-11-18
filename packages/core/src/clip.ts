@@ -1,14 +1,30 @@
 // The clip routes' shapes (server/pb_hooks/clip.pb.js, lib/clip.js), one home for the clients that call them: the
-// Chrome extension (extension/src/clip.ts) and the web app's share page (web/src/services/clip.ts). A clip is a page, text or a
-// picture sent in two steps: suggest (where JEV would file it, writes nothing), then save, where the owner chose: a new
-// note, an existing note, an open task (its `notes`), or a new task (a picture then in a new note the task links to).
+// Chrome extension (extension/src/clip.ts), the web app's share page (web/src/services/clip.ts) and the Android companion
+// (android/, by companion.ts's copies). A clip is a page, text, pictures or PDFs sent in two steps: suggest (where JEV
+// would file it, writes nothing), then save, where the owner chose: a new note, an existing note, an open task (its
+// `notes`), or a new task (its files then in a new note the task links to).
 // Pure and import-free, so the extension bundles it as it is.
 
-/** The picture a clip carries: its address and the page's words for it. Its bytes are the save's `file` part. */
+/** A picture a clip carries: its address ("" for one shared from another app) and the page's words for it. */
 export type ClipImage = { src: string; alt?: string; caption?: string };
+/** A PDF a clip carries, by its name as shared. */
+export type ClipPdf = { name: string };
 
-/** What is clipped. `url` is "" for what the phone shares as text or a photo (a selection or a picture then). */
-export type ClipPage = { url: string; title: string; selection?: string; text?: string; image?: ClipImage };
+/** What is clipped. `url` is "" for what the phone shares as text or files (a selection, pictures or PDFs then). The
+ *  files' bytes are the save's `file` parts, the pictures' JPEGs then the PDFs, in order (`clipFiles`). */
+export type ClipPage = { url: string; title: string; selection?: string; text?: string; images?: ClipImage[]; pdfs?: ClipPdf[] };
+
+/** At most this many pictures and PDFs in one clip (server/pb_hooks/lib/clip.js FILES). */
+export const CLIP_FILES = 10;
+
+/** How many files a clip carries. */
+export const clipFiles = (page: ClipPage) => (page.images?.length ?? 0) + (page.pdfs?.length ?? 0);
+
+/** What a clip's files are called in a line the owner reads: "picture", "pictures", "PDF", "PDFs" or "files"; null for none. */
+export function filesWord(page: ClipPage): string | null {
+  const i = page.images?.length ?? 0, p = page.pdfs?.length ?? 0;
+  return i && p ? "files" : i ? (i > 1 ? "pictures" : "picture") : p ? (p > 1 ? "PDFs" : "PDF") : null;
+}
 
 /** Where a clip goes. A new note's or new task's `title` is the owner's, when they gave one; else the server titles it
  *  from the clip. */
@@ -37,18 +53,18 @@ export type ClipResult =
   | { kind: "note"; path: string; title: string; action: "created" | "appended"; summary?: Summary }
   | { kind: "task"; id: string; title: string; action: "created" | "appended"; note?: string; summary?: Summary };
 
-/** The suggest request's JSON. `note`: the owner's words, context for where it goes. `look`: the picture as JEV sees it
- *  (base64 JPEG, long edge 768, padded up to 280 a side). */
+/** The suggest request's JSON. `note`: the owner's words, context for where it goes. `look`: the first picture as JEV sees
+ *  it (base64 JPEG, long edge 768, padded up to 280 a side). */
 export const suggestBody = (page: ClipPage, note: string, look?: string) =>
-  ({ ...page, note: note || undefined, image: page.image && { ...page.image, look } });
+  ({ ...page, note: note || undefined, images: page.images?.map((im, i) => (i === 0 && look ? { ...im, look } : im)) });
 
 /** The save request's `@jsonPayload`; `tags` the owner's (a new note carries them, an append adds those missing). The page's text is not sent again, unless `summary` (the owner ticked "Add a summary"):
- *  then it goes too, the summary being written from it. The picture's JPEG goes beside it as the `file` part for a note, a
- *  new one included, and for a new task (kept in a new note it links to); an existing task keeps no picture, so none goes
- *  there (`sendsFile`). */
+ *  then it goes too, the summary being written from it. The files go beside it as `file` parts for a note, a new one
+ *  included, and for a new task (kept in a new note it links to); an existing task keeps no file, so none goes there
+ *  (`sendsFiles`). */
 export const saveBody = (page: ClipPage, line: string | undefined, target: Target, note: string, summary: boolean, tags: string[] = []) => {
-  const { url, title, selection, image } = page;
-  return { url, title, selection, line, target, note: note || undefined, image, tags: tags.length ? tags : undefined, ...(summary && { summary: true, text: page.text }) };
+  const { url, title, selection, images, pdfs } = page;
+  return { url, title, selection, line, target, note: note || undefined, images, pdfs, tags: tags.length ? tags : undefined, ...(summary && { summary: true, text: page.text }) };
 };
 
 /** The clip/tags route's answer: every defined tag with JEV's probability that the page belongs under it, best first, and
@@ -70,9 +86,8 @@ export function unpickedTags(all: ClipTags["tags"], picked: readonly string[]): 
 export const savedTags = (picked: readonly string[], made: readonly string[]): string[] =>
   [...picked, ...made].filter((t, i, all) => all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i);
 
-/** Whether a save sends the picture's bytes: a clip of a picture to a note, a new note or a new task, never to an
- *  existing task. */
-export const sendsFile = (page: ClipPage, target: Target) => !!page.image && target.kind !== "task";
+/** Whether a save sends the files' bytes: a clip with files to a note, a new note or a new task, never to an existing task. */
+export const sendsFiles = (page: ClipPage, target: Target) => clipFiles(page) > 0 && target.kind !== "task";
 
 export const sameTarget = (a: Target, b: Target) =>
   a.kind === b.kind && (a.kind === "note" ? a.path === (b as typeof a).path : a.kind === "task" ? a.id === (b as typeof a).id : true);
@@ -82,17 +97,18 @@ export const targetOf = (s: Suggestion): Target => (s.kind === "note" ? { kind: 
 /** One option offered to the owner. */
 export type Choice = { target: Target; label: string; hint?: string };
 
-/** The pick first, then the others best first, then a new note unless that is the pick, then a new task. `picture`: an
- *  existing task keeps only a link to it, a new task the picture in a note of its own, which the hints say. */
-export function choices(s: Suggestions, picture: boolean): Choice[] {
+/** The pick first, then the others best first, then a new note unless that is the pick, then a new task. `files`: what
+ *  the clip's files are called (`filesWord`), null for none: an existing task keeps none of them, a new task keeps them in
+ *  a note of its own, which the hints say. */
+export function choices(s: Suggestions, files: string | null): Choice[] {
   const rest = s.suggestions.map((x): Choice => {
     const pct = `${Math.round(x.p * 100)}%`;
     return x.kind === "note"
       ? { target: targetOf(x), label: `Append to ${x.title}`, hint: pct }
-      : { target: targetOf(x), label: `Add to task ${x.title}`, hint: picture ? `${pct}, link only` : pct };
+      : { target: targetOf(x), label: `Add to task ${x.title}`, hint: files ? `${pct}, no ${files}` : pct };
   });
   const fresh: Choice = { target: NEW, label: "New note" };
-  const task: Choice = picture ? { target: NEW_TASK, label: "New task", hint: "picture in a linked note" } : { target: NEW_TASK, label: "New task" };
+  const task: Choice = files ? { target: NEW_TASK, label: "New task", hint: `${files} in a linked note` } : { target: NEW_TASK, label: "New task" };
   const top = rest.find((c) => sameTarget(c.target, s.pick));
   return top ? [top, ...rest.filter((c) => c !== top), fresh, task] : [fresh, ...rest, task];
 }

@@ -1,7 +1,7 @@
 // The clip route's logic, apart from PocketBase (pb_hooks/clip.pb.js owns the request, the database and the HTTP call),
 // so it can be tested under bun (test/clip.test.js).
 //
-// A clip is a page, or a picture on one, the browser's Share sheet: what the phone does when a link is shared and "Let the agent file it" is tapped
+// A clip is a page, a picture on one, or what the phone's share sheet hands over (text, pictures, PDFs): what the phone does when a link is shared and "Let the agent file it" is tapped
 // (server/agent/src/systemPrompt.ts, the <shared> rule), done here because the extension holds no key. The chat
 // agent is a writing model; the server's is JEV (lib/jev.js), which only decides. So it ranks where the agent would
 // file it, the owner approves the destination, and the text is the phone's own share text (packages/core/src/share.ts,
@@ -15,15 +15,17 @@
 //           option overall (a note or a task, or "new" when JEV rates a new note above every other option). A target is
 //           `{kind: "new"}`, `{kind: "note", path}` or `{kind: "task", id}`, on the wire both ways. save: the owner's choice,
 //           which may also be `{kind: "newtask"}` (JEV never suggests it: the owner's own pick).
-//   what    a picture first, embedded as the phone embeds a photo (an attachment of the note); the link as
+//   what    the pictures first, each embedded as the phone embeds a photo, then the PDFs, each a link to it (all attachments
+//           of the note, as the web app attaches them, web/src/hooks/photos.ts addFiles); the link as
 //           [title](url); the owner's note, written up by the server's model (lib/llm.js, noteRequest: their words tidied,
 //           nothing added; as typed when that fails); a line on what the page is (a choice among the page's own
 //           opening passages: JEV can't summarise, it can pick); then the selection kept as it is: bodyFor. Appended as
 //           append_to_note does, or a note of its own titled as titleFor titles it. Into a task the same text is added to
 //           its `notes`, after a blank line; a task holds no attachment (`attachments.note` relates to notes only), so a
-//           picture there is a line naming it, linked to its address, and its bytes are not kept. A new task is titled as a
-//           new note is (titleOf, the owner's title first) and gets the text without the picture as its `notes`; a picture
-//           sent with it is kept as a new note would keep it (the whole clip, picture first), the task linked `about` it.
+//           picture there is a line naming it, linked to its address, a PDF a line with its name, and their bytes are not
+//           kept. A new task is titled as a new note is (titleOf, the owner's title first) and gets the text without the
+//           files as its `notes`; files sent with it are kept as a new note would keep them (the whole clip, files first),
+//           the task linked `about` it.
 //   summary only when the owner ticked "Add a summary" (`summary: true` on save): a short summary the model writes from the
 //           page's text (what the extension sent, else the page fetched through lib/link-preview.js's guard, else the text
 //           shared), or for a picture from the words it came with (caption, alt text, text shared with it: the model can't see
@@ -35,7 +37,7 @@
 //           route (tagPick); the auto-tagger (autotag.pb.js) still evaluates the note within a minute.
 
 const { MODEL } = require("./jev.js");
-const { linkPath, localDay } = require("./notes.js");
+const { linkPath, localDay, pdfName, photoName } = require("./notes.js");
 
 const RECENT = 60;              // the agent's index: every pinned note, then this many newest (tools.ts RECENT)
 const FLOOR = 0.05;             // a note's share of the choice below which it is not offered: 1 in 20 is noise among 60+
@@ -49,6 +51,8 @@ const LINE = 300;               // that line, at most
 const NOTE = 2000;              // the owner's note, at most
 const LOOK = 3000000;           // base64 chars of the picture JEV sees: the extension sends a ~100 KB JPEG
 const ALT = 200;
+const FILES = 10;               // pictures and PDFs one clip carries, at most
+const PDF_NAME = 200;           // a PDF's name as shared, at most
 const SUMMARY_MIN = 200;        // chars of text a page or shared text needs to be worth summarising
 const PICTURE_MIN = 25;         // chars of words (caption, alt text, text shared with it) a picture needs
 const SUMMARY_CHARS = 20000;    // of content the model reads
@@ -69,14 +73,15 @@ function field(body, name, max, cut) {
   return t;
 }
 
-/** The parts both steps read: url (http(s) only; none for what the phone shares as text or a photo), title, selection.
- *  A clip with no url needs a selection or a picture to be one. */
+/** The parts both steps read: url (http(s) only; none for what the phone shares as text or files), title, selection.
+ *  A clip with no url needs a selection, a picture or a PDF to be one. */
 function page(body, what) {
   if (!body || typeof body !== "object") throw new Bad(`Send JSON: ${what}.`);
   const url = field(body, "url", 4000, false);
   if (url && !/^https?:\/\/[^\s/?#]+[^\s]*$/i.test(url)) throw new Bad("url must be an http(s) URL.");
   const out = { url, title: field(body, "title", 1000, false).replace(/\s+/g, " "), selection: field(body, "selection", 200000, false) };
-  if (!url && !out.selection && body.image == null) throw new Bad("Send a url, a selection or a picture.");
+  const some = (k) => Array.isArray(body[k]) && body[k].length > 0;
+  if (!url && !out.selection && !some("images") && !some("pdfs")) throw new Bad("Send a url, a selection, a picture or a PDF.");
   return out;
 }
 
@@ -89,27 +94,43 @@ function fileName(src) {
   return n.replace(/\s+/g, " ").trim().slice(0, 200);
 }
 
-/** A clip's `image`, the picture the context menu was opened on: `src` its address, `alt` and `caption` the page's
- *  words for it (alt or title attribute, the figure's caption), and on suggest `look`, the base64 JPEG JEV sees.
- *  undefined when there is none. */
-function picture(body, withLook) {
-  const v = body.image;
-  if (v == null) return undefined;
-  if (typeof v !== "object" || Array.isArray(v)) throw new Bad("image must be an object.");
+/** One of a clip's `images`: the picture the context menu was opened on, or one the phone shared. `src` its address ("" for
+ *  a shared one), `alt` and `caption` the page's words for it (alt or title attribute, the figure's caption), and on
+ *  suggest `look`, the base64 JPEG JEV sees (only the first picture's is looked at). */
+function picture(v, withLook) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new Bad("Each of images must be an object.");
   const one = (name, max) => field(v, name, max, true).replace(/\s+/g, " ");
   const src = field(v, "src", 100000, true), out = { src, alt: one("alt", 1000), caption: one("caption", 2000), file: fileName(src) };
   if (withLook) {
     const look = field(v, "look", LOOK, false);
-    if (look && !/^[A-Za-z0-9+/]+={0,2}$/.test(look)) throw new Bad("image.look must be a base64 JPEG.");
+    if (look && !/^[A-Za-z0-9+/]+={0,2}$/.test(look)) throw new Bad("An image's look must be a base64 JPEG.");
     if (look) out.look = look;
   }
   return out;
 }
 
+/** A clip's files, described: `images` (picture above) and `pdfs`, each `{name}` as shared; at most FILES in all, none
+ *  when absent. Their bytes are the save's `file` parts, the pictures' JPEGs then the PDFs, in this order. */
+function filesOf(body, withLook) {
+  const list = (k) => {
+    const v = body[k];
+    if (v == null) return [];
+    if (!Array.isArray(v)) throw new Bad(`${k} must be a list.`);
+    return v;
+  };
+  const images = list("images").map((v) => picture(v, withLook));
+  const pdfs = list("pdfs").map((v) => {
+    if (!v || typeof v !== "object" || typeof v.name !== "string" || !v.name.trim()) throw new Bad("Each of pdfs must be {name}.");
+    return { name: v.name.replace(/\s+/g, " ").trim().slice(0, PDF_NAME) };
+  });
+  if (images.length + pdfs.length > FILES) throw new Bad(`A clip carries at most ${FILES} pictures and PDFs.`);
+  return { images, pdfs };
+}
+
 /** The suggest request's JSON as a clip, or Bad. */
 function input(body) {
-  const p = page(body, "url (or a selection, or an image), title, and optionally text, note");
-  return { ...p, text: field(body, "text", PAGE_CHARS, true), note: field(body, "note", NOTE, false), image: picture(body, true) };
+  const p = page(body, "url (or a selection, images or pdfs), title, and optionally text, note");
+  return { ...p, text: field(body, "text", PAGE_CHARS, true), note: field(body, "note", NOTE, false), ...filesOf(body, true) };
 }
 
 const TITLE = 200;              // a new note's or new task's title the owner typed, at most
@@ -130,15 +151,15 @@ function target(v) {
   throw new Bad("target must be a note's path, a task's id, new or newtask.");
 }
 
-/** The save request's JSON, or Bad: the page, the line suggest picked (or none), the owner's note, the picture's
- *  words (its bytes are the request's file part, the route's to read; an existing task takes none), the owner's choice of
+/** The save request's JSON, or Bad: the page, the line suggest picked (or none), the owner's note, the files' words
+ *  (their bytes are the request's file parts, the route's to read; an existing task takes none), the owner's choice of
  *  where: `target`, and whether they ticked "Add a summary": `summary`, with the page's `text` then (read only then). */
 function saveInput(body) {
-  const p = page(body, "target, url (or a selection, or an image), title, and optionally line, note, image");
+  const p = page(body, "target, url (or a selection, images or pdfs), title, and optionally line, note");
   if (body.summary != null && typeof body.summary !== "boolean") throw new Bad("summary must be true or false.");
   const summary = body.summary === true;
   return {
-    ...p, line: field(body, "line", 2 * LINE, false).replace(/\s+/g, " "), note: field(body, "note", NOTE, false), image: picture(body, false), target: target(body.target),
+    ...p, line: field(body, "line", 2 * LINE, false).replace(/\s+/g, " "), note: field(body, "note", NOTE, false), ...filesOf(body, false), target: target(body.target),
     summary, text: summary ? field(body, "text", PAGE_CHARS, true) : "", tags: tagsOf(body.tags),
   };
 }
@@ -203,13 +224,26 @@ function embedOf(image, noteId, name) {
   return `![${alt.replace(/[[\]\\]/g, "\\$&")}](../${linkPath(noteId, name)})`;
 }
 
+/** A PDF's line in the body, as the web app links one (photos.ts fileMarkdown): its name as shared is the text. */
+const pdfLine = (noteId, name, label) => `[${label.replace(/[[\]\\]/g, "\\$&")}](../${linkPath(noteId, name)})`;
+
+/** The names the clip's files are stored under in the note `noteId`, the pictures' then the PDFs' (`taken`: the names the
+ *  note has already, filled as it goes), and the body's lines for them: the pictures' image lines, then the PDFs' links. */
+function filesUnder(clip, noteId, taken, now) {
+  const names = [], lines = [];
+  for (const image of clip.images) { const n = photoName(now, taken); taken.add(n); names.push(n); lines.push(embedOf(image, noteId, n)); }
+  for (const pdf of clip.pdfs) { const n = pdfName(pdf.name, taken); taken.add(n); names.push(n); lines.push(pdfLine(noteId, n, pdf.name)); }
+  return { names, embed: lines.join("\n") };
+}
+
 /** What a clip writes: a new note's title and body, or the entry appended to an existing note (the same text).
- *  `note` the owner's note as it goes in (written up, or as typed); `embed` the picture's image line, first; `summary`
- *  the summary's block (summaryBlock), right under the link. A clip of
- *  a picture alone (no url, no words) is titled as the phone titles photos, by the day `now` falls on. A title the owner
- *  gave the new note (`target.title`) wins over all of it. */
+ *  `note` the owner's note as it goes in (written up, or as typed); `embed` the files' lines, first; `summary`
+ *  the summary's block (summaryBlock), right under the link. A clip of files alone (no url, no words) is titled by its
+ *  first PDF's name, else as the phone titles photos, by the day `now` falls on. A title the owner gave the new note
+ *  (`target.title`) wins over all of it. */
 const titleOf = (clip, line, now = Date.now()) =>
-  (clip.target && clip.target.title) || titleFor(shared(clip, line, ""), null) || `Photos ${localDay(now)}`;
+  (clip.target && clip.target.title) || titleFor(shared(clip, line, ""), null)
+  || (clip.pdfs.length ? clip.pdfs[0].name.replace(/\.pdf$/i, "") : "") || `Photos ${localDay(now)}`;
 function bodyOf(clip, line, note = "", embed = "", summary = "") {
   const b = bodyFor(shared(clip, line, note, summary), null);
   return embed ? `${embed}\n\n${b}` : b;
@@ -223,6 +257,9 @@ function pictureLine(image) {
   if (/^https?:\/\//i.test(image.src)) return `![${label || "Picture"}](${image.src})`;
   return label ? `Picture: ${label}` : "Picture";
 }
+
+/** The lines a task is given for a clip's files, which it can't hold: each picture's (pictureLine), each PDF's name. */
+const fileLines = (clip) => [...clip.images.map(pictureLine), ...clip.pdfs.map((p) => `PDF: ${p.name.replace(/[[\]\\]/g, "\\$&")}`)].join("\n");
 
 /** A task's `notes` with the clip's `body` after what is there, a blank line between; null when it would not fit. */
 function taskNotes(notes, body) {
@@ -286,24 +323,27 @@ function shorten(p) {
 }
 
 /** The System One request: where the clip goes (`target`) and, with more than one passage, which says what the page is
- *  (`line`). The page is the clipping, not the owner talking: their words are `note` and their memory. A picture goes
- *  in as an asset under `ref` (a fresh random string: TypeSafe swaps it for the image wherever it appears); without
- *  `ref`, or without its bytes, JEV reads only its words. */
+ *  (`line`). The page is the clipping, not the owner talking: their words are `note` and their memory. The first picture
+ *  goes in as an asset under `ref` (a fresh random string: TypeSafe swaps it for the image wherever it appears); without
+ *  `ref`, or without its bytes, JEV reads only its words. Further pictures are counted, PDFs named. */
 function request(clip, index, tasks, memory, ps, now, ref) {
-  const page = { title: clip.title }, img = clip.image, look = ref && img && img.look;
+  const page = { title: clip.title }, img = clip.images[0], look = ref && img && img.look;
   if (clip.url) page.url = clip.url;
   if (img) {
     const i = {};
     if (look) i.picture = ref;
     for (const k of ["alt", "caption", "file"]) if (img[k]) i[k] = img[k];
     page.image = i;
+    if (clip.images.length > 1) page.more_pictures = clip.images.length - 1;
   }
+  if (clip.pdfs.length) page.pdfs = clip.pdfs.map((p) => p.name);
   if (clip.selection) page.selection = clip.selection.slice(0, STATE_CHARS);
   if (clip.text) page.text = clip.text.slice(0, STATE_CHARS);
   const state = { saved_web_page: page };
   if (clip.note) state.owner_note = clip.note;
   if (memory) state.owner_notes_memory = memory;
-  const what = img ? "this picture (`saved_web_page.image`, from the web page it was saved from, or shared on its own)" : "this web page or text";
+  const what = img ? "this picture (`saved_web_page.image`, from the web page it was saved from, or shared on its own)"
+    : clip.pdfs.length ? "these PDFs (`saved_web_page.pdfs`, by their names: their content is not given)" : "this web page or text";
 
   const criteria = { new: "None of these fits: it becomes a note of its own." };
   index.forEach((n, i) => { criteria[`n${i}`] = indexLine(n, now); });
@@ -369,7 +409,8 @@ function noteRequest(clip, line) {
   const saved = [];
   if (clip.url) saved.push(`Page: ${clip.title || clip.url} (${clip.url})`);
   else if (clip.title) saved.push(`Shared: ${clip.title}`);
-  if (clip.image) saved.push(`Picture: ${clip.image.caption || clip.image.alt || clip.image.file || "(no description)"}`);
+  for (const i of clip.images) saved.push(`Picture: ${i.caption || i.alt || i.file || "(no description)"}`);
+  for (const p of clip.pdfs) saved.push(`PDF: ${p.name}`);
   if (line) saved.push(`About the page: ${line}`);
   return { system: NOTE_SYSTEM, user: `What was saved:\n${saved.join("\n")}\n\nThe owner's note:\n${clip.note}` };
 }
@@ -386,13 +427,13 @@ function noteOf(answer, raw) {
 
 /** Whether the page's text has to be fetched: a link with no page text of its own (the phone sends none; the extension
  *  could not read some pages). Never for a picture, whose summary is of its words. */
-const needsPage = (clip) => !!clip.url && !clip.image && clip.text.length < SUMMARY_MIN;
+const needsPage = (clip) => !!clip.url && !clip.images.length && !clip.pdfs.length && clip.text.length < SUMMARY_MIN;
 
 /** What a summary can be made from, or null when there is nothing worth summarising (skipped). `fetched` is the page's text
  *  as the server read it, for a link that came with none. A page: the page's text, else the fetched text, else the
  *  text shared. A picture: only the words it came with, `text` the page it was on, context and nothing more. */
 function summaryContent(clip, fetched = "") {
-  const img = clip.image;
+  const img = clip.images[0];
   if (img) {
     const words = [img.caption && `Caption: ${img.caption}`, img.alt && `Alt text: ${img.alt}`, clip.selection && `Text shared with it: ${clip.selection}`].filter(Boolean);
     if (!words.length || [img.caption, img.alt, clip.selection].join("").length < PICTURE_MIN) return null;
@@ -463,4 +504,4 @@ function summarise(clip, io) {
   }
 }
 
-module.exports = { summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
+module.exports = { summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };

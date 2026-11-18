@@ -11,7 +11,7 @@
 // Enter or Space picks, Ctrl/Cmd+Enter in the title or note saves to the top option, Escape closes.
 import "virtual:tefnotes-theme.css";
 import "./ui.css";
-import { type Choice, choices, type ClipResult, type ClipTags, describe, type Suggestions, summaryNotice, type Target, titled, unpickedTags } from "@/core/clip";
+import { type Choice, choices, type ClipResult, type ClipTags, describe, filesWord, type Suggestions, summaryNotice, type Target, titled, unpickedTags } from "@/core/clip";
 import { type Page, readTab, save, SetupError, suggest, tagsFor } from "./clip";
 import { take } from "./handoff";
 import { draw, icon, mark } from "./icons";
@@ -151,7 +151,7 @@ async function tag() {
 function offer(s: Suggestions, focus: boolean) {
   clip.s = s;
   quiet();
-  clip.options = choices(s, !!clip.page?.image);
+  clip.options = choices(s, clip.page ? filesWord(clip.page) : null);
   const buttons = clip.options.map((c, i) => {
     const b = document.createElement("button");
     b.className = i === 0 ? "choice pick" : "choice";
@@ -255,7 +255,7 @@ async function source(): Promise<Page> {
 /** The picture's bytes, when there is one, then the suggestions. Neither the extension nor the server could fetch it: the
  *  owner may let the extension reach the picture's site, which needs this click (nothing awaited before the request). */
 async function read() {
-  const image = clip.page?.image;
+  const image = clip.page?.images?.[0];
   if (image) {
     show("busy", ["Reading the picture…"]);
     try {

@@ -1,35 +1,41 @@
 {
   "share": [
+
     {
       "name": "a browser's share: the title as the subject, the link as the text",
       "in": {
         "text": "https://example.com/a?b=1",
         "subject": "Example Domain",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": {
         "url": "https://example.com/a?b=1",
         "title": "Example Domain"
       }
     },
+
     {
       "name": "the title and the link together in the text say no more than the link",
       "in": {
         "text": "Example Domain https://example.com/a",
         "subject": "Example Domain",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": {
         "url": "https://example.com/a",
         "title": "Example Domain"
       }
     },
+
     {
       "name": "words around a link are kept as the selection",
       "in": {
         "text": "Read this: https://example.com/a. It is good",
         "subject": "",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": {
         "url": "https://example.com/a",
@@ -37,12 +43,14 @@
         "selection": "Read this: https://example.com/a. It is good"
       }
     },
+
     {
       "name": "a sentence's full stop is not the link's",
       "in": {
         "text": "See https://w.org/A_(b)).",
         "subject": "",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": {
         "url": "https://w.org/A_(b)",
@@ -50,12 +58,14 @@
         "selection": "See https://w.org/A_(b))."
       }
     },
+
     {
       "name": "selected text with no link",
       "in": {
         "text": "  a quote\nover two lines  ",
         "subject": "",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": {
         "url": "",
@@ -63,69 +73,205 @@
         "selection": "a quote\nover two lines"
       }
     },
+
     {
       "name": "a link given as the subject is the page, not its title",
       "in": {
         "text": "",
         "subject": "https://example.com/x",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": {
         "url": "https://example.com/x",
         "title": ""
       }
     },
+
     {
       "name": "a picture alone",
       "in": {
         "text": "",
         "subject": "",
-        "picture": true
+        "pictures": 1,
+        "pdfs": []
       },
       "clip": {
         "url": "",
         "title": "",
-        "image": {
-          "src": ""
-        }
+        "images": [
+          {
+            "src": ""
+          }
+        ]
       }
     },
+
     {
       "name": "a picture with its words",
       "in": {
         "text": "The receipt",
         "subject": "",
-        "picture": true
+        "pictures": 1,
+        "pdfs": []
       },
       "clip": {
         "url": "",
         "title": "",
         "selection": "The receipt",
-        "image": {
-          "src": ""
-        }
+        "images": [
+          {
+            "src": ""
+          }
+        ]
       }
     },
+
+    {
+      "name": "several pictures",
+      "in": {
+        "text": "",
+        "subject": "",
+        "pictures": 3,
+        "pdfs": []
+      },
+      "clip": {
+        "url": "",
+        "title": "",
+        "images": [
+          {
+            "src": ""
+          },
+          {
+            "src": ""
+          },
+          {
+            "src": ""
+          }
+        ]
+      }
+    },
+
+    {
+      "name": "a PDF with its subject as the title",
+      "in": {
+        "text": "",
+        "subject": "Lease",
+        "pictures": 0,
+        "pdfs": [
+          "Lease 2026.pdf"
+        ]
+      },
+      "clip": {
+        "url": "",
+        "title": "Lease",
+        "pdfs": [
+          {
+            "name": "Lease 2026.pdf"
+          }
+        ]
+      }
+    },
+
+    {
+      "name": "pictures and PDFs together, with words",
+      "in": {
+        "text": "For the accountant",
+        "subject": "",
+        "pictures": 1,
+        "pdfs": [
+          "a.pdf",
+          "b.pdf"
+        ]
+      },
+      "clip": {
+        "url": "",
+        "title": "",
+        "selection": "For the accountant",
+        "images": [
+          {
+            "src": ""
+          }
+        ],
+        "pdfs": [
+          {
+            "name": "a.pdf"
+          },
+          {
+            "name": "b.pdf"
+          }
+        ]
+      }
+    },
+
     {
       "name": "nothing shared",
       "in": {
         "text": "  ",
         "subject": "",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": null
     },
+
     {
       "name": "a subject alone is not a share",
       "in": {
         "text": "",
         "subject": "Only a title",
-        "picture": false
+        "pictures": 0,
+        "pdfs": []
       },
       "clip": null
     }
+
+  ],
+  "limits": {
+    "files": 10,
+    "pdf": 26214400
+  },
+  "files": [
+
+    {
+      "pictures": 0,
+      "pdfs": 0,
+      "word": null
+    },
+
+    {
+      "pictures": 1,
+      "pdfs": 0,
+      "word": "picture"
+    },
+
+    {
+      "pictures": 2,
+      "pdfs": 0,
+      "word": "pictures"
+    },
+
+    {
+      "pictures": 0,
+      "pdfs": 1,
+      "word": "PDF"
+    },
+
+    {
+      "pictures": 0,
+      "pdfs": 3,
+      "word": "PDFs"
+    },
+
+    {
+      "pictures": 1,
+      "pdfs": 1,
+      "word": "files"
+    }
+
   ],
   "stored": [
+
     {
       "width": 4000,
       "height": 3000,
@@ -134,6 +280,7 @@
         "height": 1200
       }
     },
+
     {
       "width": 3000,
       "height": 4000,
@@ -142,6 +289,7 @@
         "height": 1600
       }
     },
+
     {
       "width": 1600,
       "height": 900,
@@ -150,6 +298,7 @@
         "height": 900
       }
     },
+
     {
       "width": 640,
       "height": 480,
@@ -158,6 +307,7 @@
         "height": 480
       }
     },
+
     {
       "width": 1601,
       "height": 1601,
@@ -166,8 +316,10 @@
         "height": 1600
       }
     }
+
   ],
   "look": [
+
     {
       "width": 4000,
       "height": 3000,
@@ -176,6 +328,7 @@
         "height": 576
       }
     },
+
     {
       "width": 600,
       "height": 400,
@@ -184,6 +337,7 @@
         "height": 400
       }
     },
+
     {
       "width": 300,
       "height": 200,
@@ -192,6 +346,7 @@
         "height": 280
       }
     },
+
     {
       "width": 3000,
       "height": 300,
@@ -200,6 +355,7 @@
         "height": 157
       }
     },
+
     {
       "width": 0,
       "height": 0,
@@ -208,8 +364,10 @@
         "height": 768
       }
     }
+
   ],
   "choices": [
+
     {
       "name": "the pick first, the others best first, then a new note and a new task",
       "suggestions": {
@@ -232,7 +390,6 @@
           "id": "t1"
         }
       },
-      "picture": false,
       "choices": [
         {
           "target": {
@@ -262,8 +419,10 @@
           },
           "label": "New task"
         }
-      ]
+      ],
+      "files": null
     },
+
     {
       "name": "a new note first when that is the pick",
       "suggestions": {
@@ -279,7 +438,6 @@
           "kind": "new"
         }
       },
-      "picture": false,
       "choices": [
         {
           "target": {
@@ -301,10 +459,12 @@
           },
           "label": "New task"
         }
-      ]
+      ],
+      "files": null
     },
+
     {
-      "name": "a picture: a task keeps only a link, a new task a note of its own",
+      "name": "a picture: a task keeps none of it, a new task keeps it in a note of its own",
       "suggestions": {
         "suggestions": [
           {
@@ -319,7 +479,6 @@
           "id": "t1"
         }
       },
-      "picture": true,
       "choices": [
         {
           "target": {
@@ -327,7 +486,7 @@
             "id": "t1"
           },
           "label": "Add to task Shopping",
-          "hint": "50%, link only"
+          "hint": "50%, no picture"
         },
         {
           "target": {
@@ -342,8 +501,51 @@
           "label": "New task",
           "hint": "picture in a linked note"
         }
+      ],
+      "files": "picture"
+    },
+
+    {
+      "name": "PDFs: the hints name them",
+      "suggestions": {
+        "suggestions": [
+          {
+            "kind": "task",
+            "id": "t1",
+            "title": "Taxes",
+            "p": 0.5
+          }
+        ],
+        "pick": {
+          "kind": "new"
+        }
+      },
+      "files": "PDFs",
+      "choices": [
+        {
+          "target": {
+            "kind": "new"
+          },
+          "label": "New note"
+        },
+        {
+          "target": {
+            "kind": "task",
+            "id": "t1"
+          },
+          "label": "Add to task Taxes",
+          "hint": "50%, no PDFs"
+        },
+        {
+          "target": {
+            "kind": "newtask"
+          },
+          "label": "New task",
+          "hint": "PDFs in a linked note"
+        }
       ]
     },
+
     {
       "name": "nothing suggested",
       "suggestions": {
@@ -352,7 +554,6 @@
           "kind": "new"
         }
       },
-      "picture": false,
       "choices": [
         {
           "target": {
@@ -366,10 +567,13 @@
           },
           "label": "New task"
         }
-      ]
+      ],
+      "files": null
     }
+
   ],
   "results": [
+
     {
       "result": {
         "kind": "note",
@@ -380,6 +584,7 @@
       "line": "Created a new note",
       "notice": null
     },
+
     {
       "result": {
         "kind": "note",
@@ -391,6 +596,7 @@
       "line": "Appended to a note",
       "notice": null
     },
+
     {
       "result": {
         "kind": "task",
@@ -402,6 +608,7 @@
       "line": "Created a new task",
       "notice": "Saved without a summary: there was no text to write it from."
     },
+
     {
       "result": {
         "kind": "task",
@@ -413,8 +620,10 @@
       "line": "Added to a task",
       "notice": "Saved without a summary: it couldn't be written."
     }
+
   ],
   "tags": [
+
     {
       "name": "the likely ones offered best first, the rest by name",
       "all": [
@@ -457,6 +666,7 @@
         "Zeta"
       ]
     },
+
     {
       "name": "a picked tag is in neither, however unlikely",
       "all": [
@@ -476,6 +686,7 @@
       "offered": [],
       "more": []
     },
+
     {
       "name": "nothing scored: every tag in the list",
       "all": [
@@ -495,8 +706,10 @@
         "b"
       ]
     }
+
   ],
   "saved": [
+
     {
       "picked": [
         "work",
@@ -510,6 +723,7 @@
         "Ideas"
       ]
     },
+
     {
       "picked": [],
       "made": [
@@ -519,6 +733,7 @@
         "work"
       ]
     },
+
     {
       "picked": [
         "a"
@@ -528,5 +743,6 @@
         "a"
       ]
     }
+
   ]
 }

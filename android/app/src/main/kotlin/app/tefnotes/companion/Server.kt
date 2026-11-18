@@ -5,8 +5,9 @@ package app.tefnotes.companion
 
 import android.content.Context
 import androidx.core.content.edit
-import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -62,6 +63,16 @@ object Store {
     @Synchronized fun dropTick(context: Context, id: String) = prefs(context).edit { putStringSet("ticks", ticks(context) - id) }
 }
 
+/** A file a save sends as a `file` part: where its bytes are, and its type (a picture's JPEG, or a PDF as shared). */
+class Part(val file: File, val type: String) {
+    val ext get() = if (type == PDF_TYPE) "pdf" else "jpg"
+
+    companion object {
+        const val JPEG_TYPE = "image/jpeg"
+        const val PDF_TYPE = "application/pdf"
+    }
+}
+
 class Api(private val origin: String) {
     suspend fun hello(): Hello = helloOf(json("GET", "/agent/companion/hello")) ?: throw Unreachable()
 
@@ -87,31 +98,40 @@ class Api(private val origin: String) {
     /** Every defined tag scored for the clip (the suggest step's body; the picture is not looked at). */
     suspend fun tags(body: JSONObject): ClipTags = clipTagsOf(json("POST", "/api/tefnotes/clip/tags", body))
 
-    /** The save: the payload as the form's `@jsonPayload`, the picture's JPEG as its `file` part. */
-    suspend fun save(payload: JSONObject, jpeg: ByteArray?): ClipResult {
+    /** The save: the payload as the form's `@jsonPayload`, then each file as a `file` part, in the payload's order. The
+     *  files are streamed from disk: a few PDFs are more than the app should hold in memory. */
+    suspend fun save(payload: JSONObject, parts: List<Part>): ClipResult {
         val boundary = "tefnotes-${UUID.randomUUID()}"
-        val form = ByteArrayOutputStream().apply {
-            fun part(head: String, bytes: ByteArray) {
-                write("--$boundary\r\n$head\r\n\r\n".toByteArray())
-                write(bytes)
-                write("\r\n".toByteArray())
+        val heads = listOf("Content-Disposition: form-data; name=\"@jsonPayload\"" to payload.toString().toByteArray()) +
+            parts.mapIndexed { i, p -> "Content-Disposition: form-data; name=\"file\"; filename=\"file-${i + 1}.${p.ext}\"\r\nContent-Type: ${p.type}" to null }
+        fun open(head: String) = "--$boundary\r\n$head\r\n\r\n".toByteArray()
+        val close = "\r\n".toByteArray()
+        val end = "--$boundary--\r\n".toByteArray()
+        val size = heads.sumOf { (head, _) -> open(head).size.toLong() + close.size } + (heads[0].second?.size ?: 0) +
+            parts.sumOf { it.file.length() } + end.size
+        val body = Body("multipart/form-data; boundary=$boundary", size) { out ->
+            heads.forEachIndexed { i, (head, bytes) ->
+                out.write(open(head))
+                if (bytes != null) out.write(bytes) else parts[i - 1].file.inputStream().use { it.copyTo(out) }
+                out.write(close)
             }
-            part("Content-Disposition: form-data; name=\"@jsonPayload\"", payload.toString().toByteArray())
-            if (jpeg != null) part("Content-Disposition: form-data; name=\"file\"; filename=\"picture.jpg\"\r\nContent-Type: image/jpeg", jpeg)
-            write("--$boundary--\r\n".toByteArray())
-        }.toByteArray()
-        return clipResultOf(read(request("POST", "/api/tefnotes/clip", form, "multipart/form-data; boundary=$boundary")))
+            out.write(end)
+        }
+        return clipResultOf(read(request("POST", "/api/tefnotes/clip", body)))
     }
 
     private suspend fun json(method: String, path: String, body: JSONObject? = null): JSONObject = read(text(method, path, body))
 
     private suspend fun text(method: String, path: String, body: JSONObject? = null): String =
-        request(method, path, body?.toString()?.toByteArray(), "application/json")
+        request(method, path, body?.toString()?.toByteArray()?.let { bytes -> Body("application/json", bytes.size.toLong()) { it.write(bytes) } })
 
     /** An answer that is not JSON did not come from the server. */
     private fun read(answer: String): JSONObject = try { JSONObject(answer) } catch (e: JSONException) { throw Unreachable(e) }
 
-    private suspend fun request(method: String, path: String, body: ByteArray?, type: String): String = withContext(Dispatchers.IO) {
+    /** A request's body: its type, its length in bytes, and how it is written. */
+    private class Body(val type: String, val size: Long, val write: (OutputStream) -> Unit)
+
+    private suspend fun request(method: String, path: String, body: Body?): String = withContext(Dispatchers.IO) {
         val c = try { URL(origin + path).openConnection() as HttpURLConnection } catch (e: IOException) { throw Unreachable(e) }
         try {
             c.requestMethod = method
@@ -120,9 +140,9 @@ class Api(private val origin: String) {
             c.setRequestProperty("Accept", "application/json")
             if (body != null) {
                 c.doOutput = true
-                c.setRequestProperty("Content-Type", type)
+                c.setRequestProperty("Content-Type", body.type)
                 c.setFixedLengthStreamingMode(body.size)
-                c.outputStream.use { it.write(body) }
+                c.outputStream.use { body.write(it) }
             }
             val status = c.responseCode
             val answer = (if (status < 400) c.inputStream else c.errorStream)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""

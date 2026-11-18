@@ -3,7 +3,7 @@
 Kotlin, Jetpack Compose for its three small screens, Glance for the widgets, WorkManager for the one background job. What
 it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this file only what is the companion's.
 
-<!-- reviewed: 2026-11-14 -->
+<!-- reviewed: 2026-11-18 -->
 
 ## Where facts live
 
@@ -26,7 +26,7 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
 
 - **No rules here.** What a widget lists, in which order, under which label, where a row opens and in which colours is
   the server's answer. A new need is a new field in `companion.ts`, for the iPhone companion too, never logic in Kotlin.
-  The copies that exist (a share as a clip, a picture's sizes, a clip's choices, tags and result lines) are listed in
+  The copies that exist (a share as a clip, a picture's sizes, a clip's file limits and choices, tags and result lines) are listed in
   `companion.ts`'s header and each has cases in `companion-cases.json`; a new copy needs both.
 - **No screens of the app's.** A tap opens the web app (`OpenActivity`) at a `url` the server sent; the assistant button is one such (`Switches.ask`), not a chat of its own.
 - **No colour, icon or font of its own.** Colours are the feed's `look`, or the generated default (`R.color.tf_*`);

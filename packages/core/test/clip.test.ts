@@ -1,6 +1,6 @@
 // The clip routes' shapes shared with the extension (src/clip.ts), a share as a clip, the picture JEV looks at.
 import { describe, expect, it } from "bun:test";
-import { choices, describe as said, NEW, NEW_TASK, saveBody, sendsFile, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
+import { choices, describe as said, NEW, NEW_TASK, saveBody, sendsFiles, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
 import { LOOK_MAX, LOOK_MIN, lookSize } from "../src/photos";
 import { clipOf, type Shared } from "../src/share";
 
@@ -9,16 +9,14 @@ const U = "https://example.com/a";
 const ID = "abc123def456ghi";
 
 describe("a share as a clip", () => {
-  it("a link, its page's title, the text as the selection, one photo as the picture", () => {
+  it("a link, its page's title, the text as the selection, the photos and PDFs as its files", () => {
     expect(clipOf(S({ url: U }), "Page")).toEqual({ url: U, title: "Page" });
     expect(clipOf(S({ url: U, title: "From the app", text: "a quote" }), null)).toEqual({ url: U, title: "From the app", selection: "a quote" });
     expect(clipOf(S({ text: "just words" }), null)).toEqual({ url: "", title: "", selection: "just words" });
-    expect(clipOf(S({ images: [{ uri: "file:///a.jpg", width: 1, height: 2 }] }), null)).toEqual({ url: "", title: "", image: { src: "" } });
-  });
-  it("none for what the clip routes don't take: PDFs, several photos", () => {
+    expect(clipOf(S({ images: [{ uri: "file:///a.jpg", width: 1, height: 2 }] }), null)).toEqual({ url: "", title: "", images: [{ src: "" }] });
     const img = { uri: "file:///a.jpg", width: 1, height: 2 };
-    expect(clipOf(S({ images: [img, img] }), null)).toBeNull();
-    expect(clipOf(S({ url: U, pdfs: [{ uri: "f", name: "a.pdf" }] }), null)).toBeNull();
+    expect(clipOf(S({ images: [img, img] }), null)).toEqual({ url: "", title: "", images: [{ src: "" }, { src: "" }] });
+    expect(clipOf(S({ url: U, pdfs: [{ uri: "f", name: "a.pdf" }] }), null)).toEqual({ url: U, title: "", pdfs: [{ name: "a.pdf" }] });
   });
 });
 
@@ -30,7 +28,7 @@ describe("the options", () => {
     pick: { kind: "task", id: ID },
   };
   it("the pick first, the others in order, a new note last", () => {
-    expect(choices(s, false)).toEqual([
+    expect(choices(s, null)).toEqual([
       { target: { kind: "task", id: ID }, label: "Add to task Plan", hint: "50%" },
       { target: { kind: "note", path: "notes/a.md" }, label: "Append to A", hint: "30%" },
       { target: { kind: "note", path: "notes/b.md" }, label: "Append to B", hint: "10%" },
@@ -38,11 +36,11 @@ describe("the options", () => {
       { target: NEW_TASK, label: "New task" },
     ]);
   });
-  it("a new note first when it is the pick or there is none; a task's hint says a picture is only linked", () => {
-    expect(choices({ ...s, pick: NEW }, false).map((c) => c.target.kind)).toEqual(["new", "note", "task", "note", "newtask"]);
-    expect(choices({ suggestions: [], pick: NEW }, false)).toEqual([{ target: NEW, label: "New note" }, { target: NEW_TASK, label: "New task" }]);
-    expect(choices(s, true)[0].hint).toBe("50%, link only");
-    expect(choices(s, true).at(-1)).toEqual({ target: NEW_TASK, label: "New task", hint: "picture in a linked note" });
+  it("a new note first when it is the pick or there is none; the hints say a task keeps no files", () => {
+    expect(choices({ ...s, pick: NEW }, null).map((c) => c.target.kind)).toEqual(["new", "note", "task", "note", "newtask"]);
+    expect(choices({ suggestions: [], pick: NEW }, null)).toEqual([{ target: NEW, label: "New note" }, { target: NEW_TASK, label: "New task" }]);
+    expect(choices(s, "picture")[0].hint).toBe("50%, no picture");
+    expect(choices(s, "PDFs").at(-1)).toEqual({ target: NEW_TASK, label: "New task", hint: "PDFs in a linked note" });
     expect(targetOf(s.suggestions[0])).toEqual({ kind: "note", path: "notes/a.md" });
   });
   it("what was done", () => {
@@ -60,18 +58,19 @@ describe("the options", () => {
 });
 
 describe("the requests", () => {
-  const page = { url: U, title: "Page", image: { src: "", alt: "x" } };
-  it("suggest carries the note and the picture's look; save the target, and a file only for a note's picture", () => {
-    expect(suggestBody(page, "mine", "AAAA")).toEqual({ ...page, note: "mine", image: { src: "", alt: "x", look: "AAAA" } });
-    expect(suggestBody({ url: U, title: "t" }, "", undefined)).toEqual({ url: U, title: "t", note: undefined, image: undefined });
-    expect(saveBody(page, "line", { kind: "task", id: ID }, "", false)).toEqual({ url: U, title: "Page", selection: undefined, line: "line", target: { kind: "task", id: ID }, note: undefined, image: page.image, tags: undefined });
+  const page = { url: U, title: "Page", images: [{ src: "", alt: "x" }, { src: "" }], pdfs: [{ name: "a.pdf" }] };
+  it("suggest carries the note and the first picture's look; save the target, and the files only for a note", () => {
+    expect(suggestBody(page, "mine", "AAAA")).toEqual({ ...page, note: "mine", images: [{ src: "", alt: "x", look: "AAAA" }, { src: "" }] });
+    expect(suggestBody({ url: U, title: "t" }, "", undefined)).toEqual({ url: U, title: "t", note: undefined, images: undefined });
+    expect(saveBody(page, "line", { kind: "task", id: ID }, "", false)).toEqual({ url: U, title: "Page", selection: undefined, line: "line", target: { kind: "task", id: ID }, note: undefined, images: page.images, pdfs: page.pdfs, tags: undefined });
     expect(saveBody(page, undefined, NEW, "", false, ["work"])).toMatchObject({ tags: ["work"] });
-    expect(sendsFile(page, NEW)).toBe(true);
-    expect(sendsFile(page, { kind: "note", path: "notes/a.md" })).toBe(true);
-    expect(sendsFile(page, { kind: "task", id: ID })).toBe(false);
-    expect(sendsFile(page, NEW_TASK)).toBe(true);
-    expect(sendsFile({ url: U, title: "t" }, NEW_TASK)).toBe(false);
-    expect(sendsFile({ url: U, title: "t" }, NEW)).toBe(false);
+    expect(sendsFiles(page, NEW)).toBe(true);
+    expect(sendsFiles(page, { kind: "note", path: "notes/a.md" })).toBe(true);
+    expect(sendsFiles(page, { kind: "task", id: ID })).toBe(false);
+    expect(sendsFiles(page, NEW_TASK)).toBe(true);
+    expect(sendsFiles({ url: U, title: "t" }, NEW_TASK)).toBe(false);
+    expect(sendsFiles({ url: U, title: "t" }, NEW)).toBe(false);
+    expect(sendsFiles({ url: "", title: "t", pdfs: [{ name: "a.pdf" }] }, NEW)).toBe(true);
   });
   it("a summary asked for sends the flag and the page's text, which is otherwise not sent again", () => {
     const withText = { ...page, text: "The page's text." };

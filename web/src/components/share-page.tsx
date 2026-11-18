@@ -1,10 +1,9 @@
 // Something shared from another app, or pasted here: a link, text, photos or a PDF. The installed app is Android's share target
 // (the manifest's `share_target`; the service worker, sw/sw.ts, stashes the post and redirects here with `?shared=1`), and
-// a browser with no share target gets the box. A link, text or one photo gets what the extension and the phone offer
+// a browser with no share target gets the box. A link, text, photos or PDFs get what the extension and the phone offer
 // (core/clip.ts): the server suggests the notes and open tasks it fits, the owner adds a note of their own if they like, and one
-// click files it into a note, a task, a new note or a new task (services/clip.ts). PDFs and several photos, which the clip
-// routes don't take, go in a new note of their own; the assistant can file any of it instead. Nothing is written until
-// something is clicked.
+// click files it into a note, a task, a new note or a new task (services/clip.ts), photos downscaled and PDFs sent as they
+// are; the assistant can file any of it instead. Nothing is written until something is clicked.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, ChevronLeft, ClipboardPaste, FilePlus2, FileText, Link2, ListPlus, ListTodo, Loader2, SquarePlus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Turns } from "@/components/swap";
 import { Textarea } from "@/components/ui/textarea";
-import { choices, sendsFile, summaryNotice, type ClipResult, type Suggestions, type Target } from "@/core/clip";
+import { choices, CLIP_FILES, clipFiles, filesWord, sendsFiles, summaryNotice, type ClipResult, type Suggestions, type Target } from "@/core/clip";
 import { noteIdOf } from "@/core/notes";
 import { askText, clipOf, clipTags, fromPasted, fromPost, type Shared } from "@/core/share";
 import { useAssistant } from "@/hooks/assistant";
@@ -22,7 +21,8 @@ import { useActiveLens } from "@/hooks/lens";
 import { ALL_PHOTOS } from "@/hooks/photos";
 import { setPrefs, usePrefs } from "@/hooks/prefs";
 import { previewQuery } from "@/hooks/previews";
-import { saveShared, takeShared } from "@/hooks/share";
+import { saveSharedFiles, takeShared } from "@/hooks/share";
+import { MAX_PDF } from "@/core/photos";
 import { downscale, look } from "@/lib/picture";
 import { INSETS } from "@/hooks/shell";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,7 @@ const targetIcon = (t: Target) => (t.kind === "task" ? ListTodo : t.kind === "no
 
 type Ask = { state: "idle" | "loading" | "failed"; s?: undefined } | { state: "ready"; s: Suggestions };
 type Held = { shared: Shared | null; files: File[] };
+const NO_FILES: File[] = [];
 
 const ROW = "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50";
 
@@ -87,7 +88,7 @@ export function SharePage() {
   const [failed, setFailed] = useState(arrived === "err");
   const [held, setHeld] = useState<Held | null | "loading">(arrived && !failed ? "loading" : null);
   const summary = usePrefs().clip.summary;
-  const [busy, setBusy] = useState<"note" | "agent" | "clip" | null>(null);
+  const [busy, setBusy] = useState<"agent" | "clip" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [done, setDone] = useState<{ r: ClipResult; notice: string } | null>(null);   // saved, but not as asked: what to tell before opening it
@@ -112,13 +113,18 @@ export function SharePage() {
     void takeShared().then(() => navigate({ to: "/share", search: {}, replace: true }));
   }, [failed, navigate]);
 
-  const shared = held && held !== "loading" ? held.shared : null, files = held && held !== "loading" ? held.files : [];
+  const shared = held && held !== "loading" ? held.shared : null, files = held && held !== "loading" ? held.files : NO_FILES;
   const url = shared?.url ?? null;
   const preview = useQuery({ ...previewQuery(url ?? ""), enabled: !!url, retry: 1 });
   const title = preview.data?.title || null;
   const titled = !url || !preview.isPending;                  // the page's title fetched, or failed, or none to fetch
   const clip = useMemo(() => (shared ? clipOf(shared, title) : null), [shared, title]);
-  const picture = shared?.images.length === 1 ? files[Number(shared.images[0].uri)] : undefined;
+  // The share's photos then its PDFs, as the clip's files are in order (core/clip.ts `clipFiles`)
+  const pictures = useMemo(() => (shared?.images ?? []).map((i) => files[Number(i.uri)]), [shared, files]);
+  const pdfs = useMemo(() => (shared?.pdfs ?? []).map((p) => files[Number(p.uri)]), [shared, files]);
+  const picture = pictures[0];
+  const problem = clip && clipFiles(clip) > CLIP_FILES ? `That is ${clipFiles(clip)} files, and a clip takes ${CLIP_FILES} at most.`
+    : pdfs.find((f) => f.size > MAX_PDF) ? `${pdfs.find((f) => f.size > MAX_PDF)!.name} is over ${MAX_PDF / 1024 / 1024} MB.` : null;
 
   /** Where it fits, with the note as it is now; an answer overtaken by a newer question is dropped. */
   const rank = useCallback(async (words: string) => {
@@ -159,22 +165,10 @@ export function SharePage() {
     clearTimeout(pause.current);
     setBusy("clip"); setErr(null);
     try {
-      const r = await clips.save(clip, ask.s?.line, target, note.trim(), summary, clipTags(target, lens), picture && sendsFile(clip, target) ? await downscale(picture) : undefined);
+      const stored = sendsFiles(clip, target) ? [...(await Promise.all(pictures.map(downscale))), ...pdfs] : [];
+      const r = await clips.save(clip, ask.s?.line, target, note.trim(), summary, clipTags(target, lens), stored);
       const notice = summaryNotice(r);
       if (notice) { setDone({ r, notice }); setBusy(null); } else await open(r);
-    } catch (e) {
-      setErr(`Couldn't save it: ${message(e)}`);
-      setBusy(null);
-    }
-  };
-
-  /** A note of its own, for what the clip routes don't take. */
-  const asNote = async () => {
-    if (!shared) return;
-    setBusy("note"); setErr(null);
-    try {
-      const path = await saveShared(qc, shared, files, title, note);
-      await navigate({ to: "/", search: { note: noteIdOf(path) }, replace: true });
     } catch (e) {
       setErr(`Couldn't save it: ${message(e)}`);
       setBusy(null);
@@ -187,7 +181,7 @@ export function SharePage() {
     if (!shared) return;
     setBusy("agent"); setErr(null);
     try {
-      const filesAt = shared.images.length || shared.pdfs.length ? await saveShared(qc, shared, files, title, "", true) : undefined;
+      const filesAt = shared.images.length || shared.pdfs.length ? await saveSharedFiles(qc, shared, files) : undefined;
       const text = askText(shared, title, filesAt);
       await navigate({ to: "/", replace: true });
       if (await assistant.send(text)) assistant.show(); else assistant.show({ text });
@@ -198,7 +192,7 @@ export function SharePage() {
   };
 
   const fresh = (s: Shared) => { setFailed(false); setHeld({ shared: s, files: [] }); };
-  const rows = clip && ask.state === "ready" ? choices(ask.s, !!clip.image) : clip ? choices({ suggestions: [], pick: { kind: "new" } }, !!clip.image) : [];
+  const rows = clip ? choices(ask.state === "ready" ? ask.s : { suggestions: [], pick: { kind: "new" } }, filesWord(clip)) : [];
 
   return (
     <div className={cn("h-dvh", INSETS)}><div className="h-full overflow-y-auto bg-bg">
@@ -224,6 +218,7 @@ export function SharePage() {
                   <Switch id="clip-summary" checked={summary} onCheckedChange={(on) => setPrefs({ clip: { summary: on } })} disabled={!!busy} />
                   <Label htmlFor="clip-summary" className="text-[15px] font-normal">Add a summary</Label>
                 </div>
+                {problem ? <p className="px-2 text-sm text-warn" role="alert">{problem} The assistant can still file it.</p> : null}
                 {ask.state === "loading" && <p className="flex items-center gap-3 px-2 text-sm text-dim"><Loader2 className="size-4 animate-spin" /> Finding where it fits…</p>}
                 {ask.state === "failed" && <p className="px-2 text-sm text-dim">Couldn&apos;t ask the server where it fits. You can still save it as a new note or task.</p>}
                 <section aria-label="Where should it go?" className="space-y-1">
@@ -233,7 +228,7 @@ export function SharePage() {
                       const Icon = targetIcon(c.target);
                       return (
                         <li key={targetKey(c.target)}>
-                          <button type="button" className={ROW} disabled={!!busy} onClick={() => void file(c.target)}>
+                          <button type="button" className={ROW} disabled={!!busy || !!problem} onClick={() => void file(c.target)}>
                             <Icon className="size-[18px] shrink-0 text-dim" />
                             <span className="min-w-0 flex-1 truncate">{c.label}</span>
                             {c.hint ? <span className="text-[13px] text-dim">{c.hint}</span> : null}
@@ -243,16 +238,6 @@ export function SharePage() {
                     })}
                   </ul>
                 </section>
-              </>
-            )}
-            {!clip && (
-              <>
-                <Textarea placeholder="Add a note (optional)" value={note} disabled={!!busy} aria-label="A note to save with it" className="min-h-20" onChange={(e) => setNote(e.target.value)} />
-                <p className="px-2 text-sm text-dim">PDFs and several photos go in a note of their own.</p>
-                <Button size="lg" className="w-full" disabled={!!busy} onClick={() => void asNote()}>
-                  <Turns aria-live="polite" state={busy === "note" ? "busy" : "idle"}
-                    states={{ idle: <><FilePlus2 /> Save as a new note</>, busy: <><Loader2 className="animate-spin" /> Saving…</> }} />
-                </Button>
               </>
             )}
             {done && (

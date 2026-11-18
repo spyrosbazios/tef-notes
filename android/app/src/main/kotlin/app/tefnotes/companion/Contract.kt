@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** The contract this build draws (companion.ts COMPANION_CONTRACT). */
-const val CONTRACT = 2
+const val CONTRACT = 3
 const val APP = "tefnotes"
 
 // ---- the look
@@ -123,12 +123,32 @@ fun notesFeedOf(json: String?): NotesFeed? {
 
 // ---- a share as a clip (clip.ts)
 
-/** What is clipped: a page's link and title, the words shared, and whether a picture came with them. */
-data class ClipPage(val url: String, val title: String, val selection: String?, val picture: Boolean) {
-    /** The page as the clip routes take it; `look`: the picture as JEV sees it, on the suggest step. */
+/** What is clipped: a page's link and title, the words shared, and the files that came with them: how many pictures, and
+ *  each PDF's name. Their bytes are the save's file parts, the pictures' JPEGs then the PDFs (`Part`). */
+data class ClipPage(val url: String, val title: String, val selection: String?, val pictures: Int, val pdfs: List<String>) {
+    val files get() = pictures + pdfs.size
+
+    /** The page as the clip routes take it; `look`: the first picture as JEV sees it, on the suggest step. */
     fun json(look: String? = null): JSONObject = JSONObject().put("url", url).put("title", title).apply {
         if (selection != null) put("selection", selection)
-        if (picture) put("image", JSONObject().put("src", "").apply { if (look != null) put("look", look) })
+        if (pictures > 0) put("images", JSONArray((0 until pictures).map { i -> JSONObject().put("src", "").apply { if (i == 0 && look != null) put("look", look) } }))
+        if (pdfs.isNotEmpty()) put("pdfs", JSONArray(pdfs.map { JSONObject().put("name", it) }))
+    }
+}
+
+/** At most this many pictures and PDFs in one clip, and a PDF's size at most (clip.ts CLIP_FILES, photos.ts MAX_PDF). */
+const val CLIP_FILES = 10
+const val MAX_PDF = 25L * 1024 * 1024
+
+/** What a clip's files are called in a line the owner reads (clip.ts `filesWord`); null for none. */
+fun filesWord(page: ClipPage): String? {
+    val i = page.pictures
+    val p = page.pdfs.size
+    return when {
+        i > 0 && p > 0 -> "files"
+        i > 0 -> if (i > 1) "pictures" else "picture"
+        p > 0 -> if (p > 1) "PDFs" else "PDF"
+        else -> null
     }
 }
 
@@ -150,15 +170,16 @@ private fun trimUrl(found: String): String {
 private fun firstUrl(text: String): String? = URL.find(text)?.value?.let(::trimUrl)
 
 /** What another app shared, as a clip (companion.ts `shareClip`): the first link found is the page, the subject its
- *  title, the words the selection unless they say no more than the link and the title. null: nothing to clip. */
-fun shareClip(text: String, subject: String, picture: Boolean): ClipPage? {
+ *  title, the words the selection unless they say no more than the link and the title; the pictures and PDFs its files.
+ *  null: nothing to clip. */
+fun shareClip(text: String, subject: String, pictures: Int, pdfs: List<String>): ClipPage? {
     val title = subject.trim()
     val url = listOf(text, subject).firstNotNullOfOrNull { s -> s.trim().takeIf(isUrl) ?: firstUrl(s) }
     var words = text.trim()
     val rest = if (url != null) words.replaceFirst(url, "").trim() else words
     if (url != null && (rest.isEmpty() || rest == title)) words = ""
-    if (words.isEmpty() && url == null && !picture) return null
-    return ClipPage(url ?: "", if (isUrl(title)) "" else title, words.ifEmpty { null }, picture)
+    if (words.isEmpty() && url == null && pictures == 0 && pdfs.isEmpty()) return null
+    return ClipPage(url ?: "", if (isUrl(title)) "" else title, words.ifEmpty { null }, pictures, pdfs)
 }
 
 /** Where a clip goes. */
@@ -204,15 +225,16 @@ fun suggestionsOf(j: JSONObject): Suggestions = Suggestions(
 data class Choice(val target: Target, val label: String, val hint: String?)
 
 /** The pick first, then the others best first, then a new note unless that is the pick, then a new task (clip.ts
- *  `choices`). `picture`: an existing task keeps only a link to it, a new task the picture in a note of its own. */
-fun choices(s: Suggestions, picture: Boolean): List<Choice> {
+ *  `choices`). `files`: what the clip's files are called (`filesWord`), null for none: an existing task keeps none of
+ *  them, a new task keeps them in a note of its own. */
+fun choices(s: Suggestions, files: String?): List<Choice> {
     val rest = s.suggestions.map { x ->
         val pct = percent(x.p)
-        if (x.target is Target.Task) Choice(x.target, "Add to task ${x.title}", if (picture) "$pct, link only" else pct)
+        if (x.target is Target.Task) Choice(x.target, "Add to task ${x.title}", if (files != null) "$pct, no $files" else pct)
         else Choice(x.target, "Append to ${x.title}", pct)
     }
     val fresh = Choice(Target.New, "New note", null)
-    val task = Choice(Target.NewTask, "New task", if (picture) "picture in a linked note" else null)
+    val task = Choice(Target.NewTask, "New task", files?.let { "$it in a linked note" })
     val top = rest.find { it.target == s.pick }
     return if (top != null) listOf(top) + rest.filter { it !== top } + fresh + task else listOf(fresh) + rest + task
 }
@@ -262,8 +284,9 @@ fun saveBody(page: ClipPage, line: String?, target: Target, note: String, summar
         if (summary) put("summary", true)
     }
 
-/** Whether a save sends the picture's bytes: to a note, a new note or a new task, never to an existing task. */
-fun sendsFile(page: ClipPage, target: Target) = page.picture && target !is Target.Task
+/** Whether a save sends the files' bytes: to a note, a new note or a new task, never to an existing task (clip.ts
+ *  `sendsFiles`). */
+fun sendsFiles(page: ClipPage, target: Target) = page.files > 0 && target !is Target.Task
 
 /** The save's answer, as far as it is told. */
 data class ClipResult(val task: Boolean, val created: Boolean, val summary: String?)

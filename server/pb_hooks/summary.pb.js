@@ -20,7 +20,7 @@ routerAdd("POST", "/api/tefnotes/summary", (e) => {
   const title = typeof body.title === "string" ? body.title.slice(0, 300) : "";
   const run = (name, ...args) => toString($os.exec(name, ...args).output());
   const key = ds.credential(keys.read);
-  const r = lib.summarise({ url, title, text: "", selection: "", image: null }, {
+  const r = lib.summarise({ url, title, text: "", selection: "", images: [], pdfs: [] }, {
     key,
     page: (u) => lp.textOf(u, { lookup: lp.getent(run), get: lp.curl(run) }),
     blocked: (err) => err instanceof lp.Blocked,

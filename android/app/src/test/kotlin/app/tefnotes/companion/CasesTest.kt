@@ -32,7 +32,7 @@ class CasesTest {
     @Test
     fun aShareAsAClip() = each("share") { c ->
         val i = c.getJSONObject("in")
-        val clip = shareClip(i.getString("text"), i.getString("subject"), i.getBoolean("picture"))
+        val clip = shareClip(i.getString("text"), i.getString("subject"), i.getInt("pictures"), i.getJSONArray("pdfs").strings())
         same(c.opt("clip"), clip?.json(), c.getString("name"))
     }
 
@@ -49,9 +49,22 @@ class CasesTest {
     }
 
     @Test
+    fun whatAClipsFilesAreCalled() = each("files") { c ->
+        val page = ClipPage("", "", null, c.getInt("pictures"), List(c.getInt("pdfs")) { "a.pdf" })
+        assertEquals("files $c", if (c.isNull("word")) null else c.getString("word"), filesWord(page))
+    }
+
+    @Test
+    fun theLimits() {
+        val l = cases.getJSONObject("limits")
+        assertEquals(l.getInt("files"), CLIP_FILES)
+        assertEquals(l.getLong("pdf"), MAX_PDF)
+    }
+
+    @Test
     fun theChoices() = each("choices") { c ->
         val made = JSONArray()
-        for (ch in choices(suggestionsOf(c.getJSONObject("suggestions")), c.getBoolean("picture")))
+        for (ch in choices(suggestionsOf(c.getJSONObject("suggestions")), if (c.isNull("files")) null else c.getString("files")))
             made.put(JSONObject().put("target", ch.target.json()).put("label", ch.label).apply { if (ch.hint != null) put("hint", ch.hint) })
         same(c.getJSONArray("choices"), made, c.getString("name"))
     }

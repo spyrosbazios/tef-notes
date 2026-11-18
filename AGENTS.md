@@ -7,7 +7,7 @@ public page (`site/`) and the promo film drawn from its screens (`video/`). What
 the server's jobs: `ARCHITECTURE.md` (not repeated here). Rules for changes: `CONTRIBUTING.md`. Security model: `SECURITY.md`.
 Each module has its own `README.md`; `extension/` and `android/` also have an `AGENTS.md`.
 
-<!-- reviewed: 2026-11-15 -->
+<!-- reviewed: 2026-11-18 -->
 
 ## Where facts live
 
@@ -21,7 +21,7 @@ Each module has its own `README.md`; `extension/` and `android/` also have an `A
 | `packages/core/src/sync.ts` | The offline sync engine: rows (notes with `base` and conflict state, tasks, links), local edits, pull and push over a `Transport`, the 3-way and field merges, one-at-a-time `coalesced`; the web runs it over IndexedDB (`web/src/lib/sync.ts`, `local.ts`), tests over a fake server in `test/sync.test.ts` | ⭐ the sync contract in code |
 | `packages/core/src/todo.ts` | Task types (tags), patch rules, ticking (repeat rollover), Things' views, the field-level merge (tags as a set) | ⭐ tasks as records in code |
 | `server/pb_hooks/autotag.pb.js` + `lib/autotag.js` | The auto-tagger: the notes cron, and the guess route a new-task form calls as it is typed (`tagGuesser`, `packages/core/src/tags.ts`) | ⭐ |
-| `server/pb_hooks/clip.pb.js` + `lib/clip.js` | The clip routes (suggest, then save; to a note, a task, a new note or a new task, a picture then in a new note the task links to). A screenshot is a picture clip like any other. The text a share writes is `share.ts`'s (`server/test/clip.test.js` checks). Shapes: `packages/core/src/clip.ts`; contract: `extension/AGENTS.md`. A summary is written one way (`lib/clip.js` `summarise`), for a clip and for a note link's Summary button (`summary.pb.js`, `web/src/editor/link-tools.ts`) | ⭐ the extension's contract |
+| `server/pb_hooks/clip.pb.js` + `lib/clip.js` | The clip routes (suggest, then save; to a note, a task, a new note or a new task, its files then in a new note the task links to; a clip carries text, a link, and up to 10 pictures and PDFs). A screenshot is a picture clip like any other. The text a share writes is `share.ts`'s (`server/test/clip.test.js` checks). Shapes: `packages/core/src/clip.ts`; contract: `extension/AGENTS.md`. A summary is written one way (`lib/clip.js` `summarise`), for a clip and for a note link's Summary button (`summary.pb.js`, `web/src/editor/link-tools.ts`) | ⭐ the extension's contract |
 | `packages/core/src/share.ts` + `share-target.ts` + `share-stash.ts` | What a share from another app becomes: Android's web share-target form as a `Shared` (`fromPost`: the link is found in `text`), the share as a clip, the note, the assistant's message; the manifest's `share_target` path and cache names; the stash that carries the post from the service worker (`web/sw/sw.ts`) to the page (`web/src/components/share-page.tsx`). | ⭐ shares |
 | `packages/core/src/lens.ts` | Lenses, the global filter: the `Lens` type and its defensive reader, `inLens` (any of its tags, or any item when it has none, and none of its `exclude`, for notes and tasks), the tag a new item inherits (the lens's first), the `filter` text the assistant is sent; calls: `pocketbase.ts` `lenses`. Definitions are the server's `lenses` collection; which lens is on is a shared preference (`prefs.ts`) | ⭐ lenses |
 | `server/pb_hooks/tags.pb.js` + `lib/tags.js` | Tag descriptions (the route returns one; the hourly job saves one every 10 new notes); client calls: `packages/core/src/tags.ts` | |

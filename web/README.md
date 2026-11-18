@@ -1,6 +1,6 @@
 # TEF Notes web app
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-18 -->
 
 The laptop client for [TEF Notes](../README.md): browse and edit notes and tasks, view photos, PDFs and
 drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, TanStack Router and axios.
@@ -253,9 +253,8 @@ PDF shared to it open the Share page (`src/components/share-page.tsx`, `/share`)
 (`packages/core/vite.ts`) makes the browser POST the share to `/share`; the service worker (`sw/sw.ts`) reads the form once,
 stashes it in the Cache API (`packages/core/src/share-stash.ts`) and redirects to `/share?shared=1`, where the page takes it
 out. Android puts a link in `text`, not `url`: `fromPost` (`packages/core/src/share.ts`) finds it. The page files a link,
-text or one photo through the server's clip routes as the extension does (`src/services/clip.ts`, the shapes
-and the contract in [`../extension/AGENTS.md`](../extension/AGENTS.md)); PDFs and several photos become a new note with the
-files attached; "Ask the assistant" hands any of it to the chat. A lens's first tag goes on what is made.
+text, photos and PDFs through the server's clip routes as the extension does (`src/services/clip.ts`, the shapes
+and the contract in [`../extension/AGENTS.md`](../extension/AGENTS.md)); "Ask the assistant" hands any of it to the chat. A lens's first tag goes on what is made.
 
 Firefox and iOS Safari have no share target. `/share` opened directly shows a box to paste a link or text into, which
 goes the same way. A share needs the worker installed: after a deploy, the first share can still reach the old one.

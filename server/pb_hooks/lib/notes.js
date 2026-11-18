@@ -243,4 +243,13 @@ function appended(body, text, section) {
   return appendToNote(body, t.includes("\n") ? t : t.replace(/^[-*+]\s+/, ""), section);
 }
 
-module.exports = { NOTES, MEMORY, fold, localDay, idOf, parse, serialize, withTags, withBody, columns, slugify, pathStem, newNotePath, photoName, linkPath, appendToNote, appended };
+/** A PDF's name as the note stores it (photos.ts pdfName): its slug and `.pdf`, `-2`, `-3` when the note has that one. */
+function pdfName(original, taken = new Set()) {
+  // A name with nothing a slug keeps (slugify's "note" from no letters it knows) is a "document".
+  const base = original.replace(/\.pdf$/i, ""), slug = slugify(base), stem = slug === "note" && !/note/i.test(base) ? "document" : slug;
+  let n = `${stem}.pdf`;
+  for (let i = 2; taken.has(n); i++) n = `${stem}-${i}.pdf`;
+  return n;
+}
+
+module.exports = { NOTES, MEMORY, fold, localDay, idOf, parse, serialize, withTags, withBody, columns, slugify, pathStem, newNotePath, photoName, pdfName, linkPath, appendToNote, appended };

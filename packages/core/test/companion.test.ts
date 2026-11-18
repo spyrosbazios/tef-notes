@@ -1,10 +1,10 @@
 // The native companion's feeds (src/companion.ts): rows worked out here, so a companion only draws them.
 import { describe, expect, it } from "bun:test";
-import { choices, describe as describeResult, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
+import { choices, CLIP_FILES, describe as describeResult, filesWord, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
 import { DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, shareClip, switchesOf, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
-import { fit, lookSize } from "../src/photos";
+import { fit, lookSize, MAX_PDF } from "../src/photos";
 import { DEFAULT_PREFS } from "../src/prefs";
 import { ACCENTS, THEMES } from "../src/theme";
 import { newTask, type Task } from "../src/todo";
@@ -24,7 +24,7 @@ describe("the look", () => {
     expect(ownerLook({ theme: "nord", accent: "rose" }, work)).toMatchObject({ scheme: "light", bg: THEMES.light.C.bg, brand: ACCENTS.teal.light });
   });
   it("hello names the app, the contract and the summary box as left", () => {
-    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 2, look: DEFAULT_LOOK, summary: true, tag: null });
+    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 3, look: DEFAULT_LOOK, summary: true, tag: null });
     expect(helloOf(DEFAULT_PREFS, work).tag).toBe("work");
   });
 });
@@ -38,7 +38,7 @@ describe("a task list", () => {
       task("d", { when: "2026-11-20" }),
       task("e", { when: TODAY, done: TODAY }),
     ], "today");
-    expect(f).toMatchObject({ contract: 2, list: "today", title: "Today", url: "/today", more: 0 });
+    expect(f).toMatchObject({ contract: 3, list: "today", title: "Today", url: "/today", more: 0 });
     expect(f.sections).toEqual([
       { label: "", tasks: [
         { id: "a", title: "Task a", detail: "09:30", late: false, url: "/today?t=a" },
@@ -138,8 +138,15 @@ describe("the rules a companion copies", () => {
   it("the picture JEV looks at", () => {
     for (const c of cases.look) expect(lookSize(c.width, c.height)).toEqual(c.size);
   });
-  for (const c of cases.choices as unknown as { name: string; suggestions: Suggestions; picture: boolean; choices: unknown }[])
-    it(`the choices: ${c.name}`, () => expect(choices(c.suggestions, c.picture)).toEqual(c.choices as ReturnType<typeof choices>));
+  it("the limits on a clip's files", () => expect({ files: CLIP_FILES, pdf: MAX_PDF }).toEqual(cases.limits));
+  it("what a clip's files are called", () => {
+    for (const c of cases.files) {
+      const page = { url: "", title: "", images: Array.from({ length: c.pictures }, () => ({ src: "" })), pdfs: Array.from({ length: c.pdfs }, () => ({ name: "a.pdf" })) };
+      expect(filesWord(page)).toBe(c.word);
+    }
+  });
+  for (const c of cases.choices as unknown as { name: string; suggestions: Suggestions; files: string | null; choices: unknown }[])
+    it(`the choices: ${c.name}`, () => expect(choices(c.suggestions, c.files)).toEqual(c.choices as ReturnType<typeof choices>));
   for (const c of cases.tags as { name: string; all: ClipTags["tags"]; picked: string[]; offered: ClipTags["tags"]; more: string[] }[])
     it(`the tags not picked: ${c.name}`, () => expect(unpickedTags(c.all, c.picked)).toEqual({ offered: c.offered, more: c.more }));
   it("the tags a save sends: the picks, then what the lens tags, each once", () => {

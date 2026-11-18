@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-15 -->
+<!-- reviewed: 2026-11-18 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -252,13 +252,13 @@ judges likelier than not (p >= 0.5) is written into the note's frontmatter as a 
 a transaction, dropped if `rev` moved); nothing is only suggested. A new or edited tag definition re-evaluates every note,
 up to 50 a minute. Tasks are tagged only while typed (the guess route, Tasks above). Without a `typesafe` key it tags nothing.
 
-**Clip flow** (`clip.pb.js`, `lib/clip.js`). Two steps. `suggest` takes the page's URL, title and text, or a picture, and
+**Clip flow** (`clip.pb.js`, `lib/clip.js`). Two steps. `suggest` takes the page's URL, title and text, or pictures and PDFs (up to 10; JEV sees the first picture and the PDFs' names), and
 your optional note as context, and returns up to 4 candidates, each `{kind: "note" | "task", ...}`, plus the page's own
 one-line description. `clip` then takes a `target`: `{kind: "note", path}` (appended to the note), `{kind: "task", id}`
-(added to the task's `notes`; a picture only as an image line to its address, a task having no attachments),
-`{kind: "new"}` or `{kind: "newtask"}` (a new task with the clip's text as its `notes`; a picture then goes into a new note
+(added to the task's `notes`; a picture only as an image line to its address and a PDF by its name, a task having no attachments),
+`{kind: "new"}` or `{kind: "newtask"}` (a new task with the clip's text as its `notes`; its files then go into a new note
 of the whole clip, which the task is `about`, all in one transaction). A screenshot is no feature of its own: it is a
-picture clip like any other. The picture is stored as an attachment and embedded as any photo is. Your own note is
+picture clip like any other. Each picture is stored as an attachment and embedded as any photo is, each PDF attached and linked as the web app attaches one. Your own note is
 written up by the model, which tidies and adds nothing. Only when you ticked "Add a summary" (`summary: true`, off by
 default, remembered by each client) does the model add a short summary under the link or picture, from the page's text
 (fetched through the link-preview guard for a link that came with none; a picture's only from the words it came with).

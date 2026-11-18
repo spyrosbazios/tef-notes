@@ -26,14 +26,14 @@ class ContractTest {
 
     @Test
     fun helloIsOnlyATefNotesServers() {
-        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":2,"look":$look,"summary":true,"tag":"work"}"""))!!
-        assertEquals(Hello(2, JSONObject(look).toString(), true, "work"), h)
-        assertNull(helloOf(JSONObject("""{"app":"tefnotes","contract":2,"look":$look,"summary":false,"tag":null}"""))!!.tag)
+        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":3,"look":$look,"summary":true,"tag":"work"}"""))!!
+        assertEquals(Hello(3, JSONObject(look).toString(), true, "work"), h)
+        assertNull(helloOf(JSONObject("""{"app":"tefnotes","contract":3,"look":$look,"summary":false,"tag":null}"""))!!.tag)
         assertNull(helloOf(JSONObject("""{"app":"other","look":$look}""")))
         assertNull(helloOf(JSONObject("""{"message":"Not found"}""")))
     }
 
-    private val feed = """{"contract":2,"list":"today","title":"Today · Work","url":"/today","more":2,"look":$look,"sections":[
+    private val feed = """{"contract":3,"list":"today","title":"Today · Work","url":"/today","more":2,"look":$look,"sections":[
         {"label":"","tasks":[{"id":"a","title":"A","detail":"09:30","late":false,"url":"/today?t=a"},{"id":"b","title":"B","detail":"Due Nov 12","late":true,"url":"/today?t=b"}]},
         {"label":"This Evening","tasks":[{"id":"c","title":"C","detail":"","late":false,"url":"/today?t=c"}]}]}"""
 
@@ -60,7 +60,7 @@ class ContractTest {
 
     @Test
     fun aFeedOfAnotherContractOrNoFeedIsNotDrawn() {
-        assertNull(tasksFeedOf(feed.replace("\"contract\":2", "\"contract\":3")))
+        assertNull(tasksFeedOf(feed.replace("\"contract\":3", "\"contract\":4")))
         assertNull(tasksFeedOf("<html>"))
         assertNull(tasksFeedOf(null))
         assertNull(notesFeedOf("{}"))
@@ -76,7 +76,7 @@ class ContractTest {
 
     @Test
     fun aNotesFeed() {
-        val f = notesFeedOf("""{"contract":2,"title":"Notes","url":"/notes","more":0,"look":$look,"notes":[
+        val f = notesFeedOf("""{"contract":3,"title":"Notes","url":"/notes","more":0,"look":$look,"notes":[
             {"id":"a","title":"A","peek":"words","pinned":true,"url":"/note/a","color":{"bg":"#172331","fg":"#d2e2f3","line":"#6a92bd"}},
             {"id":"b","title":"B","peek":"","pinned":false,"url":"/note/b"}]}""")!!
         assertEquals(FeedNote("a", "A", "words", true, "/note/a", 0xFF172331.toInt(), 0xFFD2E2F3.toInt()), f.notes[0])
@@ -85,18 +85,19 @@ class ContractTest {
 
     @Test
     fun theRequestsAClipSends() {
-        val page = ClipPage("https://example.com", "Example", "a quote", true)
+        val page = ClipPage("https://example.com", "Example", "a quote", 2, listOf("a.pdf"))
         assertEquals(
-            JSONObject("""{"url":"https://example.com","title":"Example","selection":"a quote","image":{"src":"","look":"QUJD"},"note":"mine"}""").toString(),
+            JSONObject("""{"url":"https://example.com","title":"Example","selection":"a quote","images":[{"src":"","look":"QUJD"},{"src":""}],"pdfs":[{"name":"a.pdf"}],"note":"mine"}""").toString(),
             suggestBody(page, " mine ", "QUJD").toString(),
         )
         assertEquals(
-            JSONObject("""{"url":"https://example.com","title":"Example","selection":"a quote","image":{"src":""},"target":{"kind":"new"},"line":"the line","tags":["work"],"summary":true}""").toString(),
+            JSONObject("""{"url":"https://example.com","title":"Example","selection":"a quote","images":[{"src":""},{"src":""}],"pdfs":[{"name":"a.pdf"}],"target":{"kind":"new"},"line":"the line","tags":["work"],"summary":true}""").toString(),
             saveBody(page, "the line", Target.New, "", true, listOf("work")).toString(),
         )
-        assertEquals(true, sendsFile(page, Target.NewTask))
-        assertEquals(false, sendsFile(page, Target.Task("t")))
-        assertEquals(false, sendsFile(page.copy(picture = false), Target.New))
+        assertEquals(true, sendsFiles(page, Target.NewTask))
+        assertEquals(false, sendsFiles(page, Target.Task("t")))
+        assertEquals(false, sendsFiles(page.copy(pictures = 0, pdfs = emptyList()), Target.New))
+        assertEquals(true, sendsFiles(page.copy(pictures = 0), Target.New))
     }
 
     @Test

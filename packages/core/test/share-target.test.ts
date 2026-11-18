@@ -29,11 +29,11 @@ describe("Android's form as a share", () => {
     expect(fromPasted("   ")).toBeNull();
     expect(fromPasted(U)).toMatchObject({ url: U });
   });
-  it("one photo or a link is a clip; a PDF or several photos are not", () => {
+  it("a link, photos and PDFs are all a clip", () => {
     expect(clipOf(fromPost({ ...none, text: U })!, "Page")).toEqual({ url: U, title: "Page" });
-    expect(clipOf(fromPost({ ...none, files: [{ name: "a.png", type: "image/png" }] })!, null)).toEqual({ url: "", title: "", image: { src: "" } });
-    expect(clipOf(fromPost({ ...none, files: [{ name: "a.png", type: "image/png" }, { name: "b.png", type: "image/png" }] })!, null)).toBeNull();
-    expect(clipOf(fromPost({ ...none, files: [{ name: "a.pdf", type: "application/pdf" }] })!, null)).toBeNull();
+    expect(clipOf(fromPost({ ...none, files: [{ name: "a.png", type: "image/png" }] })!, null)).toEqual({ url: "", title: "", images: [{ src: "" }] });
+    expect(clipOf(fromPost({ ...none, files: [{ name: "a.png", type: "image/png" }, { name: "b.png", type: "image/png" }] })!, null)).toEqual({ url: "", title: "", images: [{ src: "" }, { src: "" }] });
+    expect(clipOf(fromPost({ ...none, files: [{ name: "a.pdf", type: "application/pdf" }] })!, null)).toEqual({ url: "", title: "", pdfs: [{ name: "a.pdf" }] });
   });
 });
 

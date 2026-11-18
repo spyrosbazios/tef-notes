@@ -1,21 +1,23 @@
 /// <reference path="../pb_data/types.d.ts" />
-// The browser extension's "save this page" (or this picture on it), filed the way the phone's agent files a share, in
-// two steps so the owner approves where it goes before anything is written. What they decide and write: lib/clip.js.
+// The browser extension's "save this page" (or this picture on it), and the phone's share sheet (the web app's share page
+// and the Android companion: text, a link, pictures, PDFs), filed the way the phone's agent files a share, in two steps so the owner approves where it goes before anything is written. What they decide and write: lib/clip.js.
 //
 //   POST /api/tefnotes/clip/suggest  JSON { url?, title, selection?, text? (the page's innerText), note? (the owner's
-//        words), image? { src, alt?, caption?, look? (base64 JPEG, what JEV sees) } }; no url only with a selection or an image
+//        words), images?: [{ src, alt?, caption?, look? (base64 JPEG, what JEV sees: the first picture's) }], pdfs?: [{ name }] };
+//        no url only with a selection, a picture or a PDF; at most lib/clip.js FILES pictures and PDFs
 //     200 { suggestions: [{ kind: "note", path, title, p } | { kind: "task", id, title, p }] (best first, at most 4),
 //        pick: { kind: "new" } | { kind: "note", path } | { kind: "task", id }, line?: string }
 //     Asks JEV, writes nothing. `line` is the page's own passage JEV picked as what the page is: the save sends it back.
-//   POST /api/tefnotes/clip  multipart: `@jsonPayload` { url?, title, selection?, line?, note?, image? { src, alt?, caption? },
+//   POST /api/tefnotes/clip  multipart: `@jsonPayload` { url?, title, selection?, line?, note?, images?: [{ src, alt?, caption? }], pdfs?: [{ name }],
 //        target: { kind: "new", title? } | { kind: "note", path } | { kind: "task", id } | { kind: "newtask", title? },
 //        summary?: true, text? (the page's innerText, read only with summary), tags?: [name] (the owner's: a new note or
-//        task carries them, an append adds those missing) } and, for a picture clipped to a note, a new note or a new task,
-//        its JPEG as the `file` part (an existing task takes none: it holds no attachment)
+//        task carries them, an append adds those missing) } and, for a clip to a note, a new note or a new task, one `file`
+//        part per file in the payload's order: each picture's JPEG, then each PDF as it is (an existing task takes none: it
+//        holds no attachment). The body may be up to 260 MB (PocketBase's default is 32 MB: a couple of PDFs pass it).
 //     200 { kind: "note", path, title, action: "created" | "appended", summary? } | { kind: "task", id, title,
 //        action: "created" | "appended", note?, summary? }; `summary` ("added" | "skipped" | "failed") only when one was
-//        asked for. A new task (`created`) gets the clip's text as its `notes`; with a picture, `note` is the path of a new
-//        note holding the whole clip, picture first, which the task links to (`links`, role `about`): a task holds no
+//        asked for. A new task (`created`) gets the clip's text as its `notes`; with files, `note` is the path of a new
+//        note holding the whole clip, files first, which the task links to (`links`, role `about`): a task holds no
 //        attachment. No JEV: target is the owner's choice. 404 if it is no longer there, 413 if a task's notes would overflow.
 //   POST /api/tefnotes/clip/tags  JSON as suggest (the picture is not used)
 //     200 { tags: [{ name, p }] (every defined tag, best first), picked: [name] (preselected: lib/clip.js tagPick) }
@@ -37,9 +39,9 @@
 // Writes bypass the request hooks (rev.pb.js), so the rev contract is kept here: an append re-reads the note (or the
 // task, whose `notes` it adds to) inside the transaction that writes it, so it is based on the rev it replaces, and bumps
 // it; a new note or task starts at rev 1 (a new task after every other in `order`).
-// Every column a client copies out of the frontmatter is written beside `text` (lib/notes.js columns). A picture is an
-// `attachments` record under the note's id, saved first and deleted again if the note's write fails: never one without
-// the other.
+// Every column a client copies out of the frontmatter is written beside `text` (lib/notes.js columns). Each file is an
+// `attachments` record under the note's id (its collection checks the type and size), saved first and deleted again if
+// the note's write fails: never one without the other.
 // A handler runs in its own VM and sees nothing of this file's top level: each requires what it uses.
 
 routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
@@ -70,8 +72,9 @@ routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
     else {
       try {
         const ask = (ref) => $http.send(jev.request(key, lib.request(clip, index, tasks, memory, ps, now, ref)));
-        let res = ask(clip.image && clip.image.look ? `picture-${$security.randomString(24)}` : null);
-        if ((res.statusCode === 400 || res.statusCode === 413) && clip.image && clip.image.look) {
+        const look = clip.images.length > 0 && !!clip.images[0].look;
+        let res = ask(look ? `picture-${$security.randomString(24)}` : null);
+        if ((res.statusCode === 400 || res.statusCode === 413) && look) {
           log("TypeSafe refused the picture: asking by its words", "status", res.statusCode);
           res = ask(null);
         }
@@ -130,11 +133,11 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     throw err;
   }
   try { files = e.findUploadedFiles("file"); } catch (_) { /* a page: no file part */ }
-  // A picture's JPEG is the `file` part, kept as an attachment of the note it goes in (for a new task, a new note the task
-  // links to); a page's clip, and any to an existing task, send none.
-  const kept = !!clip.image && clip.target.kind !== "task";
-  if (kept !== files.length > 0 || files.length > 1) {
-    return e.json(400, { error: "A picture's clip to a note, a new note or a new task sends its JPEG as the `file` part; a page's, or any clip to an existing task, sends none." });
+  // Each file is a `file` part, kept as an attachment of the note it goes in (for a new task, a new note the task links
+  // to); a clip to an existing task sends none.
+  const kept = clip.target.kind === "task" ? 0 : clip.images.length + clip.pdfs.length;
+  if (files.length !== kept) {
+    return e.json(400, { error: "A clip to a note, a new note or a new task sends a `file` part per picture and PDF, in that order; a clip to an existing task sends none." });
   }
 
   // The owner's note, written up: as typed without a key, or when the model fails.
@@ -170,21 +173,24 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
   }
 
   const now = Date.now();
-  let att = null;
-  /** The picture saved under `noteId`, and its image line for the body; "" for a page. */
+  const atts = [];
+  /** The files saved under `noteId`, and their lines for the body; "" for none. */
   const attach = (noteId) => {
     if (!files.length) return "";
     const taken = arrayOf(new DynamicModel({ name: "" }));
     e.app.db().newQuery("SELECT name FROM attachments WHERE note = {:id}").bind({ id: noteId }).all(taken);
-    const name = notes.photoName(now, new Set(taken.map((r) => r.name)));
-    att = new Record(e.app.findCollectionByNameOrId("attachments"));
-    att.set("note", noteId);
-    att.set("name", name);
-    att.set("file", files[0]);
-    e.app.save(att);
-    return lib.embedOf(clip.image, noteId, name);
+    const { names, embed } = lib.filesUnder(clip, noteId, new Set(taken.map((r) => r.name)), now);
+    names.forEach((name, i) => {
+      const att = new Record(e.app.findCollectionByNameOrId("attachments"));
+      att.set("note", noteId);
+      att.set("name", name);
+      att.set("file", files[i]);
+      e.app.save(att);
+      atts.push(att);
+    });
+    return embed;
   };
-  /** A new note of the whole clip (the picture first, when there is one), titled `title`, at rev 1: its record, unsaved. */
+  /** A new note of the whole clip (the files first, when there are any), titled `title`, at rev 1: its record, unsaved. */
   const newNote = (title) => {
     const stem = notes.pathStem(title, now), taken = arrayOf(new DynamicModel({ path: "" }));
     e.app.db().newQuery("SELECT path FROM notes WHERE path LIKE {:stem}").bind({ stem: `${stem}%` }).all(taken);
@@ -197,8 +203,9 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     return { path, rec };
   };
   const unattach = () => {
-    if (!att) return;
-    try { e.app.delete(att); } catch (err) { log("could not remove the picture of a failed save", "note", att.getString("note"), "error", String(err).slice(0, 200)); }
+    for (const att of atts) {
+      try { e.app.delete(att); } catch (err) { log("could not remove a file of a failed save", "note", att.getString("note"), "error", String(err).slice(0, 200)); }
+    }
   };
 
   try {
@@ -206,7 +213,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     if (clip.target.kind === "task") {
       const id = clip.target.id, gone = () => e.json(404, { error: "That task no longer exists." });
       try { e.app.findRecordById("tasks", id); } catch (_) { return gone(); }
-      const body = lib.bodyOf(clip, clip.line, note, clip.image ? lib.pictureLine(clip.image) : "", summary);
+      const body = lib.bodyOf(clip, clip.line, note, lib.fileLines(clip), summary);
       let full = false;
       e.app.runInTransaction((tx) => {
         let rec;
@@ -242,7 +249,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
       });
       if (!out) { unattach(); return e.json(404, { error: "That note no longer exists." }); }
     } else if (clip.target.kind === "newtask") {
-      // The text without the picture as the task's notes; the picture, when there is one, in a new note of the whole clip
+      // The text without the files as the task's notes; the files, when there are any, in a new note of the whole clip
       // the task is `about` (lib/links.js). Note, task and link in one transaction: all or none.
       const title = lib.titleOf(clip, clip.line, now);
       const text = lib.taskNotes("", lib.bodyOf(clip, clip.line, note, "", summary));
@@ -280,7 +287,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     log("failed", "url", clip.url, "error", String(err).slice(0, 300));
     return e.json(500, { error: "The clip could not be saved." });
   }
-});
+}, $apis.bodyLimit(260 * 1024 * 1024));   // FILES (10) PDFs of 25 MB each, and the JSON
 
 routerAdd("GET", "/api/tefnotes/clip/image", (e) => {
   const lp = require(`${__hooks}/lib/link-preview.js`);

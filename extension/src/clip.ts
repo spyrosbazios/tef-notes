@@ -2,7 +2,7 @@
 // where JEV would file it, writes nothing), then save (POST {server}/api/tefnotes/clip: where the owner chose). The popup
 // is the only place a choice is made; the tags are asked for beside the suggestions (tagsFor); the context menu hands its page to it (background.ts).
 // The shapes are packages/core/src/clip.ts's, shared with the phone's Share screen. The picture's bytes: picture.ts.
-import { type ClipPage, type ClipResult, type ClipTags, saveBody, sendsFile, suggestBody, type Suggestions, type Target } from "@/core/clip";
+import { type ClipPage, type ClipResult, type ClipTags, saveBody, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
 import { getServer, hasAccess } from "./settings";
 
 export type Page = ClipPage;
@@ -63,14 +63,14 @@ export async function readTab(tab: chrome.tabs.Tab, selection?: string, src?: st
     title: tab.title || tab.url,
     selection: blank(selection) ?? blank(grabbed?.selection),
     text: blank(grabbed?.text),
-    ...(src && { image: { src, alt: blank(grabbed?.alt), caption: blank(grabbed?.caption) } }),
+    ...(src && { images: [{ src, alt: blank(grabbed?.alt), caption: blank(grabbed?.caption) }] }),
   };
 }
 
 /** A link from the context menu: only its address is known. */
 export const linkPage = (url: string): Page => ({ url, title: url });
 
-/** `note`: the owner's words, context for where it goes. `look`: the picture as JEV sees it (base64 JPEG). */
+/** `note`: the owner's words, context for where it goes. `look`: the first picture as JEV sees it (base64 JPEG). */
 export const suggest = (page: Page, note: string, look?: string) =>
   json<Suggestions>(call("/api/tefnotes/clip/suggest", {
     method: "POST",
@@ -93,7 +93,7 @@ export const tagsFor = (page: Page, note: string) =>
 export function save(page: Page, line: string | undefined, target: Target, note: string, summary: boolean, tags: string[], file?: Blob) {
   const form = new FormData();
   form.append("@jsonPayload", JSON.stringify(saveBody(page, line, target, note, summary, tags)));
-  if (file && sendsFile(page, target)) form.append("file", file, "picture.jpg");
+  if (file && sendsFiles(page, target)) form.append("file", file, "picture.jpg");
   return json<ClipResult>(call("/api/tefnotes/clip", { method: "POST", body: form }));
 }
 

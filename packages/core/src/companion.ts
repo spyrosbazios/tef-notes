@@ -6,8 +6,9 @@
 // lets a second one be written in another language without a second copy of the rules.
 //
 // What a companion does copy is small, and checked: how a share reads as a clip (`shareClip`), the sizes a picture is
-// sent at (photos.ts `fit`, `lookSize`), the choices a clip offers, its tags and what its save says (clip.ts `choices`,
-// `unpickedTags`, `savedTags`, `describe`, `summaryNotice`). They run before the server is reached, or beside its answer. test/companion-cases.json holds the
+// sent at (photos.ts `fit`, `lookSize`), how many files a clip takes and how large a PDF (clip.ts `CLIP_FILES`, photos.ts
+// `MAX_PDF`), the choices a clip offers, its tags and what its save says (clip.ts `filesWord`,
+// `choices`, `unpickedTags`, `savedTags`, `describe`, `summaryNotice`). They run before the server is reached, or beside its answer. test/companion-cases.json holds the
 // cases; this core's tests and each companion's run the same file.
 //
 // Routes, all under /agent/companion (server/agent/src/companion.ts), errors `{error}`:
@@ -25,12 +26,13 @@ import { isNotePath, parseNote, snippetOf } from "./notes";
 import { DEFAULT_PREFS, TASK_LISTS, TASK_LIST_LABEL, type Prefs, type TaskList } from "./prefs";
 import { taskUrl } from "./push";
 import { THEMES, withAccent, type Palette, type Theme } from "./theme";
+import { PDF } from "./photos";
 import { clipOf, fromPost } from "./share";
 import { progress } from "./things";
 import { views, type Task } from "./todo";
 
 /** Raised when a route's answer changes shape. A companion built for another number says so instead of drawing it wrong. */
-export const COMPANION_CONTRACT = 2;
+export const COMPANION_CONTRACT = 3;
 
 /** The app's name in `Hello`: what tells a companion the address it was given is a TEF Notes server. */
 export const COMPANION_APP = "tefnotes";
@@ -181,13 +183,18 @@ export function notesFeed(rows: readonly NoteRow[], lenses: readonly Lens[], len
 // ---- a share
 
 /** What another app shares, as the phone's share sheet hands it over: the words (Android's EXTRA_TEXT, where a link
- *  usually sits after the page's title), a subject (often the page's title) and whether a picture came with it. */
-export type ShareIn = { text: string; subject: string; picture: boolean };
+ *  usually sits after the page's title), a subject (often the page's title), and its files: how many pictures, and each
+ *  PDF's name. A companion sends at most `CLIP_FILES` (clip.ts), the pictures first. */
+export type ShareIn = { text: string; subject: string; pictures: number; pdfs: string[] };
 
 /** The share as a clip (clip.ts), by the web app's own reading of a share (share.ts `fromPost`, `clipOf`): the first link
  *  found is the page, the subject its title, and the words the selection, unless they say no more than the link and the
- *  title. null when there is nothing to clip. */
+ *  title; the pictures and PDFs its files. null when there is nothing to clip. */
 export function shareClip(s: ShareIn): ClipPage | null {
-  const shared = fromPost({ title: s.subject, text: s.text, url: "", files: s.picture ? [{ name: "picture.jpg", type: "image/jpeg" }] : [] });
+  const files = [
+    ...Array.from({ length: s.pictures }, () => ({ name: "picture.jpg", type: "image/jpeg" })),
+    ...s.pdfs.map((name) => ({ name, type: PDF })),
+  ];
+  const shared = fromPost({ title: s.subject, text: s.text, url: "", files });
   return shared && clipOf(shared, null);
 }

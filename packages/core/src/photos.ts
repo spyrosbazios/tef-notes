@@ -55,7 +55,8 @@ export const isPdf = (name: string) => /\.pdf$/i.test(name);
  *  and `.pdf`, so it is safe in a link, a path on the phone and a URL; `-2`, `-3` when the note has that one already.
  *  The original name stays as the link's text. */
 export function pdfName(original: string, taken: ReadonlySet<string>): string {
-  const base = original.replace(/\.pdf$/i, ""), stem = /[\p{L}\p{N}]/u.test(base) ? slugify(base) : "document";
+  // A name with nothing a slug keeps (slugify's "note" from no letters it knows) is a "document".
+  const base = original.replace(/\.pdf$/i, ""), slug = slugify(base), stem = slug === "note" && !/note/i.test(base) ? "document" : slug;
   let n = `${stem}.pdf`;
   for (let i = 2; taken.has(n); i++) n = `${stem}-${i}.pdf`;
   return n;

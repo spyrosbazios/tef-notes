@@ -1,6 +1,6 @@
 # TEF Notes Companion (Android)
 
-<!-- reviewed: 2026-11-14 -->
+<!-- reviewed: 2026-11-18 -->
 
 A small native app that gives [TEF Notes](../README.md) the entry points an installed web app can't have on Android.
 It is not a second client: the app you use is still the web app, installed from Chrome. The companion has no notes
@@ -11,7 +11,7 @@ screen and no task screen; everything it shows comes from your server ready to d
 - **Tasks widget**: Today, the Inbox or Upcoming on the home screen. Tick a task, tap one to open it, add one with the
   plus. Hold the widget and choose its settings to pick the list.
 - **Notes widget**: your pinned notes, then the latest, each in its own colour.
-- **Save to TEF Notes** in the share sheet (a link, text or one picture) and in the menu over selected text in any
+- **Save to TEF Notes** in the share sheet (a link, text, or up to 10 pictures and PDFs) and in the menu over selected text in any
   app. The server suggests the notes and open tasks it fits, as for the [Chrome clipper](../extension/README.md); you
   pick one, or a new note or task. Its tags come the same way: the server's picks are on (a tap takes one off), the
   likely ones are offered, and any other tag you have defined is in a list.
