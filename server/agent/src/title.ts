@@ -53,9 +53,13 @@ export async function titleOf(server: pb.Server, note: string, pick: typeof mode
     const m = await pick(DEFAULT);
     const r = await generateText({
       model: m.model, providerOptions: m.providerOptions, instructions: INSTRUCTIONS, messages,
-      reasoning: "minimal", maxOutputTokens: 200, abortSignal: AbortSignal.timeout(MODEL_MS),
+      // no thinking: a thinking model spent a small budget on it and wrote no title (DeepSeek Flash, 2026-11-19); the
+      // headroom is for a provider that thinks anyway
+      reasoning: "none", maxOutputTokens: 1000, abortSignal: AbortSignal.timeout(MODEL_MS),
     });
-    return cleanTitle(r.text) || null;
+    const t = cleanTitle(r.text);
+    if (!t) console.error(`agent: titling ${note}: the model wrote no title (${r.finishReason})`);
+    return t || null;
   } catch (e) {
     console.error(`agent: titling ${note} failed: ${(e as Error).message}`);
     return null;
