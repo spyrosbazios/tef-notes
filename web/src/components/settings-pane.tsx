@@ -31,13 +31,13 @@ import { TagBadge } from "@/components/tag-badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useModel, useTalkModel } from "@/hooks/agent";
 import { useAppearance } from "@/hooks/appearance";
@@ -73,6 +73,8 @@ const clean = (v: string) => v.trim().replace(/^#/, "");
 const HEAD = "sticky top-0 z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
 /** A section page's own title. On the phone the page header already names the section, so it is only read out there. */
 const TITLE = cn(HEAD, "max-md:sr-only");
+/** A group inside a section page: one step below the page title, scrolls with the page. */
+const SUB = "text-base font-bold tracking-tight";
 const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). */
@@ -178,7 +180,6 @@ function Appearance() {
   return (
     <section className="space-y-3" aria-labelledby="appearance-h">
       <h2 id="appearance-h" className={TITLE}>Appearance</h2>
-      <p className="text-sm text-dim">Kept on the server: every device you open the app on has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
           <div className="flex items-baseline justify-between gap-2">
@@ -252,16 +253,10 @@ function TabOptions({ tab }: { tab: Tab }) {
 
 const setLayout = (layout: Layout, patch: Partial<LayoutPrefs>) => setPrefs(layout === "phone" ? { phone: patch } : { desktop: patch });
 
-/** One layout's preferences (core/prefs.ts): its name, whether this window is drawn in it, its rows. */
-function LayoutCard({ layout, here, children }: { layout: Layout; here: boolean; children: ReactNode }) {
-  const Icon = layout === "phone" ? Smartphone : Monitor;
+/** One layout's preferences (core/prefs.ts): its rows. */
+function LayoutCard({ layout, children }: { layout: Layout; children: ReactNode }) {
   return (
     <div className="divide-y divide-line rounded-xl border border-line">
-      <div className="flex items-center gap-2.5 px-3 py-2.5">
-        <Icon className="size-4 shrink-0 text-brand" />
-        <h3 className="min-w-0 flex-1 text-sm font-semibold">{LAYOUT_LABEL[layout]}</h3>
-        {here ? <Badge variant="secondary">This screen</Badge> : null}
-      </div>
       <StartRow layout={layout} />
       {children}
     </div>
@@ -280,20 +275,20 @@ function StartRow({ layout }: { layout: Layout }) {
 
 /** The phone's bottom bar: the tabs dragged into order (a finger after a long press), shown or hidden, and Home and Tasks tapped
  *  open for the list each starts on. */
-function PhoneLayout({ here }: { here: boolean }) {
+function PhoneLayout() {
   const { tabs: stored, hidden, tabLabels } = usePrefs().phone;
   const offered = useOffered(), tabs = stored.filter(offered);
   const [open, setOpen] = useState<Tab | null>(null);
   const drag = useRowDrag((_g, id, over, after) => setPrefs({ phone: { tabs: movedTab(prefsNow().phone.tabs, id as Tab, over as Tab, after) } }));
   return (
-    <LayoutCard layout="phone" here={here}>
+    <LayoutCard layout="phone">
       <div className="space-y-2.5 px-3 py-2.5">
         <p className="text-sm font-semibold">Tab labels</p>
         <Choice label="Tab labels" value={tabLabels} options={TAB_LABELS} names={TAB_LABELS_LABEL} onPick={(v) => setPrefs({ phone: { tabLabels: v } })} />
       </div>
       <div className="px-3 py-2.5">
         <p className="text-sm font-semibold">Tabs</p>
-        <p className="text-[13px] leading-snug text-dim">Drag to reorder (long press on a phone). Tap Home or Tasks to pick the list it opens on. Settings stays, so the bar can always be changed back.</p>
+        <p className="text-[13px] leading-snug text-dim">Drag to reorder. Tap Home or Tasks for the list it opens on.</p>
       </div>
       <ul aria-label="Tabs" className="divide-y divide-line">
         {tabs.map((t) => {
@@ -323,18 +318,18 @@ function PhoneLayout({ here }: { here: boolean }) {
 }
 
 /** The desktop's: Home's list, and the screens the sidebar lists. */
-function DesktopLayout({ here }: { here: boolean }) {
+function DesktopLayout() {
   const { homeList, hidden } = usePrefs().desktop;
   const offered = useOffered();
   return (
-    <LayoutCard layout="desktop" here={here}>
+    <LayoutCard layout="desktop">
       <div className="space-y-2.5 px-3 py-2.5">
         <p className="text-sm font-semibold">Home's task box opens on</p>
         <Choice label="Home's task box opens on, Desktop" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ desktop: { homeList: v } })} />
       </div>
       <div className="px-3 py-2.5">
         <p className="text-sm font-semibold">Sidebar</p>
-        <p className="text-[13px] leading-snug text-dim">The screens it lists. A hidden one is still a search away, and can still be where the app opens. Home, Search and Settings always stay.</p>
+        <p className="text-[13px] leading-snug text-dim">Home, Search and Settings always stay.</p>
       </div>
       <ul aria-label="Sidebar" className="divide-y divide-line">
         {RAIL.filter(offered).map((r) => {
@@ -355,15 +350,20 @@ function DesktopLayout({ here }: { here: boolean }) {
   );
 }
 
-/** Each layout's own preferences, the one this window is drawn in first. */
+/** Each layout's own preferences, a tab apiece, the one this window is drawn in first. */
 function Layouts() {
   const here = useLayout();
-  const phone = <PhoneLayout here={here === "phone"} />, desktop = <DesktopLayout here={here === "desktop"} />;
   return (
     <section className="space-y-3" aria-labelledby="layout-h">
       <h2 id="layout-h" className={TITLE}>Layout</h2>
-      <p className="text-sm text-dim">The phone and the desktop each keep their own: the screen the app starts on, Home's list, and the phone's tabs or the desktop's sidebar. A window narrower than a tablet is drawn as a phone's and follows the phone's. Kept on the server, like the look.</p>
-      {here === "phone" ? <>{phone}{desktop}</> : <>{desktop}{phone}</>}
+      <Tabs defaultValue={here} className="space-y-3">
+        <TabsList>
+          <TabsTrigger value="phone"><Smartphone /> Phone</TabsTrigger>
+          <TabsTrigger value="desktop"><Monitor /> Web</TabsTrigger>
+        </TabsList>
+        <TabsContent value="phone"><PhoneLayout /></TabsContent>
+        <TabsContent value="desktop"><DesktopLayout /></TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -402,8 +402,7 @@ function Tags() {
         <span className="flex-1 md:hidden" />
         <Button size="sm" className="rounded-full" onClick={() => setEditing(null)}><Plus /> Add tag</Button>
       </div>
-      <p className="text-sm text-dim">A tag's colour paints its badge on every device. The description is what the AI reads to decide whether a note belongs.
-        The server tags notes itself, about a minute after a save: every tag that likely fits goes on, and one you take off stays off.</p>
+      <p className="text-sm text-dim">The description is what the AI reads to decide whether a note belongs.</p>
       {data?.length || loose.length ? (
         <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tags" aria-label="Search tags" />
       ) : null}
@@ -430,8 +429,6 @@ function Tags() {
           </ul>
         ) : <Empty icon={TagIcon} className="rounded-xl border border-dashed border-line px-3 py-8"><p className="text-sm text-faint">{find ? `No tag matches “${find}”.` : "No tags defined yet."}</p></Empty>}
       </Loaded>
-
-
       {editing !== undefined ? <TagDialog key={editing?.rec ?? `new:${defining ?? ""}`} tag={editing} name={defining} onClose={() => { setEditing(undefined); setDefining(undefined); }} /> : null}
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(undefined); }}>
         <AlertDialogContent>
@@ -453,9 +450,8 @@ function Agent() {
   const choice = useModel(), { models, newChat, set } = choice;
   return (
     <div className="space-y-8">
-    <section className="space-y-3" aria-labelledby="agent-h">
+      <section className="space-y-3" aria-labelledby="agent-h">
       <h2 id="agent-h" className={TITLE}>Agent</h2>
-      <p className="text-sm text-dim">Ask answers from your notes and writes the ones you tell it to. The server holds the keys, and the model and the choices below, so every device has the same.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
@@ -464,14 +460,14 @@ function Agent() {
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
             <p className="text-sm font-semibold">Start a new chat</p>
-            <p className="text-[13px] leading-snug text-dim">When opening the assistant clears the last chat. It stays in the list either way, and a reply still running is never cut off.</p>
+            <p className="text-[13px] leading-snug text-dim">When opening the assistant clears the last chat.</p>
           </div>
           <Choice label="Start a new chat" value={newChat} options={NEW_CHATS} names={NEW_CHAT_LABEL} onPick={(v) => set({ newChat: v })} />
         </div>
         {models ? (
           <div className="px-3 py-2.5">
             <p className="text-sm font-semibold">Web</p>
-            <p className="text-[13px] text-dim">{models.web ? "The agent can search the web and read pages." : "Web search is off: the server has no search key."}</p>
+            <p className="text-[13px] leading-snug text-dim">{models.web ? "The agent can search the web and read pages." : "Web search is off: the server has no search key."}</p>
           </div>
         ) : null}
       </div>
@@ -493,13 +489,13 @@ function AgentActions() {
   const { actions, agent: { webGuard } } = usePrefs();
   return (
     <section className="space-y-3" aria-labelledby="actions-h">
-      <h2 id="actions-h" className={HEAD}>What the agent may do</h2>
-      <p className="text-sm text-dim">Ask first: the write waits on a card for your yes. Just do it: no card{webGuard ? ", unless the safety check below asks anyway" : ""}. Never: the agent can't.</p>
+      <h3 id="actions-h" className={SUB}>What the agent may do</h3>
+      <p className="text-sm text-dim">Ask first waits on a card. Just do it doesn't{webGuard ? ", unless the check below asks" : ""}. Never blocks it.</p>
       <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
         <ShieldAlert className="size-4 shrink-0 text-dim" aria-hidden />
         <div className="min-w-0 flex-1">
           <Label htmlFor="web-guard" className="text-sm font-semibold">Ask after reading outside text</Label>
-          <p className="text-[13px] leading-snug text-dim">Once a chat has read the web, a PDF, an attached file or a note written after one, Just do it asks first: such text can carry instructions aimed at the agent. Off: your rules below hold either way.</p>
+          <p className="text-[13px] leading-snug text-dim">After the web, a PDF or an attached file, Just do it asks first: such text can carry instructions.</p>
         </div>
         <Switch id="web-guard" checked={webGuard} onCheckedChange={(v) => setPrefs({ agent: { webGuard: v } })} />
       </div>
@@ -527,9 +523,8 @@ function Memory() {
   const { data, isPending } = useQuery({ queryKey: ["memory"], queryFn: memory });
   return (
     <section className="space-y-3" aria-labelledby="memory-h">
-      <h2 id="memory-h" className={HEAD}>Agent memory</h2>
-      <p className="text-sm text-dim">The agent (Ask, here and on the phone) keeps this file about you and how you keep notes, and rewrites it on its own.</p>
-      <div className="rounded-xl border border-line px-4 py-3">
+      <h3 id="memory-h" className={SUB}>Agent memory</h3>
+      <div className="rounded-xl border border-line px-3 py-2.5">
         <Loaded loading={isPending} blurred={false} skeleton={<Skeleton className="h-24" />}>
           {data?.text.trim() ? <Markdown body={data.text} /> : <Empty icon={Bot} className="py-2"><p className="text-sm text-faint">Empty: the agent hasn't written anything yet.</p></Empty>}
         </Loaded>
@@ -575,14 +570,13 @@ function ImportExport() {
   return (
     <section className="space-y-3" aria-labelledby="transfer-h">
       <h2 id="transfer-h" className={TITLE}>Import & export</h2>
-      <p className="text-sm text-dim">Notes travel as plain markdown files, with the photos and PDFs they link. An export's zip imports back as it is.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
           <Download className="mt-0.5 size-4 shrink-0 self-start text-brand" />
           <div className="min-w-0 flex-1 basis-48">
             <p className="text-sm font-semibold">Export</p>
             <p className="text-[13px] leading-snug text-dim">
-              {isPending ? "Counting notes…" : `All ${data?.length ?? 0} notes in one zip.`} A single note downloads from its own menu.
+              {isPending ? "Counting notes…" : `All ${data?.length ?? 0} notes in one zip.`}
             </p>
           </div>
           <Button variant="outline" size="sm" className="rounded-full" disabled={isPending || exporting || !data?.length} onClick={() => { void download(); }}>
@@ -593,7 +587,7 @@ function ImportExport() {
           <Upload className="mt-0.5 size-4 shrink-0 self-start text-brand" />
           <div className="min-w-0 flex-1 basis-48">
             <p className="text-sm font-semibold">Import</p>
-            <p className="text-[13px] leading-snug text-dim">Every markdown file in a folder or zip becomes a note. You see what it finds before anything is written.</p>
+            <p className="text-[13px] leading-snug text-dim">A folder or zip of markdown files. You see what it finds first.</p>
           </div>
           <div className="flex items-center gap-2">
             {busy && !src && <Loader2 className="size-4 animate-spin text-dim" />}
@@ -649,14 +643,13 @@ function ServerSync() {
   const sync = () => { void Promise.all([syncNow(), qc.invalidateQueries()]).then(() => toast("Up to date")); };
   return (
     <>
-      <p className="text-sm text-dim">Notes, photos and the agent live on the server this page was loaded from. There is no sign-in: it must only be reachable on a private network.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Server" detail={location.host} trailing={<span className={cn("text-[13px]", online ? "text-dim" : "text-warn")}>{online ? "Reachable" : "Not reachable"}</span>} />
-        <Line title="Sync now" detail="Send the changes made here that are waiting and fetch what changed on the server. Changes from other devices arrive by themselves while the app is open."
+        <Line title="Sync now" detail="Send waiting changes and fetch what changed."
           trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={!online} onClick={sync}><RefreshCw /> Sync</Button>} />
-        <Line title="Offline copy" detail={`${notes?.length ?? 0} notes and ${tasks?.length ?? 0} tasks kept for the next visit${waiting ? ` (${waiting} ${waiting === 1 ? "change" : "changes"} not sent yet)` : ""}${files.data ? `, ${files.data} attachment files` : ""}. ${worker ? "The app itself is installed for offline." : "The app's service worker isn't running, so only the page you have open works offline."}`} />
+        <Line title="Offline copy" detail={`${notes?.length ?? 0} notes and ${tasks?.length ?? 0} tasks kept for the next visit${waiting ? ` (${waiting} ${waiting === 1 ? "change" : "changes"} not sent yet)` : ""}${files.data ? `, ${files.data} attachment files` : ""}. ${worker ? "" : "No service worker: only the open page works offline."}`} />
         <Conflicts />
-        <Line title="Clear the offline copy" detail={waiting ? "Not while changes made here are waiting to be sent: clearing would lose them." : "Forgets what this browser kept. Nothing on the server changes; it comes down again the next time you open the app online."}
+        <Line title="Clear the offline copy" detail={waiting ? "Not while changes are waiting to be sent." : "Forgets what this browser kept. The server is untouched."}
           trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={waiting > 0} onClick={() => setAsking(true)}><Trash2 /> Clear</Button>} />
       </div>
       <AlertDialog open={asking} onOpenChange={setAsking}>
@@ -699,11 +692,10 @@ function Reminders() {
   });
   const detail = state.kind === "unavailable" ? `Not available: ${state.why}`
     : state.kind === "denied" ? "Notifications are blocked for this app. Allow them in the browser's site settings, then turn this on."
-    : "Rings at the time a task's reminder is set to, even when the app is closed.";
+    : "Rings at a task's reminder time, even when the app is closed.";
   return (
     <section className="space-y-3" aria-labelledby="reminders-h">
       <h2 id="reminders-h" className={TITLE}>Reminders</h2>
-      <p className="text-sm text-dim">A task with a day and a reminder time can notify you. Each device turns this on for itself; the server keeps the list of devices and sends the notifications.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <label className="flex items-center gap-3 px-3 py-2.5">
           <span className="min-w-0 flex-1">
@@ -724,7 +716,7 @@ function Voice() {
   return (
     <section className="space-y-3" aria-labelledby="voice-h">
       <h2 id="voice-h" className={TITLE}>Voice</h2>
-      <p className="text-sm text-dim">Tap the mic in the assistant, a new task, a task's notes, a note or search, and speak (Greek or English). Your server sends each piece to Fish Audio to be written down, and keeps neither: no recording, no text. The recording does leave the server, for Fish, for as long as the request takes.</p>
+      <p className="text-sm text-dim">Speech is sent to Fish Audio to be written down; the server keeps nothing.</p>
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Try it" detail={heard || "Tap the mic and say something."} trailing={<MicButton onText={setHeard} />} />
       </div>
@@ -741,13 +733,13 @@ function TalkVoice() {
   const talkChoice = useTalkModel();
   if (!on) return null;
   return (
-    <div className="space-y-3">
-      <h3 className={TITLE}>Talk</h3>
+    <div className="space-y-3 pt-4">
+      <h3 className={SUB}>Talk</h3>
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
             <p className="text-sm font-semibold">Voice model</p>
-            <p className="text-[13px] leading-snug text-dim">Both are Fish Audio's S2.1 Pro: the same engine and the same languages either way. The free one is under Fish's fair-use limits and promises no latency; the paid one is billed per character said, at about a cent a minute of speech.</p>
+            <p className="text-[13px] leading-snug text-dim">Same engine either way. Free has fair-use limits and no latency promise; paid costs about a cent a minute.</p>
           </div>
           <div role="radiogroup" aria-label="Voice model" className="flex flex-wrap gap-2">
             {TALK_MODELS.map((m) => (
@@ -761,7 +753,7 @@ function TalkVoice() {
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">Model and effort</p>
-            <p className="text-[13px] leading-snug text-dim">What Talk thinks with. Ask's unless you pick one here: a spoken reply is waited for, so a quicker model can suit it better.</p>
+            <p className="text-[13px] leading-snug text-dim">What Talk thinks with. Ask's unless set here.</p>
           </div>
           <ModelMenu choice={talkChoice} align="end" />
         </div>
@@ -781,7 +773,7 @@ function Maintenance() {
       <ServerSync />
       <div className="divide-y divide-line rounded-xl border border-line">
         <Line title="Version" detail={`Built ${builtAt().toLocaleString()}`} trailing={<span className="text-[13px] text-dim tabular-nums">{appVersion()}</span>} />
-        <Line title="Get the latest version" detail="Checks the server for a newer build and reloads into it now, instead of waiting for the update notice. Changes not sent yet stay on this device."
+        <Line title="Get the latest version" detail="Check for a newer build and reload into it."
           trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={!online || busy} onClick={reload}>{busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Reload</Button>} />
       </div>
     </section>
