@@ -196,6 +196,16 @@ function titleFor(s, pageTitle) {
   return host(s.url);
 }
 
+/** A clip of files alone, with no title the owner gave it: what the agent titles from the files (server/agent/src/title.ts). */
+const filesOnly = (clip) => !(clip.target && clip.target.title) && !clip.url && !clip.title && !clip.selection
+  && clip.images.length + clip.pdfs.length > 0;
+
+/** The agent's answer's title, fit to save (at most 60), or "" for none: the title the clip had stays then. */
+function agentTitle(json) {
+  const t = json && typeof json.title === "string" ? json.title.replace(/\s+/g, " ").trim() : "";
+  return t.length > 60 ? `${t.slice(0, 57).trimEnd()}…` : t;
+}
+
 function linkify(entry, url, text) {
   const t = text.replace(/\s+/g, " ").trim().replace(/[[\]\\]/g, "\\$&");
   return t ? entry.replace(url, () => `[${t}](${url})`) : entry;
@@ -504,4 +514,4 @@ function summarise(clip, io) {
   }
 }
 
-module.exports = { summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
+module.exports = { filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };

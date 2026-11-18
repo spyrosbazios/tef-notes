@@ -1,9 +1,20 @@
 // A share from another app, shaped for a note or for the agent (src/share.ts).
 import { describe, expect, it } from "bun:test";
-import { askText, bodyFor, chatTitle, plainShared, titleFor, type Shared } from "../src/share";
+import { askText, bodyFor, chatTitle, cleanTitle, plainShared, titleFor, type Shared } from "../src/share";
 
 const S = (p: Partial<Shared>): Shared => ({ text: "", url: null, images: [], pdfs: [], title: null, ...p });
 const U = "https://example.com/a?b=1";
+
+describe("a model's title", () => {
+  it("is one line, without a label, markdown, quotes or a full stop, at most 60", () => {
+    expect(cleanTitle('"Lease agreement for the flat."\nmore')).toBe("Lease agreement for the flat");
+    expect(cleanTitle("Title: **Receipt, hardware shop**")).toBe("Receipt, hardware shop");
+    expect(cleanTitle("“Ο λογαριασμός της ΔΕΗ”")).toBe("Ο λογαριασμός της ΔΕΗ");
+    expect(cleanTitle("Mary's notes")).toBe("Mary's notes");
+    expect(cleanTitle("y".repeat(80))).toMatch(/^y{57}…$/);
+    expect(cleanTitle("  \n ")).toBe("");
+  });
+});
 
 describe("a note of its own", () => {
   it("titles by the page, the first line, the site, or the day", () => {

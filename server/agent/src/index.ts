@@ -18,6 +18,7 @@ import { search } from "./search";
 import { steerRoute } from "./steer";
 import { talkRoute, talkSocket, talkVoicesRoute, type Fish } from "./talk";
 import { semantic } from "./semantic";
+import { titleRoute } from "./title";
 import { transcribe } from "./transcribe";
 
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
@@ -45,6 +46,7 @@ Bun.serve({
     "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
     "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server, fish) },
     "/agent/talk/voices": { GET: (req) => talkVoicesRoute(req, fish) },
+    "/agent/title": { POST: (req) => titleRoute(req, server) },
     "/agent/transcribe": { POST: (req) => transcribe(req) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/companion/hello": { GET: () => helloRoute(server) },

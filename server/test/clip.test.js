@@ -84,6 +84,24 @@ describe("the share text", () => {
   });
 });
 
+describe("a title from the agent", () => {
+  const c = (p) => ({ url: "", title: "", selection: "", images: [], pdfs: [], target: { kind: "new" }, ...p });
+  test("is asked for a clip of files alone, never over the owner's title, a link or words", () => {
+    expect(lib.filesOnly(c({ pdfs: [{ name: "a.pdf" }] }))).toBe(true);
+    expect(lib.filesOnly(c({ images: [{ src: "" }] }))).toBe(true);
+    expect(lib.filesOnly(c({ images: [{ src: "" }], target: { kind: "new", title: "Mine" } }))).toBe(false);
+    expect(lib.filesOnly(c({ images: [{ src: "" }], url: "https://example.com" }))).toBe(false);
+    expect(lib.filesOnly(c({ images: [{ src: "" }], selection: "words" }))).toBe(false);
+    expect(lib.filesOnly(c({}))).toBe(false);
+  });
+  test("an answer without one keeps the clip's own", () => {
+    expect(lib.agentTitle({ title: "Tax form 2026" })).toBe("Tax form 2026");
+    expect(lib.agentTitle({ title: null })).toBe("");
+    expect(lib.agentTitle(null)).toBe("");
+    expect(lib.agentTitle({ title: "z".repeat(90) })).toMatch(/^z{57}…$/);
+  });
+});
+
 describe("the request", () => {
   test("url and title; the rest optional, trimmed; page text cut, not refused", () => {
     expect(lib.input({ url: ` ${U} `, title: " A\n page " })).toEqual({ url: U, title: "A page", selection: "", text: "", note: "", images: [], pdfs: [] });

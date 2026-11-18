@@ -55,10 +55,29 @@ export function clipOf(s: Shared, pageTitle: string | null): ClipPage {
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 const firstLine = (t: string) => t.split("\n").map((l) => l.trim()).find(Boolean) ?? "";
 
+/** A title is at most this long; a longer one is cut with an ellipsis. */
+export const TITLE_MAX = 60;
+const cut = (t: string) => (t.length > TITLE_MAX ? `${t.slice(0, TITLE_MAX - 3).trimEnd()}…` : t);
+
+/** A title a model wrote for a shared photo or PDF (server/agent/src/title.ts), made fit to save: its first line, without
+ *  a "Title:" label, markdown, quotes or a closing full stop, at most TITLE_MAX. "" when nothing is left. */
+export function cleanTitle(raw: string): string {
+  const t = firstLine(raw)
+    .replace(/^title\s*:\s*/i, "")
+    .replace(/^[#*_>\s-]+|[*_]+$/g, "")
+    .replace(/["“”«»„`]/g, "")
+    .replace(/^'+|'+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\.+$/, "")
+    .trim();
+  return cut(t);
+}
+
 /** A title to save it under: the page's, else the text's first line (cut short), else the site, else a PDF's name, else the day. */
 export function titleFor(s: Shared, pageTitle: string | null): string {
   const t = pageTitle?.trim() || s.title || firstLine(s.text);
-  if (t) return t.length > 60 ? `${t.slice(0, 57).trimEnd()}…` : t;
+  if (t) return cut(t);
   if (s.url) return host(s.url);
   if (s.pdfs.length) return s.pdfs[0].name.replace(/\.pdf$/i, "");
   return `Photos ${localDay()}`;

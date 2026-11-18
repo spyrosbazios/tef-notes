@@ -124,7 +124,7 @@ routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
 
 routerAdd("POST", "/api/tefnotes/clip", (e) => {
   const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
-  const { without } = require(`${__hooks}/lib/autotag.js`);
+  const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
   let clip, files = [];
@@ -133,6 +133,21 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     throw err;
   }
   try { files = e.findUploadedFiles("file"); } catch (_) { /* a page: no file part */ }
+
+  // A link without its page's title (the companion sends none; the web's preview may have failed): the page's own, from the
+  // link-preview cache or fetched through its guard. None found: titled as before, by the text or the site.
+  if (clip.url && !clip.title) {
+    try {
+      const r = e.app.findFirstRecordByFilter("link_previews", "url = {:url}", { url: clip.url });
+      clip.title = r.getString("title");
+    } catch (_) { /* not cached */ }
+    if (!clip.title) {
+      const lp = require(`${__hooks}/lib/link-preview.js`), run = (name, ...args) => toString($os.exec(name, ...args).output());
+      try { clip.title = ((lp.previewOf(clip.url, { lookup: lp.getent(run), get: lp.curl(run) }) || {}).title || "").trim(); } catch (err) {
+        log("no page title", "url", clip.url, "error", String(err).slice(0, 200));
+      }
+    }
+  }
   // Each file is a `file` part, kept as an attachment of the note it goes in (for a new task, a new note the task links
   // to); a clip to an existing task sends none.
   const kept = clip.target.kind === "task" ? 0 : clip.images.length + clip.pdfs.length;
@@ -196,11 +211,35 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     e.app.db().newQuery("SELECT path FROM notes WHERE path LIKE {:stem}").bind({ stem: `${stem}%` }).all(taken);
     const path = notes.newNotePath(title, now, new Set(taken.map((r) => r.path)));
     const body = lib.bodyOf(clip, clip.line, note, attach(notes.idOf(path)), summary);
-    const text = notes.serialize({ title, created: notes.localDay(now), tags: without(clip.tags, []) }, body);
-    const rec = new Record(e.app.findCollectionByNameOrId("notes")), cols = notes.columns(path, text);
-    for (const k of Object.keys(cols)) rec.set(k, cols[k]);
+    const rec = new Record(e.app.findCollectionByNameOrId("notes"));
+    /** The note's text under the title `t`; its path stays the one the first title gave it. */
+    const titled = (t) => {
+      const cols = notes.columns(path, notes.serialize({ title: t, created: notes.localDay(now), tags: without(clip.tags, []) }, body));
+      for (const k of Object.keys(cols)) rec.set(k, cols[k]);
+    };
+    titled(title);
     rec.set("rev", 1);
-    return { path, rec };
+    return { path, rec, titled };
+  };
+  /** A clip of files alone: once they are stored under `made`, the agent's title for them (a PDF's first pages, a photo
+   *  looked at), on the unsaved note too; else `title`, the clip's own. Titling never fails the save. */
+  const AGENT = env("TEF_NOTES_AGENT") || "http://agent:8098";
+  const retitle = (made, title) => {
+    if (!made || !lib.filesOnly(clip)) return title;
+    try {
+      const res = $http.send({
+        url: `${AGENT}/agent/title`, method: "POST", timeout: 50,
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: notes.idOf(made.path) }),
+      });
+      const t = res.statusCode === 200 ? lib.agentTitle(res.json) : "";
+      if (res.statusCode !== 200) log("the agent could not title it", "status", res.statusCode);
+      if (!t) return title;
+      made.titled(t);
+      return t;
+    } catch (err) {
+      log("the agent could not title it", "error", String(err).slice(0, 200));
+      return title;
+    }
   };
   const unattach = () => {
     for (const att of atts) {
@@ -251,10 +290,10 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     } else if (clip.target.kind === "newtask") {
       // The text without the files as the task's notes; the files, when there are any, in a new note of the whole clip
       // the task is `about` (lib/links.js). Note, task and link in one transaction: all or none.
-      const title = lib.titleOf(clip, clip.line, now);
       const text = lib.taskNotes("", lib.bodyOf(clip, clip.line, note, "", summary));
       if (text == null) return e.json(413, { error: "The clip is too long for a task's notes." });
-      const made = files.length ? newNote(title) : null;
+      const first = lib.titleOf(clip, clip.line, now), made = files.length ? newNote(first) : null;
+      const title = retitle(made, first);
       e.app.runInTransaction((tx) => {
         if (made) tx.save(made.rec);
         const next = new DynamicModel({ n: 0 });
@@ -277,7 +316,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
         out = made ? { kind: "task", id: task.id, title, action: "created", note: made.path } : { kind: "task", id: task.id, title, action: "created" };
       });
     } else {
-      const title = lib.titleOf(clip, clip.line, now), made = newNote(title);
+      const first = lib.titleOf(clip, clip.line, now), made = newNote(first), title = retitle(made, first);
       e.app.save(made.rec);
       out = { kind: "note", path: made.path, title, action: "created" };
     }
