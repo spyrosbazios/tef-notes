@@ -17,7 +17,9 @@ describe("prefsOf", () => {
     expect(prefsOf({ lens: "abc" }).lens).toBe("abc");
     expect(prefsOf({ lens: "" }).lens).toBeNull();
     expect(p.notes).toEqual({ grouped: true, collapsed: ["a"], sort: "created" });
-    expect(p.agent).toEqual({ effort: "deep", newChat: "app" });
+    expect(p.agent).toEqual({ effort: "deep", newChat: "app", webGuard: true });
+    expect(prefsOf({ agent: { webGuard: false } }).agent.webGuard).toBe(false);
+    expect(prefsOf({ agent: { webGuard: "no" } }).agent.webGuard).toBe(true);
   });
   test("each layout keeps its own", () => {
     const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"] } });

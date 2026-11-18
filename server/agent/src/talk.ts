@@ -99,6 +99,7 @@ export type Deps = {
   /** The owner's effort (the steps a turn may take), and their rules for the agent's writes (actions.ts). */
   effort: Prefs["agent"]["effort"];
   rules: Prefs["actions"];
+  webGuard: Prefs["agent"]["webGuard"];
   /** Fish, in production; fakes in the tests. */
   connectVoice: ConnectVoice;
   connectEar: ConnectEar;
@@ -109,7 +110,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   if (!(await exists(d.server, start.chat))) throw new Error(`No chat ${start.chat}: create it in chats first.`);
   const prior = await pb.chat(d.server, start.chat);
   const agent: TalkAgent = await talkAgent({
-    server: d.server, model: d.model, effort: d.effort, rules: d.rules, page: start.context, foreign: false,
+    server: d.server, model: d.model, effort: d.effort, rules: d.rules, webGuard: d.webGuard, page: start.context, foreign: false,
   });
 
   const messages: UIMessage[] = settle(prior ? (readChatHistory(prior) as UIMessage[]) : []);
@@ -475,7 +476,7 @@ export async function talkRoute(req: Request, srv: Bun.Server<Sock>, server: pb.
   if (!sameOrigin(req.headers)) return new Response("Talk answers only the app on this server", { status: 403 });
   const deps: Deps = {
     server, sea, model: thinking.model || DEFAULT_MODEL, effort: thinking.effort,
-    rules: prefs.actions, connectVoice: fish.speak(sea), connectEar: fish.hear,
+    rules: prefs.actions, webGuard: prefs.agent.webGuard, connectVoice: fish.speak(sea), connectEar: fish.hear,
   };
   return srv.upgrade(req, { data: { deps, first: false, closed: false } }) ? undefined : new Response("Not a WebSocket upgrade", { status: 400 });
 }

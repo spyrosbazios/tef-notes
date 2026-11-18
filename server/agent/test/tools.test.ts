@@ -5,7 +5,7 @@ import type { ModelMessage } from "ai";
 import { DEFAULT_ACTIONS, type Actions } from "@/core/actions";
 import { cardsOf } from "@/core/agent";
 import { parseNote } from "@/core/notes";
-import { approvals } from "../src/agent";
+import { approvals, guarded } from "../src/agent";
 import { Notes } from "../src/notes";
 import { newTask, type Task } from "@/core/todo";
 import { localDay } from "@/core/time";
@@ -672,5 +672,11 @@ describe("tag definitions", () => {
       expect(await approvals(notes, todo, UNASKED)[name]({}, { messages: [] })).toBe("not-applicable");
       expect(await approvals(notes, todo, UNASKED)[name]({}, { messages: [web] })).toBe("user-approval");
     }
+  });
+  it("with the web guard off, Just do it goes after the web too; Ask first still asks", async () => {
+    const off = (rules: Actions) => approvals(notes, todo, rules, guarded(false, readWeb(notes, todo)));
+    expect(await off(UNASKED).create_tag({}, { messages: [web] })).toBe("not-applicable");
+    expect(await off(ASKED).create_tag({}, { messages: [web] })).toBe("user-approval");
+    expect(await approvals(notes, todo, UNASKED, guarded(true, readWeb(notes, todo))).create_tag({}, { messages: [web] })).toBe("user-approval");
   });
 });

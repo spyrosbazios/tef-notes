@@ -200,7 +200,9 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   result provenance, availability after taint, and the Exa requirement. `src/tools.ts` assembles them; the agent derives
   approvals from them and supplies policy lookup to the pure guard and loop utilities.
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
-  next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`.
+  next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`. The owner can turn
+  the asking off in Settings (prefs `agent.webGuard`, `src/agent.ts` `guarded`): their rules then hold as set, while the
+  `tainted` mark and the withdrawal of memory and the selection tools stay.
 - Always-on assistant: a client that stays with you (the web's docked panel, its Ask tab on a phone) sends the page it is on as
   `context` with each message (`packages/core/src/assistant.ts`). The agent reads it as the last part of the newest message's
   `<context>` (never the instructions), resolves "this note" from it, and gets UI tools (`open_note`, `open_task`,

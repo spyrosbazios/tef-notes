@@ -7,7 +7,7 @@ import { EFFORT, type Effort } from "@/core/agent";
 import type { Actions } from "@/core/actions";
 import type { AssistantContext } from "@/core/assistant";
 import type { Server } from "@/core/pocketbase";
-import { approvals, context } from "./agent";
+import { approvals, context, guarded } from "./agent";
 import { key } from "./keys";
 import { model as pickModel } from "./models";
 import { PLACES, SYSTEM, TALK, WEB } from "./systemPrompt";
@@ -57,6 +57,8 @@ export type Plan = {
   effort: Effort;
   /** The owner's rules for the agent's writes (core/actions.ts): what asks, what just goes, what is never allowed. */
   rules: Actions;
+  /** Whether a "Just do it" write still asks once the conversation has read someone else's text (prefs `agent.webGuard`). */
+  webGuard: boolean;
   page: AssistantContext | undefined;
   /** Whether this conversation has read someone else's text: its writes ask, always. */
   foreign: boolean;
@@ -71,7 +73,7 @@ export async function talkAgent(p: Plan): Promise<TalkAgent> {
   const all = Object.fromEntries(Object.entries(offered(tools(notes, todo, untrusted), web, p.page)).filter(([n]) => allowed(policyFor(n), p.rules)));
   const { model: m, providerOptions } = await pickModel(p.model);
   const { steps, reasoning } = EFFORT[p.effort];
-  const check = approvals(notes, todo, p.rules, untrusted) as Record<string, ((i: unknown, o: { messages: ModelMessage[] }) => Promise<Status>) | undefined>;
+  const check = approvals(notes, todo, p.rules, guarded(p.webGuard, untrusted)) as Record<string, ((i: unknown, o: { messages: ModelMessage[] }) => Promise<Status>) | undefined>;
   // Talk's own rules ride after the chat's, so nothing the chat says about drawing, lists or markdown has to be unlearned
   const instruction = `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}\n${TALK}\n\n${ctx.text}`;
   return {

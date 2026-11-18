@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Download, FilePen, FilePlus, FileX, LayoutGrid, ListPlus, ListTodo, ListX, Loader2, Mic, Monitor, Palette, Paperclip, Pencil, Plus, RefreshCw, Settings, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Download, FilePen, FilePlus, FileX, LayoutGrid, ListPlus, ListTodo, ListX, Loader2, Mic, Monitor, Palette, Paperclip, Pencil, Plus, RefreshCw, Settings, ShieldAlert, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ACTION_LABEL, ACTIONS, RULE_LABEL, RULES, type Action } from "@/core/actions";
@@ -490,11 +490,19 @@ const ACTION_ICON: Record<Action, LucideIcon> = {
 /** Which of the agent's writes wait on a card, go ahead, or are never allowed: one rule per action (@/core/actions), kept in the
  *  preferences and enforced by the agent's server, so no reply can skip a card. */
 function AgentActions() {
-  const actions = usePrefs().actions;
+  const { actions, agent: { webGuard } } = usePrefs();
   return (
     <section className="space-y-3" aria-labelledby="actions-h">
       <h2 id="actions-h" className={HEAD}>What the agent may do</h2>
-      <p className="text-sm text-dim">Ask first: the write waits on a card for your yes. Just do it: no card, unless the chat has read the web or a PDF, when it asks anyway. Never: the agent can't.</p>
+      <p className="text-sm text-dim">Ask first: the write waits on a card for your yes. Just do it: no card{webGuard ? ", unless the safety check below asks anyway" : ""}. Never: the agent can't.</p>
+      <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
+        <ShieldAlert className="size-4 shrink-0 text-dim" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <Label htmlFor="web-guard" className="text-sm font-semibold">Ask after reading outside text</Label>
+          <p className="text-[13px] leading-snug text-dim">Once a chat has read the web, a PDF, an attached file or a note written after one, Just do it asks first: such text can carry instructions aimed at the agent. Off: your rules below hold either way.</p>
+        </div>
+        <Switch id="web-guard" checked={webGuard} onCheckedChange={(v) => setPrefs({ agent: { webGuard: v } })} />
+      </div>
       <ul className="divide-y divide-line rounded-xl border border-line">
         {ACTIONS.map((a) => {
           const Icon = ACTION_ICON[a], { name, covers } = ACTION_LABEL[a];

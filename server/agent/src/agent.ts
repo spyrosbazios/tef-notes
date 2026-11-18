@@ -71,8 +71,14 @@ export function approvals(notes: Notes, todo: Todo, rules: Actions, web = readWe
   return policyApprovals(toolPolicies(), { notes, todo, files }, rules, web);
 }
 
+/** What `approvals` is told about the turn's taint: the taint itself while the owner's web guard is on (prefs
+ *  `agent.webGuard`), never when they turned it off. Off changes only the cards: writes are still marked `tainted`, and
+ *  memory and the selection tools are still withdrawn (loop.ts `stepTools`). */
+export const guarded = (webGuard: boolean, untrusted: (ms: ModelMessage[]) => Promise<boolean>) =>
+  webGuard ? untrusted : async () => false;
+
 /** `foreign`: someone else's text is in this turn's context (`context`), or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
-async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, rules: Actions, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[]) {
+async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, rules: Actions, webGuard: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[]) {
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = foreign ? async () => true : read;
@@ -94,7 +100,7 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, r
       ...(stepNumber === 0 && { messages: trim(messages) }),
       ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : { toolChoice: "none" as const }),
     }),
-    toolApproval: approvals(notes, todo, rules, untrusted, files),
+    toolApproval: approvals(notes, todo, rules, guarded(webGuard, untrusted), files),
     providerOptions,
   });
 }
@@ -121,8 +127,8 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   const historicalTaint = historyFromWeb(history, new Set([...(await notes.tainted()), ...(await todo.tainted())]), policyFor);
   let agent: ToolLoopAgent<never, Tools>;
   // The owner's rules are read here, never taken from the request: no client can turn a card off
-  const rules = (await ownerPrefs(server)).prefs.actions;
-  try { agent = await build(notes, todo, pick, picked, rules, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
+  const { actions: rules, agent: { webGuard } } = (await ownerPrefs(server)).prefs;
+  try { agent = await build(notes, todo, pick, picked, rules, webGuard, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }

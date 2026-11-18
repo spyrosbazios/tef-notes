@@ -52,4 +52,4 @@ for reports.
 
 In scope: bypasses of the loopback-only binding or the link-preview address check, ways a web page can make the chat agent
 write without confirmation, ways a CLI write made with `TEF_NOTES_AGENT=1` escapes the `tainted` mark, key disclosure, and flaws in the `rev` write contract that lose data. Out of scope: the
-absence of sign-in, which is the documented model.
+absence of sign-in, which is the documented model, and writes the owner let go unasked by turning the web guard off in Settings.

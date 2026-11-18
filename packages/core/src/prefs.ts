@@ -108,8 +108,9 @@ export type Prefs = {
   accent: AccentName;
   /** The notes list: grouped under its tags, which groups are folded (NO_TAG "" for "No tag"), its sort. */
   notes: { grouped: boolean; collapsed: string[]; sort: NoteSort };
-  /** The assistant: the model picked (none is the server's default), its effort, when a new chat starts. */
-  agent: { model?: string; effort: Effort; newChat: NewChat };
+  /** The assistant: the model picked (none is the server's default), its effort, when a new chat starts, and `webGuard`:
+   *  whether a "Just do it" write still asks once the chat has read someone else's text (actions.ts `decide`). */
+  agent: { model?: string; effort: Effort; newChat: NewChat; webGuard: boolean };
   /** Which of the assistant's writes ask first, go ahead, or are never allowed (actions.ts); the agent's server enforces them. */
   actions: Actions;
   /** The spoken conversation (talk.ts): the voice model the server speaks through, the Fish voice it speaks in (its
@@ -146,7 +147,7 @@ const LAYOUT_DEFAULTS: LayoutPrefs = { start: "home", homeList: "today" };
 export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
-  agent: { effort: effortOf(undefined), newChat: "app" },
+  agent: { effort: effortOf(undefined), newChat: "app", webGuard: true },
   actions: { ...DEFAULT_ACTIONS },
   talk: { model: DEFAULT_TALK_MODEL, voice: "", speed: TALK_SPEED.normal, agent: {} },
   clip: { summary: false },
@@ -184,6 +185,7 @@ export function prefsOf(raw: unknown): Prefs {
       ...(typeof agent.model === "string" && agent.model ? { model: agent.model } : {}),
       effort: effortOf(agent.effort),
       newChat: one(NEW_CHATS, agent.newChat, "app"),
+      webGuard: agent.webGuard !== false,
     },
     actions: actionsOf(p.actions),
     talk: {
