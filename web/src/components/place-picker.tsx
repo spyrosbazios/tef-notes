@@ -15,9 +15,9 @@ import { suggest } from "@/services/places";
 
 const WAIT = 300;          // ms after the last key before OpenStreetMap is asked
 
-function Row({ icon: Icon, name, detail, active, onClick }: { icon: typeof MapPin; name: string; detail?: string; active: boolean; onClick: () => void }) {
+function Row({ icon: Icon, name, detail, active, ...props }: React.ComponentProps<"button"> & { icon: typeof MapPin; name: string; detail?: string; active: boolean }) {
   return (
-    <button type="button" onClick={onClick} onMouseDown={(e) => e.preventDefault()} aria-selected={active} role="option"
+    <button type="button" onMouseDown={(e) => e.preventDefault()} aria-selected={active} role="option" {...props}
       className={cn("flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors any-pointer-coarse:py-2.5", active && "bg-muted")}>
       <Icon className="mt-0.5 size-4 shrink-0 text-dim" />
       <span className="min-w-0 flex-1">

@@ -41,7 +41,7 @@ function Item({ icon: Icon, label, count, active, onClick, value, folded }: { ic
   const button = (
     <Named label={label} folded={folded}>
       <button type="button" onClick={onClick} aria-current={active ? "page" : undefined} aria-label={folded ? label : undefined}
-        className={cn("flex h-8 w-full items-center gap-2.5 overflow-hidden rounded-lg px-2.5 text-left text-sm transition-colors",
+        className={cn("relative flex h-8 w-full items-center gap-2.5 overflow-hidden rounded-lg px-2.5 text-left text-sm transition-colors",
           active ? "text-accent-foreground font-semibold" : "text-dim hover:bg-muted hover:text-fg")}>
         <Icon className="size-4 shrink-0" />
         <span className={cn("flex-1 overflow-hidden", words(folded))}>{label}</span>
