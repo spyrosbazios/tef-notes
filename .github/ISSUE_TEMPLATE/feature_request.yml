@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a change or addition
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: TEF Notes is a personal, single-user system with no sign-in. Multi-user and public hosting are out of scope.
+  - type: textarea
+    attributes:
+      label: What you want
+      description: What should TEF Notes do that it doesn't?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Why
+      description: What are you trying to do that you can't, or only with effort?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Anything else
+      description: Which part it touches (web app, CLI, extension, Android, agent, server), alternatives you considered.

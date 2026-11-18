@@ -1,9 +1,16 @@
 # Contributing
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-18 -->
 
 Thanks for looking. Read [ARCHITECTURE.md](ARCHITECTURE.md) first; it explains the note format and the write contract
 that most changes have to respect. Security reports go through [SECURITY.md](SECURITY.md), not issues.
+
+## Ideas and planning
+
+Features are planned in the open, as [issues](https://github.com/spyrosbazios/tef-notes/issues). A feature request
+gets `enhancement`; one that will be built gets `planned`; one that won't is closed with `wontfix` and a line on why.
+Open or comment on an issue before a large PR. A PR that finishes one says `Closes #N` and adds its line to
+`CHANGELOG.md` under `Unreleased`.
 
 ## Layout
 

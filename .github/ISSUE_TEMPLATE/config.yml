@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/spyrosbazios/tef-notes/security/advisories/new
+    about: Report a vulnerability privately. Never in a public issue (see SECURITY.md).

@@ -144,6 +144,8 @@ Bug reports, feature ideas and code contributions are welcome. [Open an issue](h
 with what you expected, what happened and how to reproduce it. For code changes, start with [CONTRIBUTING.md](CONTRIBUTING.md).
 Report security issues through the process in [SECURITY.md](SECURITY.md).
 
+**Roadmap:** what is planned next is the [open `planned` issues](https://github.com/spyrosbazios/tef-notes/issues?q=is%3Aissue+is%3Aopen+label%3Aplanned).
+
 ## License
 
 [GNU AGPL-3.0](LICENSE). Contributions require a one-time [Contributor License Agreement](CLA.md).
