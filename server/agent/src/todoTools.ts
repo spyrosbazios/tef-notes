@@ -171,13 +171,20 @@ function listed(t: Task, linked: string[]) {
   };
 }
 
-/** Whether `t` holds every word of `query` (title, notes, checklist; folded like the notes' search) and carries `tag`. */
-export function matches(t: Task, query = "", tag = "") {
+/** How many of `query`'s words `t` holds (title, notes, checklist; folded like the notes' search): 0 when it has none,
+ *  or when it lacks `tag`. No words: every task (with the tag) passes at 1. */
+export function hits(t: Task, query = "", tag = "") {
   const words = fold(query).split(/\s+/).filter(Boolean);
-  if (tag && !t.tags.some((x) => fold(x) === fold(tag.trim()))) return false;
-  if (!words.length) return true;
+  if (tag && !t.tags.some((x) => fold(x) === fold(tag.trim()))) return 0;
+  if (!words.length) return 1;
   const hay = fold([t.title, t.notes, ...t.checklist.map((c) => c.text)].join("\n"));
-  return words.every((w) => hay.includes(w));
+  return words.filter((w) => hay.includes(w)).length;
+}
+
+/** The tasks that hold at least one word of `query`, the ones holding the most first (a stable sort keeps the view's
+ *  order among equals): a spelling that differs in one word no longer hides a task the other words name. */
+export function ranked(tasks: Task[], query = "", tag = "") {
+  return tasks.map((t) => ({ t, n: hits(t, query, tag) })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n).map((x) => x.t);
 }
 
 /** Whether `have` carries the tags `want` asks for (folded: case and accents ignored): every one with `all`, else any. */
@@ -277,7 +284,7 @@ export const todoPolicies = {
 export function taskReadTools(notes: Pick<import("./application/notes").NoteService, "list">, todo: Pick<import("./application/todo").TaskService, "tasks" | "notesOf">) {
   return {
     list_tasks: tool({
-      description: "The user's tasks, as Things shows them, in a view: inbox (unscheduled), today (on or before today, or due by it; This Evening ones flagged), upcoming (a later day, soonest first), logbook (done, latest first), open (every task not done, any day), all (done ones too). `query` keeps those holding every word in the title, notes or checklist (case and accents ignored); `tag` those carrying it: to find a task, open with a query. Each with its id (update_task, complete_task and delete_task take it), checklist items with theirs, dates, `tags`, and `linked`: the notes it is about. Check before saying what's due.",
+      description: "The user's tasks, as Things shows them, in a view: inbox (unscheduled), today (on or before today, or due by it; This Evening ones flagged), upcoming (a later day, soonest first), logbook (done, latest first), open (every task not done, any day), all (done ones too). `query` keeps those holding any of its words in the title, notes or checklist (case and accents ignored), the ones holding most first; `tag` those carrying it: to find a task, open with a query. Each with its id (update_task, complete_task and delete_task take it), checklist items with theirs, dates, `tags`, and `linked`: the notes it is about. Check before saying what's due.",
       inputSchema: z.object({
         view: z.enum(["inbox", "today", "upcoming", "logbook", "open", "all"]),
         query: z.string().max(200).optional().describe("Words a task holds, in its title, notes or checklist"),
@@ -289,7 +296,7 @@ export function taskReadTools(notes: Pick<import("./application/notes").NoteServ
         const today = localDay(), v = views(tasks, today);
         const inView = view === "today" ? [...v.today, ...v.evening] : view === "upcoming" ? v.upcoming.flatMap((d) => d.tasks)
           : view === "open" ? tasks.filter((t) => !t.done) : view === "all" ? tasks : v[view];
-        const list = inView.filter((t) => matches(t, query, tag));
+        const list = ranked(inView, query, tag);
         const { list: shown, left_out } = capList(list, limit), paths = new Map(all.map((n) => [n.rec, n.path]));
         const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
         return { today, tasks: await Promise.all(shown.map(async (t) => listed(t, await linked(t)))), ...(left_out ? { left_out } : {}) };

@@ -471,6 +471,13 @@ describe("tasks", () => {
     expect(await names({ view: "all", query: "report" })).toEqual(["Old report"]);
   });
 
+  it("list_tasks: a word that matches nothing no longer hides the task the others name; most words first", async () => {
+    task("Pay car tax", { notes: "due in December" });
+    task("Pay rent");
+    expect(await names({ view: "open", query: "pay car tax xyzzy" })).toEqual(["Pay car tax", "Pay rent"]);
+    expect(await names({ view: "open", query: "xyzzy" })).toEqual([]);
+  });
+
   it("delete_task: gone on the rev it read; no such task is an error", async () => {
     const t = task("Old");
     expect(await run(T.delete_task, { id: t.id } as never)).toEqual({ saved: "task", id: t.id, rev: 1 });
