@@ -78,6 +78,11 @@ export function turnsOf(act: { start(text: string, confirmed: boolean): void; co
   };
 }
 
+/** Whether an ear event is the owner taking the turn over the voice. Only `taken` is: `speech` (Fish's voice activity) opens
+ *  on any noise, a cough or the room, so cutting the reply on it made it stop while the owner sat silent; Fish judges whether
+ *  it is the owner (and not a noise or a "mm-hm", a backchannel) and says so with `user_turn_taken`. */
+export const cutsIn = (e: EarEvent, speaking: boolean): boolean => speaking && e.type === "taken";
+
 /** Where a conversation's two sides go: JSON events and voice frames to the app, and hanging up on it. */
 export type Out = { json(e: TalkServerEvent): void; voice(pcm: Uint8Array): void; close(): void };
 
@@ -355,10 +360,10 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
       case "started": strikes = 0; break;
       case "speech": {
         out.json({ type: "hearing", speaking: e.on });
-        if (e.on) { if (speaking) interrupt(); turns.speech(); }       // something is being said: whatever was heard is over
+        if (e.on) turns.speech();                                       // something is being said: whatever was heard is over
         break;
       }
-      case "taken": strikes = 0; break;
+      case "taken": strikes = 0; if (cutsIn(e, speaking)) interrupt(); break;   // the owner, not a noise, spoke over the voice
       case "eager": turns.eager(e.text); break;
       case "resumed": turns.resumed(); break;
       case "turn": if (e.yours) { strikes = 0; turns.turn(e.text); } break;
