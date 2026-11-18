@@ -39,7 +39,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useModel } from "@/hooks/agent";
+import { useModel, useTalkModel } from "@/hooks/agent";
 import { useAppearance } from "@/hooks/appearance";
 import { useRowDrag } from "@/hooks/drag";
 import { prefsNow, setPrefs, usePrefs } from "@/hooks/prefs";
@@ -450,7 +450,7 @@ function Tags() {
 }
 
 function Agent() {
-  const { models, newChat, set } = useModel();
+  const choice = useModel(), { models, newChat, set } = choice;
   return (
     <div className="space-y-8">
     <section className="space-y-3" aria-labelledby="agent-h">
@@ -459,7 +459,7 @@ function Agent() {
       <div className="divide-y divide-line rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
-          <ModelMenu align="end" />
+          <ModelMenu choice={choice} align="end" />
         </div>
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
@@ -730,6 +730,7 @@ function Voice() {
 function TalkVoice() {
   const { talk } = usePrefs();
   const on = useTalkOn();
+  const talkChoice = useTalkModel();
   if (!on) return null;
   return (
     <div className="space-y-3">
@@ -749,6 +750,13 @@ function TalkVoice() {
         </div>
         <TalkVoicePicker />
         <TalkSpeed />
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Model and effort</p>
+            <p className="text-[13px] leading-snug text-dim">What Talk thinks with. Ask's unless you pick one here: a spoken reply is waited for, so a quicker model can suit it better.</p>
+          </div>
+          <ModelMenu choice={talkChoice} align="end" />
+        </div>
       </div>
     </div>
   );

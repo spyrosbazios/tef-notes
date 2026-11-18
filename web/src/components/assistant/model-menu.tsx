@@ -1,19 +1,19 @@
 // Which model the agent runs on (the server's provider's models as it lists them) and how hard it works (@/core/agent
-// EFFORT). Both are this browser's (hooks/agent.ts); the next message goes out with them.
+// EFFORT): Ask's choice, or Talk's (hooks/agent.ts `ModelChoice`), which can also follow Ask's.
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cap, EFFORT, EFFORTS, effortOf } from "@/core/agent";
-import { useModel } from "@/hooks/agent";
+import type { ModelChoice } from "@/hooks/agent";
 
 /** A model id as the pill shows it: its last path segment (`org/model` lists) */
 const shortId = (id: string) => id.split("/").at(-1) ?? id;
 
 /** The pill reads the model and the effort, as the message field's own control. `align`: the menu's edge against the pill. */
-export function ModelMenu({ disabled, align = "start" }: { disabled?: boolean; align?: "start" | "end" }) {
-  const { model, models, effort, set } = useModel();
+export function ModelMenu({ choice, disabled, align = "start" }: { choice: ModelChoice; disabled?: boolean; align?: "start" | "end" }) {
+  const { model, models, effort, set, follows } = choice;
   const listed = models?.models ?? [];
   const ids = model && !listed.includes(model) ? [model, ...listed] : listed;   // a saved id the list no longer has
   return (
@@ -26,6 +26,14 @@ export function ModelMenu({ disabled, align = "start" }: { disabled?: boolean; a
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="max-h-96 min-w-64 overflow-y-auto">
+        {follows !== undefined ? (
+          <>
+            <DropdownMenuCheckboxItem checked={follows} disabled={follows} onCheckedChange={() => set({ follow: true })}>
+              <span className="flex flex-col"><span>Same as Ask</span><span className="text-xs text-faint">Follow the assistant's model and effort</span></span>
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuLabel className="text-xs text-faint">Effort</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={effort} onValueChange={(v) => set({ effort: effortOf(v) })}>
           {EFFORTS.map((e) => (

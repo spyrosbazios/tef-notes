@@ -18,7 +18,7 @@
 import { generateId, type ModelMessage, type UIMessage } from "ai";
 import { readChatHistory } from "@/core/chat-history";
 import { isUiTool } from "@/core/assistant";
-import type { Prefs } from "@/core/prefs";
+import { talkThinking, type Prefs } from "@/core/prefs";
 import * as pb from "@/core/pocketbase";
 import { bytesOf, costOf, talkClientEventOf, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
 import { exists, saver } from "./chats";
@@ -462,10 +462,11 @@ export async function talkRoute(req: Request, srv: Bun.Server<Sock>, server: pb.
     try { voice = await fish.fallback(); } catch (e) { return new Response((e as Error).message, { status: 502 }); }
   }
   const sea: Sea = { model: prefs.talk.model, voice, speed: prefs.talk.speed };
+  const thinking = talkThinking(prefs);
   if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") return Response.json({ model: sea.model, voice: sea.voice, speed: sea.speed } satisfies TalkStatus);
   if (!sameOrigin(req.headers)) return new Response("Talk answers only the app on this server", { status: 403 });
   const deps: Deps = {
-    server, sea, model: prefs.agent.model || DEFAULT_MODEL, effort: prefs.agent.effort,
+    server, sea, model: thinking.model || DEFAULT_MODEL, effort: thinking.effort,
     rules: prefs.actions, connectVoice: fish.speak(sea), connectEar: fish.hear,
   };
   return srv.upgrade(req, { data: { deps, first: false, closed: false } }) ? undefined : new Response("Not a WebSocket upgrade", { status: 400 });

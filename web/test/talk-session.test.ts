@@ -279,3 +279,22 @@ describe("failing to start", () => {
     expect(r.on).toBeNull();
   });
 });
+
+describe("going on", () => {
+  test("resume keeps the last chat and its transcript; a plain start is a new chat", async () => {
+    const x = await live();
+    x.r.hear({ type: "part", message: "m1", role: "user", index: 0, part: { type: "text", text: "hello" } });
+    x.session.end();
+    x.session.start({ resume: true });
+    expect(x.session.snapshot().messages).toHaveLength(1);
+    await tick();
+    expect(x.r.chats).toBe(1);
+    x.r.on!.open();
+    expect(x.r.events().at(-1)).toMatchObject({ type: "start", chat: "chat1" });
+    x.session.end();
+    x.session.start();
+    expect(x.session.snapshot().messages).toHaveLength(0);
+    await tick();
+    expect(x.r.chats).toBe(2);
+  });
+});

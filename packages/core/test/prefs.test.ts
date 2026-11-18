@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import { DEFAULT_PREFS, everyPath, isPrefPath, movedTab, NEW_CHAT_IDLE_MS, newChatDue, patchPaths, prefAt, prefsOf, rebased, shownRail, shownTabs, withPatch } from "../src/prefs";
+import { DEFAULT_PREFS, everyPath, isPrefPath, movedTab, NEW_CHAT_IDLE_MS, newChatDue, patchPaths, prefAt, prefsOf, rebased, shownRail, shownTabs, talkThinking, withPatch } from "../src/prefs";
 
 describe("prefsOf", () => {
   test("nothing is the defaults", () => {
@@ -97,5 +97,16 @@ describe("newChatDue", () => {
     expect(prefsOf({}).agent.newChat).toBe("app");
     expect(prefsOf({ agent: { newChat: "x" } }).agent.newChat).toBe("app");
     expect(prefsOf({ agent: { newChat: "idle" } }).agent.newChat).toBe("idle");
+  });
+});
+
+describe("talkThinking", () => {
+  it("follows the assistant's model and effort until Talk sets its own", () => {
+    const p = prefsOf({ agent: { model: "big", effort: "deep" } });
+    expect(talkThinking(p)).toEqual({ model: "big", effort: "deep" });
+    const q = prefsOf({ agent: { model: "big", effort: "deep" }, talk: { agent: { model: "quick", effort: "quick", junk: 1 } } });
+    expect(q.talk.agent).toEqual({ model: "quick", effort: "quick" });
+    expect(talkThinking(q)).toEqual({ model: "quick", effort: "quick" });
+    expect(prefsOf({ talk: { agent: { effort: "huge" } } }).talk.agent).toEqual({});
   });
 });

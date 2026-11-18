@@ -16,7 +16,7 @@
 // renamed is a migration of the record (server/pb_migrations/1794600000_prefs_layouts.js is one), never a second reader.
 // Pure and platform-neutral.
 import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";
-import { effortOf, type Effort } from "./agent";
+import { EFFORTS, effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
 import { DEFAULT_TALK_MODEL, TALK_MODELS, TALK_SPEED, speedOf, type TalkModel } from "./talk";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
@@ -114,13 +114,31 @@ export type Prefs = {
   actions: Actions;
   /** The spoken conversation (talk.ts): the voice model the server speaks through, the Fish voice it speaks in (its
    *  voice-model id; empty: the server's own, TEF_NOTES_TALK_VOICE, else the first voice it can find), and how fast. */
-  talk: { model: TalkModel; voice: string; speed: number };
+  talk: { model: TalkModel; voice: string; speed: number; agent: TalkAgent };
   /** A link or picture shared from another app: "Add a summary", as last left. */
   clip: { summary: boolean };
   /** The lens on (its record id; lens.ts), null for the unfiltered app. */
   lens: string | null;
   phone: PhonePrefs;
   desktop: DesktopPrefs;
+};
+
+/** The chat model and effort Talk thinks with, each unset to follow the assistant's own (`agent`): a spoken reply is
+ *  waited for, so a faster model or less effort can suit it better than it suits a typed one. */
+export type TalkAgent = { model?: string; effort?: Effort };
+
+const talkAgentOf = (raw: unknown): TalkAgent => {
+  const a = obj(raw);
+  return {
+    ...(typeof a.model === "string" && a.model ? { model: a.model } : {}),
+    ...((EFFORTS as readonly unknown[]).includes(a.effort) ? { effort: a.effort as Effort } : {}),
+  };
+};
+
+/** The model (unset: the server's default) and effort a Talk conversation runs with. */
+export const talkThinking = (p: Prefs): { model?: string; effort: Effort } => {
+  const model = p.talk.agent.model || p.agent.model;
+  return { ...(model ? { model } : {}), effort: p.talk.agent.effort ?? p.agent.effort };
 };
 
 const LAYOUT_DEFAULTS: LayoutPrefs = { start: "home", homeList: "today" };
@@ -130,7 +148,7 @@ export const DEFAULT_PREFS: Prefs = {
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), newChat: "app" },
   actions: { ...DEFAULT_ACTIONS },
-  talk: { model: DEFAULT_TALK_MODEL, voice: "", speed: TALK_SPEED.normal },
+  talk: { model: DEFAULT_TALK_MODEL, voice: "", speed: TALK_SPEED.normal, agent: {} },
   clip: { summary: false },
   lens: null,
   phone: { ...LAYOUT_DEFAULTS, tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
@@ -172,6 +190,7 @@ export function prefsOf(raw: unknown): Prefs {
       model: TALK_MODELS.find((m) => m === talk.model) ?? DEFAULT_TALK_MODEL,
       voice: typeof talk.voice === "string" ? talk.voice : "",
       speed: speedOf(talk.speed),
+      agent: talkAgentOf(talk.agent),
     },
     clip: { summary: clip.summary === true },
     lens: typeof p.lens === "string" && p.lens ? p.lens : null,

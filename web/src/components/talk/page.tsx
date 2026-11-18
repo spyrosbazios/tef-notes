@@ -8,9 +8,10 @@
 // controls on the left, the transcript and tray on the right. The time and cost so far are a quiet readout, since whether Talk is worth keeping is what it is here to find out.
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { AudioLines, Mic, MicOff, PhoneOff, RotateCw, TriangleAlert } from "lucide-react";
+import { AudioLines, History, Mic, MicOff, PhoneOff, Plus, RotateCw, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, type ReactNode } from "react";
+import { ModelMenu } from "@/components/assistant/model-menu";
 import { Empty } from "@/components/empty";
 import { PageHeader } from "@/components/page-header";
 import { Swap } from "@/components/swap";
@@ -19,6 +20,8 @@ import { Tray, Transcript } from "@/components/talk/transcript";
 import { Button } from "@/components/ui/button";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
+import { useTalkModel } from "@/hooks/agent";
+import { useAssistant } from "@/hooks/assistant";
 import { useTalk, useTalkStatus } from "@/hooks/talk";
 import { haptic } from "@/lib/haptics";
 import { clock, money, rowsOf, type TalkState } from "@/lib/talk";
@@ -41,11 +44,27 @@ function Readout() {
 }
 
 /** What the page says when there is nothing yet: what Talk is, and where the voice and the notes it reads go. */
-function About({ model }: { model: string }) {
+function About() {
   return (
     <div className="space-y-1.5 text-center">
-      <p className="text-balance text-[15px] leading-snug text-dim">Speak with the assistant and hear it answer, as in Ask. Your voice, and what it reads from your notes to answer, is sent to Google.</p>
-      <p className="text-xs text-faint">{model}</p>
+      <p className="text-balance text-[15px] leading-snug text-dim">Speak with the assistant and hear it answer, as in Ask. Your voice goes to Fish Audio to be written down, and the replies to be spoken; what it reads from your notes goes to the chat model, as in Ask. Each conversation is kept with Ask's chats.</p>
+    </div>
+  );
+}
+
+/** Which model Talk thinks with (Ask's unless set here), and the conversation's chat in Ask's history once there is one. */
+function Thinking() {
+  const { phase, chat } = useTalk();
+  const { openChat } = useAssistant();
+  const live = phase === "connecting" || phase === "live";
+  return (
+    <div className="flex items-center gap-1">
+      <ModelMenu choice={useTalkModel()} disabled={live} align="end" />
+      {chat && !live ? (
+        <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Open this conversation in Ask" title="Open in Ask" onClick={() => openChat(chat)}>
+          <History className="size-4" />
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -65,7 +84,8 @@ function Failure({ message, mic }: { message: string; mic: boolean }) {
 
 /** Start while there is no conversation (Try again after a failure); Mute and End while there is. */
 function Controls() {
-  const { phase, muted, session } = useTalk();
+  const { phase, muted, session, chat } = useTalk();
+  const resumable = phase === "idle" && !!chat;
   const swap = useTempoTransition(transition.swap), pop = useTempoTransition(spring.pop);
   const live = phase === "connecting" || phase === "live";
   const move = { initial: { opacity: 0, scale: 0.92 }, animate: { opacity: 1, scale: 1, transition: { ...pop, opacity: swap } }, exit: { opacity: 0, scale: 0.92, transition: swap } };
@@ -83,11 +103,22 @@ function Controls() {
             </Button>
           </motion.div>
         ) : (
-          <motion.div key="start" className="flex w-full justify-center" {...move}>
-            <Button className="h-14 w-full max-w-xs rounded-full text-base [&_svg:not([class*='size-'])]:size-5" onClick={() => { haptic("start"); session.start(); }}>
-              {phase === "failed" ? <RotateCw /> : <Mic />} {phase === "failed" ? "Try again" : "Start talking"}
-            </Button>
-          </motion.div>
+          resumable ? (
+            <motion.div key="resume" className="flex w-full items-center justify-center gap-3" {...move}>
+              <Button variant="outline" className="h-14 flex-1 rounded-full text-base [&_svg:not([class*='size-'])]:size-5" onClick={() => { haptic("start"); session.start(); }}>
+                <Plus /> New
+              </Button>
+              <Button className="h-14 flex-1 rounded-full text-base [&_svg:not([class*='size-'])]:size-5" onClick={() => { haptic("start"); session.start({ resume: true }); }}>
+                <Mic /> Continue
+              </Button>
+            </motion.div>
+          ) : (
+            <motion.div key="start" className="flex w-full justify-center" {...move}>
+              <Button className="h-14 w-full max-w-xs rounded-full text-base [&_svg:not([class*='size-'])]:size-5" onClick={() => { haptic("start"); session.start({ resume: phase === "failed" }); }}>
+                {phase === "failed" ? <RotateCw /> : <Mic />} {phase === "failed" ? "Try again" : "Start talking"}
+              </Button>
+            </motion.div>
+          )
         )}
       </AnimatePresence>
     </div>
@@ -125,7 +156,7 @@ function Notice({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
-function Conversation({ model }: { model: string }) {
+function Conversation() {
   const t = useTalk();
   const phone = useNarrow();
   const { rows, pending } = useMemo(() => rowsOf(t.messages), [t.messages]);
@@ -137,11 +168,12 @@ function Conversation({ model }: { model: string }) {
       <div className="pointer-events-none absolute top-7 left-8 z-10 hidden items-baseline gap-3 md:flex">
         <h1 className="text-3xl font-bold tracking-tight">Talk</h1><Readout />
       </div>
+      <div className="absolute top-6 right-6 z-10 hidden md:block"><Thinking /></div>
       <div className="flex h-full flex-col @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] @3xl:grid-rows-[minmax(0,1fr)_auto] @5xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]">
-        <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<Readout />} className="md:hidden" />
+        <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking /></>} className="md:hidden" />
         <Stage state={t.state} muted={t.muted} compact={phone && waiting} />
         <div className="flex min-h-0 flex-1 flex-col @3xl:col-start-2 @3xl:row-start-1 @3xl:border-l @3xl:border-line">
-          <Transcript rows={rows} live={live} state={t.state} newest={tail?.id} empty={<About model={model} />} />
+          <Transcript rows={rows} live={live} state={t.state} newest={tail?.id} empty={<About />} />
           <Notice id={t.failure ? "failure" : ""}>{t.failure ? <Failure message={t.failure.message} mic={t.failure.mic} /> : null}</Notice>
         </div>
         <div className="@3xl:col-start-2 @3xl:row-start-2 @3xl:border-l @3xl:border-line"><Tray pending={pending} last={tail} /></div>
@@ -156,7 +188,7 @@ function Conversation({ model }: { model: string }) {
 /** The route's component: Talk where the server has it, and a line saying so where it hasn't. */
 export function TalkPage() {
   const status = useTalkStatus(), phone = useNarrow();
-  if (status.data) return <Conversation model={status.data.model} />;
+  if (status.data) return <Conversation />;
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col">
       {phone ? <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} /> : null}

@@ -71,7 +71,9 @@ export type TalkSession = {
   subscribe: (cb: () => void) => () => void;
   snapshot: () => TalkSnapshot;
   levels: () => Levels;
-  start: () => void;
+  /** A new conversation, its own chat and an empty context; `{ resume: true }` goes on with the last one instead (its chat,
+   *  so the agent hears it all again, and its transcript), when there is one. */
+  start: (how?: { resume?: boolean }) => void;
   end: () => void;
   mute: (on: boolean) => void;
   /** A tap on a confirm card: the call's `approval.id`. */
@@ -175,12 +177,13 @@ export function createSession(deps: Deps): TalkSession {
     if (ready && !snap.muted) link?.send(pcm16(samples));
   };
 
-  const start = () => {
+  const start = (how: { resume?: boolean } = {}) => {
     if (snap.phase === "connecting" || snap.phase === "live") return;
+    const resumed = how.resume && snap.chat ? { chat: snap.chat, messages: snap.messages } : null;
     const mine = ++run;
     done.clear();
     answered.clear();
-    snap = { ...IDLE, phase: "connecting" };
+    snap = { ...IDLE, phase: "connecting", ...(resumed && { messages: resumed.messages }) };
     set({});
     // Both audio paths open before anything is awaited, so they are still inside the tap that started this
     let heard: Promise<Mic>;
@@ -195,7 +198,7 @@ export function createSession(deps: Deps): TalkSession {
       mic = opened;
       // The record comes after the microphone, so a refusal leaves no empty chat behind
       let id: string;
-      try { id = await deps.chat(); } catch (e) {
+      try { id = resumed?.chat ?? await deps.chat(); } catch (e) {
         if (mine === run) fail(e instanceof Error ? e.message : "The conversation couldn't be started.");
         return;
       }

@@ -102,7 +102,7 @@ function Header({ children }: { children?: ReactNode }) {
 
 function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory: () => void; listing: boolean }) {
   const { input, setInput, about, setAbout, focusKey, show, send, stop, newChat } = useAssistant();
-  const { model, models } = useModel();
+  const choice = useModel(), { model, models } = choice;
   const notesAsk = usePrefs().actions.editNote === "ask";
   const { messages, regenerate, status, error, addToolApprovalResponse, addToolOutput } = useChat<UIMessage>({ chat });
   const answer = useCallback((toolCallId: string, output: ChoiceOutput) => { void addToolOutput({ tool: "ask_choice", toolCallId, output }); }, [addToolOutput]);
@@ -249,7 +249,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
                 <Button variant="ghost" size="icon" className="shrink-0 rounded-full text-dim" aria-label="Attach photos or PDFs" title="Attach photos or PDFs"
                   disabled={!model || files.length >= ATTACH_MAX} onPointerDown={keep} onMouseDown={keep} onClick={() => picker.current?.click()}><Plus /></Button>
                 <div className="flex-1" />
-                <ModelMenu disabled={busy} align="end" />
+                <ModelMenu choice={choice} disabled={busy} align="end" />
                 <MicButton onText={(t) => dictateInto(field.current, field.current?.value ?? input, t, setInput)} />
                 {busy && (input.trim() || files.length) ? (
                   <Button size="icon" variant="secondary" className="shrink-0 rounded-full" aria-label="Queue" title="Send when the reply ends" onPointerDown={keep} onMouseDown={keep} disabled={!ready} onClick={() => { void go(input); }}><ListPlus /></Button>
