@@ -37,7 +37,7 @@ function Readout() {
   const now = useNow(endedAt ? 3_600_000 : 1000);
   if (startedAt == null) return null;
   return (
-    <p className="shrink-0 text-xs tabular-nums text-faint" title={usage ? `${usage.said.toLocaleString()} characters said` : undefined}>
+    <p className="min-w-0 shrink-0 whitespace-nowrap text-xs tabular-nums text-faint" title={usage ? `${usage.said.toLocaleString()} characters said` : undefined}>
       {clock(((endedAt ?? now) - startedAt) / 1000)}{usage ? ` · ${money(usage.cost)}` : ""}
     </p>
   );
@@ -53,13 +53,13 @@ function About() {
 }
 
 /** Which model Talk thinks with (Ask's unless set here), and the conversation's chat in Ask's history once there is one. */
-function Thinking() {
+function Thinking({ compact }: { compact?: boolean }) {
   const { phase, chat } = useTalk();
   const { openChat } = useAssistant();
   const live = phase === "connecting" || phase === "live";
   return (
     <div className="flex items-center gap-1">
-      <ModelMenu choice={useTalkModel()} disabled={live} align="end" />
+      <ModelMenu choice={useTalkModel()} disabled={live} align="end" compact={compact} />
       {chat && !live ? (
         <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Open this conversation in Ask" title="Open in Ask" onClick={() => openChat(chat)}>
           <History className="size-4" />
@@ -170,7 +170,7 @@ function Conversation() {
       </div>
       <div className="absolute top-6 right-6 z-10 hidden md:block"><Thinking /></div>
       <div className="flex h-full flex-col @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] @3xl:grid-rows-[minmax(0,1fr)_auto] @5xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]">
-        <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking /></>} className="md:hidden" />
+        <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking compact /></>} className="md:hidden" />
         <Stage state={t.state} muted={t.muted} compact={phone && (waiting || rows.length > 0)} />
         <div className="flex min-h-0 flex-1 flex-col @3xl:col-start-2 @3xl:row-start-1 @3xl:border-l @3xl:border-line">
           <Transcript rows={rows} live={live} state={t.state} newest={tail?.id} empty={<About />} />
