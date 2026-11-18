@@ -3,8 +3,8 @@
 // cards and widgets), and what waits for a tap in the tray, in reach. One obvious action: Start; live, Mute and End, at the bottom where
 // a thumb is. The conversation itself is the provider's (provider.tsx), so it goes on while the assistant opens notes and this page
 // is left (the pill in pill.tsx brings it back). One column (a phone's, or a window with the assistant's dock beside the page): the orb,
-// then the transcript, then the controls (over the tab bar, on a phone); when a card waits on a phone the orb steps back to a small one so
-// the card has the room. Where the page itself is wide (a container query, not the window's width, which the dock takes from): the orb and
+// then the transcript, then the controls (over the tab bar, on a phone); on a phone the orb steps back to a small one as soon as there is
+// something said or a card, so what the agent shows has the room. Where the page itself is wide (a container query, not the window's width, which the dock takes from): the orb and
 // controls on the left, the transcript and tray on the right. The time and cost so far are a quiet readout, since whether Talk is worth keeping is what it is here to find out.
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
@@ -125,16 +125,16 @@ function Controls() {
   );
 }
 
-/** The stage: the orb, and in words what the conversation is doing. When a card waits on a phone, the orb steps back (scaled, and the
- *  stage's height follows on the disclosure's tween) to leave the card the room. */
+/** The stage: the orb, and in words what the conversation is doing. On a phone, once anything is said or a card waits, the orb steps back (scaled, and the
+ *  stage's height follows on the disclosure's tween) to leave the transcript and cards the room. */
 function Stage({ state, muted, compact }: { state: TalkState; muted: boolean; compact: boolean }) {
   const glide = useTempoTransition(spring.slide);
   const label = state === "listening" && muted ? "Muted" : LABEL[state];
   return (
     <section aria-label="Conversation" data-compact={compact || undefined}
       className={cn("relative grid shrink-0 grid-rows-[minmax(0,1fr)] place-items-center pb-9 transition-[height] duration-[350ms] ease-[cubic-bezier(0.215,0.61,0.355,1)] motion-reduce:transition-none",
-        "h-[calc(min(68vw,34dvh)+3rem)] data-compact:h-32 @3xl:col-start-1 @3xl:row-start-1 @3xl:h-auto")}>
-      <motion.div initial={false} animate={{ scale: compact ? 0.3 : 1 }} transition={glide} className="w-[min(68vw,34dvh)] @3xl:w-[min(34cqw,24rem,50dvh)]">
+        "h-[calc(min(56vw,28dvh)+3rem)] data-compact:h-28 @3xl:col-start-1 @3xl:row-start-1 @3xl:h-auto")}>
+      <motion.div initial={false} animate={{ scale: compact ? 0.32 : 1 }} transition={glide} className="w-[min(56vw,28dvh)] @3xl:w-[min(34cqw,24rem,50dvh)]">
         <Orb state={state} muted={muted} className="w-full" />
       </motion.div>
       <p role="status" className={cn("absolute inset-x-0 bottom-0 grid h-9 place-items-center text-sm font-medium", state === "waiting" ? "text-brand" : state === "failed" ? "text-down" : "text-dim")}>
@@ -171,7 +171,7 @@ function Conversation() {
       <div className="absolute top-6 right-6 z-10 hidden md:block"><Thinking /></div>
       <div className="flex h-full flex-col @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] @3xl:grid-rows-[minmax(0,1fr)_auto] @5xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]">
         <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking /></>} className="md:hidden" />
-        <Stage state={t.state} muted={t.muted} compact={phone && waiting} />
+        <Stage state={t.state} muted={t.muted} compact={phone && (waiting || rows.length > 0)} />
         <div className="flex min-h-0 flex-1 flex-col @3xl:col-start-2 @3xl:row-start-1 @3xl:border-l @3xl:border-line">
           <Transcript rows={rows} live={live} state={t.state} newest={tail?.id} empty={<About />} />
           <Notice id={t.failure ? "failure" : ""}>{t.failure ? <Failure message={t.failure.message} mic={t.failure.mic} /> : null}</Notice>

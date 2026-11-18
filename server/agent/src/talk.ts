@@ -295,6 +295,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   }
 
   function finishTurn(text: string) {
+    abort = undefined;                             // nothing is thinking now: a later turn has nothing to interrupt but the voice
     if (text.trim()) ear?.said(text);
     confirm();                                     // the reply is complete: whatever was held may be said
     speak.flush();
@@ -339,7 +340,9 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   // The turn has probably ended: the model starts thinking now, but nothing is said aloud until `committed` confirms it
   // (a resumed turn was never an answer), and a turn already started on this utterance is not started twice.
   const turns = turnsOf({
-    start(text, sure) { confirmed = sure; if (sure) held = []; startTurn(text); },
+    // A new turn ends whatever is still under way: an eager reply the committed text replaced, or one still being spoken
+    // when the ear never reported speech over it. Two replies at once was the voice talking over the owner.
+    start(text, sure) { interrupt(); confirmed = sure; if (sure) held = []; startTurn(text); },
     confirm,
     cancel() {
       abort?.abort(); abort = undefined; turn = {}; step = 0;
