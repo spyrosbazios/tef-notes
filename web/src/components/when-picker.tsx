@@ -14,9 +14,9 @@ import { cn } from "@/lib/utils";
 /** Where a task stands: what When and Deadline show. */
 export type WhenState = { when: string | null; evening: boolean; due: string | null };
 
-function Choice({ icon: Icon, label, on, onClick }: { icon: typeof Star; label: string; on: boolean; onClick: () => void }) {
+function Choice({ icon: Icon, label, on, ...props }: React.ComponentProps<"button"> & { icon: typeof Star; label: string; on: boolean }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={on}
+    <button type="button" aria-pressed={on} {...props}
       className={cn("flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm transition-colors any-pointer-coarse:h-11", on && "font-semibold")}>
       <Icon className="size-4 shrink-0 text-dim" />
       <span className="flex-1">{label}</span>
