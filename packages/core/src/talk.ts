@@ -3,6 +3,7 @@
 // decides when the owner has finished, when they only acknowledged the voice, and when the sound was not them at all)
 // and the voice (voice.ts: its streaming text-to-speech) — and runs the chat's own tools, checks and confirm cards for
 // each turn. The app sends the microphone and plays the voice; it hears nothing of the speech itself.
+//   GET /agent/talk/voices?q= -> TalkVoice[]: the owner's own Fish voices, then public ones (matching `q` when given)
 //   GET /agent/talk  -> TalkStatus; 404 while the server has no Fish Audio key (Talk is off: the app hides it)
 //   WS  /agent/talk  -> one conversation, for as long as the socket is open. Refused unless the upgrade's Origin is the
 //                       server's own: no preflight guards a WebSocket the way it guards the JSON routes.
@@ -46,8 +47,22 @@ export const bytesOf = (text: string) => new TextEncoder().encode(text).length;
 /** What saying `said` bytes cost through `model`. */
 export const costOf = (said: number, model: TalkModel) => (said / 1e6) * TTS_USD_PER_MB[model];
 
-/** `GET /agent/talk`: the voice model and voice the server talks through. */
-export type TalkStatus = { model: TalkModel; voice: string };
+/** How fast the voice talks: Fish's prosody speed, a multiplier of its natural pace (docs.fish.audio, "Text to Speech"). */
+export const TALK_SPEED = { min: 0.5, max: 2, step: 0.05, normal: 1 } as const;
+
+/** A speed as stored or sent: clamped to Fish's range, on the step; the normal pace for anything else. */
+export function speedOf(v: unknown): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return TALK_SPEED.normal;
+  const clamped = Math.min(TALK_SPEED.max, Math.max(TALK_SPEED.min, v));
+  return Math.round(clamped / TALK_SPEED.step) * TALK_SPEED.step;
+}
+
+/** `GET /agent/talk`: the voice model, voice and speed the server talks through. `voice` is never empty while Talk is
+ *  on: a voice is always pinned, or every reply would be spoken by whichever voice Fish picks for that session. */
+export type TalkStatus = { model: TalkModel; voice: string; speed: number };
+
+/** A Fish voice the owner can pick (`GET /agent/talk/voices`): its id, its name, and whether it is the owner's own. */
+export type TalkVoice = { id: string; title: string; languages: string[]; mine: boolean; cover?: string; sample?: string };
 
 export type TalkClientEvent =
   /** The first frame. `chat`: a record created in `chats` first, as for /agent/chat. `context`: what is on screen as the
@@ -130,5 +145,19 @@ export function talkServerEventOf(raw: unknown): TalkServerEvent | null {
 /** `GET /agent/talk`'s body; null when it names no voice model. */
 export function talkStatusOf(raw: unknown): TalkStatus | null {
   const o = obj(raw), model = TALK_MODELS.find((m) => m === o?.model);
-  return o && model ? { model, voice: typeof o.voice === "string" ? o.voice : "" } : null;
+  return o && model ? { model, voice: typeof o.voice === "string" ? o.voice : "", speed: speedOf(o.speed) } : null;
+}
+
+const url = (v: unknown) => (typeof v === "string" && /^https:\/\//.test(v) && v.length <= 2000 ? v : undefined);
+
+/** `GET /agent/talk/voices`' body: the voices that name an id and a title, the rest dropped. */
+export function talkVoicesOf(raw: unknown): TalkVoice[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((v) => {
+    const o = obj(v), id = text(o?.id, ID_MAX), title = text(o?.title, 200);
+    if (!o || !id || !title) return [];
+    const cover = url(o.cover), sample = url(o.sample);
+    const languages = Array.isArray(o.languages) ? o.languages.filter((l): l is string => typeof l === "string").slice(0, 20) : [];
+    return [{ id, title, languages, mine: o.mine === true, ...(cover && { cover }), ...(sample && { sample }) }];
+  });
 }

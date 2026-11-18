@@ -4,7 +4,7 @@
 import { chat } from "./agent";
 import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
 import { drawingPictureRoute } from "./drawing-picture";
-import { connectFishEar, connectFishVoice } from "./fish";
+import { connectFishEar, connectFishVoice, fallbackVoice, fishVoices } from "./fish";
 import { find } from "./find";
 import { catalog } from "./models";
 import { ocrRoute, startOcr } from "./ocr";
@@ -16,11 +16,12 @@ import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { search } from "./search";
 import { steerRoute } from "./steer";
-import { talkRoute, talkSocket } from "./talk";
+import { talkRoute, talkSocket, talkVoicesRoute, type Fish } from "./talk";
 import { semantic } from "./semantic";
 import { transcribe } from "./transcribe";
 
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
+const fish: Fish = { speak: connectFishVoice, hear: connectFishEar(), voices: fishVoices, fallback: fallbackVoice };
 const port = Number(process.env.PORT ?? 8098);
 
 Bun.serve({
@@ -42,7 +43,8 @@ Bun.serve({
     "/agent/places/map": { GET: (req) => mapRoute(req) },
     "/agent/push/key": { GET: () => keyRoute() },
     "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
-    "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server, { speak: connectFishVoice, hear: connectFishEar() }) },
+    "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server, fish) },
+    "/agent/talk/voices": { GET: (req) => talkVoicesRoute(req, fish) },
     "/agent/transcribe": { POST: (req) => transcribe(req) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/companion/hello": { GET: () => helloRoute(server) },

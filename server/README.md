@@ -81,7 +81,7 @@ result.
 | `TEF_NOTES_LLM_URL` | the provider's | Its API root, e.g. another Qwen region. |
 | `TEF_NOTES_OLLAMA_URL` | | Ollama only: where it serves (`http://host.docker.internal:11434` for one on the Docker host). |
 | `TEF_NOTES_KEY_FISH` | `./keys/fish` | The Fish Audio key (`api-key`), for voice input and Talk. Without it the apps hide their mic and Talk's tab, and `/agent/transcribe` and `/agent/talk` answer 404. |
-| `TEF_NOTES_TALK_VOICE` | | Talk's voice: a Fish voice model id. Empty, Fish's own default; Settings can set one too, and that wins. |
+| `TEF_NOTES_TALK_VOICE` | | Talk's voice: a Fish voice model id. Settings picks one from Fish's list (and its speed), and that wins; with neither, the server pins the first voice Fish lists. |
 | `TEF_NOTES_OCR` | `eng` | The languages scanned PDFs are read in: Tesseract's codes joined by `+`, the main one first (`ell+eng`, `deu+eng`). Set it empty (`TEF_NOTES_OCR=`) to turn it off. See Scanned PDFs. |
 
 Deployment-specific additions (labels for a dashboard, extra networks, resource limits) go in

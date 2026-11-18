@@ -18,7 +18,7 @@
 import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";
 import { effortOf, type Effort } from "./agent";
 import { isNoteSort, type NoteSort } from "./note-sort";
-import { DEFAULT_TALK_MODEL, TALK_MODELS, type TalkModel } from "./talk";
+import { DEFAULT_TALK_MODEL, TALK_MODELS, TALK_SPEED, speedOf, type TalkModel } from "./talk";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 
 // ---- layouts
@@ -112,9 +112,9 @@ export type Prefs = {
   agent: { model?: string; effort: Effort; newChat: NewChat };
   /** Which of the assistant's writes ask first, go ahead, or are never allowed (actions.ts); the agent's server enforces them. */
   actions: Actions;
-  /** The spoken conversation (talk.ts): the voice model the server speaks through, and the Fish voice it speaks in (its
-   *  voice-model id; empty: the server's own, TEF_NOTES_TALK_VOICE). */
-  talk: { model: TalkModel; voice: string };
+  /** The spoken conversation (talk.ts): the voice model the server speaks through, the Fish voice it speaks in (its
+   *  voice-model id; empty: the server's own, TEF_NOTES_TALK_VOICE, else the first voice it can find), and how fast. */
+  talk: { model: TalkModel; voice: string; speed: number };
   /** A link or picture shared from another app: "Add a summary", as last left. */
   clip: { summary: boolean };
   /** The lens on (its record id; lens.ts), null for the unfiltered app. */
@@ -130,7 +130,7 @@ export const DEFAULT_PREFS: Prefs = {
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), newChat: "app" },
   actions: { ...DEFAULT_ACTIONS },
-  talk: { model: DEFAULT_TALK_MODEL, voice: "" },
+  talk: { model: DEFAULT_TALK_MODEL, voice: "", speed: TALK_SPEED.normal },
   clip: { summary: false },
   lens: null,
   phone: { ...LAYOUT_DEFAULTS, tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
@@ -171,6 +171,7 @@ export function prefsOf(raw: unknown): Prefs {
     talk: {
       model: TALK_MODELS.find((m) => m === talk.model) ?? DEFAULT_TALK_MODEL,
       voice: typeof talk.voice === "string" ? talk.voice : "",
+      speed: speedOf(talk.speed),
     },
     clip: { summary: clip.summary === true },
     lens: typeof p.lens === "string" && p.lens ? p.lens : null,

@@ -15,21 +15,23 @@
 // Billing is the text's: Fish charges the bytes of what is spoken (TTS) and the session's seconds (the ear), both far below a
 // speech-to-speech model's per-turn price. The key is read on every connection (keys.ts `fish`), so a new one needs no restart.
 import { decode, encode } from "@msgpack/msgpack";
-import { TALK_RATE, type TalkModel } from "@/core/talk";
+import { TALK_RATE, type TalkModel, type TalkVoice } from "@/core/talk";
 import { RATE } from "@/core/voice";
 import { key } from "./keys";
 
 const TTS_URL = "wss://api.fish.audio/v1/tts/live";
 const ASR_URL = "wss://api.fish.audio/v1/asr/realtime";
 const ASR_FILE = "https://api.fish.audio/v1/asr";
+const MODELS = "https://api.fish.audio/model";
 /** The file reader: 60 minutes is its limit, and a dictation piece is seconds. */
 const FILE_TIMEOUT = 120_000;
 const SETUP_TIMEOUT = 20_000;
 /** A session closes after 30 seconds without a client message: the ear hears nothing while the owner is quiet. */
 const KEEPALIVE = 15_000;
 
-/** The voice model and voice a conversation speaks with, from the owner's preferences (prefs.ts `talk`) and the server's. */
-export type Sea = { model: TalkModel; voice: string };
+/** The voice model, voice and pace a conversation speaks with, from the owner's preferences (prefs.ts `talk`) and the
+ *  server's. `voice` is always an id: without one Fish picks a voice per session, and every reply sounded like someone else. */
+export type Sea = { model: TalkModel; voice: string; speed: number };
 
 // ---- the voice
 
@@ -70,7 +72,8 @@ export const connectFishVoice = (sea: Sea): ConnectVoice => async (out) => {
       event: "start",
       request: {
         text: "",                                                    // the reply arrives as TextEvents
-        ...(sea.voice ? { reference_id: sea.voice } : {}),
+        reference_id: sea.voice,
+        prosody: { speed: sea.speed, volume: 0 },
         format: "pcm",
         sample_rate: TALK_RATE.voice,                                // the app's player is opened at this rate
         latency: "balanced",                                         // Fish's quality-versus-time compromise
@@ -93,6 +96,53 @@ export const connectFishVoice = (sea: Sea): ConnectVoice => async (out) => {
     stop: () => { stopped = true; try { ws.send(encode({ event: "stop" })); ws.close(); } catch { /* already gone */ } },
   };
 };
+
+// ---- the voices
+
+type FishModel = { _id?: unknown; title?: unknown; type?: unknown; languages?: unknown; cover_image?: unknown; samples?: unknown };
+
+const voiceOf = (m: FishModel, mine: boolean): TalkVoice[] => {
+  if (typeof m._id !== "string" || typeof m.title !== "string" || m.type !== "tts") return [];
+  const sample = Array.isArray(m.samples) ? (m.samples[0] as { audio?: unknown } | undefined)?.audio : undefined;
+  return [{
+    id: m._id, title: m.title, mine,
+    languages: Array.isArray(m.languages) ? m.languages.filter((l): l is string => typeof l === "string") : [],
+    ...(typeof m.cover_image === "string" && m.cover_image.startsWith("https://") && { cover: m.cover_image }),
+    ...(typeof sample === "string" && sample.startsWith("https://") && { sample }),
+  }];
+};
+
+async function models(params: Record<string, string>, apiKey: string): Promise<FishModel[]> {
+  const r = await fetch(`${MODELS}?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(SETUP_TIMEOUT) });
+  if (!r.ok) throw new Error(`Fish's voice list answered ${r.status}`);
+  const body = await r.json() as { items?: unknown };
+  return Array.isArray(body.items) ? body.items as FishModel[] : [];
+}
+
+/** The voices to pick from: the owner's own on Fish first (cloned or private), then the public ones, most liked first,
+ *  matching `q` by name when given. */
+export async function fishVoices(q: string): Promise<TalkVoice[]> {
+  const apiKey = await key("fish");
+  if (!apiKey) throw new Error("Talk has no Fish Audio key");
+  const title: Record<string, string> = q.trim() ? { title: q.trim() } : {};
+  const [own, open] = await Promise.all([
+    models({ self: "true", page_size: "50", ...title }, apiKey),
+    models({ page_size: "30", sort_by: "score", ...title }, apiKey),
+  ]);
+  const mine = own.flatMap((m) => voiceOf(m, true)), ids = new Set(mine.map((v) => v.id));
+  return [...mine, ...open.flatMap((m) => voiceOf(m, false)).filter((v) => !ids.has(v.id))];
+}
+
+/** The voice a server with none chosen speaks in: the first it can list, fixed for as long as the server runs, so a
+ *  conversation never changes voice between replies. */
+let fallback: Promise<string> | undefined;
+export function fallbackVoice(): Promise<string> {
+  fallback ??= fishVoices("").then((v) => {
+    if (!v[0]) throw new Error("Fish lists no voice to speak in: pick one in Settings");
+    return v[0].id;
+  }).catch((e) => { fallback = undefined; throw e; });
+  return fallback;
+}
 
 // ---- the ear
 

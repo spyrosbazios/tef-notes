@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { bytesOf, costOf, DEFAULT_TALK_MODEL, MIC_FRAME, TALK_RATE, talkClientEventOf, talkServerEventOf, talkStatusOf } from "../src/talk";
+import { bytesOf, costOf, DEFAULT_TALK_MODEL, MIC_FRAME, TALK_RATE, talkClientEventOf, talkServerEventOf, talkStatusOf, talkVoicesOf, speedOf, TALK_SPEED } from "../src/talk";
 
 describe("talkClientEventOf", () => {
   it("reads a start, with the context only when it has a view", () => {
@@ -40,8 +40,8 @@ describe("talkServerEventOf", () => {
 
 describe("talkStatusOf", () => {
   it("is the voice model and voice, and only an offered model", () => {
-    expect(talkStatusOf({ model: "s2.1-pro", voice: "v1" })).toEqual({ model: "s2.1-pro", voice: "v1" });
-    expect(talkStatusOf({ model: "s2.1-pro" })).toEqual({ model: "s2.1-pro", voice: "" });
+    expect(talkStatusOf({ model: "s2.1-pro", voice: "v1" })).toEqual({ model: "s2.1-pro", voice: "v1", speed: 1 });
+    expect(talkStatusOf({ model: "s2.1-pro" })).toEqual({ model: "s2.1-pro", voice: "", speed: 1 });
     expect(talkStatusOf({ model: "gemini-3.8-live" })).toBeNull();
     expect(talkStatusOf({})).toBeNull();
   });
@@ -60,5 +60,28 @@ describe("the voice's rate", () => {
   it("keeps the app's microphone frames inside the ear's own pace", () => {
     expect(MIC_FRAME).toBe(640);                     // 40 ms at 16 kHz
     expect(TALK_RATE.voice).toBe(24_000);            // the player's own rate
+  });
+});
+
+describe("speedOf", () => {
+  it("clamps to Fish's range on the step, normal for anything else", () => {
+    expect(speedOf(1.2)).toBeCloseTo(1.2);
+    expect(speedOf(5)).toBe(TALK_SPEED.max);
+    expect(speedOf(0.1)).toBe(TALK_SPEED.min);
+    expect(speedOf(1.12)).toBeCloseTo(1.1);
+    expect(speedOf("fast")).toBe(1);
+    expect(speedOf(NaN)).toBe(1);
+  });
+});
+
+describe("talkVoicesOf", () => {
+  it("keeps voices with an id and a title, and only https pictures", () => {
+    expect(talkVoicesOf([
+      { id: "a", title: "Anna", languages: ["el", 3], mine: true, cover: "https://x/c.png", sample: "http://x/s.mp3" },
+      { id: "", title: "No id" },
+      { id: "b" },
+      "junk",
+    ])).toEqual([{ id: "a", title: "Anna", languages: ["el"], mine: true, cover: "https://x/c.png" }]);
+    expect(talkVoicesOf(null)).toEqual([]);
   });
 });

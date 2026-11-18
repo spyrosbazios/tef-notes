@@ -1,6 +1,6 @@
 // Talk's calls to the agent (contract: core/talk.ts): whether the server has it, and the socket of one conversation. The socket is on
 // the page's own origin like every other call, and the server refuses one whose Origin isn't its own.
-import { talkStatusOf, type TalkStatus } from "@/core/talk";
+import { talkStatusOf, talkVoicesOf, type TalkStatus, type TalkVoice } from "@/core/talk";
 import type { Deps } from "@/lib/talk-session";
 import { api, orNull } from "./api";
 
@@ -22,3 +22,9 @@ export const open: Deps["open"] = (on) => {
     close: () => { ws.onopen = ws.onmessage = ws.onclose = null; ws.close(); },
   };
 };
+
+/** The Fish voices to pick from, the owner's own first; `q` narrows them by name. */
+export async function voices(q: string): Promise<TalkVoice[]> {
+  const r = await api.get("/agent/talk/voices", { baseURL: "", params: q ? { q } : {} });
+  return talkVoicesOf(r.data);
+}

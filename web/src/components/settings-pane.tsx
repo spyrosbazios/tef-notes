@@ -25,6 +25,7 @@ import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
 import { MicButton } from "@/components/mic-button";
+import { TalkSpeed, TalkVoicePicker } from "@/components/talk/voice-settings";
 import { Conflicts } from "@/components/sync-conflicts";
 import { TagBadge } from "@/components/tag-badge";
 import {
@@ -724,8 +725,8 @@ function Voice() {
   );
 }
 
-/** Talk's voice (core/prefs.ts `talk`): which model speaks, and in whose voice. The server speaks through it, so both are a
- *  choice for every screen; the voice is a Fish voice model's id (fish.audio, any of the public ones or your own). */
+/** Talk's voice (core/prefs.ts `talk`): which model speaks, in whose voice, and how fast. The server speaks through it, so
+ *  each is a choice for every screen. */
 function TalkVoice() {
   const { talk } = usePrefs();
   const on = useTalkOn();
@@ -746,12 +747,8 @@ function TalkVoice() {
             ))}
           </div>
         </div>
-        <div className="space-y-2 px-3 py-2.5">
-          <Label htmlFor="talk-voice" className="text-sm font-semibold">Voice</Label>
-          <p className="text-[13px] leading-snug text-dim">The id of a Fish voice model, from fish.audio. Empty: the server's own (TEF_NOTES_TALK_VOICE), else Fish's default.</p>
-          <Input id="talk-voice" defaultValue={talk.voice} placeholder="e.g. 8f2b1c…" className="font-mono text-[13px]"
-            onBlur={(e) => { const v = e.target.value.trim(); if (v !== talk.voice) setPrefs({ talk: { voice: v } }); }} />
-        </div>
+        <TalkVoicePicker />
+        <TalkSpeed />
       </div>
     </div>
   );

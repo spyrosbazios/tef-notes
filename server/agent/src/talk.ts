@@ -20,7 +20,7 @@ import { readChatHistory } from "@/core/chat-history";
 import { isUiTool } from "@/core/assistant";
 import type { Prefs } from "@/core/prefs";
 import * as pb from "@/core/pocketbase";
-import { bytesOf, costOf, talkClientEventOf, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus } from "@/core/talk";
+import { bytesOf, costOf, talkClientEventOf, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
 import { exists, saver } from "./chats";
 import { ownerPrefs } from "./prefs";
 import { settle } from "./guard";
@@ -442,13 +442,27 @@ export function sameOrigin(h: { get(name: string): string | null }): boolean {
 }
 
 /** `GET /agent/talk`: the status, or with an upgrade the conversation. 404 without a Fish key; 403 from another website. */
-export type Fish = { speak: (sea: Sea) => ConnectVoice; hear: ConnectEar };
+export type Fish = { speak: (sea: Sea) => ConnectVoice; hear: ConnectEar; voices: (q: string) => Promise<TalkVoice[]>; fallback: () => Promise<string> };
+
+/** `GET /agent/talk/voices?q=`: the voices Settings offers. */
+export async function talkVoicesRoute(req: Request, fish: Fish): Promise<Response> {
+  if (!(await key("fish"))) return new Response("Talk is off", { status: 404 });
+  try {
+    return Response.json(await fish.voices(new URL(req.url).searchParams.get("q")?.slice(0, 100) ?? ""));
+  } catch (e) {
+    return new Response((e as Error).message, { status: 502 });
+  }
+}
 
 export async function talkRoute(req: Request, srv: Bun.Server<Sock>, server: pb.Server, fish: Fish): Promise<Response | undefined> {
   if (!(await key("fish"))) return new Response("Talk is off", { status: 404 });
   const { prefs } = await ownerPrefs(server);
-  const sea: Sea = { model: prefs.talk.model, voice: prefs.talk.voice || process.env.TEF_NOTES_TALK_VOICE || "" };
-  if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") return Response.json({ model: sea.model, voice: sea.voice } satisfies TalkStatus);
+  let voice = prefs.talk.voice || process.env.TEF_NOTES_TALK_VOICE || "";
+  if (!voice) {
+    try { voice = await fish.fallback(); } catch (e) { return new Response((e as Error).message, { status: 502 }); }
+  }
+  const sea: Sea = { model: prefs.talk.model, voice, speed: prefs.talk.speed };
+  if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") return Response.json({ model: sea.model, voice: sea.voice, speed: sea.speed } satisfies TalkStatus);
   if (!sameOrigin(req.headers)) return new Response("Talk answers only the app on this server", { status: 403 });
   const deps: Deps = {
     server, sea, model: prefs.agent.model || DEFAULT_MODEL, effort: prefs.agent.effort,
