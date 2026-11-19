@@ -15,7 +15,7 @@ import { ContentsRail } from "@/components/note-contents";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
-import { UNTITLED, type FlagEdit } from "@/core/notes";
+import { UNTITLED, pastedNote, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
@@ -197,7 +197,17 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
       <div className="relative min-h-0 flex-1">
       <div ref={scroller} data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
-          <textarea ref={title} rows={1} value={d.title} onChange={(e) => d.setTitle(e.target.value.replace(/\s*\n\s*/g, " "))} aria-label="Title" placeholder="Title"
+          <textarea ref={title} rows={1} value={d.title} onChange={(e) => d.setTitle(e.target.value.replace(/\s*\n\s*/g, " "))}
+            onPaste={(e) => {
+              // Markdown pasted into an empty note's title: the first line its title, the rest its body, as written
+              const split = d.body.trim() ? null : pastedNote(e.clipboardData.getData("text/plain"));
+              if (!split) return;
+              e.preventDefault();
+              d.setTitle(split.title);
+              d.setBody(split.body);
+              void d.flush();
+            }}
+            aria-label="Title" placeholder="Title"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
             className="field-sizing-content block w-full resize-none break-words bg-transparent font-extrabold text-3xl leading-tight tracking-tight outline-none placeholder:text-faint" />
           <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-faint">

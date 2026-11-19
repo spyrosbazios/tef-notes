@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import {
   appendToNote, appended, attachmentOf, isNotePath, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
-  picturesOf, mosaicCells, slugify, snippetOf, withFlags,
+  pastedNote, picturesOf, mosaicCells, slugify, snippetOf, withFlags,
 } from "../src/notes";
 import { localDay } from "../src/time";
 
@@ -329,3 +329,17 @@ describe("appended", () => {
   });
 });
 
+
+describe("pastedNote", () => {
+  test("a heading becomes the title, the rest the body as written", () => {
+    expect(pastedNote("# Trip plan\n\n## Day 1\n- **Museum**\n- *Lunch*\n")).toEqual({ title: "Trip plan", body: "## Day 1\n- **Museum**\n- *Lunch*" });
+  });
+  test("without a heading the first line is the title", () => {
+    expect(pastedNote("\n  Groceries  \nmilk\n\n  eggs\r\n")).toEqual({ title: "Groceries", body: "milk\n\n  eggs" });
+  });
+  test("a single line is just a title", () => {
+    expect(pastedNote("# Just this")).toBeNull();
+    expect(pastedNote("Just this\n\n  \n")).toBeNull();
+    expect(pastedNote("")).toBeNull();
+  });
+});
