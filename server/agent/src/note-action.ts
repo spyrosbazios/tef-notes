@@ -36,7 +36,7 @@ const DOES: Record<Result, string> = {
 
 /** What a run adds to the agent's instructions. */
 export const instructions = ({ action, note }: Scope): string =>
-  `This turn is a note action, not a conversation: the owner pressed the button “${action.label}” on ${note}, and their message is the prompt saved for that button. Nobody is there to answer a question, so decide and act. Read the note first with read_note. ${DOES[action.result]}`;
+  `This turn is a note action, not a conversation: the owner pressed the button “${action.label}” on ${note}, and their message is the prompt saved for that button. Nobody is there to answer a question, so decide and act, and write nothing before your tool calls. Read the note first with read_note. ${DOES[action.result]}`;
 
 type Status = "not-applicable" | "user-approval" | { type: "denied"; reason: string };
 type Check = (input: unknown, options: { messages: ModelMessage[] }) => Promise<Status>;

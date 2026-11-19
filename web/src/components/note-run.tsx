@@ -27,7 +27,9 @@ import { asking, isTool, toolName, waiting } from "@/lib/ask";
 /** The writes a run ends in, by its result: one of these done is the run done. */
 const WRITES: Record<Result, readonly string[]> = { edit: ["rewrite_note", "append_to_note"], task: ["add_task"], answer: [] };
 
-const textOf = (m: UIMessage | undefined) => (m?.parts ?? []).map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join(" ").trim();
+/** The reply's closing line: its last text, as plain words (a link to the note reads as its title). */
+const closing = (m: UIMessage | undefined) =>
+  ((m?.parts ?? []).map((p) => (p.type === "text" ? p.text.trim() : "")).filter(Boolean).at(-1) ?? "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
 
 /** Whether the reply made the write its action ends in. */
 const wrote = (m: UIMessage | undefined, result: Result) => m?.role === "assistant" && m.parts.some((p) =>
@@ -59,7 +61,7 @@ function Reply({ run, onCarry, onAgain, onWrote }: Omit<Props, "onClose"> & { ru
 
   // The write made and the reply over: the panel has nothing left to show that the note doesn't
   const done = !busy && !asked && !error && wrote(last, action.result);
-  const told = useRef(false), said = textOf(last);
+  const told = useRef(false), said = closing(last);
   useEffect(() => {
     if (!done || told.current) return;
     told.current = true;
