@@ -468,3 +468,15 @@ export function reconcile(base: string | undefined, mine: string, theirs: string
   if (t === mine) return mine;
   return base == null ? null : merge3(withFlagLinesOf(base, mine), mine, t);
 }
+
+/** Multi-line Markdown pasted into an empty note's title, split: its first line becomes the title (a heading's `#`s
+ *  dropped) and the rest the body, as written. A single line (or nothing past the first) is `null`: just a title. */
+export function pastedNote(text: string): { title: string; body: string } | null {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const first = lines.findIndex((l) => l.trim());
+  if (first < 0) return null;
+  const body = lines.slice(first + 1).join("\n").replace(/^\s*\n/, "").trimEnd();
+  if (!body.trim()) return null;
+  const title = lines[first].trim().replace(/^#{1,6}\s+/, "").replace(/\s+#+$/, "").trim();
+  return { title, body };
+}
