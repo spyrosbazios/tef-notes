@@ -32,7 +32,7 @@
 
 Write Markdown notes with checkboxes, tables and code. Add photos, PDFs and Excalidraw drawings. Save pages and
 pictures with the Chrome clipper, and open articles in a distraction-free Reader view. Or say it: a mic wherever you type
-turns speech (English, Greek and 23 more European languages) into text on your own server, and keeps no recording.
+turns speech into text through Fish Audio, with your own key; the server keeps no recording.
 
 ### Keep tasks close to their context
 
@@ -43,7 +43,9 @@ tasks again from the note.
 ### Ask an assistant that knows what is open
 
 Search and discuss your notes, or ask the assistant to add a task or edit a note. Select words in a note to ask about
-them, or have them rewritten in place as an edit you can undo. Ask for a diagram and it draws it on the open
+them, or have them rewritten in place as an edit you can undo. Buttons on a note run prompts you saved, with no chat
+to open: Tidy and Make a task come with the app, you write the rest, and you choose which sit in the note's header. Talk
+is the same assistant as a spoken conversation. Ask for a diagram and it draws it on the open
 Excalidraw canvas, checks its own work and leaves it for you to keep. It sees the page you are on and shows changes for approval
 before saving by default. Choose your model provider, including a local model through
 Ollama. Scanned PDFs are read on your server too, so the assistant can read them and search can find their notes.
@@ -81,8 +83,8 @@ code and re-cut with each release.
 > read, edit and delete its data. Keep its ports on loopback, use a private-network reverse proxy for your devices,
 > and never expose it to the public internet. Read the [security model](SECURITY.md) before deploying.
 
-You need Docker with Compose. `docker compose up -d` pulls the published images (the server with the web app, the
-agent, and the speech-to-text service for voice input) for amd64 and arm64; building from source, which is also how the
+You need Docker with Compose. `docker compose up -d` pulls the published images (the server with the web app, and the
+agent) for amd64 and arm64; building from source, which is also how the
 signed clipper is made, is in the [server setup](server/README.md). Want an AI agent to do the install for you? Give it the [self-host skill](skills/self-host/SKILL.md).
 
 ```sh
@@ -117,6 +119,8 @@ The UI is in English. Notes can be in any language.
 
 All AI features are optional. The assistant runs on your server and uses the model provider you configure; the
 clients hold no model keys. You can choose DeepSeek, Anthropic, OpenAI, Grok, Qwen, Z.ai or Ollama.
+
+Voice input and Talk use a Fish Audio key of their own.
 
 See [AI providers and configuration](docs/ai-providers.md) for models, key files, auto-tagging and web search.
 Content sent to a configured provider leaves your server. Leave its key out to keep that feature off.

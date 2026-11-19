@@ -1,4 +1,4 @@
-import { Bold, BookOpen, Check, ChevronLeft, ChevronRight, Circle, Copy, Ellipsis, EllipsisVertical, FileText, Italic, Link2, ListTodo, Mic, Paperclip, Pin, Plus, Sparkles } from "lucide-react";
+import { Bold, BookOpen, Check, ChevronLeft, ChevronRight, Circle, Copy, Ellipsis, EllipsisVertical, FileText, Italic, Link2, ListChecks, ListTodo, Mic, Paperclip, Pin, Plus, Sparkles, WandSparkles } from "lucide-react";
 import { cn } from "@/lib";
 import { Fab, Mosaic, Picture, Tag } from "./parts";
 
@@ -16,7 +16,10 @@ export function LisbonPage({ narrow }: { narrow?: boolean }) {
         <span className="flex gap-0.5">{[Bold, Italic, ListTodo, Link2, Ellipsis].map((I, i) => <span key={i} className="flex h-7 min-w-7 items-center justify-center"><I className="size-4" /></span>)}</span>
         <span className="ml-2 flex items-center gap-1.5 text-xs text-faint"><Check className="size-3" />Saved</span>
         <span className="flex-1" />
-        {[Mic, Paperclip, Pin, EllipsisVertical].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
+        {/* the header's default: mic, attach, pin, the two assistant actions (Tidy, Make a task) in the brand colour, the menu */}
+        {[Mic, Paperclip, Pin].map((I, i) => <span key={i} className="flex size-8 items-center justify-center"><I className="size-4" /></span>)}
+        {[WandSparkles, ListChecks].map((I, i) => <span key={i} className="flex size-8 items-center justify-center text-brand"><I className="size-4" /></span>)}
+        <span className="flex size-8 items-center justify-center"><EllipsisVertical className="size-4" /></span>
       </header>
       <div className={cn("mx-auto w-full max-w-3xl pt-8", narrow ? "px-12" : "px-10")}>
         <h1 className="text-[30px] font-extrabold leading-tight tracking-tight">Autumn trip: Lisbon in five days</h1>

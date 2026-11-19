@@ -206,7 +206,7 @@ const FEATURES: Feature[] = [
     ),
   },
   {
-    title: "Say it instead", text: "Dictate wherever you type. Transcribed on your own server, nothing kept.", wide: true,
+    title: "Say it instead", text: "Dictate wherever you type, or talk with the assistant out loud. Through Fish Audio; your server keeps no recording.", wide: true,
     art: <Dictation />,
   },
   {

@@ -29,7 +29,7 @@ const ROWS: Row[] = [
     eyebrow: "Notes",
     title: "Write it down. Everything stays with it.",
     text: "A note is one markdown page. Photos, PDFs, drawings and links live inside it, and the tasks about it sit right under the title.",
-    points: ["Links as cards, with Read and an AI summary", "A PDF's first page in place; its text selectable", "Linked tasks under the title, on every screen"],
+    points: ["Links as cards, with Read and an AI summary", "A PDF's first page in place; its text selectable", "Linked tasks under the title, on every screen", "Buttons that run your saved prompts: Tidy, Make a task, your own"],
     caption: "The top of a note on the web: its tasks, a photo strip, a link card and its summary.",
     visual: (
       <Peek label="The top of a travel note on the web: title, tags, two linked tasks, three photos, a link card with its summary"
