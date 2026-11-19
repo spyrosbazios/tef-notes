@@ -1,6 +1,6 @@
 // Tags. A tag *definition* (name, badge colour, a hint for the AI) is a record in `tags` on the server; a note's own
-// tags are its frontmatter `tags:` line, copied into the `tags` column by noteColumns like every flag. Renaming or
-// deleting a definition leaves notes alone. The server tags notes itself (its `autotagged` column);
+// tags are its frontmatter `tags:` line, copied into the `tags` column by noteColumns like every flag. Deleting a
+// definition leaves notes alone; renaming a tag is the server's (renameTag), so every item carrying it follows. The server tags notes itself (its `autotagged` column);
 // a client's own tag edits go through applyTags.
 // Platform-neutral, like pocketbase.ts: fetch only, so the phone, the web app and the CLI share it.
 import { getJson, HttpError } from "./http";
@@ -33,6 +33,15 @@ export const createTag = async (s: Server, t: TagFields): Promise<TagDef> =>
 /** Conflict: the new name is taken. */
 export const updateTag = async (s: Server, rec: string, t: TagFields): Promise<TagDef> =>
   tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t))));
+
+/** What a rename did (server/pb_hooks/tags.pb.js): the name the items carry now, how many records changed, and whether
+ *  `to` was a tag already, which the renamed one merged into. */
+export type Renamed = { tag: string; notes: number; tasks: number; lenses: number; merged: boolean };
+
+/** Renames the tag `from` to `to` on every note, task, lens and its definition, in one transaction on the server; a
+ *  `to` already defined (case and tonos ignored) merges the two. */
+export const renameTag = (s: Server, from: string, to: string): Promise<Renamed> =>
+  getJson(`${s.url}/api/tefnotes/tags/rename`, json("POST", { from, to }), 1);
 
 // ---- descriptions written from the notes
 

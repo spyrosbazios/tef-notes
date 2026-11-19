@@ -111,4 +111,44 @@ function describe(app, ds, key, have, name, log) {
   }
 }
 
-module.exports = { rows, describe, EVERY, count, due, MAX_NOTES, BODY_CHARS, MAX_CHARS, Bad, input, tagsOf, pick, sample, request, descriptionOf };
+
+// ---- renaming
+
+const NAME_BAD = /[\s,[\]{}"\\]/;      // what a tag's name can't hold (the web's tag editor says the same)
+
+/** What a rename asks for: `{ from, to }`, both trimmed tag names, `to` a valid one. */
+function renameInput(body) {
+  const b = body && typeof body === "object" ? body : {};
+  const from = typeof b.from === "string" ? b.from.trim() : "", to = typeof b.to === "string" ? b.to.trim().replace(/^#/, "") : "";
+  if (!from || !to) throw new Bad("Send { \"from\": \"<name>\", \"to\": \"<new name>\" }.");
+  if (to.length > NAME_MAX) throw new Bad(`to is too long (max ${NAME_MAX} characters).`);
+  if (NAME_BAD.test(to)) throw new Bad("A tag's name has no spaces, commas, brackets or quotes.");
+  if (from === to) throw new Bad("The new name is the old one.");
+  return { from, to };
+}
+
+/** `names` with `from` (case and tonos ignored) as `to`, each name once (folded): the first place either stood keeps it.
+ *  null when `from` isn't among them, so a caller leaves that record alone. */
+function renamed(names, from, to) {
+  const f = fold(from), t = fold(to);
+  if (!names.some((n) => fold(n) === f)) return null;
+  const out = [];
+  for (const n of names) {
+    const v = fold(n) === f || fold(n) === t ? to : n;
+    if (!out.some((o) => fold(o) === fold(v))) out.push(v);
+  }
+  return out;
+}
+
+/** The definitions a rename leaves: `{ keep, drop }` among `defs` (`{ id, name, color, description }`). The one called
+ *  `from` is renamed, unless another is already called `to` (case and tonos ignored): then that one is kept and takes
+ *  the dropped one's colour and description where it has none. `keep` null: neither is defined, nothing to change. */
+function mergeDefs(defs, from, to) {
+  const f = fold(from), t = fold(to);
+  const src = defs.find((d) => fold(d.name) === f) || null;
+  const dst = f === t ? null : defs.find((d) => fold(d.name) === t) || null;
+  if (!dst) return { keep: src && { ...src, name: to }, drop: null, merged: false };
+  return { keep: { ...dst, color: dst.color || (src && src.color) || "", description: dst.description || (src && src.description) || "" }, drop: src, merged: true };
+}
+
+module.exports = { renameInput, renamed, mergeDefs, rows, describe, EVERY, count, due, MAX_NOTES, BODY_CHARS, MAX_CHARS, Bad, input, tagsOf, pick, sample, request, descriptionOf };

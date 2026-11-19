@@ -24,6 +24,12 @@ function useChange<V>(fn: (v: V) => Promise<unknown>) {
 
 export const useCreateTag = () => useChange((t: TagFields) => tags.create(t));
 export const useUpdateTag = () => useChange((v: { rec: string; fields: TagFields }) => tags.update(v.rec, v.fields));
+/** A tag renamed everywhere (or merged into one by that name): notes, tasks, lenses and preferences change too, so every
+ *  query is refetched, not just the definitions. */
+export function useRenameTag() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (v: { from: string; to: string }) => tags.rename(v.from, v.to), onSuccess: () => qc.invalidateQueries() });
+}
 export const useRemoveTag = () => useChange((t: TagDef) => tags.remove(t.rec));
 
 /** A description written from the notes that carry a tag: nothing is saved, the editor shows it. */

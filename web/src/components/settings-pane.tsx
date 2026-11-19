@@ -14,7 +14,7 @@ import { ArrowDownUp, Bell, Bot, Brain, Check, ChevronDown, ChevronLeft, Chevron
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ACTION_LABEL, ACTIONS, RULE_LABEL, RULES, type Action } from "@/core/actions";
-import { COLORS, type Color } from "@/core/notes";
+import { COLORS, fold, type Color } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, withAccent, type AccentName, type ThemeName } from "@/core/theme";
 import { Conflict } from "@/core/pocketbase";
 import { HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, NEW_CHAT_LABEL, NEW_CHATS, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
@@ -60,7 +60,7 @@ import { folderSource, zipSource } from "@/lib/import";
 import type { SettingsSection } from "@/lib/route-search";
 import { settingsScroll } from "@/lib/scroll";
 import { localDay } from "@/core/time";
-import { useCreateTag, useDescribeTag, useRemoveTag, useTags, useUpdateTag } from "@/hooks/tags";
+import { useCreateTag, useDescribeTag, useRemoveTag, useRenameTag, useTags, useUpdateTag } from "@/hooks/tags";
 import { message } from "@/services/api";
 import { memory } from "@/services/notes";
 import { cn } from "@/lib/utils";
@@ -77,20 +77,31 @@ const TITLE = cn(HEAD, "max-md:sr-only");
 const SUB = "text-base font-bold tracking-tight";
 const BAD = /[\s,[\]{}"\\]/;
 
-/** `name`: a new tag's name to start from (one notes already carry). */
+/** `name`: a new tag's name to start from (one notes already carry). A changed name renames the tag on every item that
+ *  carries it (the server's rename); one another tag already has merges the two, and the dialog says so before Save. */
 function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: string; onClose: () => void }) {
   const [name, setName] = useState(tag?.name ?? start ?? ""), [color, setColor] = useState<Color | undefined>(tag?.color), [description, setDescription] = useState(tag?.description ?? "");
-  const create = useCreateTag(), update = useUpdateTag(), describe = useDescribeTag();
+  const create = useCreateTag(), update = useUpdateTag(), rename = useRenameTag(), describe = useDescribeTag();
+  const { data: defs = [] } = useTags();
   const n = clean(name), bad = BAD.test(n);
-  const busy = create.isPending || update.isPending;
+  const from = tag?.name ?? start, renaming = !!from && !!n && n !== from;
+  const into = renaming ? defs.find((d) => d.rec !== tag?.rec && fold(d.name) === fold(n) && fold(d.name) !== fold(from)) : undefined;
+  const busy = create.isPending || update.isPending || rename.isPending;
   const generate = () => describe.mutate(n, { onSuccess: setDescription, onError: (err) => toast.error(message(err)) });
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!n || bad) return;
-    const fields = { name: n, color, description };
     try {
-      if (tag) await update.mutateAsync({ rec: tag.rec, fields }); else await create.mutateAsync(fields);
+      if (renaming) {
+        const r = await rename.mutateAsync({ from, to: n });
+        if (r.merged) { toast.success(`Merged “${from}” into “${r.tag}”.`); onClose(); return; }
+        const fields = { name: r.tag, color, description };
+        if (tag) await update.mutateAsync({ rec: tag.rec, fields }); else await create.mutateAsync(fields);
+      } else {
+        const fields = { name: n, color, description };
+        if (tag) await update.mutateAsync({ rec: tag.rec, fields }); else await create.mutateAsync(fields);
+      }
       onClose();
     } catch (err) {
       toast.error(err instanceof Conflict ? `There is a tag called “${n}” already.` : message(err));
@@ -103,12 +114,13 @@ function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: s
         <form onSubmit={submit} className="min-w-0 space-y-4">
           <DialogHeader>
             <DialogTitle>{tag ? "Edit tag" : "New tag"}</DialogTitle>
-            <DialogDescription>{tag ? "Notes already carrying the old name keep it." : "A tag is one word, written on a note and typed as #tag in search."}</DialogDescription>
+            <DialogDescription>{tag ? "A new name is renamed on every note, task and lens that carries it." : "A tag is one word, written on a note and typed as #tag in search."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="tag-name">Name</Label>
             <Input id="tag-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="home" aria-invalid={bad} />
-            {bad ? <p className="text-xs text-down">No spaces, commas, brackets or quotes.</p> : null}
+            {bad ? <p className="text-xs text-down">No spaces, commas, brackets or quotes.</p>
+              : into ? <p className="text-xs text-dim">“{into.name}” is a tag already: saving merges “{from}” into it, keeping its colour and description.</p> : null}
           </div>
           <div className="space-y-1.5">
             <Label>Colour</Label>
@@ -134,7 +146,7 @@ function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: s
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" className="rounded-full" onClick={onClose}>Cancel</Button>
-            <Button type="submit" className="rounded-full" disabled={!n || bad || busy}>{tag ? "Save" : "Add tag"}</Button>
+            <Button type="submit" className="rounded-full" disabled={!n || bad || busy}>{into ? "Merge" : tag ? "Save" : "Add tag"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

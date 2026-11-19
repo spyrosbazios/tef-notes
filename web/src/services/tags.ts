@@ -1,6 +1,6 @@
 // Tag definitions on the server: name, badge colour and the hint the AI reads. A note's own tags live in its text
-// (services/notes.ts); renaming or deleting a definition leaves notes alone. Conflict: the name is taken, ignoring case.
-import { tagColumns, tagDef, type TagDef, type TagFields } from "@/core/tags";
+// (services/notes.ts); deleting a definition leaves notes alone, renaming one (`rename`) renames it on them too. Conflict: the name is taken, ignoring case.
+import { tagColumns, tagDef, type Renamed, type TagDef, type TagFields } from "@/core/tags";
 import { api, orNull } from "./api";
 
 export const list = async (): Promise<TagDef[]> =>
@@ -10,6 +10,11 @@ export const create = async (t: TagFields): Promise<TagDef> => tagDef((await api
 
 export const update = async (rec: string, t: TagFields): Promise<TagDef> =>
   tagDef((await api.patch(`collections/tags/records/${rec}`, tagColumns(t))).data);
+
+/** The tag `from` renamed to `to` on every note, task and lens and its definition, by the server in one go; a `to`
+ *  already defined merges the two (@/core/tags renameTag). */
+export const rename = async (from: string, to: string): Promise<Renamed> =>
+  (await api.post("tefnotes/tags/rename", { from, to }, { timeout: 90_000 })).data;
 
 /** Already gone is done. */
 export async function remove(rec: string): Promise<void> {

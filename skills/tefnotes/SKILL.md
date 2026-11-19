@@ -71,4 +71,4 @@ Save replaces it with Excalidraw's own.
 
 ## Tags
 
-Only tags from `tefnotes tags`. Define or change one when the user asks: `tefnotes tag <name> [--color <colour>] [--about "<what it means>"]`.
+Only tags from `tefnotes tags`. Define or change one when the user asks: `tefnotes tag <name> [--color <colour>] [--about "<what it means>"]`. Rename one only when asked: `tefnotes rename-tag <old> <new>` renames it on every note, task and lens (a `<new>` already defined merges them).

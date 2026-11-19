@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Tag descriptions written from the notes that carry the tag, for the tag editors (phone, web, CLI): the logic is
+// Renaming a tag (below), and tag descriptions written from the notes that carry the tag, for the tag editors (phone, web, CLI): the logic is
 // lib/tags.js, the server's model (lib/llm.js, its one writing model). The route writes nothing: the client shows the text
 // and saves it with the tag the normal way (the `tags` collection's `description`, the hint the auto-tagger's JEV gets).
 // The hourly job below does save one: a defined tag that EVERY (10) more notes carry than when its description was last
@@ -15,6 +15,81 @@
 // a failure logs its status, as `tags:` lines.
 //
 // A handler runs in its own VM and sees nothing of this file's top level: it requires what it uses.
+//
+// POST /api/tefnotes/tags/rename JSON { from: "<name>", to: "<new name>" }
+// Renames a tag everywhere, in one transaction: every note's tags line (its text, the `tags` column, what the
+// auto-tagger added, `autotagged`) and every task's tags, each a write that bumps `rev` like any other; every lens's
+// tags and hidden tags; the notes list's folded groups in the preferences; and the definition. A `to` already defined
+// (case and tonos ignored) merges the two: the existing definition stays, taking the other's colour and description
+// where it has none, and the other is deleted; the items take its name as written there. A `from` nothing defines is
+// still renamed on the items that carry it.
+// 200 { tag, notes, tasks, lenses, merged }   tag: the name the items carry now; the counts of records changed
+// 400 bad body. Errors are { error }.
+routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
+  const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`);
+  let req;
+  try { req = lib.renameInput(e.requestInfo().body); } catch (err) {
+    if (err instanceof lib.Bad) return e.json(400, { error: err.message });
+    throw err;
+  }
+  const names = (raw) => lib.tagsOf(raw);
+  const out = { tag: req.to, notes: 0, tasks: 0, lenses: 0, merged: false };
+  e.app.runInTransaction((tx) => {
+    const defs = tx.findAllRecords("tags").map((r) => ({ id: r.id, name: r.getString("name"), color: r.getString("color"), description: r.getString("description") }));
+    const plan = lib.mergeDefs(defs, req.from, req.to);
+    const to = plan.merged ? plan.keep.name : req.to;
+    out.tag = to; out.merged = plan.merged;
+    if (plan.drop) tx.delete(tx.findRecordById("tags", plan.drop.id));
+    if (plan.keep) {
+      const rec = tx.findRecordById("tags", plan.keep.id);
+      rec.set("name", plan.keep.name); rec.set("color", plan.keep.color); rec.set("description", plan.keep.description);
+      tx.save(rec);
+    }
+
+    const ids = (coll) => {
+      const rows = arrayOf(new DynamicModel({ id: "", tags: "" }));
+      tx.db().newQuery(`SELECT id, CAST(IFNULL(tags, '[]') AS TEXT) AS tags FROM ${coll}`).all(rows);
+      return rows.filter((r) => lib.renamed(names(r.tags), req.from, to)).map((r) => r.id);
+    };
+    for (const id of ids("notes")) {
+      const rec = tx.findRecordById("notes", id), path = rec.getString("path");
+      const next = lib.renamed(notes.parse(path, rec.getString("text")).tags, req.from, to);
+      if (next) { const c = notes.columns(path, notes.withTags(path, rec.getString("text"), next)); rec.set("text", c.text); rec.set("tags", c.tags); }
+      else rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to));      // the column alone was stale
+      const auto = lib.renamed(names(rec.getString("autotagged")), req.from, to);
+      if (auto) rec.set("autotagged", auto);
+      rec.set("rev", rec.getInt("rev") + 1);
+      tx.save(rec);
+      out.notes++;
+    }
+    for (const id of ids("tasks")) {
+      const rec = tx.findRecordById("tasks", id);
+      rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to));
+      rec.set("rev", rec.getInt("rev") + 1);
+      tx.save(rec);
+      out.tasks++;
+    }
+    for (const rec of tx.findAllRecords("lenses")) {
+      const tags = lib.renamed(names(rec.getString("tags")), req.from, to), exclude = lib.renamed(names(rec.getString("exclude")), req.from, to);
+      if (!tags && !exclude) continue;
+      if (tags) rec.set("tags", tags);
+      if (exclude) rec.set("exclude", exclude);
+      tx.save(rec);
+      out.lenses++;
+    }
+    let prefs = null;
+    try { prefs = tx.findFirstRecordByFilter("prefs", "key = 'owner'"); } catch (_) { /* none yet */ }
+    if (prefs) {
+      let data = null;
+      try { data = JSON.parse(prefs.getString("data") || "null"); } catch (_) { /* unreadable: left */ }
+      const folded = data && data.notes && Array.isArray(data.notes.collapsed) ? lib.renamed(data.notes.collapsed.filter((s) => typeof s === "string"), req.from, to) : null;
+      if (folded) { data.notes.collapsed = folded; prefs.set("data", data); tx.save(prefs); }
+    }
+  });
+  e.app.logger().info("tags: renamed", "from", req.from, "to", out.tag, "notes", out.notes, "tasks", out.tasks, "lenses", out.lenses, "merged", out.merged);
+  return e.json(200, out);
+});
+
 routerAdd("POST", "/api/tefnotes/tags/describe", (e) => {
   const lib = require(`${__hooks}/lib/tags.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`tags: ${msg}`, ...kv);

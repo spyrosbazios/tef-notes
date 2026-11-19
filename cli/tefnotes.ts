@@ -13,7 +13,7 @@ import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Lin
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
 import { sceneProblem } from "@/core/drawing";
 import { drawingName, drawingPreview, fileMarkdown, isDrawingName } from "@/core/photos";
-import { createTag, describeAllTags, describeError, listTags, updateTag } from "@/core/tags";
+import { createTag, describeAllTags, describeError, listTags, renameTag, updateTag } from "@/core/tags";
 import { localDay } from "@/core/time";
 
 const HELP = `tefnotes — the notes on the server
@@ -22,6 +22,7 @@ const HELP = `tefnotes — the notes on the server
   tefnotes ls [tag]                 notes, pinned first then newest: id · title · [tags] · pinned|archived
   tefnotes tags                     the defined tags: name · colour · description
   tefnotes tag <name> [options]     a tag defined, or its definition changed: --color <colour>  --about <text>
+  tefnotes rename-tag <old> <new>   a tag renamed on every note, task and lens; a <new> already defined merges them
                                    colours: ${COLORS.join(" ")}
   tefnotes tags --describe          descriptions the server's model writes from each tag's notes, printed, not saved
       --write                      ... and saved as the tags' descriptions (replaces the ones there)
@@ -452,6 +453,12 @@ async function main(argv: string[]) {
       }
       await createTag(s, { name, color, description: opt.get("about") ?? "" });
       return console.error(`defined ${name}`);
+    }
+    case "rename-tag": {
+      const [from, to, ...rest] = a;
+      if (!from || !to || rest.length) die("tefnotes rename-tag <old> <new>");
+      const r = await renameTag(s, from, to);
+      return console.error(`${r.merged ? "merged" : "renamed"} ${from} into ${r.tag}: ${r.notes} notes, ${r.tasks} tasks, ${r.lenses} lenses`);
     }
     case "link": case "unlink": {
       const [ref, ...ids] = a;

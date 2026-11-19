@@ -101,3 +101,29 @@ describe("the hourly description", () => {
     expect(lib.due(25, 15)).toBe(true);
   });
 });
+
+describe("renaming", () => {
+  test("renameInput takes { from, to }, trims them and refuses a bad new name", () => {
+    expect(lib.renameInput({ from: " home ", to: " #house " })).toEqual({ from: "home", to: "house" });
+    for (const b of [{}, { from: "a" }, { from: "a", to: "b c" }, { from: "a", to: "a" }, { from: "a", to: "x".repeat(41) }, null])
+      expect(() => lib.renameInput(b)).toThrow(lib.Bad);
+  });
+
+  test("renamed swaps the name (case and tonos ignored), keeps the order and merges a duplicate", () => {
+    expect(lib.renamed(["work", "Σπίτι", "x"], "σπιτι", "home")).toEqual(["work", "home", "x"]);
+    expect(lib.renamed(["home", "work", "house"], "house", "Home")).toEqual(["Home", "work"]);
+    expect(lib.renamed(["work"], "home", "house")).toBeNull();
+    expect(lib.renamed(["Home"], "home", "HOME")).toEqual(["HOME"]);
+  });
+
+  test("mergeDefs renames the definition, or merges into the one already called the new name", () => {
+    const a = { id: "1", name: "house", color: "blue", description: "Where I live" };
+    const b = { id: "2", name: "Home", color: "", description: "" };
+    expect(lib.mergeDefs([a], "House", "home")).toEqual({ keep: { ...a, name: "home" }, drop: null, merged: false });
+    expect(lib.mergeDefs([a, b], "house", "home")).toEqual({ keep: { ...b, color: "blue", description: "Where I live" }, drop: a, merged: true });
+    expect(lib.mergeDefs([a, { ...b, description: "Mine" }], "house", "home").keep.description).toBe("Mine");
+    expect(lib.mergeDefs([b], "house", "home")).toEqual({ keep: { ...b, color: "", description: "" }, drop: null, merged: true });
+    expect(lib.mergeDefs([], "house", "home")).toEqual({ keep: null, drop: null, merged: false });
+    expect(lib.mergeDefs([b], "Home", "HOME")).toEqual({ keep: { ...b, name: "HOME" }, drop: null, merged: false });
+  });
+});
