@@ -7,7 +7,7 @@ public page (`site/`) and the promo film drawn from its screens (`video/`). What
 the server's jobs: `ARCHITECTURE.md` (not repeated here). Rules for changes: `CONTRIBUTING.md`. Security model: `SECURITY.md`.
 Each module has its own `README.md`; `extension/` and `android/` also have an `AGENTS.md`.
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-19 -->
 
 ## Where facts live
 
