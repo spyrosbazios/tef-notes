@@ -5,6 +5,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.13.0 - 2026-11-19
+
 ### Added
 
 - Note actions: buttons on a note that have the assistant run a saved prompt on it, with no chat to open. Two come with the
@@ -25,11 +27,29 @@ version is one semver number for the whole repository, set by the git tag (see [
   heard and voiced there. Nothing extra runs for it, and nothing more is downloaded. The `stt` container, its image and its
   volume are gone, along with `TEF_NOTES_STT` and the "Keep the model loaded" setting. Voice needs `TEF_NOTES_KEY_FISH`.
 
+- Rename a tag everywhere: its notes, tasks, lenses and definition follow, and renaming to a name that exists merges the
+  two. In Settings → Tags, or `tefnotes rename-tag <old> <new>` (#10).
+- Paste Markdown into a new note's title to import it: the first line becomes the title, the rest the body (#8).
+- A share or clip carries several pictures and PDFs at once (up to 10), from the Android share sheet and the web's share
+  page alike.
+- Shared links and files get proper titles: a link's page title, and for a PDF or a photo one the assistant writes from
+  what it holds.
+- Talk has its own model and effort (or follows the assistant's), a voice picked from Fish Audio's list, and a speed.
+- Settings → Agent: one switch turns off asking after the web or a PDF, so "Just do it" holds there too.
+
 ### Changed
 
 - Settings chooses, for each kind of agent write (create, change or delete tasks; create, edit or delete notes; files;
   tags and lenses; memory), whether it asks first, just does it, or is never allowed. It replaces the one "Write notes
   without asking" switch, carried over as it was set, and the agent's server enforces it: a reply can't skip a card.
+- Settings → Layout is split into Phone and Web tabs, with shorter hints.
+- The assistant finds tasks by the words they hold instead of requiring every word, and no longer answers "none" from one
+  empty search.
+
+### Fixed
+
+- Web: options under a hover highlight take the click again: the When picker's quick days, the place picker's
+  suggestions, the sidebar's current item (#2).
 
 ## 0.12.0 - 2026-11-15
 
