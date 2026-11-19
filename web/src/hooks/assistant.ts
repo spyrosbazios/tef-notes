@@ -3,6 +3,7 @@
 import type { Chat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
 import type { NoteRef } from "@/core/handoff";
+import type { PromptAction, Run } from "@/core/note-actions";
 import type { Held } from "@/editor";
 import { createContext, useContext } from "react";
 
@@ -30,6 +31,10 @@ export type Assistant = {
   /** Ask about words held in a note (the selection bar): `text` goes as the first message of a chat of its own, beside the
    *  dock's, whose context is `held()`'s words while it returns them. Null when the chat's record could not be made. */
   ask: (text: string, held: () => Held | null) => Promise<Chat<UIMessage> | null>;
+  /** Run a note action (core/note-actions.ts) on `note`: its prompt goes as the first message of a chat of its own, like an
+   *  ask's, narrowed by the server to what the action may do for as long as `scope()` returns the run (null once the chat is
+   *  let go: a plain chat from then on). Null when the chat's record could not be made. */
+  run: (action: PromptAction, note: NoteRef, scope: () => Run | null) => Promise<Chat<UIMessage> | null>;
   /** Make `chat` the dock's and open the dock on it: an ask carried on in the full chat. */
   adopt: (chat: Chat<UIMessage>) => void;
   /** Stop any chat's reply, and close the tool calls it left unfinished (`stop` is the dock's). */

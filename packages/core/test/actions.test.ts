@@ -6,7 +6,7 @@ describe("actions", () => {
   test("defaults are what the agent did before they were settings: everything asks but its memory", () => {
     expect(DEFAULT_ACTIONS).toEqual({
       createTask: "ask", editTask: "ask", deleteTask: "ask", createNote: "ask", editNote: "ask", deleteNote: "ask",
-      files: "ask", tags: "ask", memory: "auto",
+      files: "ask", tags: "ask", noteActions: "ask", memory: "auto",
     });
     expect(DEFAULT_PREFS.actions).toEqual(DEFAULT_ACTIONS);
   });

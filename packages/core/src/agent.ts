@@ -3,6 +3,7 @@
 // a write's flags and line diff, the reason an unanswered confirm card is settled with. Pure: no "ai" or DOM import,
 // since the sidecar loads this file outside the clients' node_modules.
 import type { UiToolName } from "./assistant";
+import { RESULT_ABOUT, RESULT_LABEL, RESULTS } from "./note-actions";
 import { dropTitle, isNotePath, parseNote, picturesOf } from "./notes";
 import { progress } from "./things";
 import type { Task } from "./todo";
@@ -51,11 +52,12 @@ export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "create_tag" | "update_tag" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
   | "summarise_links" | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "list_tagged" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
   | "create_lens" | "find_place" | "set_place" | "show_day" | "show_week" | "show_review" | "show_quote" | "show_link" | "show_lens" | "show_tasks" | "show_notes" | "find_free_slots"
-  | "read_drawing" | "show_drawing" | "attach_file" | UiToolName;
+  | "read_drawing" | "show_drawing" | "attach_file" | "list_note_actions" | "save_note_action" | UiToolName;
 
 /** Tool names as the owner would say them. */
 const LABEL: Record<ToolName, string> = {
   create_tag: "Creating a tag", create_lens: "Creating a lens", update_tag: "Changing a tag",
+  list_note_actions: "Reading your note actions", save_note_action: "Saving a note action",
   show_items: "Showing what it found",
   show_day: "Showing a day", show_week: "Showing a week", show_review: "Reviewing your week", show_quote: "Quoting a note", show_link: "Showing a link",
   show_lens: "Previewing a lens", show_tasks: "Laying out tasks", show_notes: "Gathering notes", show_drawing: "Showing a drawing", read_drawing: "Looking at a drawing", find_free_slots: "Finding free time",
@@ -72,7 +74,7 @@ export const label = (name: string) => LABEL[name as ToolName] ?? name;
 /** What a settled step amounts to, for the summary line. A tool not in KIND is never folded away. */
 export type Kind = "think" | "search" | "list" | "read" | "web" | "page" | "write" | "memory" | "tasks" | "todo" | "maps" | "place";
 const KIND: Partial<Record<ToolName, Kind>> = {
-  search_notes: "search", list_notes: "list", list_tags: "list", read_note: "read", web_search: "web", read_url: "page",
+  search_notes: "search", list_notes: "list", list_tags: "list", list_note_actions: "list", read_note: "read", web_search: "web", read_url: "page",
   create_note: "write", append_to_note: "write", rewrite_note: "write", summarise_links: "write", set_note_flags: "write", delete_note: "write", attach_file: "write", update_memory: "memory",
   find_place: "maps", set_place: "place",
   list_tasks: "tasks", list_tagged: "list", find_free_slots: "tasks", add_task: "todo", add_tasks: "todo", update_task: "todo", complete_task: "todo", delete_task: "todo",
@@ -178,6 +180,8 @@ export const cardKey = (c: Card) => (c.kind === "note" ? c.path : `${c.kind}:${c
 /** What the agent sends for a write: every tool's fields, all optional, as the part's input may be partial. */
 export type WriteInput = {
   name?: string; description?: string;
+  /** save_note_action's: the button's name, its prompt, what it does and its icon (`id`: the one changed). */
+  label?: string; prompt?: string; result?: string; icon?: string;
   /** create_lens': the tags it hides and its colour (`tags`: those it shows). */
   exclude?: string[]; accent?: string;
   path?: string; title?: string; body?: string; text?: string; why?: string; section?: string;
@@ -317,6 +321,12 @@ export function rowsOf(lines: Line[], context: number, all: boolean): Row[] {
   return rows;
 }
 
+
+/** A note action save_note_action proposes, for the approval preview: what it does, then its prompt. */
+export function actionLine(input: WriteInput): string {
+  const does = RESULTS.find((r) => r === input.result);
+  return [does && `${RESULT_LABEL[does]}: ${RESULT_ABOUT[does].toLowerCase()}.`, input.prompt?.trim()].filter(Boolean).join("\n\n");
+}
 
 /** A lens create_lens proposes, for both clients' approval previews. */
 export function lensLine(input: WriteInput): string {

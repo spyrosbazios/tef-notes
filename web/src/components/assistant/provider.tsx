@@ -8,7 +8,9 @@
 //  - `sendAutomaticallyWhen` (`resumes`): the turn resumes after a card's answer and after a UI tool's answer;
 //  - asks from the selection bar (`ask`): each a chat of its own beside the dock's, saved and listed like any, whose
 //    context is the words it holds in the note (the selection tools change them); `adopt` hands one to the dock. The
-//    dock's own doings (its badge, opening for a card) are for the dock's chat only: an ask shows its reply where it was made.
+//    dock's own doings (its badge, opening for a card) are for the dock's chat only: an ask shows its reply where it was made;
+//  - a note action's runs (`run`, core/note-actions.ts): each a chat of its own too, its requests carrying `action` (which
+//    action, on which note) for as long as the note's panel holds it, so the server narrows the turn to that action.
 // The writes the agent makes reach the screen through `useLive` (realtime), as any other client's do.
 import { Chat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,6 +21,7 @@ import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import type { NoteRef } from "@/core/handoff";
+import { runMessage, runTitle, type PromptAction, type Run } from "@/core/note-actions";
 import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
@@ -74,8 +77,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   // The dock's chat, for the callbacks of every chat (an ask's included) to tell it apart
   const docked = useRef<Chat<UIMessage> | null>(null);
 
-  /** A chat; `held`: an ask's, the words it holds while it does (null once let go: a plain chat from then on). */
-  const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null): Chat<UIMessage> => {
+  /** A chat; `held`: an ask's, the words it holds while it does (null once let go: a plain chat from then on); `scope`: a note
+   *  action's run, while its panel holds it. */
+  const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null, scope?: () => Run | null): Chat<UIMessage> => {
     const chat: Chat<UIMessage> = new Chat<UIMessage>({
       id, messages,
       transport: new DefaultChatTransport<UIMessage>({
@@ -85,7 +89,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           const context = pageContext({ view, open, task }, {
             notes: qc.getQueryData<NoteRec[]>(NOTES), tasks: qc.getQueryData<TaskRec[]>(TASKS),
           }, words ? words.markdown() : selected.current, activeLensOf(qc), !!words, openDrawingNow(qc.getQueryData<NoteRec[]>(NOTES)));
-          return { body: { id, messages, ...settingsNow(qc), context } };
+          const action = scope?.();
+          return { body: { id, messages, ...settingsNow(qc), context, ...(action ? { action } : {}) } };
         },
       }),
       sendAutomaticallyWhen: resumes,
@@ -220,6 +225,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return c;
   }, [build, qc]);
 
+  const run = useCallback(async (action: PromptAction, note: NoteRef, scope: () => Run | null) => {
+    const id = newChatId();
+    try { await createChat(id, chatTitle(runTitle(action, note))); } catch (e) { toast.error(message(e)); return null; }
+    made.current.add(id);
+    void qc.invalidateQueries({ queryKey: CHATS });
+    const c = build(id, [], undefined, scope);
+    void c.sendMessage({ text: runMessage(action, note) });
+    return c;
+  }, [build, qc]);
+
   const adopt = useCallback((c: Chat<UIMessage>) => {
     opening.current++;
     if (!dockNow().open) handed.current = true;
@@ -228,7 +243,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setFocusKey((k) => k + 1);
   }, []);
 
-  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, ask, adopt, halt }),
-    [chat, input, about, focusKey, show, send, stop, newChat, openChat, ask, adopt]);
+  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, ask, run, adopt, halt }),
+    [chat, input, about, focusKey, show, send, stop, newChat, openChat, ask, run, adopt]);
   return <AssistantContext value={value}>{children}</AssistantContext>;
 }

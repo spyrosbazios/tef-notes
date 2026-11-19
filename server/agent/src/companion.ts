@@ -6,8 +6,8 @@
 import { helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, taskListOf, tasksFeed } from "@/core/companion";
 import { activeLens, inheritTags, type Lens } from "@/core/lens";
 import * as pb from "@/core/pocketbase";
-import { PREFS_KEY, withPatch, type Prefs } from "@/core/prefs";
-import { ownerPrefs } from "./prefs";
+import { withPatch, type Prefs } from "@/core/prefs";
+import { ownerPrefs, saveOwnerPrefs } from "./prefs";
 import { localDay } from "@/core/time";
 import { NoteService } from "./application/notes";
 import { TaskService } from "./application/todo";
@@ -61,9 +61,6 @@ export async function lensRoute(req: Request, server: pb.Server): Promise<Respon
   if (pick === null) return refuse(400, "Which lens?");
   const { rec, prefs, lenses } = await owner(server);
   if (pick && !lenses.some((l) => l.rec === pick)) return refuse(404, "That lens is gone.");
-  const data = withPatch(prefs, { lens: pick || null });
-  await (rec
-    ? pb.call(server, `collections/prefs/records/${rec}`, pb.json("PATCH", { data }))
-    : pb.call(server, "collections/prefs/records", pb.json("POST", { key: PREFS_KEY, data })));
+  await saveOwnerPrefs(server, rec, withPatch(prefs, { lens: pick || null }));
   return Response.json({ ok: true });
 }

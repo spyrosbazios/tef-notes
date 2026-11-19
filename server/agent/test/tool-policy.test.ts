@@ -33,11 +33,11 @@ describe("colocated tool policies", () => {
     }
   });
 
-  it("keeps Exa optional and withdraws only the existing unsafe tools", () => {
+  it("keeps Exa optional and withdraws only the unsafe tools", () => {
     expect(names((n) => policyFor(n)?.requiresExa === true)).toEqual(["read_url", "web_search"]);
     const all = Object.keys(toolPolicies());
     expect(all.filter((n) => !stepTools(all, true, policyFor).includes(n)).sort())
-      .toEqual(["insert_after_selection", "replace_selection", "save_drawing", "update_memory"]);
+      .toEqual(["insert_after_selection", "replace_selection", "save_drawing", "save_note_action", "update_memory"]);
     expect(stepTools(all, false, policyFor)).toEqual(all);
     expect(stepTools(["draw", "delete_note", "old_removed_tool"], true, policyFor)).toEqual(["draw", "delete_note", "old_removed_tool"]);
   });
@@ -88,6 +88,7 @@ describe("colocated tool policies", () => {
       deleteNote: ["delete_note"],
       files: ["attach_file"],
       tags: ["create_lens", "create_tag", "update_tag"],
+      noteActions: ["save_note_action"],
       memory: ["update_memory"],
     });
     // Before: notes, tasks, tags and lenses asked unless "write without asking" was on; deletes and files always asked;

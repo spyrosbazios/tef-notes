@@ -7,6 +7,7 @@
 // <context>, and the tools the app does itself (open_note …, no `execute`) are offered. Such a call ends the turn
 // until the client answers it with addToolOutput and resends.
 // While a turn runs, the owner can steer it (steer.ts): their message joins the turn at the next step boundary.
+// A note action's run (note-action.ts) sends `action`: the turn is narrowed to what that action may do.
 import { ChatHistoryError, readChatHistory } from "@/core/chat-history";
 import { allowed, policyApprovals } from "./tool-policy";
 import {
@@ -17,6 +18,7 @@ import { z } from "zod";
 import type { Actions } from "@/core/actions";
 import { EFFORT, EFFORTS, type Effort } from "@/core/agent";
 import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
+import { runOf } from "@/core/note-actions";
 import { MEMORY, parseNote } from "@/core/notes";
 import type { Server } from "@/core/pocketbase";
 import { exists, saver } from "./chats";
@@ -25,6 +27,7 @@ import { historyFromWeb, repair, settle, withContext } from "./guard";
 import { key } from "./keys";
 import { stepTools, trim } from "./loop";
 import { steeringFor } from "./steer";
+import { instructions as runInstructions, offeredTo, scoped, scopeOf, type Scope } from "./note-action";
 import { Notes } from "./notes";
 import { Todo } from "./todo";
 import { model, sees, Unavailable } from "./models";
@@ -45,6 +48,7 @@ const Body = z.object({
   model: z.string().min(1).max(200),
   effort: z.enum(EFFORTS),
   context: Context,                     // the page the assistant is on; absent or unreadable: a plain chat
+  action: z.unknown().transform(runOf).optional(),  // a note action's run (note-action.ts); absent or unreadable: a plain chat
 });
 
 /** The date, memory, the notes index and what is on the owner's screen (and the first pages of the open note's PDFs):
@@ -78,19 +82,21 @@ export const guarded = (webGuard: boolean, untrusted: (ms: ModelMessage[]) => Pr
   webGuard ? untrusted : async () => false;
 
 /** `foreign`: someone else's text is in this turn's context (`context`), or the owner attached a file to the chat: its writes are tainted and ask, like after reading the web. */
-async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, rules: Actions, webGuard: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[]) {
+async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, rules: Actions, webGuard: boolean, effort: Effort, page: AssistantContext | undefined, foreign: boolean, files: readonly Attached[], scope?: Scope) {
   const { model: m, providerOptions } = await pick(id);
   const { steps, reasoning } = EFFORT[effort];
   const read = readWeb(notes, todo), untrusted = foreign ? async () => true : read;
   const web = !!(await key("exa")), all = tools(notes, todo, untrusted, files);
   // Out of the prompt: the web tools without an Exa key, the tools the client does itself unless this page can do them,
-  // and the writes the owner never allows (a call made anyway is refused by toolApproval)
+  // the writes the owner never allows (a call made anyway is refused by toolApproval), and in a note action's run all but
+  // the tools that action needs
   const ui = uiToolsFor(page), off = new Set<string>(UI_TOOL_NAMES.filter((n) => !ui.includes(n)));
   const base = (Object.keys(all) as (keyof Tools)[])
-    .filter((n) => !off.has(n) && (web || !policyFor(n)?.requiresExa) && allowed(policyFor(n), rules));
+    .filter((n) => !off.has(n) && (web || !policyFor(n)?.requiresExa) && allowed(policyFor(n), rules) && (!scope || offeredTo(scope, n)));
+  const gate = approvals(notes, todo, rules, guarded(webGuard, untrusted), files);
   return new ToolLoopAgent({
     model: m,
-    instructions: `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}`,
+    instructions: `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}${scope ? `\n\n${runInstructions(scope)}` : ""}`,
     tools: all,
     stopWhen: isStepCount(steps),
     reasoning,
@@ -100,7 +106,7 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, r
       ...(stepNumber === 0 && { messages: trim(messages) }),
       ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : { toolChoice: "none" as const }),
     }),
-    toolApproval: approvals(notes, todo, rules, guarded(webGuard, untrusted), files),
+    toolApproval: scope ? scoped(gate, scope) : gate,
     providerOptions,
   });
 }
@@ -127,8 +133,11 @@ export async function chat(req: Request, server: Server, pick: typeof model = mo
   const historicalTaint = historyFromWeb(history, new Set([...(await notes.tainted()), ...(await todo.tainted())]), policyFor);
   let agent: ToolLoopAgent<never, Tools>;
   // The owner's rules are read here, never taken from the request: no client can turn a card off
-  const { actions: rules, agent: { webGuard } } = (await ownerPrefs(server)).prefs;
-  try { agent = await build(notes, todo, pick, picked, rules, webGuard, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files); } catch (e) {
+  const { actions: rules, agent: { webGuard }, noteActions } = (await ownerPrefs(server)).prefs;
+  // A run's action is the owner's saved one, read here like the rules: a request names it and can't describe it
+  const run = parsed.data.action, scope = run && scopeOf(run, noteActions);
+  if (run && !scope) return fail(400, `No note action ${run.id}: it was deleted.`);
+  try { agent = await build(notes, todo, pick, picked, rules, webGuard, effort, page, ctx.foreign || historicalTaint || hasAttachment(parsed.data.messages as AgentMessage[]), files, scope); } catch (e) {
     if (e instanceof Unavailable) return fail(400, e.message);
     throw e;
   }

@@ -7,7 +7,7 @@ import { Check, Minus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
-import { DECLINED, diffLines, flagLine, lensLine, rowsOf, tagLine, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
+import { actionLine, DECLINED, diffLines, flagLine, lensLine, rowsOf, tagLine, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
 import { appended, parseNote } from "@/core/notes";
 import { useNotes } from "@/hooks/notes";
 import { cn } from "@/lib/utils";
@@ -96,6 +96,7 @@ function MemoryDiff({ text }: { text: string }) {
 /** What an answered card says: what was done, or what was left undone. */
 const VERB: Record<string, [done: string, skipped: string]> = {
   create_tag: ["Created", "create"], create_lens: ["Created", "create"], update_tag: ["Updated", "update"],
+  save_note_action: ["Saved", "save"],
   create_note: ["Created", "create"], append_to_note: ["Added to", "add to"], rewrite_note: ["Rewrote", "rewrite"], summarise_links: ["Summarised links in", "summarise links in"],
   set_note_flags: ["Changed flags of", "change flags of"], delete_note: ["Deleted", "delete"], attach_file: ["Filed", "file"], update_memory: ["Updated", "update"],
   set_place: ["Set the place of", "set the place of"],
@@ -110,6 +111,7 @@ export function Confirm({ name, input, id, respond, answer }: {
   const title = (input.path ? data?.find((n) => n.path === input.path)?.note.title : undefined) ?? input.path ?? "the note";
   const todo = todoWords(name, input), target = usePlaceTarget(input);
   const head = todo?.head ?? ({
+    save_note_action: input.id ? `Change the note action “${input.label ?? ""}”?` : `Add the note action “${input.label ?? ""}”?`,
     create_tag: `Create tag “${input.name ?? ""}”?`, create_lens: `Create lens “${input.name ?? ""}”?`, update_tag: `Update tag “${input.name ?? input.id ?? ""}”?`,
     create_note: `Create note “${input.title ?? ""}”?`, append_to_note: `Add to ${title}?`, rewrite_note: `Rewrite ${title}?`, summarise_links: `Summarise the links in ${title}?`,
     set_note_flags: `Change flags of ${title}?`, delete_note: `Delete ${title}?`,
@@ -119,7 +121,7 @@ export function Confirm({ name, input, id, respond, answer }: {
   const yes = todo?.yes ?? (name === "create_note" ? "Create it" : name === "append_to_note" || name === "attach_file" ? "Add it" : name === "delete_note" ? "Delete it" : "Save it");
   const flags = name === "create_note" ? flagLine(input) : "";
   const [done, skipped] = todo ? [todo.done, todo.skipped] : VERB[name] ?? ["Allowed", "allow"];
-  const subject = todo?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_lens" ? `lens “${input.name ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "attach_file" ? input.file ?? "the file" : name === "update_memory" ? "memory" : name === "set_place" ? target.title : title);
+  const subject = todo?.subject ?? ((name === "create_tag" || name === "update_tag") ? `tag “${input.name ?? input.id ?? ""}”` : name === "create_lens" ? `lens “${input.name ?? ""}”` : name === "save_note_action" ? `the note action “${input.label ?? ""}”` : name === "create_note" ? `“${input.title ?? ""}”` : name === "attach_file" ? input.file ?? "the file" : name === "update_memory" ? "memory" : name === "set_place" ? target.title : title);
 
   if (answer)
     return (
@@ -141,6 +143,7 @@ export function Confirm({ name, input, id, respond, answer }: {
           : name === "rewrite_note" && input.path ? <RewriteDiff path={input.path} title={title} input={input} />
           : (name === "create_tag" || name === "update_tag") ? <p className="whitespace-pre-wrap text-sm">{tagLine(name, input)}</p>
           : name === "create_lens" ? <p className="whitespace-pre-wrap text-sm">{lensLine(input)}</p>
+          : name === "save_note_action" ? <p className="whitespace-pre-wrap text-sm">{actionLine(input)}</p>
           : name === "set_note_flags" ? <p className="text-sm">{flagLine(input, true) || "No change"}</p>
           : name === "set_place" ? <PlacePreview input={input} />
           : name === "summarise_links" ? <p className="text-sm">A summary under each link card without one, as its Summary button writes it</p>

@@ -12,7 +12,8 @@ import { localDay } from "@/core/time";
 import { linkRecord, newLink } from "@/core/record-links";
 import { Todo } from "../src/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";
-import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, readWeb, tools, type Line } from "../src/tools";
+import { stepTools } from "../src/loop";
+import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, policyFor, readWeb, tools, type Line } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
 /** The owner's rules as the old switch left them (pb_migrations/1795000000_agent_actions.js): off is the defaults; on, the
@@ -678,5 +679,31 @@ describe("tag definitions", () => {
     expect(await off(UNASKED).create_tag({}, { messages: [web] })).toBe("not-applicable");
     expect(await off(ASKED).create_tag({}, { messages: [web] })).toBe("user-approval");
     expect(await approvals(notes, todo, UNASKED, guarded(true, readWeb(notes, todo))).create_tag({}, { messages: [web] })).toBe("user-approval");
+  });
+});
+
+describe("note actions", () => {
+  beforeEach(() => { pb.prefs.length = 0; });
+  const sum = { label: "Summarise", prompt: "Three bullets of this note.", result: "answer" } as const;
+
+  it("lists the owner's, the app's two before any are saved", async () => {
+    expect(await run(T.list_note_actions, {})).toMatchObject({ actions: [{ id: "tidy" }, { id: "task" }] });
+  });
+  it("adds one to the preferences, in every note's menu; changes one by its id", async () => {
+    expect(await run(T.save_note_action, { ...sum })).toMatchObject({ saved: { id: "summarise", icon: "sparkles", result: "answer" } });
+    const saved = pb.prefs[0].data as { noteActions: { id: string }[]; desktop: { noteHeader: { id: string; place: string }[] } };
+    expect(saved.noteActions.map((a) => a.id)).toEqual(["tidy", "task", "summarise"]);
+    expect(saved.desktop.noteHeader.find((s) => s.id === "summarise")).toEqual({ id: "summarise", place: "menu" });
+
+    expect(await run(T.save_note_action, { ...sum, id: "summarise", label: "Sum up", icon: "summary" })).toMatchObject({ saved: { id: "summarise", label: "Sum up", icon: "summary" } });
+    expect((pb.prefs[0].data as typeof saved).noteActions).toHaveLength(3);
+    expect(await run(T.save_note_action, { ...sum, id: "nope" })).toHaveProperty("error");
+    expect(await run(T.save_note_action, { ...sum, prompt: " " })).toHaveProperty("error");
+  });
+  it("follows the owner's rule, and is withdrawn once the turn has read someone else's text", async () => {
+    expect(await approvals(notes, todo, DEFAULT_ACTIONS).save_note_action({ ...sum }, { messages: [] })).toBe("user-approval");
+    expect(await approvals(notes, todo, { ...DEFAULT_ACTIONS, noteActions: "auto" }).save_note_action({ ...sum }, { messages: [] })).toBe("not-applicable");
+    expect(await approvals(notes, todo, { ...DEFAULT_ACTIONS, noteActions: "never" }).save_note_action({ ...sum }, { messages: [] })).toMatchObject({ type: "denied" });
+    expect(stepTools(["save_note_action", "list_note_actions"], true, policyFor)).toEqual(["list_note_actions"]);
   });
 });

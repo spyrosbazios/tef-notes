@@ -4,17 +4,19 @@
 // one click each, written as the frontmatter edit the phone makes (withFlags). One top bar holds every tool and option of the
 // note: the format tools, attach, pin and ⋮. A note is pure markdown: tasks are records of their own (task-detail.tsx), and those linked to it show under its title.
 import { useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Check, Download, EllipsisVertical, FileCode, FileUp, Paperclip, Link2, Loader2, PenTool, Pin, Sparkles, Trash2, TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Archive, Check, Loader2, TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { DrawingLayer } from "@/components/drawing-layer";
 import { FormatTools } from "@/components/format-tools";
-import { Swatches } from "@/components/note-actions";
+import { NoteHeaderActions } from "@/components/note-header";
+import { NoteRunPanel, RunSheen } from "@/components/note-run";
 import { MicButton } from "@/components/mic-button";
 import { ContentsRail } from "@/components/note-contents";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
+import type { PromptAction } from "@/core/note-actions";
 import { UNTITLED, pastedNote, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
@@ -24,11 +26,6 @@ import { TagEditor } from "@/components/tag-editor";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Editor } from "@/editor";
 import { useContents } from "@/hooks/contents";
 import { dictateInto } from "@/hooks/dictation";
@@ -36,25 +33,18 @@ import { openDrawing, useOpened } from "@/hooks/drawing";
 import { useDraft, type Status } from "@/hooks/draft";
 import { deleteNote, NOTES, setFlags, write } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
+import { useNoteRun, useRunning } from "@/hooks/note-run";
 import { useKeyboard } from "@/hooks/keyboard";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
 import { attachable, useAddFiles } from "@/hooks/photos";
 import { noteHref, useNav } from "@/lib/nav";
 import { ms } from "@/lib/search";
+import { syncNow } from "@/lib/sync";
 import { noteScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
 import type { NoteRec } from "@/services/notes";
-
-function IconButton({ label, children, ...p }: React.ComponentProps<typeof Button> & { label: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label={label} {...p}>{children}</Button></TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
 
 /** The save state, one line each: the box is as wide as the widest, and one swaps for the next in place (swap.tsx). */
 const STATUS: Record<Status, ReactNode> = {
@@ -117,6 +107,26 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
     await out[what]([fresh()]);
   };
 
+  /** An assistant action pressed (core/note-actions.ts): the note saved first, so the agent reads what is on screen. */
+  const about = useMemo(() => ({ path: n.path, title: n.note.title }), [n.path, n.note.title]);
+  const runs = useNoteRun(about), running = useRunning(runs.run);
+  const runAction = async (a: PromptAction) => {
+    try { await d.flush(); } catch (e) { toast.error(message(e)); return; }
+    await runs.start(a, fresh().text);
+  };
+  /** The run wrote: the panel closes and a toast says what it did; a note's change can be put back as it was. */
+  const ran = (said: string) => {
+    const r = runs.run;
+    if (!r) return;
+    runs.close();
+    const undo = r.action.result === "edit" ? {
+      label: "Undo",
+      // The agent's write may not have reached this browser's copy yet: fetched first, so the text put back replaces it
+      onClick: () => { void syncNow().then(() => write(qc, fresh(), () => r.before)).catch((e: unknown) => toast.error(message(e))); },
+    } : undefined;
+    toast(r.action.label, { description: said || (r.action.result === "edit" ? "The note was changed." : "The task was added."), action: undo });
+  };
+
   const remove = async () => {
     try { await deleteNote(qc, fresh()); toast(`Deleted “${note.title}”`); onGone(); } catch (e) { toast.error(message(e)); }
   };
@@ -157,44 +167,18 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
         <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label="Attach or draw"><Paperclip className="text-dim" /></Button></DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Attach or draw</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onSelect={() => file.current?.click()}><FileUp /> Photo or PDF…</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => openDrawing(note.id, null)}><PenTool /> New drawing</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         <input ref={file} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
-        <IconButton label={note.pinned ? "Unpin" : "Pin to top"} aria-pressed={note.pinned} onClick={() => flag({ pinned: !note.pinned })}>
-          <Pin className={note.pinned ? "fill-fg text-fg" : "text-dim"} />
-        </IconButton>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><EllipsisVertical className="text-dim" /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="text-faint text-xs">Colour</DropdownMenuLabel>
-            <Swatches value={note.color} onPick={(color) => flag({ color })} />
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem checked={raw} onCheckedChange={setRaw}><FileCode /> Markdown source</DropdownMenuCheckboxItem>
-            <DropdownMenuItem onSelect={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}>
-              <Link2 /> Copy link
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => { void sendOut("ask"); }}><Sparkles /> Ask about this note</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => { void sendOut("save"); }}><Download /> {out.verb} .md</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => { void flag(archivePatch([note])).then(() => toast(note.archived ? "Brought back from the archive" : "Archived")); }}>
-              {note.archived ? <><ArchiveRestore /> Unarchive</> : <><Archive /> Archive</>}
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onSelect={() => setConfirm(true)}><Trash2 /> Delete</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NoteHeaderActions pinned={!!note.pinned} archived={!!note.archived} color={note.color} raw={raw} saveVerb={out.verb} running={running ? runs.run?.action.id ?? null : null}
+          onFile={() => file.current?.click()} onDraw={() => openDrawing(note.id, null)} onPin={() => { void flag({ pinned: !note.pinned }); }}
+          onAsk={() => { void sendOut("ask"); }} onRaw={setRaw} onSave={() => { void sendOut("save"); }} onColor={(color) => { void flag({ color }); }}
+          onCopyLink={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}
+          onArchive={() => { void flag(archivePatch([note])).then(() => toast(note.archived ? "Brought back from the archive" : "Archived")); }}
+          onDelete={() => setConfirm(true)} onRun={(a) => { void runAction(a); }} />
       </header>
 
       <div className="relative min-h-0 flex-1">
+      <RunSheen on={running} />
+      <NoteRunPanel run={runs.run} onClose={runs.close} onCarry={runs.carry} onAgain={() => { if (runs.run) void runAction(runs.run.action); }} onWrote={ran} />
       <div ref={scroller} data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
           <textarea ref={title} rows={1} value={d.title} onChange={(e) => d.setTitle(e.target.value.replace(/\s*\n\s*/g, " "))}

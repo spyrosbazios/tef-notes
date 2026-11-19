@@ -3,9 +3,9 @@
 // Where a setting is kept (the rule; ask in this order):
 //   1. A choice the owner makes, in Settings or by leaving a view a certain way, is a preference: a field of `Prefs`, kept on
 //      the server (the `prefs` collection: one record keyed `owner`, its `data` this shape) so every device has it.
-//      - The same on every screen (the look, the notes list, the assistant and what it may do, the voice, sharing, the lens on): a key,
+//      - The same on every screen (the look, the notes list, the assistant, what it may do and the note actions it runs, the voice, sharing, the lens on): a key,
 //        or a group's field.
-//      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar): `phone` or `desktop`. A layout
+//      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar, a note's header): `phone` or `desktop`. A layout
 //        is what the window draws, not what the device is: the phone's below `md` (768px: tabs at the bottom), the desktop's from
 //        it (the rail). A laptop window made narrow is drawn as a phone's, and follows the phone's preferences.
 //   2. The state of a window rather than a choice (the dock open and how wide, the chat it is on, when it was last seen): kept by
@@ -17,6 +17,7 @@
 // Pure and platform-neutral.
 import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";
 import { EFFORTS, effortOf, type Effort } from "./agent";
+import { DEFAULT_PROMPTS, promptsOf, slotsOf, type PromptAction, type Slot } from "./note-actions";
 import { isNoteSort, type NoteSort } from "./note-sort";
 import { DEFAULT_TALK_MODEL, TALK_MODELS, TALK_SPEED, speedOf, type TalkModel } from "./talk";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
@@ -84,6 +85,8 @@ export type LayoutPrefs = {
   start: Start;
   /** The list Home's task box shows first. */
   homeList: TaskList;
+  /** A note's header: every action in order, each a button there, a row in its menu, or off (note-actions.ts). */
+  noteHeader: Slot[];
 };
 
 /** The phone's, with its bottom bar. */
@@ -113,6 +116,8 @@ export type Prefs = {
   agent: { model?: string; effort: Effort; newChat: NewChat; webGuard: boolean };
   /** Which of the assistant's writes ask first, go ahead, or are never allowed (actions.ts); the agent's server enforces them. */
   actions: Actions;
+  /** The assistant actions a note offers: the owner's saved prompts (note-actions.ts). One value: a device's change replaces the list. */
+  noteActions: PromptAction[];
   /** The spoken conversation (talk.ts): the voice model the server speaks through, the Fish voice it speaks in (its
    *  voice-model id; empty: the server's own, TEF_NOTES_TALK_VOICE, else the first voice it can find), and how fast. */
   talk: { model: TalkModel; voice: string; speed: number; agent: TalkAgent };
@@ -142,18 +147,19 @@ export const talkThinking = (p: Prefs): { model?: string; effort: Effort } => {
   return { ...(model ? { model } : {}), effort: p.talk.agent.effort ?? p.agent.effort };
 };
 
-const LAYOUT_DEFAULTS: LayoutPrefs = { start: "home", homeList: "today" };
+const layoutDefaults = (layout: Layout): LayoutPrefs => ({ start: "home", homeList: "today", noteHeader: slotsOf(undefined, layout, DEFAULT_PROMPTS) });
 
 export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
   notes: { grouped: false, collapsed: [], sort: "updated" },
   agent: { effort: effortOf(undefined), newChat: "app", webGuard: true },
   actions: { ...DEFAULT_ACTIONS },
+  noteActions: promptsOf(undefined),
   talk: { model: DEFAULT_TALK_MODEL, voice: "", speed: TALK_SPEED.normal, agent: {} },
   clip: { summary: false },
   lens: null,
-  phone: { ...LAYOUT_DEFAULTS, tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
-  desktop: { ...LAYOUT_DEFAULTS, hidden: [...RAIL_OFF] },
+  phone: { ...layoutDefaults("phone"), tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
+  desktop: { ...layoutDefaults("desktop"), hidden: [...RAIL_OFF] },
 };
 
 // ---- reading
@@ -164,15 +170,16 @@ const one = <T extends string>(of: readonly T[], v: unknown, fallback: T): T => 
 const tabsIn = (v: unknown): Tab[] => [...new Set(strings(v).filter((t): t is Tab => (TABS as readonly string[]).includes(t)))];
 const railIn = (v: unknown): RailItem[] => RAIL.filter((r) => strings(v).includes(r));
 
-const layoutOf = (l: Record<string, unknown>): LayoutPrefs => ({
-  start: one(STARTS, l.start, LAYOUT_DEFAULTS.start),
-  homeList: one(TASK_LISTS, l.homeList, LAYOUT_DEFAULTS.homeList),
+const layoutOf = (l: Record<string, unknown>, layout: Layout, prompts: readonly PromptAction[]): LayoutPrefs => ({
+  start: one(STARTS, l.start, "home"),
+  homeList: one(TASK_LISTS, l.homeList, "today"),
+  noteHeader: slotsOf(l.noteHeader, layout, prompts),
 });
 
 /** Whatever was stored as Prefs: the one defensive reader. Tabs keep their stored order, any missing ones appended. */
 export function prefsOf(raw: unknown): Prefs {
   const p = obj(raw), notes = obj(p.notes), agent = obj(p.agent), talk = obj(p.talk), clip = obj(p.clip);
-  const phone = obj(p.phone), desktop = obj(p.desktop), tabs = tabsIn(phone.tabs);
+  const phone = obj(p.phone), desktop = obj(p.desktop), tabs = tabsIn(phone.tabs), noteActions = promptsOf(p.noteActions);
   return {
     theme: one(THEME_NAMES, p.theme, DEFAULT_THEME),
     accent: one(ACCENT_NAMES, p.accent, DEFAULT_ACCENT),
@@ -188,6 +195,7 @@ export function prefsOf(raw: unknown): Prefs {
       webGuard: agent.webGuard !== false,
     },
     actions: actionsOf(p.actions),
+    noteActions,
     talk: {
       model: TALK_MODELS.find((m) => m === talk.model) ?? DEFAULT_TALK_MODEL,
       voice: typeof talk.voice === "string" ? talk.voice : "",
@@ -197,14 +205,14 @@ export function prefsOf(raw: unknown): Prefs {
     clip: { summary: clip.summary === true },
     lens: typeof p.lens === "string" && p.lens ? p.lens : null,
     phone: {
-      ...layoutOf(phone),
+      ...layoutOf(phone, "phone", noteActions),
       tabs: [...tabs, ...TABS.filter((t) => !tabs.includes(t))],
       // A tab the stored order doesn't know yet is new to this record: it starts as a new record's would
       hidden: [...new Set([...tabsIn(phone.hidden).filter((t) => HIDEABLE.includes(t)), ...OFF.filter((t) => !tabs.includes(t))])],
       tabLabels: one(TAB_LABELS, phone.tabLabels, "active"),
       tasksList: one(TASK_LISTS, phone.tasksList, "today"),
     },
-    desktop: { ...layoutOf(desktop), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF] },
+    desktop: { ...layoutOf(desktop, "desktop", noteActions), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF] },
   };
 }
 

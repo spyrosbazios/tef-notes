@@ -121,6 +121,64 @@ describe("POST /agent/chat", () => {
   });
 });
 
+describe("POST /agent/chat as a note action's run", () => {
+  const NOTE = "notes/20261001-shopping.md";
+  const pressed = (text: string): UIMessage => ({ id: "u1", role: "user", parts: [{ type: "text", text }] });
+  const run = (id: string) => ({ action: { id, note: NOTE } });
+
+  it("offers only what the action needs, and says in the instructions what the turn is", async () => {
+    replies = [text("Nothing to tidy.")];
+    await send([pressed("Tidy")], {}, undefined, run("tidy"));
+    expect(offered[0]).toEqual(expect.arrayContaining(["read_note", "rewrite_note", "append_to_note"]));
+    for (const off of ["delete_note", "create_note", "add_task", "update_memory", "set_note_flags", "web_search"]) expect(offered[0]).not.toContain(off);
+    expect(JSON.stringify(prompts[0])).toContain("pressed the button “Tidy” on notes/20261001-shopping.md");
+
+    replies = [text("ok")];
+    await send([pressed("Make a task")], {}, undefined, run("task"));
+    expect(offered[1]).toContain("add_task");
+    expect(offered[1]).not.toContain("rewrite_note");
+  });
+
+  it("its write is the chat's: a card under Ask first, done at once under Just do it", async () => {
+    replies = [toolCall("rewrite_note", { path: NOTE, text: "## Shopping\n- eggs", why: "A heading" })];
+    const asked = await send([pressed("Tidy")], {}, undefined, run("tidy"));
+    expect(asked.parts.find(isToolUIPart)).toMatchObject({ type: "tool-rewrite_note", state: "approval-requested" });
+    expect(pb.notes.get(NOTE)!.rev).toBe(1);
+
+    replies = [toolCall("rewrite_note", { path: NOTE, text: "## Shopping\n- eggs", why: "A heading" }), text("Added a heading.")];
+    await send([pressed("Tidy")], { editNote: "auto" }, undefined, run("tidy"));
+    expect(parseNote(NOTE, pb.notes.get(NOTE)!.text).body).toBe("## Shopping\n- eggs\n");
+  });
+
+  it("refuses a write to another note, and a task not linked to this one, even under Just do it", async () => {
+    pb.put("notes/20261002-other.md", "---\ntitle: Other\ncreated: 2026-10-02\n---\nkeep\n");
+    replies = [toolCall("rewrite_note", { path: "notes/20261002-other.md", text: "gone", why: "x" }), text("Couldn't.")];
+    const other = await send([pressed("Tidy")], UNASKED, undefined, run("tidy"));
+    expect(other.parts.find(isToolUIPart)).toMatchObject({ state: "output-denied" });
+    expect(pb.notes.get("notes/20261002-other.md")!.rev).toBe(1);
+
+    replies = [toolCall("add_task", { title: "Buy eggs" }), text("Couldn't.")];
+    const loose = await send([pressed("Make a task")], UNASKED, undefined, run("task"));
+    expect(loose.parts.find(isToolUIPart)).toMatchObject({ state: "output-denied" });
+
+    replies = [toolCall("add_task", { title: "Buy eggs", link: [NOTE] })];
+    const linked = await send([pressed("Make a task")], {}, undefined, run("task"));
+    expect(linked.parts.find(isToolUIPart)).toMatchObject({ type: "tool-add_task", state: "approval-requested" });
+  });
+
+  it("refuses an action the owner's list doesn't have; an unreadable one is a plain chat", async () => {
+    const res = await chat(new Request("http://x/agent/chat", {
+      method: "POST", body: JSON.stringify({ id: "chat1", messages: [pressed("x")], model: "m", effort: "normal", action: { id: "gone", note: NOTE } }),
+    }), { url: pb.url }, pick);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("No note action gone");
+
+    replies = [text("hi")];
+    await send([pressed("hi")], {}, undefined, { action: { id: "tidy", note: "agent/memory.md" } });
+    expect(offered.at(-1)).toContain("create_note");
+  });
+});
+
 describe("POST /agent/chat as the always-on assistant", () => {
   const user: UIMessage = { id: "u1", role: "user", parts: [{ type: "text", text: "tidy this note" }] };
   const page = { view: { kind: "today" }, note: { path: "notes/20261001-shopping.md", title: "Shopping", rev: 1 }, selection: "eggs" };

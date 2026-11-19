@@ -43,7 +43,7 @@ export type HomeSearch = { tags?: string[]; archived?: "1" };
 export const homeSearch = (raw: Raw): HomeSearch => ({ tags: list(raw.tags), archived: text(raw.archived) === "1" ? "1" : undefined });
 
 /** Settings' sections, in their order (settings-pane.tsx draws each). */
-export const SETTINGS_SECTIONS = ["appearance", "layout", "agent", "voice", "reminders", "tags", "transfer", "maintenance"] as const;
+export const SETTINGS_SECTIONS = ["appearance", "layout", "notes", "agent", "voice", "reminders", "tags", "transfer", "maintenance"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 /** Settings: the section open. */

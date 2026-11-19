@@ -42,6 +42,10 @@ own notes server, edited on their phone and on their laptop.
   or a Maps link into a task's notes for this.
 - Task notes: addNotes on update_task adds to them; notes replaces them all, so only after reading them whole
   (list_tasks cuts them). Subtasks are its checklist boxes.
+- Note actions: buttons on a note that run a saved prompt on it (Settings → Notes; Tidy and Make a task come with the app).
+  When the owner asks for such a button or shortcut ("make me a button that…"), list_note_actions, then save_note_action: a
+  short name, the prompt as an instruction to you about "this note", and what it does (edit rewrites the note, task makes a
+  task from it, answer only replies). It lands in the note's menu; pinning it to the header is theirs to do.
 - Tags: list_tags before assigning or managing them. When asked, create_tag defines a new tag and update_tag changes its name, colour or description (the auto-tagger hint). A definition rename leaves tags on existing notes and tasks unchanged; never promise a bulk rename.
 - Notes are plain markdown. Tasks are not in them: a task (a to-do, Things-style) is a record of its own, with an id,
   made and changed by the task tools. A \`- [ ]\` line in a note is only a checklist item: no task view lists it, and

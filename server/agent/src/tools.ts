@@ -4,6 +4,7 @@
 import { uiPolicies } from "./assistant";
 import { drawingPolicies } from "./drawings";
 import { placePolicies } from "./placeTools";
+import { noteActionPolicies, noteActionTools } from "./noteActionTools";
 import { filePolicies } from "./fileTools";
 import { widgetPolicies } from "./widgetTools";
 import { todoPolicies } from "./todoTools";
@@ -341,6 +342,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
     }),
 
     ...placeTools(todo, fromPage),
+    ...noteActionTools(notes.server),
     ...todoTools(notes, todo, fromPage),
     ...widgetTools(notes, todo, fromPage),
     ...drawingTools(notes),
@@ -422,13 +424,13 @@ export const notePolicies = {
   update_memory: { approval: "memory", result: "plain", unavailableWhenTainted: true, check: (_, { text }: { text: string }) => text.length > CAP ? "Too long" : null },
   web_search: { approval: "none", result: "untrusted", requiresExa: true },
   read_url: { approval: "none", result: "untrusted", requiresExa: true },
-} satisfies Policies<Omit<Tools, keyof typeof todoPolicies | keyof typeof widgetPolicies | keyof typeof filePolicies | keyof typeof placePolicies | keyof typeof drawingPolicies | keyof typeof uiPolicies>>;
+} satisfies Policies<Omit<Tools, keyof typeof todoPolicies | keyof typeof widgetPolicies | keyof typeof filePolicies | keyof typeof placePolicies | keyof typeof drawingPolicies | keyof typeof uiPolicies | keyof typeof noteActionPolicies>>;
 
 // Lazy because file tools also import note validators: read their policy table only after module initialization.
 let policies: ReturnType<typeof collectPolicies> | undefined;
 const collectPolicies = () => ({
   ...notePolicies, ...todoPolicies, ...widgetPolicies, ...filePolicies,
-  ...placePolicies, ...drawingPolicies, ...uiPolicies,
+  ...placePolicies, ...drawingPolicies, ...uiPolicies, ...noteActionPolicies,
 }) satisfies Policies<Tools>;
 export const toolPolicies = () => policies ??= collectPolicies();
 

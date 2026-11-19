@@ -1,5 +1,6 @@
 // Settings: the look (theme and accent), each layout's own (where the app opens, Home's list, the phone's tabs, the desktop's
-// sidebar; all the owner's preferences, on the server, hooks/prefs.ts), the agent (which model
+// sidebar; all the owner's preferences, on the server, hooks/prefs.ts), a note's header and its assistant actions
+// (settings-notes.tsx), the agent (which model
 // Ask uses, how hard it thinks, which of its writes ask first, go ahead or are never allowed: preferences too, enforced by the
 // agent's server, @/core/actions; what it remembers of the owner,
 // agent/memory.md: shown, not edited), task reminders on this device (Web Push), the tag definitions (kept on the server, so the
@@ -10,7 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
-import { ArrowDownUp, Bell, Bot, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Download, FilePen, FilePlus, FileX, LayoutGrid, ListPlus, ListTodo, ListX, Loader2, Mic, Monitor, Palette, Paperclip, Pencil, Plus, RefreshCw, Settings, ShieldAlert, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Bell, Bot, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Download, FilePen, FilePlus, FileX, LayoutGrid, ListPlus, ListTodo, ListX, Loader2, Mic, Monitor, MousePointerClick, NotebookPen, Palette, Paperclip, Pencil, Plus, RefreshCw, Settings, ShieldAlert, Smartphone, Sparkles, Tag as TagIcon, Trash2, Upload, Wrench, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ACTION_LABEL, ACTIONS, RULE_LABEL, RULES, type Action } from "@/core/actions";
@@ -24,6 +25,9 @@ import { ModelMenu } from "@/components/assistant/model-menu";
 import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
+import { Choice } from "@/components/settings-choice";
+import { NotesSettings } from "@/components/settings-notes";
+import { HEAD, SUB, TITLE } from "@/components/settings-style";
 import { MicButton } from "@/components/mic-button";
 import { TalkSpeed, TalkVoicePicker } from "@/components/talk/voice-settings";
 import { Conflicts } from "@/components/sync-conflicts";
@@ -69,12 +73,6 @@ import { appVersion, forceUpdate } from "@/lib/update";
 
 /** A tag is one word: it is written on the note's `tags:` line and typed as `#tag` in search. */
 const clean = (v: string) => v.trim().replace(/^#/, "");
-/** A section's title stays at the top of the scrolling page. */
-const HEAD = "sticky top-0 z-10 -mx-1 bg-bg/95 px-1 py-2 font-bold text-lg tracking-tight backdrop-blur";
-/** A section page's own title. On the phone the page header already names the section, so it is only read out there. */
-const TITLE = cn(HEAD, "max-md:sr-only");
-/** A group inside a section page: one step below the page title, scrolls with the page. */
-const SUB = "text-base font-bold tracking-tight";
 const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). A changed name renames the tag on every item that
@@ -235,17 +233,6 @@ function Appearance() {
         </div>
       </div>
     </section>
-  );
-}
-
-/** A row of small radio buttons. */
-function Choice<T extends string>({ label, value, options, names, onPick }: { label: string; value: T; options: readonly T[]; names: Record<T, string>; onPick: (v: T) => void }) {
-  return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
-      {options.map((o) => (
-        <Button key={o} type="button" role="radio" aria-checked={o === value} size="sm" variant={o === value ? "default" : "outline"} onClick={() => onPick(o)}>{names[o]}</Button>
-      ))}
-    </div>
   );
 }
 
@@ -492,7 +479,7 @@ function Agent() {
 
 const ACTION_ICON: Record<Action, LucideIcon> = {
   createTask: ListPlus, editTask: ListTodo, deleteTask: ListX, createNote: FilePlus, editNote: FilePen, deleteNote: FileX,
-  files: Paperclip, tags: TagIcon, memory: Brain,
+  files: Paperclip, tags: TagIcon, noteActions: MousePointerClick, memory: Brain,
 };
 
 /** Which of the agent's writes wait on a card, go ahead, or are never allowed: one rule per action (@/core/actions), kept in the
@@ -796,6 +783,7 @@ function Maintenance() {
 const SECTIONS = [
   { id: "appearance", label: "Appearance", about: "Theme and primary colour", icon: Palette, body: Appearance },
   { id: "layout", label: "Layout", about: "Phone and desktop: start screen, Home's list, tabs, sidebar screens", icon: LayoutGrid, body: Layouts },
+  { id: "notes", label: "Notes", about: "A note's header buttons, and the assistant actions it runs", icon: NotebookPen, body: NotesSettings },
   { id: "agent", label: "Agent", about: "Model, effort, write confirmations, memory", icon: Bot, body: Agent },
   { id: "voice", label: "Voice", about: "Dictation, and the voice Talk speaks in", icon: Mic, body: Voice },
   { id: "reminders", label: "Reminders", about: "Task notifications on this device", icon: Bell, body: Reminders },

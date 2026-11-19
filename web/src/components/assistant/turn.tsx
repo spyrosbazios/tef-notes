@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type WriteInput } from "@/core/agent";
 import { askedAbout } from "@/core/handoff";
+import { ranOn } from "@/core/note-actions";
 import { plainShared } from "@/core/share";
 import { isAskTool, type ChoiceOutput } from "@/core/assistant";
 import { isWidgetTool, widgetOf } from "@/core/widgets";
@@ -115,7 +116,9 @@ function UiRow({ name, p, title }: { name: AppTool; p: ToolPart; title: string |
 /** The owner's own words: a message, or one sent into a running reply (a steering message). Photos as thumbnails, PDFs by name. */
 function Said({ parts }: { parts: Part[] }) {
   // a share from another app reads as "Shared: …", not as the <shared> block the agent gets
-  const { notes, rest } = askedAbout(parts.map((p) => (p.type === "text" ? p.text : "")).join(""));
+  // a note action's run (core/note-actions.ts) reads as its name over its note, the prompt after it
+  const said = parts.map((p) => (p.type === "text" ? p.text : "")).join(""), ran = ranOn(said);
+  const { notes, rest } = ran ? { notes: [ran.note], rest: `${ran.label}: ${ran.prompt}` } : askedAbout(said);
   const text = plainShared(rest);
   const files = parts.filter((p) => p.type === "file");
   return (

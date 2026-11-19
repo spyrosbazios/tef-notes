@@ -10,7 +10,7 @@
 // the owner's own undoable edits, saved by them. Pure and platform-neutral.
 
 export const ACTIONS = [
-  "createTask", "editTask", "deleteTask", "createNote", "editNote", "deleteNote", "files", "tags", "memory",
+  "createTask", "editTask", "deleteTask", "createNote", "editNote", "deleteNote", "files", "tags", "noteActions", "memory",
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -28,6 +28,7 @@ export const ACTION_LABEL: Record<Action, { name: string; covers: string }> = {
   deleteNote: { name: "Delete notes", covers: "Remove a note and its files" },
   files: { name: "Files", covers: "Attach a chat's photo or PDF to a note" },
   tags: { name: "Tags and lenses", covers: "Create and describe tags, create lenses" },
+  noteActions: { name: "Note actions", covers: "Add or change the assistant buttons a note offers" },
   memory: { name: "Memory", covers: "What it remembers about you" },
 };
 
@@ -35,7 +36,7 @@ export type Actions = Record<Action, Rule>;
 
 export const DEFAULT_ACTIONS: Actions = {
   createTask: "ask", editTask: "ask", deleteTask: "ask", createNote: "ask", editNote: "ask", deleteNote: "ask",
-  files: "ask", tags: "ask", memory: "auto",
+  files: "ask", tags: "ask", noteActions: "ask", memory: "auto",
 };
 
 export const isAction = (v: unknown): v is Action => (ACTIONS as readonly unknown[]).includes(v);

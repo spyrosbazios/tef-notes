@@ -190,7 +190,7 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   everything again). The page's line tells the model the text is OCR's, and when it read poorly. Setup and limits:
   `server/README.md`, "Scanned PDFs".
 - Each write belongs to an action (create, change or delete tasks; create, edit or delete notes; files; tags and lenses;
-  memory: `packages/core/src/actions.ts`), and the owner's rule for it in Settings decides: Ask first (a confirm card, AI SDK
+  note actions; memory: `packages/core/src/actions.ts`), and the owner's rule for it in Settings decides: Ask first (a confirm card, AI SDK
   tool approval), Just do it (no card unless the turn is tainted), or Never (withdrawn from the model, a call refused). The
   agent reads the rules from the preferences for every turn, never from the request. Defaults: every write asks but memory. The chat draws
   notes and tasks as cards: every write's result carries its `card`, and `show_items` is how the agent puts
@@ -202,7 +202,13 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
   next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`. The owner can turn
   the asking off in Settings (prefs `agent.webGuard`, `src/agent.ts` `guarded`): their rules then hold as set, while the
-  `tainted` mark and the withdrawal of memory and the selection tools stay.
+  `tainted` mark and the withdrawal of memory, `save_note_action` and the selection tools stay.
+- Note actions (`packages/core/src/note-actions.ts`): a button on a note runs a prompt the owner saved, as a chat of its own
+  whose requests carry `action` (which action, on which note). The agent reads the action from the preferences and narrows
+  the turn to it (`src/note-action.ts`): only the tools its result needs (rewrite this note, add a task, or read and
+  answer), a write to another note refused, a new task refused unless linked to the note. The write itself is the chat's:
+  the same card, rule and taint check. The agent saves an action itself only through `save_note_action`
+  (`src/noteActionTools.ts`), which a tainted turn is never offered: a saved prompt runs later with write tools.
 - Always-on assistant: a client that stays with you (the web's docked panel, its Ask tab on a phone) sends the page it is on as
   `context` with each message (`packages/core/src/assistant.ts`). The agent reads it as the last part of the newest message's
   `<context>` (never the instructions), resolves "this note" from it, and gets UI tools (`open_note`, `open_task`,

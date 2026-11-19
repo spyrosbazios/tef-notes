@@ -7,6 +7,15 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Added
 
+- Note actions: buttons on a note that have the assistant run a saved prompt on it, with no chat to open. Two come with the
+  app, yours to change or delete: Tidy (headings, lists, typos, nothing invented, shown as a diff to accept) and Make a task
+  (a task proposed from the note, linked back to it). Write your own in Settings → Notes, or ask the assistant to make one. A
+  run shows in a panel on the note (a sheet on the phone) with its steps, the usual card, Stop, Run again and "Open in chat";
+  what it writes follows "What the agent may do", and each action is offered only the tools it needs (#4, #5).
+- Choose a note's header: every note action, the app's own (attach, pin, ask, markdown source, copy link, download,
+  archive) and yours, is a button in the header, a row in the menu, or off, in the order you drag them into, separately for
+  the phone and the desktop. Settings → Notes, or "Pin to header" on a menu row (#6).
+
 - Talk: a spoken conversation with the assistant, on a tab of its own (and a pill while you are on another screen). Fish
   Audio's realtime ear decides what a turn is — yours, a "mm-hm" over the voice, or the television — and its streaming
   voice answers a sentence at a time; the thinking, the cards, the write rules and the taint checks are the chat's own. The
