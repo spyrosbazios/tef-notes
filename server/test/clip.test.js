@@ -371,12 +371,10 @@ describe("tags on a clip", () => {
     expect(() => lib.tagsOf([""])).toThrow();
     expect(() => lib.tagsOf([1])).toThrow();
   });
-  test("tagPick: every tag at or above the threshold, best first, else none", () => {
-    expect(lib.tagPick([{ name: "a", p: 0.9 }, { name: "b", p: 0.95 }, { name: "c", p: 0.4 }], 0.5).picked).toEqual(["b", "a"]);
-    expect(lib.tagPick([{ name: "a", p: 0.55 }, { name: "c", p: 0.7 }], 0.5).picked).toEqual(["c", "a"]);
-    const none = lib.tagPick([{ name: "a", p: 0.2 }, { name: "b", p: 0.3 }], 0.5);
-    expect(none.picked).toEqual([]);
-    expect(none.tags.map((t) => t.name)).toEqual(["b", "a"]);
+  test("tagPick: every tag best first, rounded, with the preselection it is given", () => {
+    const r = lib.tagPick([{ name: "a", p: 0.9 }, { name: "b", p: 0.951 }, { name: "c", p: 0.4 }], ["b"]);
+    expect(r.tags).toEqual([{ name: "b", p: 0.95 }, { name: "a", p: 0.9 }, { name: "c", p: 0.4 }]);
+    expect(r.picked).toEqual(["b"]);
   });
   test("saveInput carries the tags", () => {
     expect(lib.saveInput({ url: "https://x.org", title: "X", target: { kind: "new" }, tags: ["work"] }).tags).toEqual(["work"]);

@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-20 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -68,10 +68,11 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   keeps no picture. A drawing's PNG is also a tile picture of its note, like a photo.
 - The `title`, `day`, flag and `tags` columns are copies of the frontmatter, written by the client beside `text`. Edit the
   text; never set those columns alone (`noteColumns` in `packages/core/src/pocketbase.ts` builds them for every writer).
-- `autotagged` and `tagged` belong to the server's auto-tagger and are never written by a client. The auto-tagger suggests nothing: every tag it judges likelier than not (p >= 0.5) it adds
-  itself, and a wrong one is removed by hand. `autotagged` holds every name it ever added to the note, which it never
-  adds again, so a tag you removed by hand stays removed. `tagged` is `"<rev>:<hash of the tag definitions>"`, the state
-  the note was last evaluated at. The server's tag additions are ordinary `rev` bumps (the 3-way merge absorbs them); a
+- `autotagged` and `tagged` belong to the server's auto-tagger and are never written by a client. The auto-tagger suggests nothing: every tag it judges likely enough (p >= 0.7, more for a tag you keep taking off) it adds
+  itself, at most 3 of its own on a note, and a wrong one is removed by hand. `autotagged` holds every name it ever added to the note, which it never
+  adds again, so a tag you removed by hand stays removed; the ones no longer on the note are what it learns from. `tagged` is
+  `"<rev>:<hash of the tag definitions>:<hash of the title and text>"`, the state the note was last evaluated at: a new
+  `rev` with the same title and text (a tag taken off, a pin) is re-stamped, never asked about again. The server's tag additions are ordinary `rev` bumps (the 3-way merge absorbs them); a
   verdict with nothing to add (`tagged` alone) changes neither `rev` nor `updated`, nor reaches realtime.
 - `tainted` belongs to the chat agent: set in the same write when it writes a note with web text in view, never cleared,
   never sent by a client. A tainted note read back counts as reading the web, so that chat's next write asks first.
@@ -252,11 +253,14 @@ JS VM: a handler sees none of its file's top-level scope, so shared code is `req
 | `POST /agent/chat`, `GET /agent/models`, `GET /agent/search` | `server/agent/` | The chat agent and its search by meaning (a separate process) |
 | `GET /agent/companion/hello`, `tasks`, `notes`; `POST /agent/companion/tasks`, `tasks/:id/done` | `server/agent/src/companion.ts` | What the native companion (`android/`) draws and its two writes: feeds ready to draw, in the owner's colours and under the lens on. Contract: `packages/core/src/companion.ts` |
 
-**Auto-tagger** (`autotag.pb.js`, `lib/autotag.js`). A cron that runs every minute asks JEV about notes not yet
-evaluated at their current `rev` and tag definitions, looking at up to 3 of a note's photos (`lib/images.js`). Every tag it
-judges likelier than not (p >= 0.5) is written into the note's frontmatter as a `rev`-bumping compare-and-swap (re-read in
-a transaction, dropped if `rev` moved); nothing is only suggested. A new or edited tag definition re-evaluates every note,
-up to 50 a minute. Tasks are tagged only while typed (the guess route, Tasks above). Without a `typesafe` key it tags nothing.
+**Auto-tagger** (`autotag.pb.js`, `lib/autotag.js`). A cron that runs every minute asks JEV about notes whose title,
+text or tag definitions changed since they were last evaluated, looking at up to 3 of a note's photos (`lib/images.js`).
+It learns from what you did: each tag's question names a few notes you filed under it by hand and a few you took it off,
+and a tag needs p >= 0.7 to be added, up to 0.92 as you take it off more of what it was given (`cutOf`). A note carries
+at most 3 of its tags. Each one is written into the note's frontmatter as a `rev`-bumping compare-and-swap (re-read in
+a transaction, dropped if `rev` moved); nothing is only suggested. A new or renamed tag, or a description you edit,
+re-evaluates every note, up to 50 a minute; a description the server wrote does not. The clipper's preselection and a
+new task's guess use the same questions and cuts. Tasks are tagged only while typed (the guess route, Tasks above). Without a `typesafe` key it tags nothing.
 
 **Clip flow** (`clip.pb.js`, `lib/clip.js`). Two steps. `suggest` takes the page's URL, title and text, or pictures and PDFs (up to 10; JEV sees the first picture and the PDFs' names), and
 your optional note as context, and returns up to 4 candidates, each `{kind: "note" | "task", ...}`, plus the page's own
@@ -279,12 +283,14 @@ is pinned for the connection. The image installs `curl` for this. Never switch i
 follows redirects unseen, or loosen the check.
 
 **Tag descriptions** (`tags.pb.js`, `lib/tags.js`). `{tag}` or `{all: true}`; the model writes a description (up to 400
-characters, the auto-tagger's hint) from up to 12 notes that carry the tag. Clients save it with the tag. An hourly job
-(`tags.pb.js`) rewrites and saves a defined tag's description itself each time 10 more notes carry it than when it was
-last written (`tags.described`), replacing a hand-written one.
+characters, the auto-tagger's hint) from up to 12 notes you filed under the tag by hand, spread over its history (any that
+carry it when there are none), and the titles of notes you took it off. Clients save it with the tag. An hourly job
+(`tags.pb.js`) writes one itself only for a tag whose description you didn't write (`tags.describedBy`; one saved through
+the API is yours): first at 3 hand-tagged notes, then each time they double (`tags.described`). It never draws on the
+auto-tagger's own tags: a description drawn from them described its mistakes, and spread them.
 
 **Where AI is allowed to write.** JEV only decides (tags, suggestions). The writing model (the server's provider) only tidies your own note on a clip,
-writes a summary when you asked, and drafts a tag description when you asked (returned, not saved) or when 10 more notes carry the tag (saved). Only the chat agent
+writes a summary when you asked, and drafts a tag description when you asked (returned, not saved) or for a tag whose description you didn't write, as you tag more notes with it (saved). Only the chat agent
 writes text of its own, and only with your confirmation.
 
 ## Web app

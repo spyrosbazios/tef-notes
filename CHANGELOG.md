@@ -5,6 +5,17 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Changed
+
+- The auto-tagger learns from you. Each tag is judged against a few notes you filed under it by hand and a few you took
+  it off, a tag you keep removing needs a likelier match before it is added again, and a note gets at most three tags of
+  its own. Taking a tag off no longer sends the note back to be tagged again (only a change to its title or text does).
+  The clipper's preselected tags and a new task's guessed tags follow the same rules.
+- Tag descriptions the server writes are drawn only from notes you tagged by hand, spread over the tag's history, and
+  say what doesn't belong from the notes you took it off; they are written at 3 such notes and again each time that
+  doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
+  re-tags every note. The ones it wrote before are rewritten once this way.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

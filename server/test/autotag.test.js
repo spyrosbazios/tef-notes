@@ -9,14 +9,31 @@ describe("names", () => {
     expect(notes.fold("ΈΡΓΟ")).toBe("εργο");
     expect(lib.without(["Home", "Work", "work", "Έργο"], ["home", "εργο"])).toEqual(["Work"]);
   });
-  test("definitions' hash moves with a name or a description, not with their order", () => {
-    const a = { name: "Food", description: "recipes" }, b = { name: "Work", description: "" };
+  test("definitions' hash moves with a name or the owner's description, not with their order", () => {
+    const a = { name: "Food", description: "recipes", own: true }, b = { name: "Work", description: "", own: true };
     expect(lib.defsHash([a, b])).toBe(lib.defsHash([b, a]));
     expect(lib.defsHash([a, b])).not.toBe(lib.defsHash([a, { ...b, description: "jobs" }]));
     expect(lib.defsHash([a, b])).not.toBe(lib.defsHash([a]));
     expect(lib.defsHash([a])).toMatch(/^[0-9a-f]{8}$/);
   });
-  test("the evaluated state", () => expect(lib.taggedKey(3, "ab12cd34")).toBe("3:ab12cd34"));
+  test("a description the server wrote sends no note back to be asked", () => {
+    const a = { name: "Food", description: "recipes", own: false };
+    expect(lib.defsHash([a])).toBe(lib.defsHash([{ ...a, description: "cooking and recipes" }]));
+    expect(lib.defsHash([a])).not.toBe(lib.defsHash([{ ...a, own: true }]));
+  });
+  test("the evaluated state: rev, definitions, text", () => {
+    expect(lib.taggedKey(3, "ab12cd34", "0badcafe")).toBe("3:ab12cd34:0badcafe");
+    expect(lib.contentKey({ title: "A", body: "b" })).toBe(lib.contentKey({ title: "A", body: "b" }));
+    expect(lib.contentKey({ title: "A", body: "b" })).not.toBe(lib.contentKey({ title: "A", body: "c" }));
+  });
+  test("fresh: same definitions and text need no question, whatever the rev; the old key counts at its rev", () => {
+    expect(lib.fresh("3:h:c", 4, "h", "c")).toBe(true);           // a tag taken off: rev moved, nothing asked
+    expect(lib.fresh("3:h:c", 4, "h", "d")).toBe(false);          // the text changed
+    expect(lib.fresh("3:h:c", 3, "g", "c")).toBe(false);          // the definitions changed
+    expect(lib.fresh("3:h", 3, "g", "c")).toBe(true);             // evaluated before this key: no sweep on deploy
+    expect(lib.fresh("3:h", 4, "g", "c")).toBe(false);
+    for (const t of ["", null, undefined, "x"]) expect(lib.fresh(t, 1, "h", "c")).toBe(false);
+  });
 });
 
 describe("asking", () => {
@@ -40,9 +57,51 @@ describe("asking", () => {
     expect(lib.probabilities(r.defs, { answers: { t0: { noul: 0.9 }, t1: { noul: "x" }, t2: { noul: 0 } } })).toEqual([{ name: "T0", p: 0.9 }, { name: "T2", p: 0 }]);
     expect(lib.probabilities(r.defs, {})).toEqual([]);
   });
-  test("0.5 and up adds, likeliest first; below that does nothing", () => {
-    const ps = [{ name: "a", p: 0.5 }, { name: "b", p: 0.85 }, { name: "c", p: 0.8499 }, { name: "d", p: 0.4999 }, { name: "e", p: 1 }];
-    expect(lib.decide(ps)).toEqual(["e", "b", "c", "a"]);
+  test("each tag's cut and up adds, likeliest first, at most `room`", () => {
+    const ps = [{ name: "a", p: 0.7 }, { name: "b", p: 0.85 }, { name: "c", p: 0.8499 }, { name: "d", p: 0.6999 }, { name: "e", p: 1 }];
+    expect(lib.AUTO).toBe(0.7);
+    expect(lib.decide(ps, [], 9)).toEqual(["e", "b", "c", "a"]);
+    expect(lib.decide(ps)).toEqual(["e", "b", "c"]);
+    expect(lib.decide(ps, [], 0)).toEqual([]);
+    expect(lib.decide(ps, [{ name: "B", cut: 0.9 }], 9)).toEqual(["e", "c", "a"]);
+  });
+});
+
+describe("what the owner taught it", () => {
+  const rows = [
+    { id: "n1", title: "Old flat lease", tags: ["Home"], auto: [], updated: "2026-01-01" },
+    { id: "n2", title: "Boiler service", tags: ["home", "chores"], auto: ["chores"], updated: "2026-03-01" },
+    { id: "n3", title: "Sprint notes", tags: ["work"], auto: ["home"], updated: "2026-04-01" },
+    { id: "n4", title: "Rent", tags: ["Σπίτι", "home"], auto: [], updated: "2026-05-01" },
+  ];
+  const ps = lib.profile(rows);
+  test("hand-tagged notes are yes, ones the tag was taken off are no, newest first", () => {
+    expect(ps.get("home")).toEqual({ yes: [{ id: "n4", title: "Rent" }, { id: "n2", title: "Boiler service" }, { id: "n1", title: "Old flat lease" }], no: [{ id: "n3", title: "Sprint notes" }], added: 1, removed: 1 });
+    expect(ps.get("chores")).toEqual({ yes: [], no: [], added: 1, removed: 0 });
+    expect(ps.get("σπιτι").yes.map((n) => n.id)).toEqual(["n4"]);
+  });
+  test("a tag taken off often needs a likelier answer, never above CEIL", () => {
+    expect(lib.cutOf(undefined)).toBe(lib.AUTO);
+    expect(lib.cutOf({ added: 9, removed: 0 })).toBe(lib.AUTO);
+    expect(lib.cutOf({ added: 1, removed: 1 })).toBeCloseTo(0.775);
+    expect(lib.cutOf({ added: 28, removed: 21 })).toBeCloseTo(0.903);
+    expect(lib.cutOf({ added: 1000, removed: 1000 })).toBe(lib.CEIL);
+  });
+  test("definitions: the owner's description marked, examples and cut attached", () => {
+    const [h, w] = lib.definitions([{ name: " home ", description: "the house", describedBy: "owner" }, { name: "work", description: "", describedBy: "auto" }, { name: "  ", description: "" }], ps);
+    expect(h).toMatchObject({ name: "home", own: true, cut: lib.cutOf(ps.get("home")) });
+    expect(h.yes.length).toBe(3);
+    expect(w).toMatchObject({ name: "work", own: false, yes: [{ id: "n3", title: "Sprint notes" }], no: [], cut: lib.AUTO });
+  });
+  test("spread: the first, the last and evenly between", () => {
+    expect(lib.spread([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([1, 4, 7]);
+    expect(lib.spread([1, 2], 3)).toEqual([1, 2]);
+    expect(lib.spread([1, 2, 3], 1)).toEqual([1]);
+  });
+  test("the question names the owner's examples, never the note asked about, quotes made safe", () => {
+    const [d] = lib.definitions([{ name: "home", description: "the house", describedBy: "owner" }], lib.profile([...rows, { id: "n5", title: 'The "big" move', tags: ["home"], auto: [], updated: "2026-06-01" }]));
+    const q = lib.requests({ title: "Rent", body: "b" }, [d], [], "n4")[0].body.questions.t0.instructions;
+    expect(q).toBe(`Should this note carry the tag "home"? The tag means: the house Notes the owner filed under it: "The 'big' move"; "Boiler service"; "Old flat lease". Notes the owner took it off, as not fitting: "Sprint notes". Say yes only if this note is about the same thing as the notes filed under it.`);
   });
 });
 
@@ -111,5 +170,4 @@ describe("photos", () => {
     for (const ref of Object.keys(r.body.assets)) expect(state).toContain(ref);
   });
   test("at most three photos are the hook's to send", () => expect(lib.PHOTOS).toBe(3));
-  test("the evaluated-at marker keeps its shape", () => expect(lib.taggedKey(7, "0badcafe")).toBe("7:0badcafe"));
 });

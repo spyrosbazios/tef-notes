@@ -1,10 +1,12 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Auto-tagging, on the server so every client gets it and none holds a key. Two ways, both through JEV (TypeSafe's
-// decision model, lib/autotag.js) with one yes/no question per tag definition, a tag likelier than not (p >= 0.5) taken:
+// decision model, lib/autotag.js) with one yes/no question per tag definition:
 //
-// Notes: once a minute, up to BATCH notes whose `tagged` isn't their current "<rev>:<hash of the tag definitions>" are
-// asked about by their title and body. A tag found is written like a hand edit would: into the frontmatter (`text`, the
-// `tags` copy), `rev` + 1. Nothing is only suggested: a wrong tag is removed by hand.
+// Notes: once a minute, up to BATCH notes whose `tagged` isn't their current state are asked about by their title and
+// body. A tag at or above its cut (lib/autotag.js cutOf: 0.7, higher for a tag the owner keeps taking off) is written
+// like a hand edit would: into the frontmatter (`text`, the `tags` copy), `rev` + 1, at most MAX_AUTO of the tagger's
+// tags on a note. Nothing is only suggested: a wrong tag is removed by hand, and that removal is what teaches it: each
+// question names notes the owner filed under the tag by hand and notes the owner took it off (lib/autotag.js profile).
 //
 // Tasks: only while one is being typed. POST /api/tefnotes/tags/guess { title, notes? } answers { tags } (likeliest
 // first) and saves nothing; the clients call it debounced from the task form and put the tags on the draft, and what the
@@ -12,9 +14,11 @@
 // failed, 400 a bad body; no definitions or no title is { tags: [] }.
 //
 //   autotagged  json  every name this hook ever added to the record: never added again, so a tag taken off
-//                     by hand stays off
-//   tagged      text  "<rev>:<hash>" the record was last evaluated at; one moves to the back of the queue when it, or
-//                     the definitions, change, so a backlog drains over several runs, newest first
+//                     by hand stays off; the ones no longer on the note are the owner's "no" examples
+//   tagged      text  "<rev>:<defs hash>:<text hash>" the note was last evaluated at (lib/autotag.js taggedKey). A new
+//                     `rev` whose title and text are what was asked about (a tag taken off, a pin) is only re-stamped:
+//                     asking again is how a removed tag used to be followed by another one. The definitions' hash holds
+//                     the names and the owner's own descriptions, not the ones the server writes (lib/tags.js)
 //
 // Photos: a note's first PHOTOS embedded pictures (attachments records, JPEG or PNG) go to JEV beside its text, which
 // is how a receipt, a whiteboard or a product shot gets its tags. TypeSafe rejects a whole request over one picture
@@ -38,7 +42,7 @@ cronAdd("autotag", "* * * * *", () => {
   if (!key || $app.store().get("autotag-running")) return;     // a run still going when the next minute starts
   const lib = require(`${__hooks}/lib/autotag.js`), notes = require(`${__hooks}/lib/notes.js`), images = require(`${__hooks}/lib/images.js`);
 
-  const defs = $app.findAllRecords("tags").map((r) => ({ name: r.getString("name").trim(), description: r.getString("description") })).filter((d) => d.name);
+  const defs = lib.load($app);
   if (!defs.length) return;
   const hash = lib.defsHash(defs);
 
@@ -76,7 +80,7 @@ cronAdd("autotag", "* * * * *", () => {
    *  `withTags(cur, tags)`: how those tags are written into the fresh record. */
   const NOTES = {
     coll: "notes", noun: "note",
-    sql: "SELECT id FROM notes WHERE path LIKE 'notes/%' AND IFNULL(tagged, '') != CAST(CAST(rev AS INTEGER) AS TEXT) || ':' || {:hash} ORDER BY updated DESC LIMIT {:n}",
+    sql: "SELECT id FROM notes WHERE path LIKE 'notes/%' AND IFNULL(tagged, '') NOT LIKE CAST(CAST(rev AS INTEGER) AS TEXT) || ':' || {:hash} || ':%' ORDER BY updated DESC LIMIT {:n}",
     subject: (rec) => {
       const path = rec.getString("path"), text = rec.getString("text"), note = notes.parse(path, text);
       return {
@@ -114,13 +118,20 @@ cronAdd("autotag", "* * * * *", () => {
       if (state.down) break;
       try {
         const rec = $app.findRecordById(coll, id), rev = rec.getInt("rev"), had = names(rec, "autotagged");
-        const sub = subject(rec);
-        // Not asked about: what the record has, what the server added once already (and the owner may have removed)
-        const open = sub.askable ? defs.filter((d) => lib.without([d.name], sub.tags.concat(had)).length) : [];
+        const sub = subject(rec), content = lib.contentKey(sub.item);
+        // Only re-stamped, in the same guarded UPDATE as a verdict with nothing to add
+        const stamp = (tx) => tx.db().newQuery(`UPDATE ${coll} SET tagged = {:tagged} WHERE id = {:id} AND rev = {:rev}`)
+          .bind({ tagged: lib.taggedKey(rev, hash, content), id, rev }).execute();
+        if (lib.fresh(rec.getString("tagged"), rev, hash, content)) { stamp($app); continue; }
+        // Not asked about: what the record has, what the server added once already (and the owner may have removed);
+        // nothing at all once the note carries MAX_AUTO of the tagger's tags
+        const kept = lib.without(had, lib.without(had, sub.tags));   // the tagger's tags still on the note
+        const room = lib.MAX_AUTO - kept.length;
+        const open = sub.askable && room > 0 ? defs.filter((d) => lib.without([d.name], sub.tags.concat(had)).length) : [];
 
         const ask = (photos) => {
           const found = [];
-          for (const req of lib.requests(sub.item, open, photos)) {
+          for (const req of lib.requests(sub.item, open, photos, id)) {
             const json = post(req.body, noun, id, state);
             if (!json) return null;
             found.push(...lib.probabilities(req.defs, json));
@@ -134,7 +145,7 @@ cronAdd("autotag", "* * * * *", () => {
           found = ask([]);
         }
         if (!found) continue;                                   // `tagged` stays: next run asks again
-        const add = lib.decide(found);
+        const add = lib.decide(found, defs, room);
 
         $app.runInTransaction((tx) => {
           const cur = tx.findRecordById(coll, id);
@@ -143,13 +154,12 @@ cronAdd("autotag", "* * * * *", () => {
             sub.withTags(cur, sub.tags.concat(lib.without(add, sub.tags)));
             cur.set("autotagged", had.concat(lib.without(add, had)));
             cur.set("rev", rev + 1);
-            cur.set("tagged", lib.taggedKey(rev + 1, hash));
+            cur.set("tagged", lib.taggedKey(rev + 1, hash, content));
             tx.save(cur);
             added += add.length;
           } else {
             // A verdict is not an edit, and a save stamps `updated` (which the lists sort by) however it is set
-            tx.db().newQuery(`UPDATE ${coll} SET tagged = {:tagged} WHERE id = {:id} AND rev = {:rev}`)
-              .bind({ tagged: lib.taggedKey(rev, hash), id, rev }).execute();
+            stamp(tx);
           }
           done++;
         });
@@ -174,7 +184,7 @@ routerAdd("POST", "/api/tefnotes/tags/guess", (e) => {
   if (!input) return e.json(400, { error: "Send { title, notes? } as strings." });
   const key = keys.read("typesafe");
   if (!key) return e.json(503, { error: "The server has no TypeSafe key." });
-  const defs = e.app.findAllRecords("tags").map((r) => ({ name: r.getString("name").trim(), description: r.getString("description") })).filter((d) => d.name);
+  const defs = lib.load(e.app);
   if (!defs.length || !input.title) return e.json(200, { tags: [] });
 
   const ps = [];
@@ -190,5 +200,5 @@ routerAdd("POST", "/api/tefnotes/tags/guess", (e) => {
     }
     ps.push(...lib.probabilities(r.defs, res.json));
   }
-  return e.json(200, { tags: lib.decide(ps) });
+  return e.json(200, { tags: lib.decide(ps, defs) });
 });

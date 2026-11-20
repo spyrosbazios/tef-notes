@@ -175,11 +175,10 @@ function tagsOf(v) {
   return v.map((t) => t.trim());
 }
 
-/** JEV's probabilities for each defined tag, best first, as the extension offers them: `picked` the ones it preselects,
- *  every tag at or above AUTO (autotag.js). */
-function tagPick(ps, auto) {
+/** JEV's probabilities for each defined tag, best first, as the extension offers them, and `picked`, the ones it
+ *  preselects (lib/autotag.js decide: what the auto-tagger would add). */
+function tagPick(ps, picked) {
   const sorted = ps.slice().sort((a, b) => b.p - a.p);
-  const picked = sorted.filter((x) => x.p >= auto).map((x) => x.name);
   return { tags: sorted.map((x) => ({ name: x.name, p: Math.round(x.p * 100) / 100 })), picked };
 }
 

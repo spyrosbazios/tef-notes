@@ -53,8 +53,9 @@ same way; never suggested, always offered last).
    The save also takes `tags?: [name]`, the owner's: a new note or task carries them; a note or task appended to gains the ones it
    lacks (case and tonos folded), in the same rev-bumping write.
 2b. `POST {server}/api/tefnotes/clip/tags`, JSON as step 1 (the picture unused), answers `200 {tags: [{name, p}], picked}`
-   and writes nothing: every defined tag scored by JEV (one yes/no each, as the auto-tagger asks), best first; `picked` every
-   one at or above 0.85, else the best at or above 0.5 (`tagPick` in `lib/clip.js`). No key, no definitions or a JEV
+   and writes nothing: every defined tag scored by JEV (one yes/no each, as the auto-tagger asks), best first; `picked` what the
+   auto-tagger would add (`decide` in `lib/autotag.js`: each tag's cut, 0.7 up to 0.92 for one the owner keeps taking
+   off, at most 3; `tagPick` in `lib/clip.js` sorts and rounds). No key, no definitions or a JEV
    failure: every tag at 0, none picked. Asked beside step 1, so the chips show as soon as JEV answers; asked again with a
    typed note until the owner changes the chips. Shape: `ClipTags` in core.
 3. `GET {server}/api/tefnotes/clip/image?url=` the picture's bytes, fetched by the server through the link-preview SSRF

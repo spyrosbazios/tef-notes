@@ -2,12 +2,15 @@
 // Renaming a tag (below), and tag descriptions written from the notes that carry the tag, for the tag editors (phone, web, CLI): the logic is
 // lib/tags.js, the server's model (lib/llm.js, its one writing model). The route writes nothing: the client shows the text
 // and saves it with the tag the normal way (the `tags` collection's `description`, the hint the auto-tagger's JEV gets).
-// The hourly job below does save one: a defined tag that EVERY (10) more notes carry than when its description was last
-// written (`described`) gets a new one, in place of whatever was there, hand-written or not. A new description changes
-// the auto-tagger's definitions hash, so every note is asked about again, as after a hand edit.
+// The hourly job below does save one, only for a tag whose description the owner didn't write (`describedBy`): drawn from
+// the notes the owner filed under it by hand, first at 3 of them, then each time they double (lib/tags.js due). A
+// description saved through the API (a client, the agent's tools) is the owner's: the request hooks below mark it, and
+// the job never writes over it. The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
+// used for the notes asked about from then on and sends no note back to be asked again; the owner's own edit does.
 //
 // POST /api/tefnotes/tags/describe JSON { tag: "<name>" } | { all: true }
-// 200 { tag, description }                    one tag (its name as sent); description is at most 400 characters
+// 200 { tag, description }                    one tag (its name as sent); description is at most 400 characters, drawn
+//                                             from the hand-tagged notes, or from any that carry the tag when none are
 // 200 [{ tag, description }, ...]             `all`: every defined tag that has at least one note, in name order; one
 //                                             the model failed on is left out (the log says which)
 // 400 bad body, 404 no note carries the tag, 502 the model refused or failed (for `all`: for every tag), 503 no key.
@@ -35,7 +38,7 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
   const names = (raw) => lib.tagsOf(raw);
   const out = { tag: req.to, notes: 0, tasks: 0, lenses: 0, merged: false };
   e.app.runInTransaction((tx) => {
-    const defs = tx.findAllRecords("tags").map((r) => ({ id: r.id, name: r.getString("name"), color: r.getString("color"), description: r.getString("description") }));
+    const defs = tx.findAllRecords("tags").map((r) => ({ id: r.id, name: r.getString("name"), color: r.getString("color"), description: r.getString("description"), describedBy: r.getString("describedBy") }));
     const plan = lib.mergeDefs(defs, req.from, req.to);
     const to = plan.merged ? plan.keep.name : req.to;
     out.tag = to; out.merged = plan.merged;
@@ -43,6 +46,7 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
     if (plan.keep) {
       const rec = tx.findRecordById("tags", plan.keep.id);
       rec.set("name", plan.keep.name); rec.set("color", plan.keep.color); rec.set("description", plan.keep.description);
+      if (plan.merged) rec.set("describedBy", plan.keep.describedBy);
       tx.save(rec);
     }
 
@@ -105,7 +109,7 @@ routerAdd("POST", "/api/tefnotes/tags/describe", (e) => {
   try {
     const have = lib.rows(e.app);
 
-    const describe = (name) => lib.describe(e.app, ds, key, have, name, log);
+    const describe = (name) => lib.describe(e.app, ds, key, have, name, log, true);
 
     if (!req.all) {
       const r = describe(req.tag);
@@ -137,11 +141,25 @@ cronAdd("tag-describe", "17 * * * *", () => {
   const have = lib.rows($app);
   for (const rec of $app.findAllRecords("tags")) {
     const name = rec.getString("name").trim(), n = lib.count(have, name);
-    if (!name || !lib.due(n, rec.getInt("described"))) continue;
+    if (!name || !lib.due(n, rec.getInt("described"), rec.getString("describedBy"))) continue;
     const r = lib.describe($app, ds, key, have, name, log);
     if (!r.description) continue;                                 // failed: the next hour tries again
     rec.set("description", r.description);
     rec.set("described", n);
+    rec.set("describedBy", "auto");
     try { $app.save(rec); log("described", "tag", name, "notes", n); } catch (err) { log("saving the description failed", "tag", name, "error", String(err).slice(0, 200)); }
   }
 });
+
+// A description that arrives through the API is the owner's (the tag editors, the agent's tag tools): the hourly job
+// above never writes over it, and the auto-tagger's definitions hash holds it. The job's own save is no request, so it
+// fires neither hook.
+onRecordCreateRequest((e) => {
+  e.record.set("describedBy", e.record.getString("description").trim() ? "owner" : "");
+  e.next();
+}, "tags");
+
+onRecordUpdateRequest((e) => {
+  if (e.record.getString("description") !== e.record.original().getString("description")) e.record.set("describedBy", "owner");
+  e.next();
+}, "tags");
