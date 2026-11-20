@@ -6,7 +6,7 @@
 // leaves the results room (the list takes what the viewport has left).
 import { EllipsisVertical, Focus, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
-import { useState } from "react";
+import { useState, type PointerEvent } from "react";
 import { ago } from "@/core/time";
 import { fold } from "@/core/notes";
 import { Markdown } from "@/components/markdown";
@@ -61,14 +61,21 @@ export function Palette({ open, onOpenChange, onNew }: { open: boolean; onOpenCh
   const [dialog, setDialog] = useState<"tags" | "delete" | null>(null);                 // opened from it, over `target`
   const [target, setTarget] = useState<string[]>([]);
   const ask = (kind: "tags" | "delete") => { if (menu) setTarget([menu.path]); setDialog(kind); };
+  // The pointer picks a row only when it really moves: Chrome sends a still pointermove after every scroll, so cmdk's own hover
+  // selection gave the highlight back to the row under a resting mouse each time an arrow key scrolled the next row into view.
+  const hover = (e: PointerEvent) => {
+    if (!e.movementX && !e.movementY) return;
+    const v = (e.target as Element).closest("[cmdk-item]:not([aria-disabled=true])")?.getAttribute("data-value");
+    if (v && v !== active) setActive(v);
+  };
   const run = (f: () => void) => { onOpenChange(false); setQ(""); f(); };
 
   return (
     <PaletteDialog open={open} onOpenChange={onOpenChange} title="Search everything" description="Notes, tasks, tags, lenses and views. #tag narrows to a tag; a lens's name switches to it.">
-      <Command shouldFilter={false} value={active} onValueChange={setActive}>
+      <Command shouldFilter={false} value={active} onValueChange={setActive} disablePointerSelection>
         <CommandInput value={q} onValueChange={setQ} placeholder="Search notes, tasks, or #tag…" />
         <div className="flex min-h-0">
-        <CommandList className="max-h-[calc(100dvh-6rem)] min-w-0 flex-1 overscroll-contain md:max-h-[65vh]">
+        <CommandList className="max-h-[calc(100dvh-6rem)] min-w-0 flex-1 overscroll-contain md:max-h-[65vh]" onPointerMove={hover}>
           <CommandEmpty>Nothing matches.</CommandEmpty>
           {hits.length ? (
             <CommandGroup heading="Notes">
