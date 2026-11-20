@@ -20,7 +20,7 @@
 //        note holding the whole clip, files first, which the task links to (`links`, role `about`): a task holds no
 //        attachment. No JEV: target is the owner's choice. 404 if it is no longer there, 413 if a task's notes would overflow.
 //   POST /api/tefnotes/clip/tags  JSON as suggest (the picture is not used)
-//     200 { tags: [{ name, p }] (every defined tag, best first), picked: [name] (preselected: lib/clip.js tagPick) }
+//     200 { tags: [{ name, p }] (every defined or used tag, best first; undefined ones scored 0), picked: [name] (preselected: lib/clip.js tagPick) }
 //     Asks JEV one yes/no per tag definition (lib/autotag.js), writes nothing; no key or no definitions: every tag, none
 //     picked. Its own route so the tags arrive as soon as they are known, beside the suggestions.
 //   GET  /api/tefnotes/clip/image?url=  the picture at a public URL, for the extension when it can't fetch it itself;
@@ -101,9 +101,13 @@ routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
     throw err;
   }
   const defs = e.app.findAllRecords("tags").map((r) => ({ name: r.getString("name").trim(), description: r.getString("description") })).filter((d) => d.name);
+  // Every tag the owner could add by hand: the defined ones (JEV scores those) and any a note or task carries undefined.
+  const used = arrayOf(new DynamicModel({ name: "" }));
+  e.app.db().newQuery("SELECT DISTINCT TRIM(j.value) AS name FROM notes, json_each(IFNULL(notes.tags, '[]')) j WHERE j.type = 'text' UNION SELECT DISTINCT TRIM(j.value) FROM tasks, json_each(IFNULL(tasks.tags, '[]')) j WHERE j.type = 'text'").all(used);
+  const names = [...new Set([...defs.map((d) => d.name), ...used.map((u) => u.name).filter(Boolean)])];
   const scored = (ps) => {
     const seen = new Set(ps.map((x) => x.name));
-    return e.json(200, lib.tagPick([...ps, ...defs.filter((d) => !seen.has(d.name)).map((d) => ({ name: d.name, p: 0 }))], auto.AUTO));
+    return e.json(200, lib.tagPick([...ps, ...names.filter((n) => !seen.has(n)).map((name) => ({ name, p: 0 }))], auto.AUTO));
   };
   const key = keys.read("typesafe");
   if (!key || !defs.length) return scored([]);

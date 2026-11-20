@@ -6,13 +6,13 @@
 // server saves there. An optional note: typing one asks for suggestions again with it as context (after a pause, or
 // on leaving the box), and the save writes it up under the clip. Tags: asked for beside the suggestions, so they show
 // as soon as JEV has them; the preselected ones are chips, a tap takes one off, the other likely ones are offered to add,
-// and any defined tag can be added from the list. Until the owner changes them, a new note asks for them again. An optional title is used when it goes to a new note or a new task. "Add a summary" (remembered) has the server write one
+// and any tag in use can be added from the list. Under the suggestions, a search finds any note to add to instead. Until the owner changes them, a new note asks for them again. An optional title is used when it goes to a new note or a new task. "Add a summary" (remembered) has the server write one
 // under the link or picture; when it couldn't, the result says so. Keyboard: the top option has focus, arrows move,
 // Enter or Space picks, Ctrl/Cmd+Enter in the title or note saves to the top option, Escape closes.
 import "virtual:tefnotes-theme.css";
 import "./ui.css";
 import { type Choice, choices, type ClipResult, type ClipTags, describe, filesWord, type Suggestions, summaryNotice, type Target, titled, unpickedTags } from "@/core/clip";
-import { type Page, readTab, save, SetupError, suggest, tagsFor } from "./clip";
+import { findNotes, type Page, readTab, save, SetupError, suggest, tagsFor } from "./clip";
 import { take } from "./handoff";
 import { draw, icon, mark } from "./icons";
 import { allow, type Picture, picture, PictureError } from "./picture";
@@ -29,6 +29,8 @@ const tagsBox = document.getElementById("tags")!;
 const offeredBox = document.getElementById("offered")!;
 const addTag = document.getElementById("add-tag") as HTMLSelectElement;
 const summaryBox = document.getElementById("summary") as HTMLInputElement;
+const findBox = document.getElementById("find") as HTMLInputElement;
+const foundBox = document.getElementById("found")!;
 document.getElementById("brand")!.append(mark(20), "TEF Notes");
 
 const handoff = new URLSearchParams(location.search).get("handoff");
@@ -36,6 +38,7 @@ if (!handoff) document.documentElement.classList.add("action");
 const CLOSE_MS = 1500;   // the context menu's window, once saved: long enough to read the result
 const CLOSE_NOTICE_MS = 5000;   // ... and long enough to read that a summary was left out
 const RERANK_MS = 900;   // a pause in typing the note before asking again
+const FIND_MS = 250;   // a pause in typing a search before asking
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
@@ -173,6 +176,47 @@ function offer(s: Suggestions, focus: boolean) {
   if (focus) buttons[0]?.focus();
 }
 
+/** Any note, found by its title or path: each result saves there like a suggestion does. A newer search cancels the last. */
+let finding: AbortController | undefined, findPause: ReturnType<typeof setTimeout> | undefined;
+async function find() {
+  finding?.abort();
+  const q = findBox.value.trim();
+  if (!q) return foundBox.replaceChildren();
+  const ask = (finding = new AbortController());
+  try {
+    const notes = await findNotes(q, ask.signal);
+    if (ask.signal.aborted || clip.saving) return;
+    if (!notes.length) {
+      const s = document.createElement("span");
+      s.className = "dim small";
+      s.textContent = "No note matches.";
+      return foundBox.replaceChildren(s);
+    }
+    foundBox.replaceChildren(...notes.map((n) => {
+      const b = document.createElement("button");
+      b.className = "choice";
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = `Add to ${n.title || n.path}`;
+      b.append(draw(icon.append, 16), label);
+      b.addEventListener("click", () => void commit({ kind: "note", path: n.path }, b));
+      return b;
+    }));
+  } catch (e) {
+    if (ask.signal.aborted) return;
+    const s = document.createElement("span");
+    s.className = "dim small";
+    s.textContent = message(e);
+    foundBox.replaceChildren(s);
+  }
+}
+findBox.addEventListener("input", () => { clearTimeout(findPause); findPause = setTimeout(() => void find(), FIND_MS); });
+findBox.addEventListener("keydown", (event) => {
+  if (event.key !== "ArrowDown") return;
+  const first = foundBox.querySelector<HTMLButtonElement>("button");
+  if (first) { event.preventDefault(); first.focus(); }
+});
+
 /** Suggestions for the page with the note as it is now; an answer overtaken by a newer question is dropped. */
 async function rank(focus: boolean) {
   const page = clip.page;
@@ -282,8 +326,8 @@ async function read() {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") return window.close();
-  if (event.target === noteBox || event.target === titleBox || event.target === addTag || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
-  const buttons = [...list.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+  if (event.target === noteBox || event.target === titleBox || event.target === addTag || event.target === findBox || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
+  const buttons = [...list.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"), ...foundBox.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
   if (!buttons.includes(document.activeElement as HTMLButtonElement) && document.activeElement !== document.body) return;
   if (!buttons.length) return;
   event.preventDefault();

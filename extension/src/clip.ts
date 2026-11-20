@@ -27,14 +27,15 @@ function grab(cap: number, src: string | null) {
 
 const blank = (s: string | undefined) => (s?.trim() ? s : undefined);
 
-/** A request to the server; `init` without a signal. Errors come back as messages fit to show. */
+/** A request to the server; `init.signal` cancels it beside the timeout. Errors come back as messages fit to show. */
 async function call(route: string, init: RequestInit = {}): Promise<Response> {
   const server = await getServer();
   if (!server) throw new SetupError("Set the TEF Notes server's address first.");
   if (!(await hasAccess(server))) throw new SetupError("Allow this extension to reach the server in its settings.");
   let res: Response;
   try {
-    res = await fetch(`${server}${route}`, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const timeout = AbortSignal.timeout(TIMEOUT_MS);
+    res = await fetch(`${server}${route}`, { ...init, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout });
   } catch {
     throw new Error("Can't reach the server. Check the address and that you are on the server's network.");
   }
@@ -99,3 +100,14 @@ export function save(page: Page, line: string | undefined, target: Target, note:
 
 /** A picture the extension couldn't fetch itself, through the server (a public one only): its bytes. */
 export const pictureViaServer = async (src: string) => (await call(`/api/tefnotes/clip/image?url=${encodeURIComponent(src)}`)).blob();
+
+/** Notes whose title or path holds `q`, newest first, for filing into a note the suggestions missed (never an archived
+ *  one, as the suggest route). PocketBase's own records API: the server has no sign-in, and the rules allow reads. */
+export async function findNotes(q: string, signal?: AbortSignal): Promise<{ path: string; title: string }[]> {
+  const term = JSON.stringify(q.trim());
+  const filter = `path ~ "notes/%" && archived != true && (title ~ ${term} || path ~ ${term})`;
+  const params = new URLSearchParams({ filter, sort: "-updated", perPage: "8", fields: "path,title", skipTotal: "1" });
+  const res = await call(`/api/collections/notes/records?${params}`, signal ? { signal } : {});
+  const body = (await res.json()) as { items?: { path: string; title: string }[] };
+  return body.items ?? [];
+}
