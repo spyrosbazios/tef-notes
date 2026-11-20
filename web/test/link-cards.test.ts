@@ -143,3 +143,15 @@ describe("the caret and a card's line", () => {
     expect(caretBlock(s)).toBe(1);
   });
 });
+
+describe("drawnOver: a last line with no caret line of its own gets a paragraph after it", () => {
+  const first = (md: string) => parse(md).firstChild!;
+  test("a card, a picture, a PDF are drawn over; words are not", async () => {
+    const { drawnOver } = await import("../src/editor/index");
+    expect(drawnOver(first("https://example.com/a"))).toBe(true);
+    expect(drawnOver(first("![a](photo.jpg)"))).toBe(true);
+    expect(drawnOver(first("[doc.pdf](/api/files/attachments/n1/doc.pdf)"))).toBe(true);
+    expect(drawnOver(first("see https://example.com/a"))).toBe(false);
+    expect(drawnOver(first("plain words"))).toBe(false);
+  });
+});

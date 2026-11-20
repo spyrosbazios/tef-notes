@@ -12,10 +12,10 @@ import { cellAround, tableEditing } from "prosemirror-tables";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { base, commands, isActive, keys, linkAt, setLink, typed } from "./commands";
 import type { CommandName } from "./commands";
-import { chipHref, drawingPreviewSrc, fileChips, isDrawingLink, type PdfPage, type PdfPages } from "./files";
+import { chipHref, drawingPreviewSrc, fileChips, isDrawingLink, isPdfLink, type PdfPage, type PdfPages } from "./files";
 import { heldMark, heldRange, hold, type Held } from "./held";
 import { markdownSlice, normalizeBody, parse, schema, serialize, sliceMarkdown } from "./markdown";
-import { linkCards } from "./link-cards";
+import { cardUrl, linkCards } from "./link-cards";
 import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
 import type { Summarize } from "./link-tools";
@@ -119,11 +119,29 @@ function placeholder(text: string) {
   });
 }
 
-/** The note always ends on a paragraph, so there is somewhere to type after a table, a rule or a code block. */
+/** A paragraph drawn as something other than text (a link's card or player, pictures, PDF pages, drawings): the caret
+ *  has no line in it to land on. */
+export function drawnOver(p: Node): boolean {
+  if (p.type !== schema.nodes.paragraph || !p.childCount) return false;
+  if (cardUrl(p)) return true;
+  let file = false;
+  for (let i = 0; i < p.childCount; i++) {
+    const c = p.child(i);
+    if (c.type === schema.nodes.image) { file = true; continue; }
+    if (c.type === schema.nodes.hard_break || (c.isText && !c.text?.trim())) continue;
+    const href = schema.marks.link.isInSet(c.marks)?.attrs.href;
+    if (c.isText && href && (isPdfLink(href) || isDrawingLink(href))) { file = true; continue; }
+    return false;
+  }
+  return file;
+}
+
+/** The note always ends on a paragraph to type in, so there is somewhere to write after a table, a rule, a code block
+ *  or an attachment. */
 const trailingParagraph = new Plugin({
   appendTransaction: (_trs, _old, state) => {
     const last = state.doc.lastChild;
-    return last?.type === schema.nodes.paragraph ? null : state.tr.insert(state.doc.content.size, schema.nodes.paragraph.create());
+    return last?.type === schema.nodes.paragraph && !drawnOver(last) ? null : state.tr.insert(state.doc.content.size, schema.nodes.paragraph.create());
   },
 });
 
