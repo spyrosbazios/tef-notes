@@ -7,6 +7,8 @@ import { router } from "./router";
 // The default theme as --tf-* (vite-shared.ts reads packages/core/src/theme.ts): index.css maps every token onto it,
 // and hooks/appearance.ts re-sets the variables to the theme and accent this browser chose
 import "virtual:tefnotes-theme.css";
+// Lucide's icons for the editor's stylesheet rules, as --icon-* variables (vite-icons.ts)
+import "virtual:tefnotes-icons.css";
 import "./index.css";
 
 sweepStorage();
