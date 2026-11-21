@@ -16,6 +16,11 @@ version is one semver number for the whole repository, set by the git tag (see [
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
 
+### Fixed
+
+- The assistant's last step of a turn is sent no tools at all, and the app refuses a call to an app tool the turn did not
+  offer. What an untrusted tool's error said now counts as read from the web in the turns that follow, as in its own.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

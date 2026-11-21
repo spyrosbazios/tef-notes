@@ -60,6 +60,12 @@ export function pageContext(at: Where, held: Cached, selection: string, lens?: L
 export type AppTool = Exclude<UiToolName, "ask_choice">;
 export const isAppTool = (name: string): name is AppTool => isUiTool(name) && !isAskTool(name);
 
+/** The answer to a UI tool call the request didn't offer (`offered`: `uiToolsFor` of the context it carried), null when it did.
+ *  The server never sends such a tool, but a provider can emit a call to any name it has seen; the app does only what it
+ *  offered, so a call outside that is refused here and the model reads why. */
+export const notOffered = (offered: readonly UiToolName[], name: UiToolName): UiOutput | null =>
+  offered.includes(name) ? null : uiError(`${name} was not on offer in this turn: nothing was done.`);
+
 /** What a UI tool needs of the app: the records it names (after a look at the server if the cache hasn't them yet, as a note
  *  the agent just wrote may not have arrived), and the nav. */
 export type UiHost = {

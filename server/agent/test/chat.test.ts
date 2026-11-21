@@ -19,10 +19,10 @@ afterAll(() => pb.stop());
 
 type Reply = Awaited<ReturnType<MockLanguageModelV3["doStream"]>>;
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } };
-const toolCall = (toolName: string, input: object): Reply => ({
+const toolCall = (toolName: string, input: object, id = "call-1"): Reply => ({
   stream: convertArrayToReadableStream([
     { type: "stream-start", warnings: [] },
-    { type: "tool-call", toolCallId: "call-1", toolName, input: JSON.stringify(input) },
+    { type: "tool-call", toolCallId: id, toolName, input: JSON.stringify(input) },
     { type: "finish", finishReason: { unified: "tool-calls", raw: undefined }, usage },
   ]),
 });
@@ -34,8 +34,8 @@ const text = (t: string): Reply => ({
   ]),
 });
 
-let replies: Reply[] = [], prompts: unknown[] = [], offered: string[][] = [];
-const mock = new MockLanguageModelV3({ doStream: async (o) => { prompts.push(o.prompt); offered.push((o.tools ?? []).map((t) => t.name)); return replies.shift()!; } });
+let replies: Reply[] = [], prompts: unknown[] = [], offered: string[][] = [], choices: unknown[] = [];
+const mock = new MockLanguageModelV3({ doStream: async (o) => { prompts.push(o.prompt); offered.push((o.tools ?? []).map((t) => t.name)); choices.push(o.toolChoice?.type); return replies.shift()!; } });
 const pick = (async () => ({ model: mock, providerOptions: {} })) as unknown as typeof model;
 
 /** The reply as useChat would build it from the stream. */
@@ -57,7 +57,7 @@ async function send(messages: UIMessage[], actions: Partial<Actions> = {}, conte
 }
 
 beforeEach(() => {
-  pb.notes.clear(); pb.chats.clear(); pb.attachments.clear(); replies = []; prompts = []; offered = [];
+  pb.notes.clear(); pb.chats.clear(); pb.attachments.clear(); replies = []; prompts = []; offered = []; choices = [];
   pb.chats.set("chat1", { id: "chat1", title: "", messages: null, model: "" });
   pb.put("notes/20261001-shopping.md", "---\ntitle: Shopping\ncreated: 2026-10-01\n---\n- eggs\n");
 });
@@ -107,6 +107,17 @@ describe("POST /agent/chat", () => {
     // Withdrawn, the SDK refuses the call itself; toolApproval's denial (tool-policy.test.ts) is the second lock
     expect(done.parts.find(isToolUIPart)).toMatchObject({ type: "tool-append_to_note", state: "output-error", errorText: expect.stringContaining("unavailable tool") });
     expect(pb.notes.get("notes/20261001-shopping.md")!.rev).toBe(1);
+  });
+
+  it("sends no tool at all on the last step, and none may be called there", async () => {
+    // quick: 6 steps. Five tool calls, and the sixth step is the one that has to answer
+    replies = [1, 2, 3, 4, 5].map((n) => toolCall("list_tags", {}, `call-${n}`)).concat(text("All tags."));
+    await send([{ id: "u1", role: "user", parts: [{ type: "text", text: "tags?" }] }], {}, undefined, { effort: "quick" });
+    expect(offered).toHaveLength(6);
+    for (const step of offered.slice(0, 5)) expect(step).toContain("list_tags");
+    expect(offered[5]).toEqual([]);
+    expect(choices[5]).toBe("none");
+    expect(choices.slice(0, 5).every((c) => c === "auto")).toBe(true);
   });
 
   it("writes without a card when asked to, and refuses a chat that doesn't exist", async () => {
