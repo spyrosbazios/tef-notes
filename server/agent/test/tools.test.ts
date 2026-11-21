@@ -13,7 +13,8 @@ import { linkRecord, newLink } from "@/core/record-links";
 import { Todo } from "../src/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";
 import { stepTools } from "../src/loop";
-import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, policyFor, readWeb, tools, type Line } from "../src/tools";
+import { ago, indexLine, noteIndex, type Line } from "../src/note-index";
+import { appended, checkWrite, NOTE_RE, READ_RE, policyFor, readWeb, tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
 /** The owner's rules as the old switch left them (pb_migrations/1795000000_agent_actions.js): off is the defaults; on, the

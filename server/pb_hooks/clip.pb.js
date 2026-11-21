@@ -45,7 +45,7 @@
 // A handler runs in its own VM and sees nothing of this file's top level: each requires what it uses.
 
 routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "No suggestions could be made.", () => {
-  const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
+  const lib = require(`${__hooks}/lib/clip.js`), core = require(`${__hooks}/lib/core.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
   let clip;
@@ -63,7 +63,7 @@ routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => require(`${__hooks}/lib/h
     e.app.db().newQuery("SELECT t.id AS id, t.title AS title, IFNULL(t.`when`, '') AS scheduled, IFNULL(t.due, '') AS due, t.updated AS updated FROM tasks t WHERE IFNULL(t.done, '') = '' ORDER BY t.updated DESC LIMIT {:n}").bind({ n: lib.TASKS }).all(open);
     const tasks = lib.taskIndex(open.map((r) => lib.taskRow(r)));
     let memory = "";
-    try { memory = e.app.findFirstRecordByFilter("notes", "path = {:p}", { p: notes.MEMORY }).getString("text").trim(); } catch (_) { /* none yet */ }
+    try { memory = e.app.findFirstRecordByFilter("notes", "path = {:p}", { p: core.MEMORY }).getString("text").trim(); } catch (_) { /* none yet */ }
     const ps = lib.passages(clip.text);
 
     let out = lib.suggest(null, index, tasks, ps);
@@ -127,7 +127,7 @@ routerAdd("POST", "/api/tefnotes/clip/tags", (e) => require(`${__hooks}/lib/http
 }));
 
 routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The clip could not be saved.", () => {
-  const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
+  const lib = require(`${__hooks}/lib/clip.js`), core = require(`${__hooks}/lib/core.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
   const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`), records = require(`${__hooks}/lib/records.js`), rows = require(`${__hooks}/lib/rows.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
@@ -229,11 +229,11 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
   /** A new note of the whole clip (the files first, when there are any), titled `title`: its path and its text under the
    *  title it has then (`text()`), saved by `saveNote`. Its path stays the one the first title gave it. */
   const newNote = (title) => {
-    const stem = notes.pathStem(title, now), taken = arrayOf(new DynamicModel({ path: "" }));
+    const stem = core.newNotePath(title, now).replace(/\.md$/, ""), taken = arrayOf(new DynamicModel({ path: "" }));
     e.app.db().newQuery("SELECT path FROM notes WHERE path LIKE {:stem}").bind({ stem: `${stem}%` }).all(taken);
-    const path = notes.newNotePath(title, now, new Set(taken.map((r) => r.path)));
-    const body = lib.bodyOf(clip, clip.line, note, attach(notes.idOf(path)), summary);
-    const made = { path, title, text: () => notes.serialize({ title: made.title, created: notes.localDay(now), tags: without(clip.tags, []) }, body) };
+    const path = core.newNotePath(title, now, new Set(taken.map((r) => r.path)));
+    const body = lib.bodyOf(clip, clip.line, note, attach(core.noteIdOf(path)), summary);
+    const made = { path, title, text: () => core.serializeNote({ title: made.title, created: core.localDay(now), tags: without(clip.tags, []) }, body) };
     return made;
   };
   const saveNote = (tx, made) => records.create(tx, "notes", (r) => { r.set("path", made.path); r.set("text", made.text()); }, { taint: true });
@@ -245,7 +245,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
     try {
       const res = send({
         url: `${AGENT}/agent/title`, method: "POST", timeout: 50,
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: notes.idOf(made.path) }),
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: core.noteIdOf(made.path) }),
       });
       const t = res.statusCode === 200 ? lib.agentTitle(res.json) : "";
       if (res.statusCode !== 200) log("the agent could not title it", "status", res.statusCode);
@@ -286,14 +286,14 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
       const target = clip.target.path;
       let id;
       try { id = e.app.findFirstRecordByFilter("notes", "path = {:p}", { p: target }).id; } catch (_) { return e.json(404, { error: "That note no longer exists." }); }
-      const body = lib.bodyOf(clip, clip.line, note, attach(notes.idOf(target)), summary);
+      const body = lib.bodyOf(clip, clip.line, note, attach(core.noteIdOf(target)), summary);
       e.app.runInTransaction((tx) => {
         let title = "";
         const rec = records.casWrite(tx, "notes", id, (r) => {
-          const text = r.getString("text"), n = notes.parse(target, text);
+          const text = r.getString("text"), n = core.parseNote(target, text);
           const added = without(clip.tags, n.tags);
-          let next = notes.withBody(text, n, notes.appended(n.body, body));
-          if (added.length) next = notes.withTags(target, next, [...n.tags, ...added]);
+          let next = core.withBody(text, n, core.appended(n.body, body));
+          if (added.length) next = core.withFlags(target, next, { tags: [...n.tags, ...added] });
           r.set("text", next);
           title = n.title;
         }, { taint: true });
@@ -305,7 +305,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
       // the task is `about` (lib/links.js). Note, task and link in one transaction: all or none.
       const text = lib.taskNotes("", lib.bodyOf(clip, clip.line, note, "", summary));
       if (text == null) return e.json(413, { error: "The clip is too long for a task's notes." });
-      const first = lib.titleOf(clip, clip.line, now), made = files.length ? newNote(first) : null;
+      const first = lib.titleOf(clip, clip.line), made = files.length ? newNote(first) : null;
       const title = retitle(made, first);
       e.app.runInTransaction((tx) => {
         const saved = made ? saveNote(tx, made) : null;
@@ -328,7 +328,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
         out = made ? { kind: "task", id: task.id, title, action: "created", note: made.path } : { kind: "task", id: task.id, title, action: "created" };
       });
     } else {
-      const first = lib.titleOf(clip, clip.line, now), made = newNote(first), title = retitle(made, first);
+      const first = lib.titleOf(clip, clip.line), made = newNote(first), title = retitle(made, first);
       e.app.runInTransaction((tx) => { saveNote(tx, made); });
       out = { kind: "note", path: made.path, title, action: "created" };
     }

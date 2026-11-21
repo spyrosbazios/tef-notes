@@ -27,8 +27,10 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
   maps PocketBase's answers to those failures (`outcomeOf`: a relation to a deleted record is `Gone`). The fetch client
   (`pocketbase.ts`) and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports
   the contracts, not the HTTP client, and switches on those types, never on status codes: a `Refused` change is parked
-  (`refused`) and shown to the owner instead of being retried. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
-  the note format that a test (`server/test/notes.test.js`) checks against `packages/core/src/notes.ts`.
+  (`refused`) and shown to the owner instead of being retried. The server's hooks run in PocketBase's JS VM and import no TypeScript, so what they use of the core (the note
+  format, the share text, links) and of the agent (the notes index, the provider table) is bundled for it, at image build
+  and before the tests and the integration run: `server/pb_hooks/bundle/core.ts` → `lib/core.js` (generated, never
+  committed). One copy of each rule.
 - Clients own merging. The server stays thin: schema, rules, the `rev` contract and a few jobs.
 - There is no sign-in; see [SECURITY.md](SECURITY.md).
 
@@ -237,7 +239,7 @@ the agent writes it the same way). Links are outside it (above).
   Historical tool inputs and outputs remain intact for display and export. Schema repair and prompt trimming operate
   on an execution copy; taint is classified before repair, and both streaming and final saves retain the historical parts.
 - Providers: one model provider per server, `TEF_NOTES_PROVIDER` (DeepSeek by default; `server/agent/src/models.ts`, with
-  `server/pb_hooks/lib/llm.js` its plain-HTTP copy for the hooks); `exa` powers web search. Without the provider's key a chat is refused; without
+  `server/agent/src/providers.ts` the table both it and the hooks' plain-HTTP caller, `server/pb_hooks/lib/llm.js`, read); `exa` powers web search. Without the provider's key a chat is refused; without
   `exa` the web tools are left out of the prompt.
 - Places (`src/places.ts`, `src/placeTools.ts`): `GET /agent/places/suggest`, `place` and `map` are a task's place search
   over OpenStreetMap's free services, no key: Photon for suggestions (each a whole place) and the assistant's `find_place`

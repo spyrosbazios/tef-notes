@@ -37,6 +37,16 @@ ARG TEF_NOTES_URL CRX_KEY_FILE TEF_NOTES_VERSION
 RUN --mount=type=secret,id=crx_key \
     bun run build && bun run pack /run/secrets/crx_key /src/extension/out
 
+# The hooks, with lib/core.js: the clients' code they use (note format, share text, links, the agent's notes index and
+# provider table) bundled for PocketBase's JS VM by pb_hooks/bundle/build.ts. Plain JS, the same on every architecture.
+FROM --platform=$BUILDPLATFORM oven/bun:1.3.9-alpine AS hooks
+WORKDIR /src/server
+COPY packages/core/src /src/packages/core/src
+COPY server/agent/tsconfig.json agent/tsconfig.json
+COPY server/agent/src/note-index.ts server/agent/src/providers.ts agent/src/
+COPY server/pb_hooks pb_hooks
+RUN bun pb_hooks/bundle/build.ts && rm -r pb_hooks/bundle
+
 FROM alpine:3.22 AS base
 ARG PB_VERSION=0.40.6
 # BuildKit sets it (amd64, arm64): PocketBase publishes a zip for each
@@ -50,7 +60,7 @@ COPY --from=web /src/web/dist /pb/pb_public
 # Baked in, never bind-mounted: PocketBase restarts on a hook change and applies every pending migration, so a mounted
 # checkout deployed whatever was saved. They change with `up --build` only.
 COPY server/pb_migrations /pb/pb_migrations
-COPY server/pb_hooks /pb/pb_hooks
+COPY --from=hooks /src/server/pb_hooks /pb/pb_hooks
 EXPOSE 8090
 # CORS: no web page reads this API from another origin (the web app is served here, and the extension's host permission
 # needs no CORS), so --origins (PocketBase's default "*") names only the extension: the one this image serves, by the id

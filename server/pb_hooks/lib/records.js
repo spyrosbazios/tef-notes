@@ -1,6 +1,6 @@
 // The rev contract for the server's own writes. A save from a hook or a cron fires none of the request hooks (rev.pb.js),
 // so every hook that writes a note or a task goes through here instead of bumping `rev` by hand: one copy of the
-// compare-and-swap, of the columns a note carries beside its text (notes.js columns), and of the `tainted` mark.
+// compare-and-swap, of the columns a note carries beside its text (core noteColumns), and of the `tainted` mark.
 //
 // `tainted` (pb_migrations/1792600000_chats.js, 1793000002_todo_tainted.js): a record holding text the owner didn't
 // write (a clipped page, a share from another app, what a model wrote) is marked, so a chat that reads it back treats
@@ -9,12 +9,12 @@
 // Plain CommonJS over the transaction PocketBase hands a hook (`tx`: findRecordById, findCollectionByNameOrId, save),
 // so bun can test it with a fake (server/test/records.test.js).
 
-const { columns } = require("./notes.js");
+const { noteColumns } = require("./core.js");
 
 /** A note's text written to its record with every column copied out of it; a task has none. */
 function copyColumns(collection, rec) {
   if (collection !== "notes") return;
-  const cols = columns(rec.getString("path"), rec.getString("text"));
+  const cols = noteColumns(rec.getString("path"), rec.getString("text"));
   for (const k of Object.keys(cols)) rec.set(k, cols[k]);
 }
 

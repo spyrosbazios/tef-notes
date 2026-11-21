@@ -1,5 +1,5 @@
-// The clip route's lib (pb_hooks/lib/clip.js): the text it writes must be the phone's share text (packages/core/src/
-// share.ts), which these compare against; what it reads from a request, asks JEV, and does with the answer.
+// The clip route's lib (pb_hooks/lib/clip.js): the text it writes, the phone's share text (packages/core/src/share.ts,
+// through the hooks' bundle lib/core.js); what it reads from a request, asks JEV, and does with the answer.
 import { describe, expect, test } from "bun:test";
 import lib from "../pb_hooks/lib/clip.js";
 import jev from "../pb_hooks/lib/jev.js";
@@ -8,25 +8,13 @@ import { make } from "../pb_hooks/lib/llm.js";
 const ds = make("deepseek", () => "");
 import { bodyFor, titleFor } from "../../packages/core/src/share";
 import { CLIP_FILES, CLIP_TEXT } from "../../packages/core/src/clip";
-import { linkify } from "../../packages/core/src/links";
+import { localDay } from "../../packages/core/src/time";
 import { fileMarkdown, linkPath, pdfName, photoMarkdown, photoName } from "../../packages/core/src/photos";
 
 const U = "https://www.example.com/a?b=1";
 const S = (p) => ({ text: "", url: U, images: [], pdfs: [], title: null, ...p });
 
 describe("the share text", () => {
-  const cases = [
-    S({}), S({ title: "Example Domain" }), S({ title: "A [page] \\ x" }), S({ text: "a quote", title: "Page" }), S({ text: `Read ${U} now`, title: "Page" }),
-    S({ text: `Read ${U} now` }), S({ text: "\n first line \nsecond" }), S({ text: "x".repeat(80) }), S({ title: "y".repeat(70) }),
-    S({ url: "https://user@WWW.Example.org:8080/x" }), S({ url: "http://[::1]:80/x" }),
-  ];
-  test("titles as titleFor", () => {
-    for (const s of cases) for (const page of [null, "Fetched title", "  "]) expect(lib.titleFor(s, page)).toBe(titleFor(s, page));
-  });
-  test("bodies as bodyFor, links as linkify", () => {
-    for (const s of cases) for (const page of [null, "Fetched $& title"]) expect(lib.bodyFor(s, page)).toBe(bodyFor(s, page));
-    expect(lib.linkify(`see ${U}`, U, "A $1 [b]")).toBe(linkify(`see ${U}`, U, "A $1 [b]"));
-  });
   test("a clip: the link, the line on what it is, then the selection", () => {
     const clip = lib.input({ url: U, title: "Page", selection: "  clipped\ntext " });
     expect(lib.bodyOf(clip, "What it is.")).toBe(`[Page](${U})\n\nWhat it is.\n\nclipped\ntext\n`);
@@ -47,11 +35,10 @@ describe("the share text", () => {
     expect(lib.bodyOf(text, "")).toBe(bodyFor(S({ url: null, text: "just words" }), null));
     expect(lib.titleOf(text, "")).toBe(titleFor(S({ url: null, text: "just words" }), null));
     const photo = lib.saveInput({ title: "", target: { kind: "new" }, images: [{ src: "" }] });
-    const day = Date.parse("2026-10-30T09:08:07");
-    expect(lib.titleOf(photo, "", day)).toBe("Photos 2026-10-30");
+    expect(lib.titleOf(photo, "")).toBe(`Photos ${localDay()}`);
     expect(lib.bodyOf(photo, "", "", "![](../attachments/n/p.jpg)")).toBe("![](../attachments/n/p.jpg)\n\n");
     const pdf = lib.saveInput({ title: "", target: { kind: "new" }, images: [{ src: "" }], pdfs: [{ name: "Lease 2026.pdf" }] });
-    expect(lib.titleOf(pdf, "", day)).toBe("Lease 2026");
+    expect(lib.titleOf(pdf, "")).toBe("Lease 2026");
   });
   test("several pictures and PDFs: stored under free names, the pictures' lines then the PDFs' links, as the web app attaches them", () => {
     const clip = lib.saveInput({ title: "", target: { kind: "new" }, images: [{ src: "" }, { src: "" }], pdfs: [{ name: "Μίσθωση [v2].pdf" }, { name: "?.pdf" }] });
@@ -148,8 +135,7 @@ describe("the request", () => {
       expect(() => lib.input(bad)).toThrow(lib.Bad);
     }
   });
-  test("the limits are core's (the hook cannot load it at runtime): its file count, and the page text it sends whole", () => {
-    expect(lib.FILES).toBe(CLIP_FILES);
+  test("the limits are core's: its file count, and the page text it sends whole", () => {
     const files = (n) => ({ url: U, title: "t", images: Array(n).fill({ src: "" }) });
     expect(lib.input(files(CLIP_FILES)).images.length).toBe(CLIP_FILES);
     expect(() => lib.input(files(CLIP_FILES + 1))).toThrow(lib.Bad);
@@ -212,11 +198,6 @@ describe("the notes index", () => {
     expect(idx[0].path).toBe("notes/old-pin.md");
     expect(idx[1].path).toBe("notes/n0.md");
     expect(idx[60].path).toBe("notes/n59.md");
-  });
-  test("one line per note: path · title · tags · flags · age", () => {
-    expect(lib.indexLine({ path: "notes/a.md", title: "A", tags: ["x", "y"], pinned: true, updated: now - 3 * 86400000 }, now))
-      .toBe("notes/a.md · A · [x, y] · pinned · 3d ago");
-    expect(lib.indexLine({ path: "notes/a.md", title: "A", tags: [], pinned: false, updated: now }, now)).toBe("notes/a.md · A · today");
   });
 });
 

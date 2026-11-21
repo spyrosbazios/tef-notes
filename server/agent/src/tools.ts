@@ -21,6 +21,7 @@ import { localDay } from "@/core/time";
 import { uiTools } from "./assistant";
 import { capList, clip, fromWeb as classifyReads } from "./guard";
 import { definedTags, TAGS, type Meta, type Notes } from "./notes";
+import { ago, flagsOf, newest } from "./note-index";
 import { drawingTools } from "./drawings";
 import { fileTools } from "./fileTools";
 import type { Attached } from "@/core/assistant";
@@ -37,7 +38,6 @@ import { lensFields, LENS, widgetTools } from "./widgetTools";
 export const CAP = 6000;                    // agent/memory.md rides in every prompt; keep it small
 const SUMMARIES = 10;                       // summarise_links: pages read in one call
 const NOTE = 20_000, PAGE = 20_000, LIST = 60, SHOWN = 8;            // read_note: chars; list_notes: the most it hands back; show_items: cards at most
-export const RECENT = 60;                   // the prompt's index: every pinned note, then this many newest
 
 /** What the note tools write: notes only — memory has update_memory. One level, any letters (the laptop names
  *  files `Λίστα.md` too), no `/`, `\\`, control character or `..`: nothing the server would refuse. */
@@ -48,35 +48,6 @@ export const READ_RE = new RegExp(`${NOTE_RE.source}|^agent\\/memory\\.md$`, "u"
 /** What read_image keeps in the chat: which picture, never its bytes (toModelOutput fetches them). */
 type Seen = { error: string } | { path: string; name: string; rec: string; file: string };
 
-/** The index's view of a note: what indexLine and list_notes read. */
-export type Line = Pick<Meta, "path" | "title" | "tags" | "pinned" | "updated"> & { archived?: boolean; color?: string };
-
-const DAY = 86_400_000;
-/** How long since a note was last edited, in whole days. */
-export const ago = (updated: number, now = Date.now()) => {
-  const d = Math.floor((now - updated) / DAY);
-  return d <= 0 ? "today" : `${d}d ago`;
-};
-
-const flagsOf = (n: Line) => (n.archived ? "archived" : n.pinned ? "pinned" : "");
-
-/** One note as the prompt lists it: `path · title · [tags] · pinned · Nd ago`, empty parts left out. */
-export const indexLine = (n: Line, now = Date.now()) =>
-  [n.path, n.title, n.tags.length ? `[${n.tags.join(", ")}]` : "", flagsOf(n), ago(n.updated, now)].filter(Boolean).join(" · ");
-
-const newest = <T extends Line>(xs: T[]) => [...xs].sort((a, b) => b.updated - a.updated);
-
-/** The `<notes>` block: every pinned note, then the newest `n` of the rest, then how many more there are, and how many are
- *  archived (never listed: the owner put them away; search_notes still finds them). */
-export function noteIndex(list: Line[], now = Date.now(), n = RECENT) {
-  const all = list.filter((x) => x.path.startsWith(NOTES)), N = newest(all.filter((x) => !x.archived));
-  const top = N.filter((x) => x.pinned), rest = N.filter((x) => !x.pinned);
-  const lines = [...top, ...rest.slice(0, n)].map((x) => indexLine(x, now));
-  const more = rest.length - n, shelved = all.length - N.length;
-  if (more > 0) lines.push(`(${more} older note${more === 1 ? "" : "s"} not listed: search_notes or list_notes finds them)`);
-  if (shelved > 0) lines.push(`(${shelved} archived note${shelved === 1 ? "" : "s"} not listed: search_notes or list_notes "archived" finds them)`);
-  return lines.join("\n") || "(no notes yet)";
-}
 
 /** Why a note write can't go ahead, or null. Checked before the user is asked: a bad path goes straight back
  *  to the agent instead of through a confirm card. `body`: a rewrite's, which must not bring frontmatter of its

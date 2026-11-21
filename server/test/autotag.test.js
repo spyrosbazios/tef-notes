@@ -1,13 +1,13 @@
 // The auto-tagger's lib (pb_hooks/lib/autotag.js): what it asks JEV and does with the answers. The `tags:` line it writes
-// is lib/notes.js's, checked against the clients' in notes.test.js.
+// is core withFlags's (the hooks' bundle, lib/core.js).
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import lib from "../pb_hooks/lib/autotag.js";
-import notes from "../pb_hooks/lib/notes.js";
+import { fold } from "../pb_hooks/lib/core.js";
 
 describe("names", () => {
   test("folded: case and Greek tonos", () => {
-    expect(notes.fold("ΈΡΓΟ")).toBe("εργο");
+    expect(fold("ΈΡΓΟ")).toBe("εργο");
     expect(lib.without(["Home", "Work", "work", "Έργο"], ["home", "εργο"])).toEqual(["Work"]);
   });
   test("definitions' hash moves with a name or the owner's description, not with their order", () => {

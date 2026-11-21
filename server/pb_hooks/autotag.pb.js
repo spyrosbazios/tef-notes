@@ -42,7 +42,7 @@ cronAdd("autotag", "* * * * *", () => {
   const jev = require(`${__hooks}/lib/jev.js`);
   const key = require(`${__hooks}/lib/keys.js`).read("typesafe");   // no key: tag nothing
   if (!key || $app.store().get("autotag-running")) return;     // a run still going when the next minute starts
-  const lib = require(`${__hooks}/lib/autotag.js`), notes = require(`${__hooks}/lib/notes.js`), images = require(`${__hooks}/lib/images.js`), records = require(`${__hooks}/lib/records.js`);
+  const lib = require(`${__hooks}/lib/autotag.js`), core = require(`${__hooks}/lib/core.js`), images = require(`${__hooks}/lib/images.js`), records = require(`${__hooks}/lib/records.js`);
 
   const defs = lib.load($app);
   if (!defs.length) return;
@@ -82,10 +82,10 @@ cronAdd("autotag", "* * * * *", () => {
     coll: "notes", noun: "note",
     sql: lib.NOTES_SQL,
     subject: (rec) => {
-      const path = rec.getString("path"), text = rec.getString("text"), note = notes.parse(path, text);
+      const path = rec.getString("path"), text = rec.getString("text"), note = core.parseNote(path, text);
       return {
         item: note, askable: !!note.body.trim(), tags: note.tags, photos: () => photosOf(note),
-        withTags: (cur, tags) => { cur.set("text", notes.withTags(path, text, tags)); },
+        withTags: (cur, tags) => { cur.set("text", core.withFlags(path, text, { tags })); },
       };
     },
   };

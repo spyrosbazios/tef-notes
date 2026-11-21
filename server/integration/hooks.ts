@@ -134,3 +134,11 @@ test("every route answers a failure as { error } alone (lib/http.js), which the 
     expect(r.error?.length).toBeGreaterThan(3);
   }
 });
+
+test("clip: a bare link with no title is titled by its site, the core's titleFor run in PocketBase (lib/url.js)", async () => {
+  // A loopback page: the route's guarded fetch of its title is refused, so the title is the host's.
+  const out = await clip({ title: "", selection: "", url: "http://user@127.0.0.1:9/a?b=1", target: { kind: "new" } });
+  const rec = await record("notes", (await pb.read(s, out.path))!.rec);
+  expect(rec.title).toBe("127.0.0.1");
+  expect(rec.text).toContain("<http://user@127.0.0.1:9/a?b=1>");
+});

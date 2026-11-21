@@ -11,6 +11,8 @@ node_modules/
 
 # build output and artifacts
 dist/
+# the hooks' bundle of the clients' code (server/pb_hooks/bundle/build.ts)
+server/pb_hooks/lib/core.js
 # the promo film: rendered (video/out), and placed in the site's public/ by the Pages workflow
 video/out/
 site/public/film*

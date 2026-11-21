@@ -1,0 +1,4 @@
+[test]
+# The hooks' bundle of the clients' code (pb_hooks/lib/core.js) is built before any test loads it, so the tests run what
+# PocketBase runs.
+preload = ["./test/core.ts"]

@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { buildCore } from "../pb_hooks/bundle/build";
 
 const application = process.argv.slice(2).includes("--application");
 if (process.argv.slice(2).some((arg) => arg !== "--application")) throw new Error("Usage: run.ts [--application]");
@@ -37,6 +38,7 @@ async function command(args: string[]) {
 }
 try {
   await mkdir(env.TEF_NOTES_KEYS_DIR);
+  await buildCore();   // the hooks' bundle of the clients' code, as the image builds it (server/Dockerfile)
   await cp(join(server, "pb_hooks"), join(root, "pb_hooks"), { recursive: true });
   await cp(join(server, "pb_migrations"), join(root, "pb_migrations"), { recursive: true });
   let binary = process.env.TEF_TEST_POCKETBASE ? resolve(process.env.TEF_TEST_POCKETBASE) : Bun.which("pocketbase");

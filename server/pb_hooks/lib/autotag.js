@@ -24,7 +24,7 @@ const TITLE_CHARS = 80;                 // of an example's title
 
 // ---- tag names
 
-const { fold } = require("./notes.js");
+const { fold } = require("./core.js");
 const { spread, noteTags } = require("./rows.js");
 
 /** The names in `list` that `names` does not have, ignoring case and tonos, each once. */
