@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cutsIn, sameOrigin, turnsOf, wordsOf } from "../src/talk";
+import { cutsIn, turnsOf, wordsOf } from "../src/talk";
 
 describe("wordsOf", () => {
   test("says a whole sentence at once, and keeps what follows", () => {
@@ -19,21 +19,6 @@ describe("wordsOf", () => {
 
   test("a line break ends one too: the reply is drawn as it is said", () => {
     expect(wordsOf("Found the note you meant\nand this")).toEqual({ say: "Found the note you meant\n", rest: "and this" });
-  });
-});
-
-describe("sameOrigin", () => {
-  const headers = (h: Record<string, string>) => ({ get: (n: string) => h[n.toLowerCase()] ?? null });
-
-  test("a browser on this server's own host, or a client with no Origin at all", () => {
-    expect(sameOrigin(headers({ origin: "https://notes.ts.net:8097", host: "notes.ts.net:8097" }))).toBe(true);
-    expect(sameOrigin(headers({ origin: "https://notes.ts.net", "x-forwarded-host": "notes.ts.net" }))).toBe(true);
-    expect(sameOrigin(headers({}))).toBe(true);
-  });
-
-  test("another website is refused: this is what keeps one out of the socket", () => {
-    expect(sameOrigin(headers({ origin: "https://evil.example", host: "notes.ts.net:8097" }))).toBe(false);
-    expect(sameOrigin(headers({ origin: "not a url", host: "notes.ts.net" }))).toBe(false);
   });
 });
 

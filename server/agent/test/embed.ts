@@ -1,6 +1,10 @@
 // A stand-in for the embedding model (src/semantic.ts): a word's concept is one dimension, so tests can say which
 // texts mean the same thing without loading the real model. Preloaded (bunfig.toml) so no test downloads it. OCR
-// (src/ocr.ts) is off the same way, so no test runs Tesseract unless it brings a stand-in (useOcr).
+// (src/ocr.ts) is off the same way, so no test runs Tesseract unless it brings a stand-in (useOcr). The data volume is a
+// temp directory, so a test that needs it (the approval secret, approval-secret.ts) writes nothing into the checkout.
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { useOcr } from "../src/ocr";
 import { Semantic, useSemantic, type Embed } from "../src/semantic";
 
@@ -15,3 +19,5 @@ export const fakeEmbed: Embed = async (texts) => texts.map((t) => {
 
 useSemantic(new Semantic(fakeEmbed));
 useOcr(null);
+
+process.env.TEF_NOTES_DATA ??= mkdtempSync(join(tmpdir(), "agent-data-"));

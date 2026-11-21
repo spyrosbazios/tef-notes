@@ -1,6 +1,7 @@
 // The agent sidecar: the chat agent's loop, beside PocketBase in the same compose (server/docker-compose.yml), because
 // PocketBase's JS hooks can't stream. Served same-origin under /agent/* by a reverse proxy on a private network (e.g.
 // a tunnel such as `tailscale serve`); no sign-in, like PocketBase: that network is the gate, so it listens on loopback only on the host.
+// Every route that takes a body or changes something is wrapped in `own` (request-guard.ts): another website's browser is refused.
 import { chat } from "./agent";
 import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "./companion";
 import { drawingPictureRoute } from "./drawing-picture";
@@ -12,6 +13,7 @@ import { allPdfs, pagesRoute, readScans, thumbRoute } from "./pdfs";
 import { mapRoute, placeRoute, suggestRoute } from "./places";
 import { NoteService } from "./application/notes";
 import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
+import { own } from "./request-guard";
 import { startReminders } from "./reminders";
 import { reader } from "./reader";
 import { search } from "./search";
@@ -30,30 +32,30 @@ Bun.serve({
   hostname: process.env.HOST ?? "127.0.0.1",
   idleTimeout: 255,                          // a reply can think for a while between chunks; keep-alives come every 15 s
   routes: {
-    "/agent/chat": { POST: (req) => chat(req, server) },
-    "/agent/chat/:id/steer": { POST: (req) => steerRoute(req, req.params.id) },
-    "/agent/find": { POST: (req) => find(req, server) },
+    "/agent/chat": { POST: own("json", (req) => chat(req, server)) },
+    "/agent/chat/:id/steer": { POST: own("json", (req) => steerRoute(req, req.params.id)) },
+    "/agent/find": { POST: own("json", (req) => find(req, server)) },
     "/agent/search": { GET: (req) => search(req, server) },
     "/agent/reader": { GET: (req) => reader(req, server) },
     "/agent/pdf-thumb": { GET: (req) => thumbRoute(req, server) },
-    "/agent/drawing-picture": { POST: (req) => drawingPictureRoute(req) },
+    "/agent/drawing-picture": { POST: own("json", (req) => drawingPictureRoute(req)) },
     "/agent/pdf-pages": { GET: (req) => pagesRoute(req, server) },
     "/agent/ocr": { GET: () => ocrRoute() },
     "/agent/places/suggest": { GET: (req) => suggestRoute(req) },
     "/agent/places/place": { GET: (req) => placeRoute(req) },
     "/agent/places/map": { GET: (req) => mapRoute(req) },
     "/agent/push/key": { GET: () => keyRoute() },
-    "/agent/push/subscribe": { POST: (req) => subscribeRoute(req, server), DELETE: (req) => unsubscribeRoute(req, server) },
+    "/agent/push/subscribe": { POST: own("json", (req) => subscribeRoute(req, server)), DELETE: own("json", (req) => unsubscribeRoute(req, server)) },
     "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server, fish) },
     "/agent/talk/voices": { GET: (req) => talkVoicesRoute(req, fish) },
-    "/agent/title": { POST: (req) => titleRoute(req, server) },
-    "/agent/transcribe": { POST: (req) => transcribe(req) },
+    "/agent/title": { POST: own("json", (req) => titleRoute(req, server)) },
+    "/agent/transcribe": { POST: own("bytes", (req) => transcribe(req)) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/companion/hello": { GET: () => helloRoute(server) },
-    "/agent/companion/tasks": { GET: (req) => tasksRoute(req, server), POST: (req) => addTaskRoute(req, server) },
-    "/agent/companion/tasks/:id/done": { POST: (req) => tickRoute(server, req.params.id) },
+    "/agent/companion/tasks": { GET: (req) => tasksRoute(req, server), POST: own("json", (req) => addTaskRoute(req, server)) },
+    "/agent/companion/tasks/:id/done": { POST: own("none", (req) => tickRoute(server, req.params.id)) },
     "/agent/companion/notes": { GET: () => notesRoute(server) },
-    "/agent/companion/lens": { POST: (req) => lensRoute(req, server) },
+    "/agent/companion/lens": { POST: own("json", (req) => lensRoute(req, server)) },
   },
   websocket: talkSocket,
   fetch: () => new Response("Not found", { status: 404 }),
