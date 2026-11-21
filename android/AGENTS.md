@@ -53,8 +53,8 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
   WorkManager): on the JVM, against a real server on the loopback and a `Context` of temp files and in-memory preferences
   (`Fakes.kt`). The widgets, the sheets and WorkManager's scheduling are checked by hand on a phone: there is no emulator on
   the build host and no instrumented test.
-- Android's `JSONObject.optString` answers the text "null" for a JSON null; the JVM test library answers "". Only
-  `Hello.tag` is ever null, and `helloOf` asks `isNull` first. A new nullable field needs the same.
+- Android's `JSONObject.optString` answers the text "null" for a JSON null; the JVM test library answers "". A nullable
+  field read with it must ask `isNull` first.
 - `compileSdk` is 37 because Compose 1.12 requires it. `targetSdk` stays at 36: targeting 37 makes reaching a server on
   the local network need a run-time permission (`ACCESS_LOCAL_NETWORK`), which must be built and tried on a phone first.
 - Lint fails the build on any warning, except the four that fire when the world moves, not the code

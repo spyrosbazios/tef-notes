@@ -55,6 +55,22 @@ test("clip: an append to a task bumps rev; a new task starts at rev 1", async ()
   expect(await record("tasks", made.id)).toMatchObject({ rev: 1, tags: ["x"], title: "Clipped task", tainted: true });
 });
 
+test("clip: under the owner's lens, a new note or task takes its tag on the server; an append takes the picks alone", async () => {
+  const lens = await pb.call(s, "collections/lenses/records", pb.json("POST", { name: "Work", tags: [" #Work ", "clients"] }));
+  const prefs = await pb.call(s, "collections/prefs/records", pb.json("POST", { key: "owner", data: { lens: lens.id } }));
+  try {
+    const note = await clip({ target: { kind: "new" }, tags: ["ideas"] });
+    expect((await record("notes", (await pb.read(s, note.path))!.rec)).tags).toEqual(["ideas", "Work"]);
+    const task = await clip({ target: { kind: "newtask", title: "Under the lens" }, tags: ["work"] });
+    expect((await record("tasks", task.id)).tags).toEqual(["work"]);             // picked already, ignoring case
+    const n = await pb.create(s, `notes/${id()}.md`, '---\ntitle: "Mine"\ntags: [a]\n---\nFirst\n');
+    await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
+    expect((await record("notes", n.rec)).tags).toEqual(["a", "b"]);
+  } finally {
+    await pb.call(s, `collections/prefs/records/${prefs.id}`, { method: "DELETE" });
+  }
+});
+
 test("tags rename: every note and task carrying it is a rev write, columns copied out of the text", async () => {
   const from = `old${id()}`, to = `new${id()}`;
   const n = await pb.create(s, `notes/${id()}.md`, `---\ntitle: "Tagged"\ntags: [${from}, keep]\n---\nBody\n`);

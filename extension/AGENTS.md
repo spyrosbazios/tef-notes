@@ -51,7 +51,8 @@ same way; never suggested, always offered last).
    is made too, the task linked `about` it (`links`, `packages/core/src/record-links.ts`), and `note` in the answer is its
    path. Note, task and link are written in one transaction.
    The save also takes `tags?: [name]`, the owner's: a new note or task carries them; a note or task appended to gains the ones it
-   lacks (case and tonos folded), in the same rev-bumping write.
+   lacks (case and tonos folded), in the same rev-bumping write. A client sends the owner's picks alone: the server adds the lens's
+   tag (the owner's `prefs.lens`) to a new note or task, whichever client saved it.
 2b. `POST {server}/api/tefnotes/clip/tags`, JSON as step 1 (the picture unused), answers `200 {tags: [{name, p}], picked}`
    and writes nothing: every defined tag scored by JEV (one yes/no each, as the auto-tagger asks), best first; `picked` what the
    auto-tagger would add (`decide` in `lib/autotag.js`: each tag's cut, 0.7 up to 0.92 for one the owner keeps taking

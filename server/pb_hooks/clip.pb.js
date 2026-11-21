@@ -10,8 +10,8 @@
 //     Asks JEV, writes nothing. `line` is the page's own passage JEV picked as what the page is: the save sends it back.
 //   POST /api/tefnotes/clip  multipart: `@jsonPayload` { url?, title, selection?, line?, note?, images?: [{ src, alt?, caption? }], pdfs?: [{ name }],
 //        target: { kind: "new", title? } | { kind: "note", path } | { kind: "task", id } | { kind: "newtask", title? },
-//        summary?: true, text? (the page's innerText, read only with summary), tags?: [name] (the owner's: a new note or
-//        task carries them, an append adds those missing) } and, for a clip to a note, a new note or a new task, one `file`
+//        summary?: true, text? (the page's innerText, read only with summary), tags?: [name] (the owner's picks: a new note or
+//        task carries them and the lens's tag, added here, an append adds the picks missing) } and, for a clip to a note, a new note or a new task, one `file`
 //        part per file in the payload's order: each picture's JPEG, then each PDF as it is (an existing task takes none: it
 //        holds no attachment). The body may be up to 260 MB (PocketBase's default is 32 MB: a couple of PDFs pass it).
 //     200 { kind: "note", path, title, action: "created" | "appended", summary? } | { kind: "task", id, title,
@@ -143,6 +143,13 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
   if (files.length !== lib.filesSent(clip)) {
     return e.json(400, { error: "A clip to a note, a new note or a new task sends a `file` part per picture and PDF, in that order; a clip to an existing task sends none." });
   }
+
+  // A new note or task carries the lens's tag, whichever client sent it: the clients send the owner's picks alone
+  let prefs = null;
+  try { prefs = JSON.parse(e.app.findFirstRecordByData("prefs", "key", "owner").getString("data") || "null"); } catch (_) { /* none saved yet: no lens */ }
+  clip.tags = lib.savedTags(clip, lib.lensTag(prefs, (id) => {
+    try { return rows.names(e.app.findRecordById("lenses", id).getString("tags")); } catch (_) { return null; }
+  }));
 
   // Every call to another service below (the page's title, the note's write-up, the summary, the agent's title) shares one
   // deadline, so the save answers well inside the clients' wait; one that would start too late is skipped, as if it failed.

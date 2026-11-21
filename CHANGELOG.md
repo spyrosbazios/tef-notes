@@ -7,6 +7,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- A clip saved as a new note or task under a lens gets the lens's tag whichever way it was saved: the clipper used to
+  leave it off, the share page to drop your picked tags. The server adds it now; every client sends just your picks.
 - Auto-tagging: a note the tagging service keeps refusing no longer holds up the rest; it is retried less and less
   often, and set aside after a few tries until you edit it.
 - Saving a clip answers in time even when the page, the writing model and the agent are all slow: their calls share

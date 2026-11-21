@@ -1,9 +1,8 @@
 // What Android's Share sheet hands the installed web app — a link, clipped text, photos, PDFs — shaped for the two things
 // the app does with it: save it as a note as it is, or hand it to the agent to file. Pure: the form's parsing and the
 // text it becomes are tested in packages/core/test/share.test.ts; the page is web/src/components/share-page.tsx.
-import type { ClipPage, Target } from "./clip";
+import type { ClipPage } from "./clip";
 import { askedAbout } from "./handoff";
-import { inheritTags, type Lens } from "./lens";
 import { firstUrl, linkify } from "./links";
 import { isPdf, PDF } from "./photos";
 import { localDay } from "./time";
@@ -34,11 +33,6 @@ export function fromPost(p: { title: string; text: string; url: string; files: r
 
 /** Something typed or pasted into the share page's box, as a share. */
 export const fromPasted = (text: string): Shared | null => fromPost({ title: "", text, url: "", files: [] });
-
-/** The tags a clip carries, the owner's: a new note or task takes the lens's first tag (what the app makes under a lens
- *  does), an existing one is left as it is. */
-export const clipTags = (target: Target, lens: Lens | null | undefined): string[] =>
-  target.kind === "new" || target.kind === "newtask" ? inheritTags(lens) : [];
 
 /** The share as a clip for the server's clip routes (core/clip.ts): its link, the page's title, the text as the selection,
  *  its photos and PDFs as the clip's files (their bytes are the store's, in the share's order: photos, then PDFs). */

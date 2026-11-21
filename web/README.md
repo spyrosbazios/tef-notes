@@ -256,7 +256,7 @@ PDF shared to it open the Share page (`src/components/share-page.tsx`, `/share`)
 stashes it in the Cache API (`packages/core/src/share-stash.ts`) and redirects to `/share?shared=1`, where the page takes it
 out. Android puts a link in `text`, not `url`: `fromPost` (`packages/core/src/share.ts`) finds it. The page files a link,
 text, photos and PDFs through the server's clip routes as the extension does (`src/services/clip.ts`, the shapes
-and the contract in [`../extension/AGENTS.md`](../extension/AGENTS.md)); "Ask the assistant" hands any of it to the chat. A lens's first tag goes on what is made.
+and the contract in [`../extension/AGENTS.md`](../extension/AGENTS.md)); "Ask the assistant" hands any of it to the chat. A lens's first tag goes on what is made (the server adds it to a clip).
 
 Firefox and iOS Safari have no share target. `/share` opened directly shows a box to paste a link or text into, which
 goes the same way. A share needs the worker installed: after a deploy, the first share can still reach the old one.

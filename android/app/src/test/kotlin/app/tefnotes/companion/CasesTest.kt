@@ -80,11 +80,6 @@ class CasesTest {
     }
 
     @Test
-    fun theTagsASaveSends() = each("saved") { c ->
-        assertEquals(c.getJSONArray("tags").strings(), savedTags(c.getJSONArray("picked").strings(), c.getJSONArray("made").strings()))
-    }
-
-    @Test
     fun theContractIsTheServers() = assertEquals(cases.getInt("contract"), CONTRACT)
 
     @Test

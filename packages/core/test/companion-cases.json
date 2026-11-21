@@ -708,43 +708,6 @@
     }
 
   ],
-  "saved": [
-
-    {
-      "picked": [
-        "work",
-        "Ideas"
-      ],
-      "made": [
-        "ideas"
-      ],
-      "tags": [
-        "work",
-        "Ideas"
-      ]
-    },
-
-    {
-      "picked": [],
-      "made": [
-        "work"
-      ],
-      "tags": [
-        "work"
-      ]
-    },
-
-    {
-      "picked": [
-        "a"
-      ],
-      "made": [],
-      "tags": [
-        "a"
-      ]
-    }
-
-  ],
 
   "contract": 3,
 

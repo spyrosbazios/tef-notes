@@ -34,10 +34,12 @@
 //           answer says which: summary "added", "skipped" or "failed".
 //   tags    the owner's pick (`tags` on save, names from the `tags` collection): a new note carries them, a note or a task
 //           appended to gains those it lacks (case and tonos folded). The extension preselects them from the clip/tags
-//           route (tagPick); the auto-tagger (autotag.pb.js) still evaluates the note within a minute.
+//           route (tagPick); the auto-tagger (autotag.pb.js) still evaluates the note within a minute. A new note or
+//           task also takes the lens's tag, added here for every client alike (savedTags): what the app makes under a
+//           lens carries its first tag (core lens.ts inheritTags), and the lens on is the owner's (`prefs.lens`).
 
 const { MODEL } = require("./jev.js");
-const { linkPath, localDay, pdfName, photoName } = require("./notes.js");
+const { fold, linkPath, localDay, pdfName, photoName } = require("./notes.js");
 const { names } = require("./rows.js");
 
 const RECENT = 60;              // the agent's index: every pinned note, then this many newest (tools.ts RECENT)
@@ -177,6 +179,22 @@ function tagsOf(v) {
     throw new Bad(`tags must be at most ${TAGS} names of at most ${TAG_CHARS} characters.`);
   }
   return v.map((t) => t.trim());
+}
+
+/** The tag what the app makes under the lens on carries (core lens.ts lensTag: its first tag, `#` and spaces off), or ""
+ *  with none on or the one on gone. `prefs`: the owner's preferences' data; `lensTags(id)`: a lens record's tags, null
+ *  when there is no such record. */
+function lensTag(prefs, lensTags) {
+  const id = prefs && typeof prefs === "object" && typeof prefs.lens === "string" ? prefs.lens : "";
+  if (!id) return "";
+  return (lensTags(id) || []).map((t) => t.trim().replace(/^#/, "").trim()).find(Boolean) || "";
+}
+
+/** The tags a save gives: the owner's picks, and for a new note or task the lens's tag after them, once (case and tonos
+ *  folded). An append adds the picks alone: what exists already is not made under the lens. */
+function savedTags(clip, lens) {
+  const makes = clip.target.kind === "new" || clip.target.kind === "newtask";
+  return makes && lens && !clip.tags.some((t) => fold(t) === fold(lens)) ? [...clip.tags, lens] : clip.tags;
 }
 
 /** JEV's probabilities for each defined tag, best first, as the extension offers them, and `picked`, the ones it
@@ -525,4 +543,4 @@ function summarise(clip, io) {
   }
 }
 
-module.exports = { DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
+module.exports = { lensTag, savedTags, DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };

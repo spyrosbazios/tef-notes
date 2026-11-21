@@ -119,7 +119,8 @@ Things-style to-dos, records of their own (`tasks`; schema in
 
 A lens (`packages/core/src/lens.ts`) is a name and a set of tags: a global filter. While one is on, a note or task is shown
 only if it carries any of its tags (`inLens`, tonos and case ignored) in every list, count, search and tag view, and a note
-or task made meanwhile gets the lens's first tag (`inheritTags`). A record opened by its address stays reachable whatever the
+or task made meanwhile gets the lens's first tag (`inheritTags`; for a clip, from any client, the server adds it: `lib/clip.js`
+`savedTags`). A record opened by its address stays reachable whatever the
 lens says; only lists are narrowed.
 
 - The definitions are the `lenses` collection (`server/pb_migrations/1793600000_lenses.js`: `name`, unique ignoring case, and

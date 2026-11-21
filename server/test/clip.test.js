@@ -85,6 +85,24 @@ describe("the share text", () => {
   });
 });
 
+describe("the lens's tag", () => {
+  const lenses = { w: [" #Work ", "clients"], blank: ["", " "], none: [] };
+  const tagsOf = (id) => lenses[id] ?? null;
+  test("the first tag of the lens on, as core lensTag reads it; none with no lens on, or the one on gone", () => {
+    expect(lib.lensTag({ lens: "w" }, tagsOf)).toBe("Work");
+    for (const prefs of [null, {}, { lens: null }, { lens: "" }, { lens: "gone" }, { lens: "blank" }, { lens: "none" }, "x"]) expect(lib.lensTag(prefs, tagsOf)).toBe("");
+  });
+  test("a new note or task takes it after the owner's picks, once; an append takes the picks alone", () => {
+    const save = (kind, tags) => lib.savedTags({ target: { kind }, tags }, "Work");
+    expect(save("new", ["ideas"])).toEqual(["ideas", "Work"]);
+    expect(save("newtask", [])).toEqual(["Work"]);
+    expect(save("new", ["WORK"])).toEqual(["WORK"]);
+    expect(save("note", ["ideas"])).toEqual(["ideas"]);
+    expect(save("task", [])).toEqual([]);
+    expect(lib.savedTags({ target: { kind: "new" }, tags: ["a"] }, "")).toEqual(["a"]);
+  });
+});
+
 describe("the save's limits", () => {
   test("a file part per picture and PDF, none for an existing task", () => {
     const c = (kind) => ({ images: [{ src: "" }, { src: "" }], pdfs: [{ name: "a.pdf" }], target: { kind } });
