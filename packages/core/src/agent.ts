@@ -3,7 +3,6 @@
 // a write's flags and line diff, the reason an unanswered confirm card is settled with. Pure: no "ai" or DOM import,
 // since the sidecar loads this file outside the clients' node_modules.
 import type { UiToolName } from "./assistant";
-import { RESULT_ABOUT, RESULT_LABEL, RESULTS } from "./note-actions";
 import { dropTitle, isNotePath, parseNote, picturesOf } from "./notes";
 import { progress } from "./things";
 import type { Task } from "./todo";
@@ -47,12 +46,13 @@ export const SUGGEST = ["What did I note about…", "Note this: ", "What's pinne
 /** Sentence case for labels written lower-case in the code. */
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** The server agent's tools (server/agent/src/tools.ts is the authority; the UI tools the client does itself are assistant.ts's;
- *  `show_*` hand back a widget to draw, widgets.ts); a name not here shows as it is. */
+/** The server agent's tools (server/agent/src/tools.ts registers them, and its types refuse a tool missing here or a name here
+ *  it lacks; the UI tools the client does itself are assistant.ts's; `show_*` hand back a widget to draw, widgets.ts). */
 export type ToolName = "show_items" | "search_notes" | "list_notes" | "list_tags" | "create_tag" | "update_tag" | "read_note" | "create_note" | "append_to_note" | "rewrite_note"
   | "summarise_links" | "set_note_flags" | "delete_note" | "update_memory" | "web_search" | "read_url" | "list_tasks" | "list_tagged" | "add_task" | "add_tasks" | "update_task" | "complete_task" | "delete_task"
   | "create_lens" | "find_place" | "set_place" | "show_day" | "show_week" | "show_review" | "show_quote" | "show_link" | "show_lens" | "show_tasks" | "show_notes" | "find_free_slots"
-  | "read_drawing" | "show_drawing" | "attach_file" | "list_note_actions" | "save_note_action" | UiToolName;
+  | "read_drawing" | "show_drawing" | "diagram_guide" | "attach_file" | "list_note_actions" | "save_note_action"
+  | "read_attachment" | "read_image" | "read_page" | UiToolName;
 
 /** Tool names as the owner would say them. */
 const LABEL: Record<ToolName, string> = {
@@ -61,6 +61,7 @@ const LABEL: Record<ToolName, string> = {
   show_items: "Showing what it found",
   show_day: "Showing a day", show_week: "Showing a week", show_review: "Reviewing your week", show_quote: "Quoting a note", show_link: "Showing a link",
   show_lens: "Previewing a lens", show_tasks: "Laying out tasks", show_notes: "Gathering notes", show_drawing: "Showing a drawing", read_drawing: "Looking at a drawing", find_free_slots: "Finding free time",
+  diagram_guide: "Reading how to lay out a diagram", read_attachment: "Reading a PDF", read_image: "Looking at a picture", read_page: "Reading a page",
   search_notes: "Searching your notes", list_notes: "Listing your notes", list_tags: "Reading your tags", read_note: "Reading a note",
   create_note: "New note", append_to_note: "Adding to a note", rewrite_note: "Rewriting a note", summarise_links: "Summarising links", set_note_flags: "Changing a note's flags", delete_note: "Deleting a note",
   attach_file: "Filing an attachment", update_memory: "Memory", web_search: "Searching the web", read_url: "Reading a page",
@@ -213,68 +214,6 @@ export type TaskInput = {
   when?: string; evening?: boolean; due?: string; every?: string; remind?: string;
 };
 
-/** The dates a task tool sets, as one line: add_task's, or (`change`) update_task's, where null clears. */
-function taskLine(i: WriteInput, change = false) {
-  const parts = [
-    i.when ? (i.evening ? `${i.when}, this evening` : i.when) : change && i.when === null && "no day",
-    i.due ? `due ${i.due}` : change && i.due === null && "no deadline",
-    i.every ? `every ${i.every}` : change && i.every === null && "doesn't repeat",
-    i.remind ? `remind ${i.remind}` : change && i.remind === null && "no reminder",
-  ].filter((x): x is string => !!x);
-  return cap(parts.join(" · "));
-}
-
-const quoted = (s: string | undefined, or: string) => (s?.trim() ? `“${s.trim()}”` : or);
-
-/** A confirm card's words for a task tool: its question, the button, what the answered line says was done or
- *  left undone and of what. null for any other write. */
-export function todoWords(name: string, i: WriteInput): { head: string; yes: string; done: string; skipped: string; subject: string } | null {
-  const task = quoted(i.about, "a task"), reopen = i.done === false;
-  switch (name) {
-    case "add_task": return { head: `Add task ${quoted(i.title, "")}?`, yes: "Add it", done: "Added task", skipped: "add task", subject: quoted(i.title, "a task") };
-    case "add_tasks": {
-      const n = i.tasks?.length ?? 0;
-      return { head: `Add ${n} task${n === 1 ? "" : "s"}?`, yes: n === 1 ? "Add it" : "Add them", done: `Added ${n} task${n === 1 ? "" : "s"}`,
-        skipped: "add the tasks", subject: "the tasks" };
-    }
-    case "update_task": return { head: `Change ${task}?`, yes: "Save it", done: "Changed", skipped: "change", subject: task };
-    case "complete_task": return reopen ? { head: `Reopen ${task}?`, yes: "Reopen it", done: "Reopened", skipped: "reopen", subject: task }
-      : { head: `Complete ${task}?`, yes: "Complete it", done: "Completed", skipped: "complete", subject: task };
-    case "delete_task": return { head: `Delete ${task}?`, yes: "Delete it", done: "Deleted", skipped: "delete", subject: task };
-    default: return null;
-  }
-}
-
-/** The lines of a task card's body: what the write does. */
-export function todoLines(name: string, i: WriteInput): string[] {
-  const items = i.checklist && !Array.isArray(i.checklist) ? i.checklist : undefined, texts = Array.isArray(i.checklist) ? i.checklist : items?.add;
-  const list = (xs: string[] | undefined) => (xs?.length ? xs.join(", ") : "");
-  const lines: (string | false | 0 | null | undefined)[] = [];
-  switch (name) {
-    case "add_task":
-      lines.push(taskLine(i) || "No day", "In the Inbox",
-        i.link?.length && `About ${list(i.link)}`, i.tags?.length && `Tags: ${list(i.tags)}`, texts?.length && `Checklist: ${list(texts)}`, i.notes);
-      break;
-    case "add_tasks":
-      lines.push(...(i.tasks ?? []).map((t, n) => {
-        const own = [taskLine(t).toLowerCase(), t.checklist?.length ? `checklist: ${list(t.checklist)}` : "", t.tags?.length ? `tags: ${list(t.tags)}` : ""].filter(Boolean);
-        return `${n + 1}. ${t.title}${own.length ? ` (${own.join("; ")})` : ""}`;
-      }));
-      break;
-    case "update_task":
-      lines.push(taskLine(i, true), i.title && `Retitle to “${i.title}”`, i.notes != null && (i.notes ? `Notes: ${i.notes}` : "Clear the notes"), i.addNotes && `Add to the notes: ${i.addNotes}`,
-        i.link?.length && `Link ${list(i.link)}`, i.unlink?.length && `Unlink ${list(i.unlink)}`,
-        i.addTags?.length && `Add tags: ${list(i.addTags)}`, i.removeTags?.length && `Remove tags: ${list(i.removeTags)}`,
-        items?.add?.length && `Add to the checklist: ${list(items.add)}`,
-        items?.set?.length && `Change ${items.set.length} checklist item${items.set.length === 1 ? "" : "s"}`,
-        items?.remove?.length && `Remove ${items.remove.length} checklist item${items.remove.length === 1 ? "" : "s"}`);
-      break;
-    case "complete_task": lines.push(i.done === false ? "Open it again" : "Mark it done"); break;
-    case "delete_task": lines.push("Delete it for good"); break;
-  }
-  return lines.filter((x): x is string => !!x);
-}
-
 /** The flags a create sets, or the change a set_note_flags makes, as one line. */
 export function flagLine(i: WriteInput, change = false) {
   const parts = [
@@ -321,30 +260,4 @@ export function rowsOf(lines: Line[], context: number, all: boolean): Row[] {
     else (rows[rows.length - 1] as { fold: number }).fold++;
   });
   return rows;
-}
-
-
-/** A note action save_note_action proposes, for the approval preview: what it does, then its prompt. */
-export function actionLine(input: WriteInput): string {
-  const does = RESULTS.find((r) => r === input.result);
-  return [does && `${RESULT_LABEL[does]}: ${RESULT_ABOUT[does].toLowerCase()}.`, input.prompt?.trim()].filter(Boolean).join("\n\n");
-}
-
-/** A lens create_lens proposes, for both clients' approval previews. */
-export function lensLine(input: WriteInput): string {
-  return [
-    input.tags?.length && `Shows: ${input.tags.join(", ")}`,
-    input.exclude?.length && `Hides: ${input.exclude.join(", ")}`,
-    input.accent && `Colour: ${input.accent}`,
-  ].filter(Boolean).join("\n");
-}
-
-/** The definition fields proposed by a tag tool, for both clients' approval previews. */
-export function tagLine(name: string, input: WriteInput): string {
-  return [
-    input.name && `Name: ${input.name}`,
-    input.color !== undefined && `Colour: ${input.color ?? "none"}`,
-    input.description !== undefined && `Description: ${input.description || "(empty)"}`,
-    name === "update_tag" && "Existing notes and tasks keep their tag names.",
-  ].filter(Boolean).join("\n");
 }

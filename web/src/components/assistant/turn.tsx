@@ -9,11 +9,12 @@ import remend from "remend";
 import { Markdown } from "@/components/markdown";
 import { buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cardsByPart, flagLine, gist, kindOf, label, UNCONFIRMED, type Kind, type WriteInput } from "@/core/agent";
+import { cardsByPart, gist, kindOf, label, UNCONFIRMED, type Kind, type WriteInput } from "@/core/agent";
 import { askedAbout } from "@/core/handoff";
 import { ranOn } from "@/core/note-actions";
 import { plainShared } from "@/core/share";
 import { isAskTool, type ChoiceOutput } from "@/core/assistant";
+import { detailOf, isWriteTool } from "@/core/tool-words";
 import { isWidgetTool, widgetOf } from "@/core/widgets";
 import { useNotes } from "@/hooks/notes";
 import { useTasks } from "@/hooks/todo";
@@ -27,32 +28,6 @@ import { Choice } from "./choice";
 import { Confirm } from "./confirm";
 import { Rise } from "./rise";
 import { WidgetView } from "./widgets";
-
-const str = (v: unknown) => (typeof v === "string" ? v : "");
-
-/** The line beside a tool's name: what it looked for, which note, or the agent's why. */
-function detailOf(name: string, i: Record<string, unknown>, titleOf: (path: unknown) => string): string {
-  switch (name) {
-    case "search_notes": case "web_search": case "find_place": return str(i.query);
-    case "set_place": return ["a task", i.clear ? "no place" : str(i.name) || "a place from Maps"].join(" · ");
-    case "list_notes": return str(i.filter);
-    case "list_tagged": return Array.isArray(i.tags) ? i.tags.map(str).join(i.match === "all" ? " + " : " · ") : "";
-    case "read_note": case "append_to_note": case "summarise_links": case "delete_note": return titleOf(i.path);
-    case "create_lens": return str(i.name);
-    case "create_tag": case "update_tag": return str(i.name) || str(i.id);
-    case "create_note": return str(i.title);
-    case "attach_file": return [str(i.file), i.path ? titleOf(i.path) : str(i.title)].filter(Boolean).join(" · ");
-    case "rewrite_note": return str(i.why) || titleOf(i.path);
-    case "set_note_flags": return `${titleOf(i.path)} · ${flagLine(i as WriteInput, true)}`;
-    case "add_task": return str(i.title);
-    case "update_task": case "complete_task": case "delete_task": return str(i.about);
-    case "list_tasks": return [str(i.view), str(i.query), str(i.tag)].filter(Boolean).join(" · ");
-    case "update_memory": return str(i.why);
-    case "show_items": return "";
-    case "read_url": return Array.isArray(i.urls) ? i.urls.join(", ") : str(i.url);
-    default: return "";
-  }
-}
 
 const settledState = (p: ToolPart) => p.state === "output-available" || p.state === "output-error" || p.state === "output-denied";
 const answered = (p: ToolPart) => p.state === "approval-requested" || p.state === "approval-responded";
@@ -192,7 +167,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
     const refused = p.state === "output-denied" && approval?.isAutomatic === true;
     const declined = p.state === "output-denied" && !unconfirmed && !refused;
     const decided = approval?.approved === undefined || unconfirmed || refused || p.state === "output-error" ? undefined : approval.approved ? "yes" : "no";
-    if ((p.state === "approval-requested" && last && !live) || decided)
+    if (isWriteTool(name) && ((p.state === "approval-requested" && last && !live) || decided))
       return (
         <div key={i} className="space-y-2">
           <Confirm name={name} input={(p.input ?? {}) as WriteInput} reads={reads} id={approval?.id ?? ""} respond={respond} answer={decided} />

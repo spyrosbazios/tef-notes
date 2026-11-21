@@ -5,6 +5,7 @@
 import type { ModelMessage } from "ai";
 import type { NoteService } from "./application/notes";
 import type { TaskService } from "./application/todo";
+import type { ToolName } from "@/core/agent";
 import type { Attached } from "@/core/assistant";
 import { uiModule } from "./assistant";
 import { drawingModule } from "./drawings";
@@ -28,6 +29,12 @@ type ToolsOf<M> = M extends ToolModule<infer T> ? T : never;
 type Intersect<U> = (U extends unknown ? (u: U) => void : never) extends (i: infer I) => void ? I : never;
 /** The agent's tools, as one tool set. */
 export type Tools = Intersect<ToolsOf<(typeof MODULES)[number]>>;
+
+/** True only when A and B are assignable both ways. */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+// The clients' words for each tool are records over core's ToolName (@/core/agent, @/core/tool-words): a tool registered here
+// and not named there, or a name there with no tool, stops this compiling.
+true satisfies Same<keyof Tools, ToolName>;
 
 /** Whether the chat has read the web: a web tool's result, or a note or task written with web text in view
  *  (`tainted`) read back. */

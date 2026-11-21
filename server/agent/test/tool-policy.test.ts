@@ -8,6 +8,7 @@ import { offeredTo, outOfScope, type Scope } from "../src/note-action";
 import { allowed, policyApprovals, type Policy, type PolicyContext } from "../src/tool-policy";
 import { ACTIONS, DEFAULT_ACTIONS, isAction, RULES, type Actions } from "@/core/actions";
 import type { Result } from "@/core/note-actions";
+import { WRITE_TOOLS } from "@/core/tool-words";
 
 const names = (match: (name: string) => boolean) => Object.keys(toolPolicies()).filter(match).sort();
 const result = (toolName: string, value: string): ModelMessage[] => [{
@@ -30,6 +31,8 @@ describe("colocated tool policies", () => {
     for (const [name, p] of Object.entries(toolPolicies() as Record<string, Policy>)) {
       if (p.approval !== "none") expect([name, isAction(p.approval)]).toEqual([name, true]);
     }
+    // The writes are the ones the clients have a confirm card's words for (@/core/tool-words)
+    expect(names((n) => policyFor(n)?.approval !== "none")).toEqual([...WRITE_TOOLS].sort());
   });
 
   it("offers Talk all but what needs a screen, a selection or a chat's file", () => {

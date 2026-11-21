@@ -343,7 +343,7 @@ export function ChatNote() {
   );
 }
 
-/** A write the agent proposes (web/src/components/assistant/confirm.tsx): the question (core/agent.ts `todoWords`), why,
+/** A write the agent proposes (web/src/components/assistant/confirm.tsx): the question (core/tool-words.ts `CONFIRM`), why,
  *  the tasks as numbered lines, and two pills. Nothing is written before the first. */
 export function ConfirmCard({ title, why, tasks }: { title: string; why?: string; tasks: DemoTask[] }) {
   const line = (t: DemoTask) => [t.when?.toLowerCase(), t.tags?.length ? `tags: ${t.tags.join(", ")}` : null].filter(Boolean).join("; ");
