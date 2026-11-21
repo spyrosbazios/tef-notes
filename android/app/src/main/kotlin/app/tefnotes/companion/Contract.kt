@@ -1,6 +1,7 @@
 // The server's answers as this app reads them, and the few rules it holds a copy of. The contract is
 // packages/core/src/companion.ts (feeds, hello) and packages/core/src/clip.ts (a share's two steps); the copies (how a
-// share reads as a clip, a picture's sizes, a clip's choices and what its save says) are run over the core's own cases,
+// share reads as a clip, a picture's sizes and qualities, a clip's choices and what its save says, the contract, the task
+// lists, the server's address, a ticked task's leaving the feed) are run over the core's own cases,
 // packages/core/test/companion-cases.json, by CasesTest. Pure: no Android here, so the JVM tests cover it.
 package app.tefnotes.companion
 
@@ -81,6 +82,16 @@ private fun <T> JSONArray?.list(of: (JSONObject) -> T): List<T> =
     if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it)?.let(of) }
 
 private fun parsed(json: String?): JSONObject? = try { json?.let(::JSONObject) } catch (_: Exception) { null }
+
+/** What the owner is told when the server and this build draw different contracts: which side to update. */
+fun mismatchMessage(contract: Int) = "That server and this app are of different versions: update the ${if (contract > CONTRACT) "app" else "server"}."
+
+/** The words for a feed that is of another contract than this build draws (`tasksFeedOf` and `notesFeedOf` answer null for
+ *  it, which a widget would take for "not loaded yet"); null for anything else: none, no feed, or one this build draws. */
+fun feedMismatch(json: String?): String? {
+    val contract = parsed(json)?.takeIf { it.has("contract") }?.optInt("contract") ?: return null
+    return if (contract == CONTRACT) null else mismatchMessage(contract)
+}
 
 /** A tasks feed from its JSON; null when it is none, or one of another contract. */
 fun tasksFeedOf(json: String?): TasksFeed? {

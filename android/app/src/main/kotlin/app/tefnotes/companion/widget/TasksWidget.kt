@@ -49,7 +49,7 @@ class TasksWidget : GlanceAppWidget() {
         val add = actionStartActivity<TaskActivity>(actionParametersOf(ActionParameters.Key<String>(TaskActivity.LIST) to list))
         Frame(look, feed?.title ?: listLabel(list), feed?.url ?: "/$list", stale && feed != null, feed?.switches, add) {
             when {
-                feed == null -> Unread(context, look, stale)
+                feed == null -> Unread(context, look, stale, state[Keys.Feed])
                 feed.sections.isEmpty() -> Message(look, "Nothing here", open(feed.url))
                 else -> Rows(feed, look, state[Keys.Ticked].orEmpty())
             }

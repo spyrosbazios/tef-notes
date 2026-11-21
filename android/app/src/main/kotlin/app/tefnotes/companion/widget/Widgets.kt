@@ -56,6 +56,7 @@ import app.tefnotes.companion.Switches
 import app.tefnotes.companion.Sync
 import app.tefnotes.companion.Tokens
 import app.tefnotes.companion.Unreachable
+import app.tefnotes.companion.feedMismatch
 import app.tefnotes.companion.lensesJson
 import app.tefnotes.companion.withoutTask
 import java.util.concurrent.ConcurrentHashMap
@@ -199,10 +200,16 @@ internal fun Frame(look: Look, title: String, url: String, stale: Boolean, switc
 internal fun Message(look: Look, words: String, onClick: Action) =
     Box(GlanceModifier.fillMaxSize().padding(16.dp).clickable(onClick), contentAlignment = Alignment.Center) { Text(words, style = text(look.dim, 13)) }
 
-/** What a widget with no feed says: there is no server yet, it couldn't be reached, or it hasn't been asked. */
+/** What a widget with no feed says: there is no server yet, it couldn't be reached, the feed it was sent is of another
+ *  contract than this build draws (`feed`, as kept: the same words as Settings, which is where the owner goes), or it
+ *  hasn't been asked. */
 @Composable
-internal fun Unread(context: Context, look: Look, stale: Boolean) = when {
-    Store.server(context) == null -> Message(look, "Tap to set your server", actionStartActivity<SettingsActivity>())
-    stale -> Message(look, "The server can't be reached. Tap to try again", actionRunCallback<RefreshAction>())
-    else -> Message(look, "Loading", actionRunCallback<RefreshAction>())
+internal fun Unread(context: Context, look: Look, stale: Boolean, feed: String?) {
+    val mismatch = feedMismatch(feed)
+    when {
+        Store.server(context) == null -> Message(look, "Tap to set your server", actionStartActivity<SettingsActivity>())
+        stale -> Message(look, "The server can't be reached. Tap to try again", actionRunCallback<RefreshAction>())
+        mismatch != null -> Message(look, mismatch, actionStartActivity<SettingsActivity>())
+        else -> Message(look, "Loading", actionRunCallback<RefreshAction>())
+    }
 }

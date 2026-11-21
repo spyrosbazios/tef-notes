@@ -1,11 +1,11 @@
 // The native companion's feeds (src/companion.ts): rows worked out here, so a companion only draws them.
 import { describe, expect, it } from "bun:test";
 import { choices, CLIP_FILES, describe as describeResult, filesWord, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
-import { DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, shareClip, switchesOf, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
+import { COMPANION_CONTRACT, DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, shareClip, switchesOf, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
-import { fit, lookSize, MAX_PDF } from "../src/photos";
-import { DEFAULT_PREFS } from "../src/prefs";
+import { LOOK_QUALITY, lookSize, MAX_PDF, QUALITY, storedSize } from "../src/photos";
+import { DEFAULT_PREFS, TASK_LIST_LABEL, TASK_LISTS } from "../src/prefs";
 import { ACCENTS, THEMES } from "../src/theme";
 import { newTask, type Task } from "../src/todo";
 import cases from "./companion-cases.json";
@@ -130,10 +130,7 @@ describe("the rules a companion copies", () => {
     it(`a share as a clip: ${c.name}`, () => expect(shareClip(c.in)).toEqual(c.clip as ReturnType<typeof shareClip>));
 
   it("the picture stored: long edge 1600, never enlarged", () => {
-    for (const c of cases.stored) {
-      const to = fit(c.width, c.height), k = !to ? 1 : "width" in to ? to.width / c.width : to.height / c.height;
-      expect({ width: Math.round(c.width * k), height: Math.round(c.height * k) }).toEqual(c.size);
-    }
+    for (const c of cases.stored) expect(storedSize(c.width, c.height)).toEqual(c.size);
   });
   it("the picture JEV looks at", () => {
     for (const c of cases.look) expect(lookSize(c.width, c.height)).toEqual(c.size);
@@ -151,6 +148,34 @@ describe("the rules a companion copies", () => {
     it(`the tags not picked: ${c.name}`, () => expect(unpickedTags(c.all, c.picked)).toEqual({ offered: c.offered, more: c.more }));
   it("the tags a save sends: the picks, then what the lens tags, each once", () => {
     for (const c of cases.saved) expect(savedTags(c.picked, c.made)).toEqual(c.tags);
+  });
+  it("the contract a companion draws: bumped here and there together", () => expect(COMPANION_CONTRACT).toBe(cases.contract));
+  it("the task lists, in the order and under the names a companion offers", () =>
+    expect(TASK_LISTS.map((l) => [l, TASK_LIST_LABEL[l]])).toEqual(cases.taskLists));
+  it("the JPEG qualities, as whole percents", () =>
+    expect({ stored: Math.round(QUALITY * 100), look: Math.round(LOOK_QUALITY * 100) }).toEqual(cases.jpeg));
+  it("the server's address as typed: the origin the URL standard gives for an https address, else none", () => {
+    // The companion's own rule (no core copy to run): checked against the platform's, so a case can't be one nobody reads that way.
+    const origin = (input: string) => {
+      const typed = input.trim();
+      try {
+        const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(typed) ? typed : `https://${typed}`);
+        return url.protocol === "https:" ? url.origin : null;
+      } catch {
+        return null;
+      }
+    };
+    for (const c of cases.addresses) expect(origin(c.input)).toBe(c.origin);
+  });
+  describe("a tick shown before the server has it", () => {
+    // What a widget draws from the tick to the next feed is the feed the server would send without that task: the cases'
+    // `feed` and `after` are made here, from `tasks`, so the Kotlin that cuts one from the other is held to the server's own.
+    const bare = (tasks: Task[]) => { const { look: _, ...rest } = tasksFeed(tasks, "today", TODAY, [], null, DEFAULT_LOOK); return rest; };
+    for (const c of cases.withoutTask) it(c.name, () => {
+      const all = c.tasks.map((t) => task(t.id, { when: TODAY, evening: t.evening, order: t.order }));
+      expect(bare(all)).toEqual(c.feed as ReturnType<typeof bare>);
+      expect(bare(all.filter((t) => t.id !== c.tick))).toEqual(c.after as ReturnType<typeof bare>);
+    });
   });
   it("what a save says", () => {
     for (const c of cases.results as unknown as { result: ClipResult; line: string; notice: string | null }[]) {

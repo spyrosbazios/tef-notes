@@ -137,3 +137,16 @@ test("attachments: multipart, exact download, name uniqueness and note deletion 
   await pb.removePhoto(s, survivor.rec);
   expect(await pb.photos(s, otherOwner)).toEqual([]);
 });
+
+test("search: a typed % or _ matches itself, not any text (PocketBase reads a bare % as a pattern)", async () => {
+  const percent = await pb.create(s, `notes/${id()}.md`, "# Hit\nzqprice 100% sure\n");
+  const wild = await pb.create(s, `notes/${id()}.md`, "# Miss\nzqprice 100 sure\n");
+  const under = await pb.create(s, `notes/${id()}.md`, "# Hit\nzq_name\n");
+  const other = await pb.create(s, `notes/${id()}.md`, "# Miss\nzqXname\n");
+  const found = async (q: string) => (await pb.search(s, q)).map((n) => n.rec).sort();
+  expect(await found("100%")).toEqual([percent.rec]);
+  expect(await found("zqprice 100")).toEqual([percent.rec, wild.rec].sort());
+  expect(await found("zq_name")).toEqual([under.rec]);
+  expect(await found("zq")).toEqual([percent.rec, wild.rec, under.rec, other.rec].sort());
+  for (const n of [percent, wild, under, other]) await pb.remove(s, n);
+});

@@ -17,6 +17,10 @@ export type ClipPage = { url: string; title: string; selection?: string; text?: 
 /** At most this many pictures and PDFs in one clip (server/pb_hooks/lib/clip.js FILES). */
 export const CLIP_FILES = 10;
 
+/** A page's text, cut to this many characters before it is sent (`text` of a clip: the summary is written from it; the server
+ *  accepts a little more, lib/clip.js `PAGE_CHARS`). */
+export const CLIP_TEXT = 50000;
+
 /** How many files a clip carries. */
 export const clipFiles = (page: ClipPage) => (page.images?.length ?? 0) + (page.pdfs?.length ?? 0);
 
@@ -54,7 +58,7 @@ export type ClipResult =
   | { kind: "task"; id: string; title: string; action: "created" | "appended"; note?: string; summary?: Summary };
 
 /** The suggest request's JSON. `note`: the owner's words, context for where it goes. `look`: the first picture as JEV sees
- *  it (base64 JPEG, long edge 768, padded up to 280 a side). */
+ *  it (base64 JPEG, long edge 768, a small one made up to 280 on its short side: photos.ts `lookSize`). */
 export const suggestBody = (page: ClipPage, note: string, look?: string) =>
   ({ ...page, note: note || undefined, images: page.images?.map((im, i) => (i === 0 && look ? { ...im, look } : im)) });
 
