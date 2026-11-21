@@ -4,13 +4,14 @@
 // a new file name). A scanned page has none of its own: its text is what OCR read off its picture (ocr.ts), which the
 // background does for every stored PDF (`readScans`) and read_attachment waits for (`readNow`); until then, and with
 // OCR off, it reads as empty. A PDF is someone else's text, like a web page: whatever the model reads of one taints the
-// chat (guard.ts), so a write after it always asks.
-import { extractText, getDocumentProxy, renderPageAsImage } from "unpdf";
+// chat (guard.ts), so a write after it always asks. pdf.js and the canvas never run on the agent's event loop: every job
+// here (text, page count, a tile's picture) is the render process's (render.ts).
 import type { UIMessage } from "ai";
 import { isPdf, PDF } from "@/core/photos";
 import { parseNote } from "@/core/notes";
 import * as pb from "@/core/pocketbase";
 import { ocr } from "./ocr";
+import { render, RenderError } from "./render";
 import { MAX_PAGES, type Doc } from "./semantic";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -38,8 +39,26 @@ const ASK_PAGES = 12, ASK_MS = 60_000;
 /** The stored file's name in OCR's books, and where its bytes are. */
 const sourceOf = (server: pb.Server, p: Pick<Pdf, "rec" | "file">) => ({ key: `${p.rec}/${p.file}`, url: pb.photoUrl(server, p) });
 
-/** The PDF itself can't be read (it wants a password, it is broken): no retry will change that. */
+/** The PDF itself can't be read (it wants a password, it is broken, it hangs or crashes pdf.js): no retry will change that. */
 export class Unreadable extends Error {}
+
+/** The stored file's bytes, for the render process. */
+async function bytesOf(server: pb.Server, p: Pick<Pdf, "rec" | "file">): Promise<Uint8Array> {
+  const res = await fetch(pb.photoUrl(server, p));
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/** A PDF's own text, one string per page, whitespace runs folded. `pdf` resolves to the bytes when the render process
+ *  is ready for them. A failure of the job is the PDF's: Unreadable. */
+async function textOf(pdf: () => Promise<Uint8Array>): Promise<string[]> {
+  try {
+    return (await render().run("text", async () => ({ pdf: await pdf() }))).map(fold);
+  } catch (e) {
+    throw e instanceof RenderError ? new Unreadable(e.message) : e;
+  }
+}
+const fold = (t: string) => t.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
 
 const cache = new Map<string, Promise<string[]>>();
 
@@ -47,17 +66,7 @@ const cache = new Map<string, Promise<string[]>>();
 function own(server: pb.Server, p: Pdf): Promise<string[]> {
   const key = `${p.rec}/${p.file}`, hit = cache.get(key);
   if (hit) { cache.delete(key); cache.set(key, hit); return hit; }        // newest last: the oldest goes first
-  const run = (async () => {
-    const res = await fetch(pb.photoUrl(server, p));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    try {
-      const { text } = await extractText(await getDocumentProxy(bytes), { mergePages: false });
-      return text.map((t) => t.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim());
-    } catch (e) {
-      throw new Unreadable((e as Error).message);
-    }
-  })();
+  const run = textOf(() => bytesOf(server, p));
   run.catch(() => cache.delete(key));       // a failure is tried again next time
   cache.set(key, run);
   while (cache.size > KEPT) cache.delete(cache.keys().next().value!);
@@ -89,15 +98,19 @@ export async function readNow(server: pb.Server, p: Pdf, from: number, to: numbe
 let sweep: Promise<void> | undefined;
 
 /** The background's pass: queues the unread scanned pages of every stored PDF (the first MAX_PAGES of each, what search
- *  indexes; later ones are read when asked for), and forgets what was read of PDFs that are gone. One pass at a time. */
+ *  indexes; later ones are read when asked for), and forgets what was read of PDFs that are gone. One pass at a time.
+ *  While the reader can't work (no language data yet) and is waiting out its back-off (ocr.ts `holding`), a pass opens
+ *  no PDF: it would only be to queue what can't be read. */
 export function readScans(server: pb.Server): Promise<void> {
   const o = ocr();
   if (!o) return Promise.resolve();
   if (sweep) return sweep;
   const run = (async () => {
+    if (o.holding()) return;
     const all = (await pb.photos(server)).filter((p) => isPdf(p.name));
     o.keep(new Set(all.map((p) => sourceOf(server, p).key)));
     for (const p of all) {
+      if (o.holding()) break;
       const src = sourceOf(server, p);
       if (o.settled(src.key) || o.queued(src.key)) continue;
       let text: string[];
@@ -171,7 +184,6 @@ export async function preview(server: pb.Server, note: { id: string; path: strin
  *  TEF_NOTES_DATA, so a restart doesn't draw them again; the newest 64 also in memory. */
 export const THUMB_WIDTH = 640, BLUR_WIDTH = 32, THUMB_QUALITY = 0.8;
 const thumbs = new Map<string, Promise<Uint8Array>>();
-let rendering: Promise<unknown> = Promise.resolve();       // one page at a time: four cores, and the agent's chat beside it
 const thumbDir = () => join(process.env.TEF_NOTES_DATA ?? "./data", "pdf-thumbs");
 
 /** The bytes at `path` on disk, else made by `make` and written there (a failed write only costs a redraw). */
@@ -183,32 +195,15 @@ async function onDisk(path: string, make: () => Promise<Uint8Array>): Promise<Ui
   return out;
 }
 
-/** `jpeg` shrunk to `width`, as JPEG. */
-async function shrink(jpeg: Uint8Array, width: number): Promise<Uint8Array> {
-  const { createCanvas, loadImage } = await import("@napi-rs/canvas");
-  const img = await loadImage(Buffer.from(jpeg));
-  const c = createCanvas(width, Math.max(1, Math.round((img.height * width) / img.width)));
-  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-  return new Uint8Array(await c.encode("jpeg", 70));
-}
-
 /** The first page of the note's PDF `name` as JPEG at `size`; null when the note has no such PDF. */
 export async function thumb(server: pb.Server, note: string, name: string, size: pb.ThumbSize = "sharp"): Promise<Uint8Array | null> {
   const p = (await pdfsOf(server, note)).find((x) => x.name === name);
   if (!p) return null;
   const base = `${p.rec}_${p.file.replace(/[^\w.-]/g, "_")}`, key = `${base}_${size}`, hit = thumbs.get(key);
   if (hit) { thumbs.delete(key); thumbs.set(key, hit); return hit; }
-  const sharp = () => onDisk(join(thumbDir(), `${base}_sharp.jpg`), () => {
-    const run = rendering.catch(() => {}).then(async () => {
-      const res = await fetch(pb.photoUrl(server, p));
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const doc = await getDocumentProxy(new Uint8Array(await res.arrayBuffer()));
-      return new Uint8Array(await renderPageAsImage(doc, 1, { canvasImport: () => import("@napi-rs/canvas"), width: THUMB_WIDTH, format: "jpeg", quality: THUMB_QUALITY }));
-    });
-    rendering = run;
-    return run;
-  });
-  const run = size === "sharp" ? sharp() : onDisk(join(thumbDir(), `${base}_blur.jpg`), async () => shrink(await sharp(), BLUR_WIDTH));
+  const sharp = () => onDisk(join(thumbDir(), `${base}_sharp.jpg`), () =>
+    render().run("thumb", async () => ({ pdf: await bytesOf(server, p), width: THUMB_WIDTH, quality: THUMB_QUALITY })));
+  const run = size === "sharp" ? sharp() : onDisk(join(thumbDir(), `${base}_blur.jpg`), async () => render().run("shrink", { jpeg: await sharp(), width: BLUR_WIDTH }));
   run.catch(() => thumbs.delete(key));
   thumbs.set(key, run);
   while (thumbs.size > 64) thumbs.delete(thumbs.keys().next().value!);
@@ -222,9 +217,7 @@ export async function pageCount(server: pb.Server, note: string, name: string): 
   if (!p) return null;
   const path = join(thumbDir(), `${p.rec}_${p.file.replace(/[^\w.-]/g, "_")}_pages.txt`), f = Bun.file(path);
   if (await f.exists()) { const n = Number(await f.text()); if (n > 0) return n; }
-  const res = await fetch(pb.photoUrl(server, p));
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const n = (await getDocumentProxy(new Uint8Array(await res.arrayBuffer()))).numPages;
+  const n = await render().run("pages", async () => ({ pdf: await bytesOf(server, p) }));
   await mkdir(thumbDir(), { recursive: true }).then(() => Bun.write(path, String(n))).catch(() => {});
   return n;
 }
@@ -271,9 +264,8 @@ function attachedText(url: string): Promise<string> {
   const run = (async () => {
     const comma = url.indexOf(",");
     if (!url.startsWith("data:") || comma < 0) throw new Error("not a data URL");
-    const doc = await getDocumentProxy(new Uint8Array(Buffer.from(url.slice(comma + 1), "base64")));
-    const { text } = await extractText(doc, { mergePages: false });
-    const all = text.map((t, i) => `[page ${i + 1}]\n${t.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim()}`).join("\n\n");
+    const text = await textOf(async () => new Uint8Array(Buffer.from(url.slice(comma + 1), "base64")));
+    const all = text.map((t, i) => `[page ${i + 1}]\n${t}`).join("\n\n");
     return all.length > READ_CHARS ? `${all.slice(0, READ_CHARS)}\n(cut at ${READ_CHARS} of ${all.length} characters)` : all;
   })();
   run.catch(() => attached.delete(key));

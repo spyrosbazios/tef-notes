@@ -2,7 +2,7 @@
 // background, a PDF that can't be opened is given up on after a few tries, another engine reads everything again.
 // Tesseract itself isn't run here: its TSV is read from a sample (ocr-run.ts `fromTsv`).
 import { afterAll, describe, expect, it } from "bun:test";
-import { langsOf, Ocr, Unready, type Read, type Reader } from "../src/ocr";
+import { BACKOFF_MS, langsOf, languagesOf, Ocr, Unready, type Read, type Reader } from "../src/ocr";
 import { fromTsv } from "../src/ocr-run";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -78,15 +78,61 @@ describe("Ocr", () => {
     expect(o.status()).toMatchObject({ failedPages: 1, failedPdfs: 1, problem: "HTTP 502" });
   });
 
-  it("holds nothing against a PDF while the reader itself can't work", async () => {
-    let ready = false;
-    const o = new Ocr(async (url, pages, got, stop) => { if (!ready) throw new Unready("no language data"); await all(url, pages, got, stop); }, "e");
-    for (let i = 0; i < 5; i++) { o.queue(A, [1]); await o.idle(); }
+  it("holds nothing against a PDF while the reader itself can't work, and tries again once the back-off is over", async () => {
+    let ready = false, clock = 0;
+    const o = new Ocr(async (url, pages, got, stop) => { if (!ready) throw new Unready("no language data"); await all(url, pages, got, stop); }, "e", ":memory:", () => clock);
+    o.queue(A, [1]);
+    await o.idle();
     expect([o.settled(A.key), o.stored(A.key).size, o.problem]).toEqual([false, 0, "no language data"]);
+    clock += BACKOFF_MS;
     ready = true;
     o.queue(A, [1]);
     await o.idle();
     expect([o.settled(A.key), o.stored(A.key).size, o.problem]).toEqual([true, 1, ""]);
+  });
+
+  it("leaves a reader that can't work alone for twice as long each time, up to the cap, not every minute", async () => {
+    let calls = 0, clock = 0;
+    const o = new Ocr(async () => { calls++; throw new Unready("no language data"); }, "e", ":memory:", () => clock);
+    const waits: number[] = [];
+    for (let i = 0; i < 9; i++) {
+      o.queue(A, [1]);
+      await o.idle();
+      expect(o.holding()).toBe(true);
+      let wait = 0;
+      while (o.holding()) { clock += 1000; wait += 1000; }       // the time until it is tried again
+      waits.push(wait);
+    }
+    expect(calls).toBe(9);
+    expect(waits).toEqual([1, 2, 4, 8, 16, 32, 60, 60, 60].map((m) => m * 60_000));        // minutes; 60 is BACKOFF_MAX_MS
+  });
+
+  it("does nothing while holding: queued files are dropped, askers are let go, later ones ignored", async () => {
+    let calls = 0, clock = 0;
+    const o = new Ocr(async () => { calls++; throw new Unready("no language data"); }, "e", ":memory:", () => clock);
+    o.queue(A, [1]);
+    o.queue(B, [1]);                                           // behind A: set aside with it
+    await o.idle();
+    expect(calls).toBe(1);
+    expect(o.queued(B.key)).toBe(false);
+    o.queue(B, [1]);
+    await o.want(B, [1]);                                      // resolves at once, reads nothing
+    await o.idle();
+    expect([calls, o.queued(B.key), o.stored(B.key).size]).toEqual([1, false, 0]);
+    expect(o.status()).toMatchObject({ waiting: 0, failedPdfs: 0, problem: "no language data" });
+  });
+
+  it("starts the back-off over once the reader has worked", async () => {
+    let fail = true, calls = 0, clock = 0;
+    const o = new Ocr(async (url, pages, got, stop) => { calls++; if (fail) throw new Unready("no data"); await all(url, pages, got, stop); }, "e", ":memory:", () => clock);
+    o.queue(A, [1]); await o.idle();
+    clock += BACKOFF_MS; o.queue(A, [1]); await o.idle();      // the second failure holds for two minutes
+    clock += 2 * BACKOFF_MS; fail = false; o.queue(A, [1]); await o.idle();
+    expect([calls, o.holding(), o.settled(A.key)]).toEqual([3, false, true]);
+    fail = true;
+    o.queue(B, [1]); await o.idle();
+    clock += BACKOFF_MS;                                       // the first failure's wait again, not the third's
+    expect(o.holding()).toBe(false);
   });
 
   it("forgets the files it isn't told to keep", async () => {
@@ -115,6 +161,14 @@ describe("TEF_NOTES_OCR", () => {
     expect(langsOf("ell+eng")).toEqual(["ell", "eng"]);
     expect(langsOf(" DEU, eng  chi_sim+deu ")).toEqual(["deu", "eng", "chi_sim"]);
     expect(langsOf("")).toEqual([]);
+  });
+
+  it("drops a code Tesseract has no data for and says which, keeping the others in order", () => {
+    expect(languagesOf("ell+eng")).toEqual({ use: ["ell", "eng"], ignored: [] });
+    expect(languagesOf("ell+xyz+eng+gre")).toEqual({ use: ["ell", "eng"], ignored: ["xyz", "gre"] });
+    expect(languagesOf("xyz")).toEqual({ use: [], ignored: ["xyz"] });
+    expect(languagesOf("")).toEqual({ use: [], ignored: [] });
+    expect(() => languagesOf("greek!")).toThrow("is not a Tesseract language code");
   });
 
   it("refuses what can't be a code", () => {
