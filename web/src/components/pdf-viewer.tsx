@@ -23,7 +23,7 @@ export function PdfViewer({ url, name, onClose }: { url: string | null; name: st
       <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined} className="flex h-[92dvh] w-[min(56rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
         <DialogTitle className="truncate border-b border-line py-3 pr-12 pl-4 text-sm font-semibold">{name}</DialogTitle>
         <DialogDescription className="sr-only">The PDF, page by page</DialogDescription>
-        {url ? <Pages url={url} /> : null}
+        {url ? <Pages key={url} url={url} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -33,6 +33,8 @@ function Pages({ url }: { url: string }) {
   const host = useRef<HTMLDivElement>(null), pdf = useRef<PdfPages | null>(null);
   const [zoom, setZoom] = useState(2), [state, setState] = useState<"loading" | "shown" | "failed">("loading");
   const [err, setErr] = useState("");
+  // The pages can zoom once they are all laid out (`showPdf` resolved): until then the buttons wait, so the label is always the zoom they have
+  const [ready, setReady] = useState(false);
   const fade = useTempoTransition(transition.fade), reveal = useTempoTransition(transition.reveal);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ function Pages({ url }: { url: string }) {
       const bytes = new Uint8Array(await res.arrayBuffer());
       if (!live) return;
       const shown = await showPdf(host.current!, bytes, () => { if (live) setState("shown"); });
-      if (live) pdf.current = shown; else shown.destroy();
+      if (live) { pdf.current = shown; setReady(true); } else shown.destroy();
     })().catch((e) => { if (live) { setState("failed"); setErr(message(e)); } });
     return () => { live = false; pdf.current?.destroy(); pdf.current = null; };
   }, [url]);
@@ -69,9 +71,9 @@ function Pages({ url }: { url: string }) {
         <motion.div ref={host} initial={false} animate={{ opacity: state === "shown" ? 1 : 0, transition: reveal }} />
       </div>
       <footer className="flex h-12 shrink-0 items-center justify-center gap-2 border-t border-line text-dim text-sm">
-        <Button variant="ghost" size="icon" aria-label="Zoom out" disabled={zoom === 0} onClick={() => step(-1)}><Minus /></Button>
+        <Button variant="ghost" size="icon" aria-label="Zoom out" disabled={!ready || zoom === 0} onClick={() => step(-1)}><Minus /></Button>
         <span className="w-12 text-center tabular-nums">{Math.round(STEPS[zoom] * 100)}%</span>
-        <Button variant="ghost" size="icon" aria-label="Zoom in" disabled={zoom === STEPS.length - 1} onClick={() => step(1)}><Plus /></Button>
+        <Button variant="ghost" size="icon" aria-label="Zoom in" disabled={!ready || zoom === STEPS.length - 1} onClick={() => step(1)}><Plus /></Button>
       </footer>
     </>
   );

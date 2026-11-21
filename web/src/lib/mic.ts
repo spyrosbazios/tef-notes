@@ -54,5 +54,14 @@ export async function openMic({ rate, frame, onFrame }: { rate: number; frame: n
   }
 }
 
+/** `open` (a call to `openMic`) awaited, and the microphone it opened closed again at once when `wanted()` is false by then: the
+ *  component that asked has left while the browser's permission prompt or the audio setup was under way. Null in that case. */
+export async function openWhileWanted(open: () => Promise<Mic>, wanted: () => boolean): Promise<Mic | null> {
+  const mic = await open();
+  if (wanted()) return mic;
+  mic.close();
+  return null;
+}
+
 /** A frame's loudness as the meters show it (speech sits low in the range, so it is lifted): 0..1. */
 export const loudness = (frame: Float32Array): number => Math.min(1, rms(frame) * 4);

@@ -57,8 +57,13 @@ function Paste({ onShare }: { onShare: (s: Shared) => void }) {
 
 /** The share as it came: the link (with the page's own title), the text, photos as thumbnails, PDFs by name. */
 function Shown({ shared, files, title, image }: { shared: Shared; files: File[]; title: string | null; image?: string }) {
-  // Their addresses live as long as the page, which is short-lived and holds the files itself
-  const urls = useMemo(() => shared.images.map((i) => URL.createObjectURL(files[Number(i.uri)])), [shared, files]);
+  // Made and revoked with the share they are of: another share, or leaving, frees the files' addresses
+  const [urls, setUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const made = shared.images.map((i) => URL.createObjectURL(files[Number(i.uri)]));
+    setUrls(made);
+    return () => made.forEach((u) => URL.revokeObjectURL(u));
+  }, [shared, files]);
   return (
     <section className="space-y-3 rounded-xl border border-line bg-card p-4" aria-label="Shared">
       {shared.url && (
@@ -147,9 +152,10 @@ export function SharePage() {
   }, [clip, titled, rank]);
   useEffect(() => () => { clearTimeout(pause.current); asking.current?.abort(); }, []);
 
-  const rerank = () => {
+  /** Ask again with the note's text as the field holds it (the caller passes it: a handler made on an earlier render has an older `note`). */
+  const rerank = (words: string) => {
     clearTimeout(pause.current);
-    if (clip && busy == null && note.trim() !== ranked.current) void rank(note.trim());
+    if (clip && busy == null && words.trim() !== ranked.current) void rank(words.trim());
   };
 
   /** What the save touched, current in the lists before it is opened (the opened page would say "gone" for a note it hasn't
@@ -213,7 +219,8 @@ export function SharePage() {
             {clip && !done && (
               <>
                 <Textarea placeholder="Add a note (optional)" value={note} disabled={!!busy} aria-label="A note to save with it" className="min-h-20"
-                  onChange={(e) => { setNote(e.target.value); clearTimeout(pause.current); pause.current = setTimeout(rerank, RERANK_MS); }} onBlur={rerank} />
+                  onChange={(e) => { const words = e.target.value; setNote(words); clearTimeout(pause.current); pause.current = setTimeout(() => rerank(words), RERANK_MS); }}
+                  onBlur={(e) => rerank(e.target.value)} />
                 <div className="flex items-center gap-3 px-1">
                   <Switch id="clip-summary" checked={summary} onCheckedChange={(on) => setPrefs({ clip: { summary: on } })} disabled={!!busy} />
                   <Label htmlFor="clip-summary" className="text-[15px] font-normal">Add a summary</Label>

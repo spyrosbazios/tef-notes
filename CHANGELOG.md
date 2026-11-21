@@ -9,6 +9,15 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 - `tefnotes` run with `TEF_NOTES_AGENT=1` marks every write that carries content: `import` and `draw --replace` no longer
   leave a note unmarked, and a tag description it writes is recorded as an agent's, not the owner's.
+- Voice input: leaving the screen while the microphone was still opening no longer leaves it recording (and streaming to
+  the speech service) in the background.
+- Share page: the note you type reranks where the share fits from its current text (the first character used to be
+  missed), and the shared photos' temporary addresses are released when the page is left.
+- Place picker: Enter pressed right after typing waits for the suggestions for those words instead of picking from the
+  previous words' list.
+- A task's place card tries its map again when the map's address changes (another place or theme) after a failed load.
+- PDF viewer: the zoom buttons wait until the pages can zoom, so the percentage always matches what is shown.
+- The `n` key no longer creates a note behind an open dialog.
 
 ### Changed
 
