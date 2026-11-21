@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { boxDraft, shown, type Draft, type DraftState, type Status } from "@/lib/drafts";
-import { holdDrafts, noteDrafts, syncNow } from "@/lib/records";
+import { holdDrafts, noteDrafts, pushNow } from "@/lib/records";
 import type { NoteRec } from "@/services/notes";
 
 export type { Clash, Status } from "@/lib/drafts";
@@ -27,7 +27,7 @@ function useSaid(s: DraftState) {
 export function useDraft(r: NoteRec) {
   const { rec, path } = r;
   const d = useMemo(() => noteDrafts({ rec, path }), [rec, path]);   // the record id's drafts, the same object as the note moves
-  useEffect(() => { const release = holdDrafts(rec, d); return () => { void release().then(syncNow); }; }, [rec, d]);
+  useEffect(() => { const release = holdDrafts(rec, d); return () => { void release().then(pushNow); }; }, [rec, d]);
   const body = useDraftState(d.body), title = useDraftState(d.title);
   useSaid(body);
   useSaid(title);

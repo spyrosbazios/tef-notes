@@ -1,6 +1,6 @@
 // A change as data (src/changes.ts): applied to a copy as the edit helpers of src/sync.ts would, and a tick worked out as changes.
 import { describe, expect, test } from "bun:test";
-import { applyChange, tickChanges, topicOf, type Change } from "../src/changes";
+import { applyChange, keysOf, tickChanges, topicOf, type Change } from "../src/changes";
 import { liveLinks, visibleLinks, type LinkRow, type NoteRow, type Store, type TaskRow } from "../src/sync";
 import { newTask } from "../src/todo";
 
@@ -15,8 +15,8 @@ describe("applying a change", () => {
   test("says whether it changed the copy", () => {
     const s = store();
     expect(applyChange(s, { kind: "note.add", rec: "r1", path: P, text: "a" }, false)).toBe(true);
-    expect(applyChange(s, { kind: "note.write", path: P, text: "a" }, false)).toBe(false);
-    expect(applyChange(s, { kind: "note.write", path: P, text: "b", mark: { tainted: true } }, false)).toBe(true);
+    expect(applyChange(s, { kind: "note.write", rec: "r1", path: P, text: "a" }, false)).toBe(false);
+    expect(applyChange(s, { kind: "note.write", rec: "r1", path: P, text: "b", mark: { tainted: true } }, false)).toBe(true);
     expect(s.notes.get(P)).toMatchObject({ text: "b", tainted: true });
     const t = newTask("t1", { title: "x" });
     expect(applyChange(s, { kind: "task.save", task: t }, false)).toBe(true);
@@ -26,6 +26,28 @@ describe("applying a change", () => {
     expect(applyChange(s, { ...link, id: "l2" }, false)).toBe(false);          // the relation is held already, under l1
     expect(applyChange(s, { kind: "link.remove", id: "l1" }, false)).toBe(true);
     expect(applyChange(s, { kind: "link.remove", id: "l1" }, false)).toBe(false);
+  });
+
+  test("a note's write finds it by record id where it moved, and puts it back when the copy no longer holds it", () => {
+    const s = store();
+    applyChange(s, { kind: "note.add", rec: "r1", path: P, text: "a" }, false);
+    const moved = "notes/20261101-a-2.md";
+    s.notes.put({ ...s.notes.get(P)!, path: moved });
+    s.notes.delete(P);
+    expect(applyChange(s, { kind: "note.write", rec: "r1", path: P, text: "b" }, false)).toBe(true);
+    expect([s.notes.get(P), s.notes.get(moved)?.text]).toEqual([undefined, "b"]);
+    s.notes.delete(moved);                                            // deleted on another device, the sync took it away
+    expect(applyChange(s, { kind: "note.write", rec: "r1", path: moved, text: "c" }, false)).toBe(true);
+    expect(s.notes.get(moved)).toMatchObject({ rec: "r1", text: "c", rev: null });
+    applyChange(s, { kind: "note.add", rec: "r2", path: P, text: "another" }, false);
+    s.notes.delete(moved);
+    expect(() => applyChange(s, { kind: "note.write", rec: "r1", path: P, text: "d" }, false)).toThrow("taken");
+  });
+
+  test("a change names the row it is to", () => {
+    expect(keysOf({ kind: "note.write", rec: "r1", path: P, text: "" })).toEqual(["notes", P]);
+    expect(keysOf({ kind: "task.remove", id: "t1" })).toEqual(["tasks", "t1"]);
+    expect(keysOf({ kind: "link.add", id: "l1", from: { type: "task", id: "t1" }, to: { type: "note", id: "r1" }, role: "about" })).toEqual(["links", "l1"]);
   });
 
   test("a delete of what the server never had keeps a tombstone only while a sync is out", () => {

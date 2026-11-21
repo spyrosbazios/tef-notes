@@ -7,6 +7,15 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- Two tabs of the app open at once no longer overwrite each other's unsent edits: one tab keeps the offline copy and syncs
+  for all, the others hand it their changes and show its copy. When it closes, or a phone freezes it in the background,
+  another tab takes over.
+- Changes made on another device arrive from the live feed itself, record by record, instead of a full re-download of every
+  note, task and link; an edit goes up without one. The feed's normal 5-minute idle close no longer flashes "Offline" or
+  re-downloads, a failed subscription is retried, and Settings shows when live updates are off.
+- The offline copy records the shape of its rows: a row this build can't read is dropped instead of loaded wrong, and a copy
+  a newer build wrote is left alone. The one-shot step giving old notes a record id now runs as the copy is read
+  (`unversioned` in `web/src/lib/local.ts`): delete it once each of your browsers has opened this release.
 - The assistant: a write it can't make (a note that isn't there, a bad date) is refused before it runs, with the reason
   shown in the chat. Two writes proposed at once can no longer let one under "Ask first" through without its card.
 - The assistant's chat names every step in words: reading a PDF, looking at a picture, reading a page and fetching a

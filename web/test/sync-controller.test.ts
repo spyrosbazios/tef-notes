@@ -16,7 +16,7 @@ function fixture() {
     tasks: { revs: async () => [], get: unused, getMany: async () => [], create: unused, update: unused, remove: unused },
     links: { ids: async () => [], byIds: unused, add: unused, remove: unused },
   };
-  const sync = createSync({ store, ready: Promise.resolve(), transport, online: () => online, schedule });
+  const sync = createSync({ store, transport, online: () => online, schedule });
   return { store, sync, transport, queued, lists: () => lists, offline: () => { online = false; } };
 }
 
@@ -46,24 +46,68 @@ test("controllers isolate stores, status and redraw subscriptions; route loaders
   expect(draws).toHaveLength(2);
 });
 
-test("the last lifecycle owner cancels pending work, cleanup is idempotent and remount restarts", async () => {
+test("the last lifecycle owner cancels pending work, cleanup is idempotent and remount sends what waited", async () => {
   const f = fixture();
+  const created: string[] = [];
+  f.transport.tasks.create = async (t) => { created.push(t.id); return { ...t, rev: 1 }; };
   const mounted = idle(f.sync), first = f.sync.start(), second = f.sync.start();
   await mounted;
   f.sync.apply([{ kind: "task.save", task: newTask("t1", { title: "x" }) }]);
-  f.sync.heard("links", "create", { id: "news" });
-  expect([...f.queued.values()].sort((a, b) => a - b)).toEqual([250, 1500]);
+  expect([...f.queued.values()]).toEqual([1500]);
   first(); first();
-  expect(f.queued.size).toBe(2);
+  expect(f.queued.size).toBe(1);
   second();
   expect(f.queued.size).toBe(0);
   f.sync.apply([{ kind: "task.save", task: newTask("t2", { title: "y" }) }]);
-  f.sync.heard("links", "create", { id: "later" });
   expect(f.queued.size).toBe(0);
-  const before = f.lists(), mountedAgain = idle(f.sync), stop = f.sync.start();
+  const mountedAgain = idle(f.sync), stop = f.sync.start();
   await mountedAgain;
-  expect(f.lists()).toBeGreaterThan(before);
+  expect(created.sort()).toEqual(["t1", "t2"]);
+  expect(f.lists()).toBe(0);                                     // a push alone: the pull comes with the realtime feed
   stop();
+});
+
+test("an edit goes up by a push alone; a pull is only what syncNow asks for", async () => {
+  const f = fixture();
+  f.transport.tasks.create = async (t) => ({ ...t, rev: 1 });
+  const stop = f.sync.start();
+  await idle(f.sync);
+  f.sync.apply([{ kind: "task.save", task: newTask("t1", { title: "x" }) }]);
+  const [push] = [...f.queued.keys()];
+  const pushed = idle(f.sync);
+  push!();
+  await pushed;
+  expect([f.lists(), f.sync.getStatus().waiting]).toEqual([0, 0]);
+  await f.sync.syncNow();
+  expect(f.lists()).toBe(1);
+  stop();
+});
+
+test("a record the realtime feed reports is in the copy and its list at once, rev-checked, with no request", async () => {
+  const f = fixture();
+  const draws: unknown[] = [];
+  f.sync.onRedraw((t) => draws.push(t));
+  f.transport.tasks.create = async (t) => ({ ...t, rev: 1 });
+  saveTask(f.store, newTask("t1", { title: "mine" }));
+  await f.sync.syncNow();
+  draws.length = 0;
+  const lists = f.lists();
+  f.sync.heard({ topic: "tasks", task: { ...newTask("t1", { title: "mine" }), rev: 1 } });   // this app's own write echoing back
+  expect(draws).toEqual([]);
+  f.sync.heard({ topic: "tasks", task: { ...newTask("t1", { title: "the phone's" }), rev: 2 } });
+  expect(f.store.tasks.get("t1")).toMatchObject({ rev: 2, data: { title: "the phone's" } });
+  expect(draws).toEqual([["tasks"]]);
+  f.sync.heard({ topic: "tasks", gone: "t1" });
+  expect(f.store.tasks.get("t1")).toBeUndefined();
+  expect([f.lists(), f.queued.size]).toEqual([lists, 0]);
+});
+
+test("why the realtime feed is off is in the status until it is on again", () => {
+  const f = fixture();
+  f.sync.feed("Live updates are off: HTTP 404");
+  expect(f.sync.getStatus().feed).toBe("Live updates are off: HTTP 404");
+  f.sync.feed(undefined);
+  expect(f.sync.getStatus().feed).toBeUndefined();
 });
 
 test("a failed request finishing after stop cannot rearm the retry timer", async () => {
@@ -71,11 +115,11 @@ test("a failed request finishing after stop cannot rearm the retry timer", async
   addNote(f.store, "a1", "notes/a.md", "waiting");
   let reject!: (reason: Error) => void, entered!: () => void;
   const started = new Promise<void>((resolve) => { entered = resolve; });
-  f.transport.notes.list = () => { entered(); return new Promise((_, fail) => { reject = fail; }); };
+  f.transport.notes.create = () => { entered(); return new Promise((_, fail) => { reject = fail; }); };
   const stop = f.sync.start();
   await started;
   const done = idle(f.sync);
-  f.transport.notes.list = async () => { throw new Error("offline"); };
+  f.transport.notes.create = async () => { throw new Error("offline"); };
   stop();
   reject(new Error("offline"));
   await done;

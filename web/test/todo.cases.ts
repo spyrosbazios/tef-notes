@@ -2,11 +2,13 @@
 // is made on the copy and shows at once, goes up when a sync runs, and a stale one is merged, never sent over the newer.
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import "./storage";
+import "./locks";
 import { QueryClient } from "@tanstack/react-query";
 import { parseNote } from "@/core/notes";
 import { Conflict, Unavailable } from "@/core/pocketbase";
 import { sameLink, type Link } from "@/core/record-links";
 import { retagTask, taskOf, type Task } from "@/core/todo";
+import type { StreamHandlers } from "@/lib/tab-sync";
 
 type Rev<T> = T & { rev: number };
 const server = { tasks: new Map<string, Rev<Task>>(), notes: new Map<string, { rec: string; path: string; text: string; rev: number }>(), links: new Map<string, Link>(), down: false };
@@ -70,6 +72,10 @@ mock.module("@/services/links", () => ({
   remove: (id: string) => net(() => void server.links.delete(id)),
 }));
 
+/** The realtime stream the leading tab runs, as `live` started it. */
+let stream: StreamHandlers | undefined;
+mock.module("@/services/realtime", () => ({ watch: (h: StreamHandlers) => { stream = h; return () => { stream = undefined; }; } }));
+
 const { createNote, deleteNote, landed, write, setFlags, NOTES } = await import("@/hooks/notes");
 const { addTask, editTask, changeTask, removeTask, tickTask, TASKS } = await import("@/hooks/todo");
 const { addLink, LINKS } = await import("@/hooks/links");
@@ -77,7 +83,7 @@ const { LENSES, setActiveLens } = await import("@/hooks/lens");
 const { addItem } = await import("@/core/todo");
 const { local } = await import("@/lib/local");
 const { note } = await import("@/lib/net");
-const { getStatus, heard, onRedraw, sync, syncNow } = await import("@/lib/sync");
+const { getStatus, live, onRedraw, sync, syncNow } = await import("@/lib/sync");
 const { projectLocal } = await import("@/lib/local-records");
 const { noteDrafts, noteIdNow } = await import("@/lib/records");
 
@@ -412,30 +418,35 @@ describe("an open note's typing", () => {
 });
 
 describe("the realtime feed", () => {
-  test("a note another device changed is news, and the echo of what this app sent is not", async () => {
+  test("a note another device changed is taken in at once with no listing; the echo of what this app sent changes nothing", async () => {
+    const stopLive = live(() => {});
     const r = await createNote(qc, "Echo");
     await syncNow();
-    const rec = [...server.notes.values()][0]!;
+    const rec = [...server.notes.values()][0]!, at = (x: typeof rec) => ({ rec: x.rec, path: x.path, rev: x.rev, text: x.text, kind: "note" as const });
     lists = 0;
-    heard("notes", "update", { id: rec.rec, path: rec.path, rev: rec.rev });          // the rev this copy has: the echo
-    await Bun.sleep(300);
+    stream!.heard({ topic: "notes", note: at(rec) });                                // the rev this copy has: the echo
+    const newer = { ...rec, text: `${rec.text}more\n`, rev: rec.rev + 1 };
+    server.notes.set(rec.rec, newer);
+    stream!.heard({ topic: "notes", note: at(newer) });
+    expect(seen().find((n) => n.path === r.path)?.text).toBe(newer.text);
+    expect(local.notes.get(r.path)).toMatchObject({ rev: newer.rev, base: newer.text });
+    stream!.heard({ topic: "notes", note: { ...at(newer), rec: "m", path: "agent/memory.md", rev: 9 } });   // not a note this app syncs
     expect(lists).toBe(0);
-    heard("notes", "update", { id: rec.rec, path: rec.path, rev: rec.rev + 1 });
-    await Bun.sleep(300);
-    expect(lists).toBe(1);
-    heard("notes", "update", { id: "m", path: "agent/memory.md", rev: 9 });             // not a note this app syncs
-    await Bun.sleep(300);
-    expect(lists).toBe(1);
-    expect(r.path).toBe(rec.path);
+    expect(getStatus().waiting).toBe(0);
+    stopLive();
   });
 
-  test("a task or link the copy lacks is news; one it has is not", async () => {
-    const t = await addTask(qc, { title: "a" });
-    await syncNow();
+  test("a task or link from another device is in the lists at once; a gap in the feed is one pull", async () => {
+    const stopLive = live(() => {});
     lists = 0;
-    heard("tasks", "update", { id: t.id, rev: 1 });
-    heard("links", "create", { id: "unknown" });
-    await Bun.sleep(300);
-    expect(lists).toBe(1);                                   // two events, one sync
+    stream!.heard({ topic: "tasks", task: { ...taskOf({ id: "t9", title: "from the phone" }), rev: 1 } });
+    stream!.heard({ topic: "links", link: { id: "l9", from: { type: "task", id: "t9" }, to: { type: "note", id: "n1" }, role: "about" } });
+    expect(cached("t9")?.title).toBe("from the phone");
+    expect(qc.getQueryData<Link[]>(LINKS)?.map((l) => l.id)).toEqual(["l9"]);
+    expect(lists).toBe(0);
+    stream!.gap();
+    await syncNow();
+    expect(lists).toBe(1);                                    // one pull: the gap's, which the sync asked for meanwhile shares
+    stopLive();
   });
 });

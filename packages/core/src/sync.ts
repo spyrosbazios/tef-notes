@@ -17,6 +17,9 @@
 //     under its own id, which the row takes), a remove is a tombstone, `Gone` (an end gone from the server) drops the link.
 // "Unsent" is `updated !== pushed` (both ms, `tick`ed so an edit in the same millisecond as a push still reads as unsent,
 // and one made while a push is out stays unsent after it).
+// When: a full round (pull, then push) when the client may have missed something (it opened, its realtime feed came back after
+// a gap); a push alone after an edit (`syncRound`'s `pull: false`). What another device changed meanwhile comes one record at a
+// time from the server's realtime feed (`takeHeard`), rev-checked as a pull of that record would be.
 // A failure is one of the transport's typed outcomes (record-contracts): `Unavailable` is tried again later, `Refused` parks
 // the row (`refused`, its reason): it is not sent again until it is edited or the owner asks (`retryRefused`, `discardRefused`).
 // A note written with text the owner didn't write (a model's summary) carries the `tainted` mark (`Mark`) on the row until a
@@ -539,11 +542,75 @@ async function pushLinks(c: Run) {
   }
 }
 
+// ---- one record the server's realtime feed reported
+
+/** A record created or changed (its whole record, as the feed sends it), or gone, on the server. */
+export type Heard =
+  | { topic: "notes"; note: Fetched } | { topic: "notes"; gone: Pick<Entry, "rec" | "path"> }
+  | { topic: "tasks"; task: Versioned<Task> } | { topic: "tasks"; gone: string }
+  | { topic: "links"; link: Link } | { topic: "links"; gone: string };
+
+/** `h` taken into the copy as a pull of that one record would take it: a rev the row has already, or an older one, is ignored
+ *  (this client's own write echoing back reaches it at the rev its push left, or while it is still unsent); a row edited here
+ *  and not sent keeps its edit, for the push to settle; a record gone from the server goes here too unless edited here since.
+ *  true when the copy changed. */
+export function takeHeard(s: Store, h: Heard): boolean {
+  if (h.topic === "notes") {
+    if ("gone" in h) {
+      const n = s.notes.get(h.gone.path);
+      if (!n || n.rec !== h.gone.rec || !(n.deleted || (!unsent(n) && n.lost == null))) return false;
+      s.notes.delete(n.path);
+      return true;
+    }
+    const r = h.note, n = s.notes.get(r.path);
+    if (!isNotePath(r.path) || (n && n.rec === r.rec && n.rev != null && n.rev >= r.rev)) return false;
+    takeNote(s, r);
+    return s.notes.get(r.path) !== n;
+  }
+  if (h.topic === "tasks") {
+    if ("gone" in h) {
+      const t = s.tasks.get(h.gone);
+      if (!t || t.rev == null || !(t.deleted || !taskUnsent(t))) return false;
+      s.tasks.delete(t.id);
+      return true;
+    }
+    const t = s.tasks.get(h.task.id);
+    if (t && t.rev != null && t.rev >= h.task.rev) return false;
+    takeTask(s, h.task);
+    return s.tasks.get(h.task.id) !== t;
+  }
+  if ("gone" in h) {
+    const l = s.links.get(h.gone);
+    if (l?.pushed == null) return false;                          // one made here and not up yet is the push's
+    s.links.delete(h.gone);
+    return true;
+  }
+  const l = s.links.get(h.link.id);
+  if (l && l.pushed != null) return false;
+  s.links.put(l ? { ...l, pushed: Date.now() } : { link: h.link, pushed: Date.now(), deleted: false });   // an add of ours that landed
+  return true;
+}
+
 // ---- a round
 
-/** Pull then push, every record on its own: one failure holds back nothing else. Notes first, then tasks, then the links that
- *  name them. A server that can't be reached ends the round after the pull. true when the server was reached. */
-export async function syncRound(c: Run): Promise<boolean> {
+/** A push alone: what was edited here goes up, in the order a full round sends it, and a server that can't be reached ends it.
+ *  true when the server was reached. */
+async function pushRound(c: Run): Promise<boolean> {
+  let down = false;
+  const r: Run = { ...c, fail: (what, e) => { if (unreachable(e)) down = true; c.fail(what, e); } };
+  for (const step of [pushNotes, pushTasks, pushLinks, dropTasks]) {
+    await step(r);
+    if (down) break;
+  }
+  c.changed?.();
+  return !down;
+}
+
+/** Pull then push (`pull`), or push alone, every record on its own: one failure holds back nothing else. Notes first, then
+ *  tasks, then the links that name them. A server that can't be reached ends the round after the pull. true when the server
+ *  was reached. */
+export async function syncRound(c: Run, { pull }: { pull: boolean }): Promise<boolean> {
+  if (!pull) return pushRound(c);
   if (!(await pullNotes(c))) return false;
   c.changed?.();
   await pushNotes(c);

@@ -11,8 +11,10 @@ import { complete, nextOrder, reopen, type Task } from "./todo";
 export type Change =
   /** A note made here, under its own record id. `mark`: its text holds someone else's. */
   | { kind: "note.add"; rec: string; path: string; text: string; mark?: Mark }
-  /** A note's whole text. */
-  | { kind: "note.write"; path: string; text: string; mark?: Mark }
+  /** A note's whole text. `rec` names the note wherever the copy holds it by the time the change is applied (moved aside to `-2`
+   *  by a sync since), and puts it back at `path` when the copy no longer holds it (deleted on another device meanwhile): an edit
+   *  made here outlives a delete elsewhere, as the sync's does. */
+  | { kind: "note.write"; rec: string; path: string; text: string; mark?: Mark }
   | { kind: "note.remove"; path: string }
   /** A task's fields, a new one's too. */
   | { kind: "task.save"; task: Task }
@@ -26,12 +28,27 @@ export type Topic = "notes" | "tasks" | "links";
 
 export const topicOf = (c: Change): Topic => (c.kind.startsWith("note.") ? "notes" : c.kind.startsWith("task.") ? "tasks" : "links");
 
+/** The rows a change names, by table and key (a note's path, a task's or a link's id): what a copy that applied it says it holds
+ *  now, to one that applied it on a guess (another tab's, lib/tab-sync.ts). */
+export function keysOf(c: Change): [Topic, string] {
+  switch (c.kind) {
+    case "note.add": case "note.write": case "note.remove": return ["notes", c.path];
+    case "task.save": return ["tasks", c.task.id];
+    case "task.remove": return ["tasks", c.id];
+    case "link.add": case "link.remove": return ["links", c.id];
+  }
+}
+
 /** `c` applied to the copy. `syncing`: a sync is out (a delete keeps a tombstone then). false when it changed nothing (the text
  *  it held already, a record that isn't there). Throws on a change the copy can't take (a path held, a link refused). */
 export function applyChange(s: Store, c: Change, syncing: boolean): boolean {
   switch (c.kind) {
     case "note.add": addNote(s, c.rec, c.path, c.text, c.mark); return true;
-    case "note.write": return writeNote(s, c.path, c.text, c.mark);
+    case "note.write": {
+      const at = s.notes.get(c.path)?.rec === c.rec ? c.path : s.notes.all().find((n) => n.rec === c.rec)?.path;
+      if (at == null) { addNote(s, c.rec, c.path, c.text, c.mark); return true; }
+      return writeNote(s, at, c.text, c.mark);
+    }
     case "note.remove": return removeNote(s, c.path, syncing);
     case "task.save": {
       const before = s.tasks.get(c.task.id);

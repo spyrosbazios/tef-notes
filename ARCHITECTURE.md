@@ -336,7 +336,11 @@ writes text of its own, and only with your confirmation.
 configure). It uses shadcn, TanStack Query and axios services (`web/src/services/`), with errors mapped to the core's
 `Conflict`. The web sync controller (`web/src/lib/sync-controller.ts`) owns its mutable status and timers over an injected
 store and transport; a round that fails is tried again after 5 s, doubling to at most 5 minutes, and Settings lists the
-changes the server refused, to send again or let go. The root frame's `hooks/live.ts` owns realtime and browser lifecycle subscriptions; `lib/local-records.ts`
+changes the server refused, to send again or let go. One tab of the app runs it, with the realtime feed and the writes to
+IndexedDB; the others mirror that tab's copy and hand it their changes (`web/src/lib/tab-sync.ts`, a Web Lock and a
+BroadcastChannel). An edit goes up by a push alone; what other devices change comes record by record from the realtime feed,
+rev-checked as a pull of that record would be (`packages/core/src/sync.ts` `takeHeard`), and a full pull is only for a gap in
+the feed. The root frame's `hooks/live.ts` owns realtime and browser lifecycle subscriptions; `lib/local-records.ts`
 owns the notes/tasks/links query projections, shared by feature edits and sync redraws; `lib/records.ts` is the one writer of
 the local copy (changes handed to the controller's `apply`) and owns an open note's unsaved typing (web/README.md, Offline). On a phone it is the installed PWA, in its own layout below `md`.
 
