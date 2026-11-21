@@ -33,7 +33,7 @@ export async function importNotes(s: pb.Server, src: Source, o: { dry: boolean; 
     if (same) t.same++;
     line(!cur ? "new" : same ? "same" : "update");
     if (o.dry) return;
-    if (!cur) { await pb.create(s, e.path, e.text, o.mark); t.made++; }
+    if (!cur) { await pb.create(s, pb.recordId(), e.path, e.text, o.mark); t.made++; }
     else if (!same) {
       if (!(await pb.update(s, cur, e.text, o.mark))) throw new Error(`${e.path} was deleted meanwhile`);
       t.updated++;

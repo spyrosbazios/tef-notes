@@ -67,7 +67,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const scroller = useRef<HTMLDivElement>(null);
   const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text
   const title = useRef<HTMLTextAreaElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
-  const addFiles = useAddFiles(n.note.id);
+  const addFiles = useAddFiles(n.path);
   const note = n.note;
 
   const fresh = () => qc.getQueryData<NoteRec[]>(NOTES)?.find((x) => x.path === n.path) ?? n;
@@ -95,8 +95,9 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
     if (!files.some(attachable)) return;
     setUploading(true);
     try {
-      const md = await addFiles(files);
-      if (md) place(md);
+      await d.flush();
+      const { lines } = await addFiles(files);
+      if (lines) place(lines);
     } catch (e) { toast.error(message(e)); } finally { setUploading(false); }
   };
 

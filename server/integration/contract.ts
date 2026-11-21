@@ -9,7 +9,7 @@ if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun -
 const s = { url };
 let serial = 0;
 const id = () => `contract${String(++serial).padStart(7, "0")}`;
-const note = () => pb.create(s, `notes/${id()}.md`, "# Contract\n");
+const note = () => pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Contract\n");
 const task = () => pb.tasks.create(s, newTask(id(), { title: "Contract task" }));
 const record = (collection: string, id: string) => `collections/${collection}/records/${id}`;
 const raw = (path: string, method: string, body?: unknown) => fetch(`${url}/api/${path}`, body === undefined ? { method } : pb.json(method, body));
@@ -64,16 +64,28 @@ for (const collection of ["notes", "tasks"] as const) {
   });
 }
 
+test("keyset paging's filter: `id > last` sorted by id, beside a listing's own filter", async () => {
+  const [a, b] = [await task(), await task()];
+  const after = (last: string) => pb.call(s, `collections/tasks/records?fields=id&sort=id&perPage=500&skipTotal=1&filter=${encodeURIComponent(`(rev >= 1) && id > ${pb.lit(last)}`)}`);
+  const ids = (await after(a.id)).items.map((r: { id: string }) => r.id);
+  expect(ids).toContain(b.id);
+  expect(ids).not.toContain(a.id);
+  expect(ids).toEqual([...ids].sort());
+});
+
 test("noteColumns survive HTTP create/update; path and kind are immutable", async () => {
   const path = `notes/${id()}.md`;
   const text = '---\ntitle: "Δοκιμή"\ncreated: 2026-11-14\npinned: true\narchived: true\ncolor: blue\ntags: [work, home]\n---\nBody\n';
-  const n = await pb.create(s, path, text);
+  const rec = pb.recordId(), n = await pb.create(s, rec, path, text);
+  expect(n.rec).toBe(rec);                                   // the client's own record id, as tasks have theirs
   expect(await pb.call(s, record("notes", n.rec))).toMatchObject({ ...pb.noteColumns(path, text), rev: 1, kind: "note" });
+  await expect(pb.create(s, rec, `notes/${id()}.md`, text)).rejects.toBeInstanceOf(pb.Conflict);   // its id taken: it landed before
   expect(pb.noteColumns(path, text)).toMatchObject({ title: "Δοκιμή", day: "2026-11-14", pinned: true, archived: true, color: "blue", tags: ["work", "home"] });
-  await expect(pb.create(s, path, text)).rejects.toBeInstanceOf(pb.Conflict);
+  await expect(pb.create(s, pb.recordId(), path, text)).rejects.toBeInstanceOf(pb.Conflict);
   for (const patch of [{ path: "notes/moved.md" }, { kind: "capture" }]) {
     expect((await raw(record("notes", n.rec), "PATCH", { rev: n.rev, ...patch })).status).toBe(400);
   }
+  await expect(pb.update(s, { ...n, path: "notes/moved.md" }, text)).rejects.toBeInstanceOf(pb.Refused);
   expect(await pb.get(s, n.rec)).toEqual(n);
   const cleared = "# Plain\nNo frontmatter.\n";
   await pb.update(s, n, cleared);
@@ -104,6 +116,12 @@ test("links: idempotent replay, unique ends/role, shape checks and cascades on e
   expect((await pb.tasks.get(s, t.id))?.rev).toBe(1);
   await pb.remove(s, n);
   expect(await pb.links.of(s, l.from)).toEqual([]);
+  // A link to a note deleted meanwhile: what PocketBase answers, and the protocol's typed outcome for it (the sync drops it)
+  const dangling = newLink(id(), l.from, { type: "note", id: n.rec }, "about");
+  const refused = await raw("collections/links/records", "POST", linkRecord(dangling));
+  expect(refused.status).toBe(400);
+  expect((await refused.json()).data.toNote.code).toBe("validation_missing_rel_records");
+  await expect(pb.links.add(s, dangling)).rejects.toBeInstanceOf(pb.Gone);
   expect((await pb.tasks.get(s, t.id))?.rev).toBe(1);
   const n2 = await note();
   const l2 = await pb.links.add(s, { ...l, id: id(), to: { type: "note", id: n2.rec } });

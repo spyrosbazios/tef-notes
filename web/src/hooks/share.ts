@@ -2,7 +2,7 @@
 // one way the page files it that isn't the clip routes': the files-only note the assistant is pointed at (it can't attach
 // files to a chat, so they go in a note first).
 import type { QueryClient } from "@tanstack/react-query";
-import { noteIdOf, parseNote } from "@/core/notes";
+import { parseNote } from "@/core/notes";
 import { SHARE_CACHE } from "@/core/share-target";
 import { takePost, type Posted } from "@/core/share-stash";
 import type { Shared } from "@/core/share";
@@ -29,12 +29,13 @@ const withLines = (path: string, text: string, lines: string): string => {
 };
 
 /** The share's photos and PDFs in a note of their own, titled by the clock for the assistant to retitle. `files` are the
- *  stash's, which the share's images and PDFs point at by place. Resolves to the note's path. */
+ *  stash's, which the share's images and PDFs point at by place. The note goes up before its files do (`addFiles`), so they
+ *  are filed under the path it keeps. Resolves to the note's path. */
 export async function saveSharedFiles(qc: QueryClient, s: Shared, files: File[]): Promise<string> {
   const d = new Date();
   const rec = await createNote(qc, `Photos ${localDay()} ${two(d.getHours())}:${two(d.getMinutes())}`);
   const mine = [...s.images, ...s.pdfs].map((f) => Number(f.uri)).sort((a, b) => a - b).map((i) => files[i]);
-  const lines = await addFiles(qc, noteIdOf(rec.path), mine);
-  if (lines) await write(qc, rec, (text) => withLines(rec.path, text, lines));
-  return rec.path;
+  const { path, lines } = await addFiles(qc, rec.path, mine);
+  if (lines) await write(qc, { ...rec, path }, (text) => withLines(path, text, lines));
+  return path;
 }

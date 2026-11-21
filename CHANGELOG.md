@@ -71,6 +71,27 @@ version is one semver number for the whole repository, set by the git tag (see [
 - The server folds tag names as the apps do, so tags with Hebrew, Devanagari, Arabic or Japanese marks no longer
   duplicate or escape a rename.
 
+### Fixed
+
+- Waiting for a sync while one is already out now waits for a fresh round: the assistant opening a note it just made, a
+  note action's Undo and the Share page no longer see the notebook as it was before the write.
+- A change the server refuses (a link to a note deleted on another device, a note or task it won't take) is no longer
+  retried every 30 seconds forever. A link to something deleted is dropped; anything else the server refused is listed in
+  Settings > Server & sync, to try again or let go, and the sync notice says so. A sync that fails is retried after 5
+  seconds, then less and less often, up to every 5 minutes.
+- A note, task or link made or deleted on another device while a sync was listing a large notebook could be dropped from
+  this one until the next sync: listings now page by record id.
+- A new note whose upload landed but whose reply was lost is no longer duplicated as `-2` when edited, and a note deleted
+  and made again at the same path on another device is fetched again instead of this device keeping (and later merging)
+  the old one's text: notes carry their own record id from the moment they are made, as tasks do.
+- Photos shared into a new note, or added to a note just made, are filed only once the note is on the server, so they
+  can't be left behind if its name turns out to be taken.
+- Text kept after "Use the server's" is no longer lost if the note is then deleted on another device: it waits in
+  Settings to be restored or dismissed.
+- The web app's offline copy is written to the device one batch at a time, each in one transaction and in order; a write
+  that fails (storage full) is kept to try again with the next and is shown ("Not saved on this device") instead of being
+  dropped silently.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

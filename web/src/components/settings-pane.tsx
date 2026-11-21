@@ -30,7 +30,7 @@ import { NotesSettings } from "@/components/settings-notes";
 import { HEAD, SUB, TITLE } from "@/components/settings-style";
 import { MicButton } from "@/components/mic-button";
 import { TalkSpeed, TalkVoicePicker } from "@/components/talk/voice-settings";
-import { Conflicts } from "@/components/sync-conflicts";
+import { Conflicts, Refused } from "@/components/sync-conflicts";
 import { TagBadge } from "@/components/tag-badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -634,7 +634,7 @@ function ImportExport() {
 /** The server this app talks to, what this browser keeps of it for offline, and clearing that: Maintenance's first box. */
 function ServerSync() {
   const qc = useQueryClient();
-  const online = useOnline(), { waiting } = useSyncStatus();
+  const online = useOnline(), { waiting, refused, unsaved } = useSyncStatus(), held = waiting + refused.length;
   const { data: notes } = useNotes(), { data: tasks } = useTasks();
   const files = useQuery({ queryKey: ["offline-files"], queryFn: keptFiles });
   const [asking, setAsking] = useState(false);
@@ -646,10 +646,11 @@ function ServerSync() {
         <Line title="Server" detail={location.host} trailing={<span className={cn("text-[13px]", online ? "text-dim" : "text-warn")}>{online ? "Reachable" : "Not reachable"}</span>} />
         <Line title="Sync now" detail="Send waiting changes and fetch what changed."
           trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={!online} onClick={sync}><RefreshCw /> Sync</Button>} />
-        <Line title="Offline copy" detail={`${notes?.length ?? 0} notes and ${tasks?.length ?? 0} tasks kept for the next visit${waiting ? ` (${waiting} ${waiting === 1 ? "change" : "changes"} not sent yet)` : ""}${files.data ? `, ${files.data} attachment files` : ""}. ${worker ? "" : "No service worker: only the open page works offline."}`} />
+        <Line title="Offline copy" detail={`${notes?.length ?? 0} notes and ${tasks?.length ?? 0} tasks kept for the next visit${waiting ? ` (${waiting} ${waiting === 1 ? "change" : "changes"} not sent yet)` : ""}${files.data ? `, ${files.data} attachment files` : ""}. ${worker ? "" : "No service worker: only the open page works offline."}${unsaved ? ` ${unsaved}` : ""}`} />
         <Conflicts />
-        <Line title="Clear the offline copy" detail={waiting ? "Not while changes are waiting to be sent." : "Forgets what this browser kept. The server is untouched."}
-          trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={waiting > 0} onClick={() => setAsking(true)}><Trash2 /> Clear</Button>} />
+        <Refused />
+        <Line title="Clear the offline copy" detail={held ? "Not while changes are waiting to be sent or were refused." : "Forgets what this browser kept. The server is untouched."}
+          trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={held > 0} onClick={() => setAsking(true)}><Trash2 /> Clear</Button>} />
       </div>
       <AlertDialog open={asking} onOpenChange={setAsking}>
         <AlertDialogContent>

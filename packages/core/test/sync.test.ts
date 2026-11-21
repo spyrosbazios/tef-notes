@@ -1,12 +1,14 @@
 // The sync engine (src/sync.ts) against a fake server that holds the rev contract: a write at a stale rev is a Conflict, a
-// create at a taken path or id is a Conflict, a delete at a stale rev is a Conflict.
+// create at a taken path or id is a Conflict, a delete at a stale rev is a Conflict. Its other failures are what PocketBase
+// answers (server/integration/contract.ts pins them), read by the protocol's own `outcomeOf`.
 import { describe, expect, test } from "bun:test";
 import { serializeNote } from "../src/notes";
-import { Conflict, type Remote, type Versioned } from "../src/pocketbase";
+import { Conflict, Unavailable, type Remote, type Versioned } from "../src/pocketbase";
+import { outcomeOf } from "../src/record-protocol";
 import { sameLink, type Link } from "../src/record-links";
 import {
-  addLink, carryLinks, coalesced, conflicted, dismissLost, freshNote, keepMine, patch, removeLink, removeNote, removeTask, restoreMine, saveTask,
-  syncRound, takeTheirs, tick, visibleLinks, waiting, writeNote,
+  addLink, addNote, carryLinks, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
+  restoreMine, retryRefused, saveTask, syncRound, takeTheirs, tick, visibleLinks, waiting, writeNote,
   type LinkRow, type NoteRow, type Run, type Store, type TaskRow, type Transport,
 } from "../src/sync";
 import { newTask, taskOf, type Task } from "../src/todo";
@@ -26,7 +28,7 @@ function fakeServer() {
   const calls: string[] = [];
   const net = async <T>(what: string, f: () => T): Promise<T> => {
     calls.push(what);
-    if (down) throw new TypeError("network");
+    if (down) throw new Unavailable("network");
     return f();
   };
   const remote = (r: NoteRec): Remote => ({ rec: r.rec, path: r.path, rev: r.rev, text: r.text, kind: "note" });
@@ -35,10 +37,9 @@ function fakeServer() {
     notes: {
       list: () => net("notes.list", () => [...notes.values()].map((r) => ({ rec: r.rec, path: r.path, rev: r.rev, kind: "note" as const }))),
       get: (rec) => net("notes.get", () => { const r = notes.get(rec); return r ? remote(r) : null; }),
-      read: (path) => net("notes.read", () => { const r = byPath(path); return r ? remote(r) : null; }),
-      create: (path, text) => net("notes.create", () => {
-        if (byPath(path)) throw new Conflict(path);
-        const r = { rec: `rec${++n}`, path, text, rev: 1 };
+      create: (rec, path, text) => net("notes.create", () => {
+        if (notes.has(rec) || byPath(path)) throw new Conflict(path);
+        const r = { rec, path, text, rev: 1 };
         notes.set(r.rec, r);
         return remote(r);
       }),
@@ -91,13 +92,12 @@ function fakeServer() {
         const had = [...links.values()].find((x) => x.id === l.id || sameLink(x, l));
         if (had) return had;
         const ends = [l.from, l.to];
-        for (const e of ends) if (e.type === "task" ? !tasks.has(e.id) : ![...notes.keys()].includes(e.id)) throw Object.assign(new Error("404"), { status: 404 });
+        for (const e of ends) if (e.type === "task" ? !tasks.has(e.id) : ![...notes.keys()].includes(e.id)) throw outcomeOf(400, { message: "Failed to create record.", data: { [`${e === l.from ? "from" : "to"}${e.type === "task" ? "Task" : "Note"}`]: { code: "validation_missing_rel_records", message: "Failed to find all relation records with the provided ids." } } }, "links");
         links.set(l.id, l);
         return l;
       }),
       remove: (id) => net("links.remove", () => void links.delete(id)),
     },
-    status: (e) => (e as { status?: number }).status,
   };
   return {
     api, notes, tasks, links, calls,
@@ -123,18 +123,25 @@ function run(s: Store, server: ReturnType<typeof fakeServer>, over: Partial<Run>
 }
 
 describe("coalesced", () => {
-  test("a call while one runs shares it and runs once more after", async () => {
-    let started = 0, release!: () => void;
+  test("calls while one runs share one rerun after it, and their promise is that rerun's", async () => {
+    let started = 0, seen = 0, release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
-    const go = coalesced(async () => { started++; await gate; });
-    const a = go(), b = go(), c = go();
+    let server = 0;
+    const go = coalesced(async () => { started++; const at = server; await gate; seen = at; });
+    const a = go();
+    server = 1;                                                // a write lands while the first run is out
+    const b = go(), c = go();
     expect(go.running()).toBe(true);
-    expect(b).toBe(a); expect(c).toBe(a);
+    expect(b).not.toBe(a); expect(c).toBe(b);
     release();
     await a;
-    await Bun.sleep(5);
+    expect(seen).toBe(0);
+    await b;
+    expect(seen).toBe(1);                                      // the caller that arrived mid-run sees the write
     expect(started).toBe(2);
     expect(go.running()).toBe(false);
+    await go();
+    expect(started).toBe(3);
   });
   test("a run that never awaits still clears running", async () => {
     let started = 0;
@@ -210,14 +217,14 @@ describe("notes", () => {
 
   test("a note made here is created, and keeps the text typed while it went up", async () => {
     const server = fakeServer(), s = store();
-    writeNote(s, P, note("A", "one"));
+    addNote(s, "mine1", P, note("A", "one"));
     const create = server.api.notes.create;
-    server.api.notes.create = async (path, text) => { const r = await create(path, text); writeNote(s, P, note("A", "one\nmore")); return r; };   // typed while the create is out
+    server.api.notes.create = async (rec, path, text) => { const r = await create(rec, path, text); writeNote(s, P, note("A", "one\nmore")); return r; };   // typed while the create is out
     await run(s, server).go();
     expect(s.notes.get(P)!.text).toBe(note("A", "one\nmore"));
     expect(waiting(s)).toBe(1);                              // the second edit is still unsent
     await run(s, server).go();
-    expect(server.notes.get("rec1")!.text).toBe(note("A", "one\nmore"));
+    expect(server.notes.get("mine1")!.text).toBe(note("A", "one\nmore"));
     expect(waiting(s)).toBe(0);
   });
 
@@ -278,7 +285,7 @@ describe("notes", () => {
   test("a new note whose path the server took moves aside to -2", async () => {
     const server = fakeServer(), s = store();
     server.put("notes/20261101-untitled.md", note("Untitled", "theirs"));
-    writeNote(s, "notes/20261101-untitled.md", note("Untitled", "mine"));
+    addNote(s, "mine1", "notes/20261101-untitled.md", note("Untitled", "mine"));
     const moves: [string, string][] = [];
     const r = run(s, server, { moved: (a, b) => moves.push([a, b]) });
     await r.go();
@@ -289,21 +296,71 @@ describe("notes", () => {
     expect([...server.notes.values()].map((x) => x.path).sort()).toEqual(["notes/20261101-untitled-2.md", "notes/20261101-untitled.md"]);
   });
 
-  test("a create that landed once before is not a second note", async () => {
+  test("a create whose reply was lost, then edited, is read back by its record id: one note, never a second", async () => {
     const server = fakeServer(), s = store();
-    server.put(P, note("A", "same"));
-    writeNote(s, P, note("A", "same"));
+    addNote(s, "mine1", P, note("A", "one"));
+    const create = server.api.notes.create;
+    server.api.notes.create = async (rec, path, text) => { await create(rec, path, text); throw new Unavailable("reply lost"); };
     await run(s, server).go();
-    expect([...server.notes.keys()]).toEqual(["rec1"]);
-    expect(s.notes.get(P)).toMatchObject({ rec: "rec1", rev: 1 });
+    expect(server.notes.get("mine1")).toMatchObject({ path: P, rev: 1 });
+    expect(waiting(s)).toBe(1);
+    writeNote(s, P, note("A", "one\ntwo"));                     // edited before the next round
+    server.api.notes.create = create;
+    await run(s, server).go();
+    expect([...server.notes.values()].map((r) => [r.rec, r.path, r.text, r.rev])).toEqual([["mine1", P, note("A", "one\ntwo"), 2]]);
+    expect(s.notes.get(P)).toMatchObject({ rec: "mine1", rev: 2, conflict_rev: null });
     expect(waiting(s)).toBe(0);
+  });
+
+  test("a note deleted and made again at the same path elsewhere is fetched again, not kept as the old one", async () => {
+    const server = fakeServer(), s = store();
+    const old = server.put(P, note("A", "old"));
+    await run(s, server).go();
+    server.notes.delete(old.rec);
+    const now = server.put(P, note("A", "new"));                // a new record, at rev 1 like the old one was
+    expect(now.rev).toBe(old.rev);
+    await run(s, server).go();
+    expect(s.notes.get(P)).toMatchObject({ rec: now.rec, rev: 1, text: note("A", "new"), base: note("A", "new") });
+    expect(waiting(s)).toBe(0);
+  });
+
+  test("an edit to a note deleted and made again elsewhere moves aside, never merged into the new note", async () => {
+    const server = fakeServer(), s = store();
+    const old = server.put(P, note("A", "old"));
+    await run(s, server).go();
+    server.notes.delete(old.rec);
+    const now = server.put(P, note("A", "new"));
+    writeNote(s, P, note("A", "old, edited here"));
+    await run(s, server).go();
+    expect(server.notes.get(now.rec)!.text).toBe(note("A", "new"));
+    const moved = [...server.notes.values()].find((r) => r.rec !== now.rec)!;
+    expect([moved.path, moved.text]).toEqual(["notes/20261101-a-2.md", note("A", "old, edited here")]);
+    await run(s, server).go();
+    expect(s.notes.get(P)).toMatchObject({ rec: now.rec, text: note("A", "new") });
+  });
+
+  test("text kept after taking theirs outlives the server deleting the note, and restoring puts it back", async () => {
+    const server = fakeServer(), s = store();
+    const r = server.put(P, note("A", "one"));
+    await run(s, server).go();
+    writeNote(s, P, note("A", "mine"));
+    server.put(P, note("A", "theirs"));
+    await run(s, server).go();
+    takeTheirs(s, P);
+    server.notes.delete(r.rec);
+    await run(s, server).go();
+    expect(s.notes.get(P)).toMatchObject({ lost: note("A", "mine") });
+    expect(conflicted(s)).toEqual([P]);
+    restoreMine(s, P);
+    await run(s, server).go();
+    expect([...server.notes.values()].map((x) => [x.path, x.text])).toEqual([[P, note("A", "mine")]]);
   });
 
   test("a delete is a tombstone, sent with its rev; a note the server never had is gone at once", async () => {
     const server = fakeServer(), s = store();
     server.put(P, note("A", "one"));
     await run(s, server).go();
-    writeNote(s, "notes/20261101-b.md", note("B"));
+    addNote(s, "mine1", "notes/20261101-b.md", note("B"));
     expect(removeNote(s, "notes/20261101-b.md", false)).toBe(true);
     expect(s.notes.get("notes/20261101-b.md")).toBeUndefined();
     expect(removeNote(s, P, false)).toBe(true);
@@ -347,7 +404,7 @@ describe("notes", () => {
 
   test("an unreachable server ends the round after the pull and leaves every edit unsent", async () => {
     const server = fakeServer(), s = store();
-    writeNote(s, P, note("A", "one"));
+    addNote(s, "mine1", P, note("A", "one"));
     saveTask(s, newTask("t1", { title: "x" }));
     server.take(true);
     const r = run(s, server);
@@ -359,7 +416,7 @@ describe("notes", () => {
 
   test("an edit while a sync is out outlives it", () => {
     const s = store();
-    s.notes.put({ ...freshNote(P, note("A"), 1), rec: "r", rev: 1, base: note("A"), pushed: 1 });
+    s.notes.put({ ...freshNote("r", P, note("A"), 1), rev: 1, base: note("A"), pushed: 1 });
     writeNote(s, P, note("A", "x"));
     expect(s.notes.get(P)!.updated).toBeGreaterThan(s.notes.get(P)!.pushed!);
     expect(tick({ updated: Date.now() + 1000 })).toBeGreaterThan(Date.now() + 1000);
@@ -434,6 +491,64 @@ describe("tasks", () => {
   });
 });
 
+describe("refused", () => {
+  const refusal = outcomeOf(400, { message: "Failed to create record.", data: { title: { code: "validation_max_text_constraint", message: "Must be no more than 500 character(s)." } } }, "tasks");
+
+  test("a change the server refuses is parked with its reason, not counted as waiting nor sent again", async () => {
+    const server = fakeServer(), s = store();
+    saveTask(s, newTask("task1", { title: "x" }));
+    let tries = 0;
+    server.api.tasks.create = async () => { tries++; throw refusal; };
+    const r = run(s, server);
+    expect(await r.go()).toBe(true);
+    expect(r.errs).toEqual([]);
+    expect(waiting(s)).toBe(0);
+    expect(refusals(s)).toEqual([{ kind: "task", key: "task1", title: "x", deleted: false, reason: "Failed to create record. (title: Must be no more than 500 character(s).)" }]);
+    await run(s, server).go();
+    expect(tries).toBe(1);
+  });
+
+  test("an edit or a retry sends it again; a discard lets it go", async () => {
+    const server = fakeServer(), s = store();
+    saveTask(s, newTask("task1", { title: "x" }));
+    const create = server.api.tasks.create;
+    server.api.tasks.create = async () => { throw refusal; };
+    await run(s, server).go();
+    saveTask(s, { ...s.tasks.get("task1")!.data, title: "shorter" });
+    expect(refusals(s)).toEqual([]);
+    await run(s, server).go();
+    expect(refusals(s).length).toBe(1);
+    expect(retryRefused(s, "task", "task1")).toBe(true);
+    expect(retryRefused(s, "task", "task1")).toBe(false);
+    server.api.tasks.create = create;
+    await run(s, server).go();
+    expect(server.tasks.get("task1")).toMatchObject({ title: "shorter", rev: 1 });
+    server.api.tasks.update = async () => { throw refusal; };
+    saveTask(s, { ...s.tasks.get("task1")!.data, title: "refused" });
+    await run(s, server).go();
+    expect(discardRefused(s, "task", "task1")).toBe(true);
+    expect(s.tasks.get("task1")!.data.title).toBe("shorter");
+    expect(waiting(s)).toBe(0);
+  });
+
+  test("a refused note goes back to the server's text when discarded, a never-sent one away", async () => {
+    const server = fakeServer(), s = store();
+    server.put(P, note("A", "one"));
+    await run(s, server).go();
+    server.api.notes.update = async () => { throw refusal; };
+    server.api.notes.create = async () => { throw refusal; };
+    writeNote(s, P, note("A", "too long"));
+    addNote(s, "mine2", "notes/20261101-b.md", note("B"));
+    await run(s, server).go();
+    expect(refusals(s).map((x) => [x.kind, x.key, x.title])).toEqual([["note", P, "A"], ["note", "notes/20261101-b.md", "B"]]);
+    discardRefused(s, "note", P);
+    discardRefused(s, "note", "notes/20261101-b.md");
+    expect(s.notes.get(P)!.text).toBe(note("A", "one"));
+    expect(s.notes.get("notes/20261101-b.md")).toBeUndefined();
+    expect(waiting(s)).toBe(0);
+  });
+});
+
 describe("links", () => {
   const ids = (() => { let i = 0; return () => `lnk${++i}`; })();
 
@@ -453,6 +568,17 @@ describe("links", () => {
     expect(s.links.get(id)).toBeUndefined();
   });
 
+  test("a link to a note made here waits for the note to go up", async () => {
+    const server = fakeServer(), s = store();
+    server.putTask(newTask("task1", { title: "x" }));
+    addNote(s, "mine1", P, note("A"));
+    const id = addLink(s, ids(), { type: "task", id: "task1" }, { type: "note", id: "mine1" }, "about");
+    server.api.notes.create = async () => { throw new Unavailable("down"); };
+    await run(s, server).go();
+    expect(s.links.get(id)).toMatchObject({ pushed: null });
+    expect(server.links.size).toBe(0);
+  });
+
   test("a link whose task is not up yet waits a round, not forever", async () => {
     const server = fakeServer(), s = store();
     const n = server.put(P, note("A"));
@@ -460,7 +586,7 @@ describe("links", () => {
     const id = addLink(s, ids(), { type: "task", id: "task1" }, { type: "note", id: n.rec }, "about");
     s.tasks.put({ ...s.tasks.get("task1")!, rev: null });
     // a round in which the task's create fails: the link stays unsent, and is not dropped
-    server.api.tasks.create = async () => { throw Object.assign(new Error("boom"), { status: 500 }); };
+    server.api.tasks.create = async () => { throw outcomeOf(500, { message: "Something went wrong." }, "tasks"); };
     const r = run(s, server);
     await r.go();
     expect(s.links.get(id)).toMatchObject({ pushed: null });
@@ -482,7 +608,7 @@ describe("links", () => {
     expect(addLink(s, "again", { type: "task", id: "task1" }, { type: "note", id: n.rec }, "about")).toBe("theirs");
   });
 
-  test("a 404 drops the link: an end is gone from the server", async () => {
+  test("a link to a note deleted elsewhere is dropped, not retried forever", async () => {
     const server = fakeServer(), s = store();
     saveTask(s, newTask("task1", { title: "x" }));
     const id = addLink(s, ids(), { type: "task", id: "task1" }, { type: "note", id: "nosuchnote" }, "about");
@@ -531,7 +657,7 @@ describe("waiting", () => {
   test("counts unsent and deleted rows, not those in step", () => {
     const s = store();
     expect(waiting(s)).toBe(0);
-    s.notes.put({ ...freshNote(P, "x", 1), rev: 1, rec: "r", pushed: 1 });
+    s.notes.put({ ...freshNote("r", P, "x", 1), rev: 1, pushed: 1 });
     expect(waiting(s)).toBe(0);
     patch(s.notes, P, { updated: 5 });
     expect(waiting(s)).toBe(1);

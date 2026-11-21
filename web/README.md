@@ -219,8 +219,11 @@ projections rather than coordinating each other's caches.
   one is never resent. A note both sides edited is merged by lines against `base`; where the edits overlap nothing is sent and the
   note is listed under **Settings > Server & sync > Conflicts**, where the owner keeps the text made here or uses the server's
   (which keeps the replaced text to restore). A task is merged field by field, this side winning a field both
-  changed, so it never conflicts. A new note whose path another device took first goes up as `-2`. Links are a set of ids: an
-  add is idempotent, a delete is a tombstone, and an add whose end is gone from the server is dropped.
+  changed, so it never conflicts. A new note carries its own record id from the start; one whose path another device took
+  first goes up as `-2`, and one whose create landed but whose reply was lost is found again by that id. Links are a set of
+  ids: an add is idempotent, a delete is a tombstone, and an add whose end is gone from the server is dropped. A change the
+  server refuses is listed under **Settings > Server & sync > Refused**, to send again or let go; a failed round is retried
+  after 5 s, doubling up to 5 minutes.
 - **Shown:** `src/components/sync-notice.tsx`, a pill floating over the top of the page (it takes no room, so nothing moves),
   says "Offline" once the server has been out of reach for a few seconds (a dropped stream on returning to the app doesn't flash
   it) and "N changes waiting" when the last sync failed to send them; changes only waiting their turn are not shown. Offline state is `src/lib/net.ts`: the browser says so, or a
@@ -236,9 +239,9 @@ projections rather than coordinating each other's caches.
   marked `synced`, every other write is refused up front): attachment uploads, drawings, the assistant (chats, models, replies),
   search by asking, reader view, clips, tags, lenses and push subscriptions. They have no local copy to wait in. Mutations of
   those keep TanStack's `networkMode: "always"` (`src/root.tsx`) so they fail instead of pausing.
-- **Limits:** a note made here has no server record id until it first goes up, so it can't be linked to a task
-  before then (the picker leaves it out); a new note is checked against the server for a free path when it can be reached, and a
-  clash found at the push moves the note to `-2` without moving photos uploaded to it meanwhile; there is no
+- **Limits:** a new note is checked against the server for a free path when it can be reached, and a clash found at the push
+  moves the note to `-2`; files are added to a note only once it is on the server (`landed`, `src/hooks/notes.ts`), so they
+  are never filed under a path it then leaves; there is no
   background sync after the page closes, so changes wait for the next visit; no "restore" banner on a note's own page (Settings
   lists them); notes are fetched whole.
 - **If IndexedDB is unavailable** (a private window) the app runs on memory: edits sync while the page is open and are lost with

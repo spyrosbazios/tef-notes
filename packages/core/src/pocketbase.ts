@@ -13,7 +13,7 @@ import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
 import { noteKindOf, type NoteKind } from "./notes";
 import type { Link, LinkEnd } from "./record-links";
 import { conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
-export { Conflict, likeLit, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
+export { Conflict, Gone, Refused, Unavailable, likeLit, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
 import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "./record-protocol";
 export { linkFilter } from "./record-protocol";
 import { taskOf, type Task } from "./todo";
@@ -59,10 +59,10 @@ export async function call(s: Server, path: string, init: RequestInit = {}): Pro
 
 const transport = (s: Server): RecordTransport => ({
   request: (path, request = {}) => call(s, path, request.body === undefined ? { method: request.method } : json(request.method ?? "POST", request.body)),
-  status: (e) => e instanceof HttpError ? e.status : undefined,
+  answer: (e) => e instanceof HttpError ? { status: e.status, body: e.body } : undefined,
 });
 const remote = (r: any): Remote => ({ rec: r.id, path: r.path, rev: r.rev, text: r.text, kind: noteKindOf(r.kind) });
-const notes = (s: Server) => noteCollection(transport(s), remote, { sort: "path" });
+const notes = (s: Server) => noteCollection(transport(s), remote);
 export const list = (s: Server): Promise<Listed[]> => notes(s).list();
 export const get = (s: Server, rec: string): Promise<Remote | null> => notes(s).get(rec);
 export const read = (s: Server, path: string): Promise<Remote | null> => notes(s).read(path);
@@ -88,7 +88,8 @@ export async function search(s: Server, query: string, limit = 20): Promise<Remo
   return j.items.map(remote);
 }
 
-export const create = (s: Server, path: string, text: string, mark: Mark = {}): Promise<Remote> => notes(s).create(path, text, mark);
+/** A new note under the caller's own record id (`recordId`); Conflict when a record has that id or that path already. */
+export const create = (s: Server, rec: string, path: string, text: string, mark: Mark = {}): Promise<Remote> => notes(s).create(rec, path, text, mark);
 export const update = (s: Server, e: Entry, text: string, mark: Mark = {}): Promise<Remote | null> => notes(s).update(e, text, mark);
 export const remove = (s: Server, e: Pick<Entry, "rec" | "rev">): Promise<void> => notes(s).remove(e);
 

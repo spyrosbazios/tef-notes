@@ -86,10 +86,10 @@ describe("the links calls", () => {
   it("lists one end's links by its column, either side for `of`", async () => {
     const f = stub(() => Response.json({ items: [wire, { id: "bad", role: "about" }] }));
     expect(await links.to(S, N)).toEqual([l]);
-    expect(decodeURIComponent(f.mock.calls[0][0])).toContain(`filter=${linkFilter("to", N)}`);
+    expect(decodeURIComponent(f.mock.calls[0][0])).toContain(`filter=(${linkFilter("to", N)})`);
     expect(linkFilter("from", T)).toBe('fromTask = "t1"');
     await links.of(S, N);
-    expect(decodeURIComponent(f.mock.calls[1][0])).toContain('filter=fromNote = "n1" || toNote = "n1"');
+    expect(decodeURIComponent(f.mock.calls[1][0])).toContain('filter=(fromNote = "n1" || toNote = "n1")');
   });
   it("makes one with every column sent", async () => {
     const f = stub(() => Response.json(wire));

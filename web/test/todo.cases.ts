@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import "./storage";
 import { QueryClient } from "@tanstack/react-query";
 import { parseNote } from "@/core/notes";
-import { Conflict } from "@/core/pocketbase";
+import { Conflict, Unavailable } from "@/core/pocketbase";
 import { sameLink, type Link } from "@/core/record-links";
 import { retagTask, taskOf, type Task } from "@/core/todo";
 
@@ -12,8 +12,7 @@ type Rev<T> = T & { rev: number };
 const server = { tasks: new Map<string, Rev<Task>>(), notes: new Map<string, { rec: string; path: string; text: string; rev: number }>(), links: new Map<string, Link>(), down: false };
 const sent: Record<string, unknown>[] = [];
 let lists = 0;
-let ids = 0;
-const net = async <T>(f: () => T): Promise<T> => { if (server.down) throw new TypeError("network"); return f(); };
+const net = async <T>(f: () => T): Promise<T> => { if (server.down) throw new Unavailable("network"); return f(); };
 
 const noteRec = (r: { rec: string; path: string; text: string; rev: number }) => ({ ...r, kind: "note" as const, updated: "2026-11-01T10:00:00.000Z" });
 // A faked module is the whole process's, not this file's: a test file run after this one imports the fake too. So it keeps
@@ -25,9 +24,9 @@ mock.module("@/services/notes", () => ({
   list:() => net(() => { lists++; return [...server.notes.values()].map((r) => ({ rec: r.rec, path: r.path, rev: r.rev, kind: "note" })); }),
   get: (rec: string) => net(() => { const r = server.notes.get(rec); return r ? noteRec(r) : null; }),
   read: (path: string) => net(() => { const r = [...server.notes.values()].find((x) => x.path === path); return r ? noteRec(r) : null; }),
-  create: (path: string, text: string) => net(() => {
-    if ([...server.notes.values()].some((x) => x.path === path)) throw new Conflict(path);
-    const r = { rec: `r${++ids}`, path, text, rev: 1 };
+  create: (rec: string, path: string, text: string) => net(() => {
+    if (server.notes.has(rec) || [...server.notes.values()].some((x) => x.path === path)) throw new Conflict(path);
+    const r = { rec, path, text, rev: 1 };
     server.notes.set(r.rec, r);
     return noteRec(r);
   }),
@@ -67,7 +66,7 @@ mock.module("@/services/links", () => ({
   remove: (id: string) => net(() => void server.links.delete(id)),
 }));
 
-const { createNote, deleteNote, write, setFlags, NOTES } = await import("@/hooks/notes");
+const { createNote, deleteNote, landed, write, setFlags, NOTES } = await import("@/hooks/notes");
 const { addTask, editTask, changeTask, removeTask, tickTask, TASKS } = await import("@/hooks/todo");
 const { addLink, LINKS } = await import("@/hooks/links");
 const { LENSES, setActiveLens } = await import("@/hooks/lens");
@@ -160,6 +159,19 @@ describe("writes go to the copy first", () => {
     await syncNow();
     expect(getStatus().conflicts).toEqual([r.path]);
     expect([...server.notes.values()][0]!.text).toContain("theirs");
+  });
+
+  test("a note made here goes up under its own record id, and files wait for it to land where it stays", async () => {
+    server.down = true;
+    const r = await createNote(qc, "Shared");
+    expect(r.rec).toMatch(/^[a-z0-9]{15}$/);
+    await expect(landed(r.path)).rejects.toThrow("isn't on the server yet");
+    server.notes.set("theirs", { rec: "theirs", path: r.path, text: "another device's", rev: 1 });   // its name taken meanwhile
+    server.down = false;
+    const at = await landed(r.path);
+    expect(at).toMatch(/-shared-2\.md$/);
+    expect(server.notes.get(r.rec)).toMatchObject({ path: at, rev: 1 });
+    expect(await landed(at)).toBe(at);
   });
 
   test("a new note takes -2 when the server has the name", async () => {

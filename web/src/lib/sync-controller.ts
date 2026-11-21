@@ -2,10 +2,13 @@
 // instance; browser events and realtime are attached by the app, not by importing this module.
 import { isNotePath } from "@/core/notes";
 import {
-  coalesced, conflicted, dismissLost, keepMine, restoreMine, syncRound, takeTheirs, waiting, type Store, type Transport,
+  coalesced, conflicted, discardRefused, dismissLost, keepMine, refusals, restoreMine, retryRefused, syncRound, takeTheirs, waiting,
+  type Refusal, type Store, type Transport,
 } from "@/core/sync";
 
-export type SyncStatus = { waiting: number; conflicts: string[]; syncing: boolean; error?: string };
+/** `refused`: changes the server refused, parked until the owner sends them again or lets them go (Settings lists them).
+ *  `unsaved`: why the copy couldn't be written to this device's storage, until a write goes through (lib/local.ts). */
+export type SyncStatus = { waiting: number; conflicts: string[]; refused: Refusal[]; syncing: boolean; error?: string; unsaved?: string };
 
 export type Settle = "mine" | "theirs" | "restore" | "dismiss";
 
@@ -13,13 +16,16 @@ type Cancel = () => void;
 type Later = (work: () => void, ms: number) => Cancel;
 const later: Later = (work, ms) => { const timer = setTimeout(work, ms); return () => clearTimeout(timer); };
 
-export function createSync({ store: local, ready, transport, online, schedule = later }: {
-  store: Store; ready: Promise<void>; transport: Transport; online: () => boolean; schedule?: Later;
+/** What the copy's storage says about its writes (lib/local.ts `storeError`); a copy kept in memory alone has none. */
+type Stored = { get: () => string | undefined; watch: (l: () => void) => () => void };
+
+export function createSync({ store: local, ready, transport, online, schedule = later, stored }: {
+  store: Store; ready: Promise<void>; transport: Transport; online: () => boolean; schedule?: Later; stored?: Stored;
 }) {
   let mounts = 0;
   // ---- what the app shows of it
 
-  let status: SyncStatus = { waiting: 0, conflicts: [], syncing: false };
+  let status: SyncStatus = { waiting: 0, conflicts: [], refused: [], syncing: false };
   const watchers = new Set<() => void>();
 
   /** The current status; the same object until something in it changes (what useSyncExternalStore needs). */
@@ -29,12 +35,15 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     return () => { watchers.delete(l); };
   }
 
+  const refusedKey = (r: Refusal[]) => r.map((x) => `${x.kind}:${x.key}:${x.title}:${x.reason}`).join("\n");
   function refresh(over: Partial<Pick<SyncStatus, "syncing" | "error">> = {}) {
-    const next: SyncStatus = { ...status, waiting: waiting(local), conflicts: conflicted(local), ...over };
-    if (next.waiting === status.waiting && next.syncing === status.syncing && next.error === status.error && next.conflicts.join("\n") === status.conflicts.join("\n")) return;
+    const next: SyncStatus = { ...status, waiting: waiting(local), conflicts: conflicted(local), refused: refusals(local), unsaved: stored?.get(), ...over };
+    if (next.waiting === status.waiting && next.syncing === status.syncing && next.error === status.error && next.unsaved === status.unsaved
+      && next.conflicts.join("\n") === status.conflicts.join("\n") && refusedKey(next.refused) === refusedKey(status.refused)) return;
     status = next;
     watchers.forEach((l) => l());
   }
+  stored?.watch(() => refresh());
 
   /** Called after a sync changed the copy: the app redraws from it (hooks/live.ts `useLive` registers the redraw). */
   const redraws = new Set<() => void>();
@@ -55,10 +64,11 @@ export function createSync({ store: local, ready, transport, online, schedule = 
 
   /** How long after the last edit it goes up: a burst of edits is one push, and a note being typed into leaves "waiting" by itself. */
   const PUSH_AFTER = 1500;
-  /** After a round that couldn't finish with edits waiting, how long before trying again (a back-online or a realtime
-   *  reconnect asks sooner). */
-  const RETRY_AFTER = 30_000;
-  let pushTimer: Cancel | undefined, retryTimer: Cancel | undefined;
+  /** After a round that couldn't finish with edits waiting, how long before trying again: the first wait, doubled after each
+   *  round that fails again up to the last, back to the first after a round that went through (a back-online or a realtime
+   *  reconnect asks sooner). A change the server refused is not waiting: it is never retried by itself. */
+  const RETRY_FIRST = 5_000, RETRY_MOST = 300_000;
+  let pushTimer: Cancel | undefined, retryTimer: Cancel | undefined, failures = 0;
 
   const round = coalesced(async () => {
     await ready;
@@ -75,7 +85,8 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     } finally {
       refresh({ syncing: false, error: errs[0] });
       redraws.forEach((f) => f());
-      if (mounts && (!ok || errs.length) && waiting(local)) retryTimer = schedule(() => { void syncNow(); }, RETRY_AFTER);
+      failures = ok && !errs.length ? 0 : failures + 1;
+      if (mounts && failures && waiting(local)) retryTimer = schedule(() => { void syncNow(); }, Math.min(RETRY_FIRST * 2 ** (failures - 1), RETRY_MOST));
     }
   });
 
@@ -114,7 +125,7 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     if (topic === "notes") {
       if (typeof r.path !== "string" || !isNotePath(r.path)) return;
       const n = local.notes.get(r.path);
-      isNews = gone ? !!n && !n.deleted : !n || n.rev !== r.rev;
+      isNews = gone ? !!n && !n.deleted && n.rec === r.id : !n || n.rec !== r.id || n.rev !== r.rev;
     } else if (topic === "tasks") {
       const t = local.tasks.get(r.id);
       isNews = gone ? !!t && !t.deleted : !t || t.rev !== r.rev;
@@ -151,5 +162,14 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     if (how === "mine" || how === "restore") void syncNow();
     return true;
   }
-  return { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle, start };
+  /** A change the server refused, sent again as it is (`retry`) or let go (`discard`: back to the server's version, or away
+   *  when the server never had it). false when it was not refused (a second tap). The caller redraws. */
+  function resolveRefused(r: Pick<Refusal, "kind" | "key">, how: "retry" | "discard"): boolean {
+    const done = (how === "retry" ? retryRefused : discardRefused)(local, r.kind, r.key);
+    if (!done) return false;
+    refresh();
+    if (how === "retry") void syncNow();
+    return true;
+  }
+  return { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle, resolveRefused, start };
 }

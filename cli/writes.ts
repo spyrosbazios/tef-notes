@@ -18,7 +18,7 @@ export function writer(mark: pb.Mark) {
     /** Whether the writes are an agent's. */
     marks: mark.tainted === true,
     notes: {
-      create: (s: pb.Server, path: string, text: string) => pb.create(s, path, text, mark),
+      create: (s: pb.Server, rec: string, path: string, text: string) => pb.create(s, rec, path, text, mark),
       update: (s: pb.Server, e: pb.Entry, text: string) => pb.update(s, e, text, mark),
     },
     tasks: {

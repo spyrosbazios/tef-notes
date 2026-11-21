@@ -56,7 +56,7 @@ function LinkedNotes({ task }: { task: TaskRec }) {
   const [open, setOpen] = useState(false), [q, setQ] = useState("");
   const { linked, unseen } = useMemo(() => notesFor(links ?? [], task.id, sorted), [links, task.id, sorted]);
   const taken = useMemo(() => linkedNoteIds(links ?? [], task.id), [links, task.id]);
-  const hits = useMemo(() => scoped.filter((n) => n.rec && !taken.has(n.rec)).filter(matches(q)).slice(0, 30), [scoped, taken, q]);
+  const hits = useMemo(() => scoped.filter((n) => !taken.has(n.rec)).filter(matches(q)).slice(0, 30), [scoped, taken, q]);
   const add = (n: NoteRec) => { setOpen(false); setQ(""); report(addLink(qc, { type: "task", id: task.id }, { type: "note", id: n.rec }, "about")); };
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1 py-1">
