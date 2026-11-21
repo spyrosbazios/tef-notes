@@ -67,15 +67,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('server/agent/bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
-      # The hooks have no package.json; test/llm.test.js imports the agent's model table, so it needs the agent's modules.
-      - run: bun install --frozen-lockfile
-        working-directory: server/agent
+      # The hooks have no package.json and their tests load no package. server/bunfig.toml preloads test/core.ts, which
+      # builds pb_hooks/lib/core.js (the clients' code bundled for PocketBase) before any test loads it.
       - run: bun test ./test
 
   pocketbase-contract:
@@ -89,6 +82,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       # Isolated temporary data, real migrations/hooks, Dockerfile's PocketBase pin.
       # Missing binary/download or startup failures fail this job; nothing is skipped.
+      # run.ts builds pb_hooks/lib/core.js, the hooks' bundle of the clients' code, before it starts PocketBase.
       - run: bun install --frozen-lockfile
         working-directory: server/agent
       - run: bun --no-env-file server/integration/run.ts --application

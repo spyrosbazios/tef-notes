@@ -30,9 +30,10 @@ Clone the whole repository: every module imports `packages/core`.
 ## Rules
 
 - **`packages/core` stays dependency-free and shared.** No runtime dependencies, no platform APIs. If two clients need the
-  same logic, it goes there; never copy it into a client. (Two deliberate copies, each kept in step by a test: `server/pb_hooks/lib/notes.js`,
-  because the hooks are plain JS, and the few rules in `android/`'s `Contract.kt`, because it is Kotlin; its cases are
-  `packages/core/test/companion-cases.json`.)
+  same logic, it goes there; never copy it into a client. (The server's hooks run in PocketBase's JS VM, so they get the
+  core as a bundle, never a copy: export what they need from `server/pb_hooks/bundle/core.ts`, which builds `lib/core.js`.
+  Only pure code goes in it. One deliberate copy, kept in step by a test: the few rules in `android/`'s `Contract.kt`,
+  because it is Kotlin; its cases are `packages/core/test/companion-cases.json`.)
 - **Package managers are fixed per module**: bun everywhere (`packages/core`, `server/agent`, `web`, `cli`, `extension`, and `android`'s build script; the app itself is Gradle's). Do not add a second lockfile to a module.
 - **`web/src/components/ui/` is shadcn's output.** Add components with `bunx --bun shadcn@latest add <name>`; never
   hand-edit them.

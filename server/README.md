@@ -325,7 +325,10 @@ cd agent && bun run typecheck
 ```
 
 The hooks' pure code lives in `pb_hooks/lib/` so bun can test it; a PocketBase handler runs in its own VM and sees none
-of its file's top-level scope, so shared code is `require`d from `lib/`.
+of its file's top-level scope, so shared code is `require`d from `lib/`. What they use of the clients' TypeScript is
+`lib/core.js`, a bundle of `pb_hooks/bundle/core.ts` (`bun pb_hooks/bundle/build.ts`; generated, never committed): the
+image builds it, `bun test` here builds it first (`bunfig.toml`), and so does the integration runner. A hook needing more
+of the core exports it there; only pure code, which build.ts enforces.
 
 ## Upgrading PocketBase
 
@@ -358,7 +361,7 @@ version from `Dockerfile`; downloads use that exact GitHub release and are check
 checksums. An existing binary with a different version fails explicitly. The default suite needs no package install;
 `--application` also loads the agent's application services and needs its dependencies.
 
-The runner copies the repository migrations and hooks into a fresh temporary directory, starts PocketBase on an
+The runner builds the hooks' bundle, copies the repository migrations and hooks into a fresh temporary directory, starts PocketBase on an
 OS-assigned `127.0.0.1` port, and tests the public shared client over HTTP. It uses an empty key directory and a minimal
 child environment, never deployment configuration, production data, Docker Compose, or an existing server URL.
 It stops its children and removes only its temporary directory on completion or handled interruption.

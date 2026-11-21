@@ -30,7 +30,7 @@
 // 200 { tag, notes, tasks, lenses, merged }   tag: the name the items carry now; the counts of records changed
 // 400 bad body. Errors are { error }.
 routerAdd("POST", "/api/tefnotes/tags/rename", (e) => require(`${__hooks}/lib/http.js`).route(e, "tags", "The tag could not be renamed.", () => {
-  const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`), records = require(`${__hooks}/lib/records.js`);
+  const lib = require(`${__hooks}/lib/tags.js`), core = require(`${__hooks}/lib/core.js`), records = require(`${__hooks}/lib/records.js`);
   let req;
   try { req = lib.renameInput(e.requestInfo().body); } catch (err) {
     if (err instanceof lib.Bad) return e.json(400, { error: err.message });
@@ -60,8 +60,8 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => require(`${__hooks}/lib/ht
     // column alone carried the old name is rewritten all the same, which puts the copy right.
     for (const id of ids("notes")) {
       records.casWrite(tx, "notes", id, (rec) => {
-        const path = rec.getString("path"), next = lib.renamed(notes.parse(path, rec.getString("text")).tags, req.from, to);
-        if (next) rec.set("text", notes.withTags(path, rec.getString("text"), next));
+        const path = rec.getString("path"), next = lib.renamed(core.parseNote(path, rec.getString("text")).tags, req.from, to);
+        if (next) rec.set("text", core.withFlags(path, rec.getString("text"), { tags: next }));
         const auto = lib.renamed(names(rec.getString("autotagged")), req.from, to);
         if (auto) rec.set("autotagged", auto);
       });

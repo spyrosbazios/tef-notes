@@ -10,7 +10,7 @@
 // one itself only where there is none or its own (`describedBy`, 1795200000_tag_described_by.js; `replaceable`): first at MIN hand-tagged
 // notes, then each time their count doubles, at least EVERY more (`described`, 1793900000_tag_described.js).
 
-const { parse, fold } = require("./notes.js");
+const { fold, parseNote } = require("./core.js");
 const { names, spread } = require("./rows.js");
 
 const MAX_NOTES = 12;                   // notes shown to the model per tag, spread over its history
@@ -87,7 +87,7 @@ function saveDescription(tx, id, name, description, n) {
 
 /** A note as the model reads it: its title and the opening of its body (pictures dropped, blank runs squeezed). */
 function sample(path, text) {
-  const n = parse(path, text);
+  const n = parseNote(path, text);
   const body = n.body.replace(/^[ \t]*!\[[^\]]*\]\([^)]*\)[ \t]*$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
   return { title: n.title, excerpt: body.length > BODY_CHARS ? `${body.slice(0, BODY_CHARS).trimEnd()}…` : body };
 }

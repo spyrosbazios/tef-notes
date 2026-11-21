@@ -31,7 +31,7 @@ import { ownerPrefs } from "./prefs";
 import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
 import { PLACES, SYSTEM, TALK, today, WEB } from "./systemPrompt";
-import { noteIndex } from "./notes";
+import { noteIndex } from "./note-index";
 import { readWeb, tools, toolPolicies, policyFor, type Tools } from "./tools";
 
 /** A message as useChat holds it, tool parts typed: what `chats.messages` holds. */

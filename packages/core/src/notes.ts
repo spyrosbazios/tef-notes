@@ -342,7 +342,7 @@ export function dropTitle(body: string, title: string) {
 const isItem = (l: string) => /^\s*([-*+]|\d+[.)])\s/.test(l);
 const blank = (l: string) => !l.trim();
 
-/** The body with `text` added, as the agent's append_to_note saves it (server/pb_hooks/lib/notes.js) and its confirm card
+/** The body with `text` added, as the agent's append_to_note and a clip to a note save it and its confirm card
  *  previews it. appendToNote makes one line a bullet itself, so a line already written as one (`- [ ] milk`) loses its
  *  own marker first. */
 export function appended(body: string, text: string, section?: string) {

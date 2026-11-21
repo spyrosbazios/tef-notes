@@ -13,7 +13,8 @@ import { linkRecord, newLink } from "@/core/record-links";
 import { TaskService } from "../src/application/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";
 import { stepTools } from "../src/loop";
-import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, type Line } from "../src/notes";
+import { appended, checkWrite, NOTE_RE, READ_RE } from "../src/notes";
+import { ago, indexLine, noteIndex, type Line } from "../src/note-index";
 import { policyFor, readWeb, tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 

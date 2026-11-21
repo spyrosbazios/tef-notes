@@ -5,10 +5,10 @@
 // (server/agent/src/systemPrompt.ts, the <shared> rule), done here because the extension holds no key. The chat
 // agent is a writing model; the server's is JEV (lib/jev.js), which only decides. So it ranks where the agent would
 // file it, the owner approves the destination, and the text is the phone's own share text (packages/core/src/share.ts,
-// mirrored below). Two steps: suggest (asks JEV, writes nothing), then save (no JEV, writes where the owner chose).
+// through lib/core.js). Two steps: suggest (asks JEV, writes nothing), then save (no JEV, writes where the owner chose).
 //
 //   where   suggest: a choice among the notes the agent's prompt lists (every pinned one, then the 60
-//           newest, as tools.ts indexLine writes them), the TASKS most recently touched open tasks, and "new". The page, the picture (JEV sees it, beside its alt
+//           newest, as the agent's note-index.ts indexLine writes them), the TASKS most recently touched open tasks, and "new". The page, the picture (JEV sees it, beside its alt
 //           text, caption and file name), the owner's note and agent/memory.md (how they keep notes) are the state it
 //           reads. Every option's probability comes back: the
 //           notes and tasks at FLOOR or above, best first, at most SUGGESTIONS of them, are offered; `pick` is the top
@@ -39,10 +39,9 @@
 //           lens carries its first tag (core lens.ts inheritTags), and the lens on is the owner's (`prefs.lens`).
 
 const { MODEL } = require("./jev.js");
-const { fold, linkPath, localDay, pdfName, photoName } = require("./notes.js");
+const { ago, bodyFor, CLIP_FILES: FILES, fileMarkdown, fold, indexLine, linkPath, listed, pdfName, photoName, RECENT, titleFor } = require("./core.js");
 const { names } = require("./rows.js");
 
-const RECENT = 60;              // the agent's index: every pinned note, then this many newest (tools.ts RECENT)
 const FLOOR = 0.05;             // a note's share of the choice below which it is not offered: 1 in 20 is noise among 60+
 const SUGGESTIONS = 4;          // notes and tasks offered at most: the suggestion and three others
 const TASKS = 40;               // open tasks JEV chooses among, the most recently touched
@@ -54,7 +53,6 @@ const LINE = 300;               // that line, at most
 const NOTE = 2000;              // the owner's note, at most
 const LOOK = 3000000;           // base64 chars of the picture JEV sees: the extension sends a ~100 KB JPEG
 const ALT = 200;
-const FILES = 10;               // pictures and PDFs one clip carries, at most (core clip.ts CLIP_FILES: test/clip.test.js checks they agree)
 const PDF_NAME = 200;           // a PDF's name as shared, at most
 const DEADLINE_MS = 75000;      // a save's calls to other services together (title, write-up, summary, agent title): the
                                 // clients wait 120 s (web services/clip.ts, extension clip.ts), and the writes come after
@@ -204,18 +202,7 @@ function tagPick(ps, picked) {
   return { tags: sorted.map((x) => ({ name: x.name, p: Math.round(x.p * 100) / 100 })), picked };
 }
 
-// ---- the text (mirrors packages/core/src/share.ts titleFor and bodyFor, links.ts linkify; test/clip.test.js compares)
-
-/** The host as `new URL` gives it, `www.` off. */
-const host = (u) => { const m = /^[a-z][a-z\d+.-]*:\/\/(?:[^@/?#]*@)?(\[[^\]]*\]|[^:/?#]*)/i.exec(u); return m ? m[1].toLowerCase().replace(/^www\./, "") : u; };
-const firstLine = (t) => t.split("\n").map((l) => l.trim()).find(Boolean) || "";
-
-/** `s`: share.ts's Shared, the parts a clip has: { text, url, title }. */
-function titleFor(s, pageTitle) {
-  const t = (pageTitle && pageTitle.trim()) || s.title || firstLine(s.text);
-  if (t) return t.length > 60 ? `${t.slice(0, 57).trimEnd()}…` : t;
-  return host(s.url);
-}
+// ---- the text: the phone's share text, core share.ts titleFor and bodyFor (lib/core.js)
 
 /** How many `file` parts a save carries: one per picture and PDF, none for a clip to an existing task (it holds none). */
 const filesSent = (clip) => (clip.target.kind === "task" ? 0 : clip.images.length + clip.pdfs.length);
@@ -237,25 +224,11 @@ function agentTitle(json) {
   return t.length > 60 ? `${t.slice(0, 57).trimEnd()}…` : t;
 }
 
-function linkify(entry, url, text) {
-  const t = text.replace(/\s+/g, " ").trim().replace(/[[\]\\]/g, "\\$&");
-  return t ? entry.replace(url, () => `[${t}](${url})`) : entry;
-}
-
-function bodyFor(s, pageTitle) {
-  const label = (pageTitle && pageTitle.trim()) || s.title || "";
-  let body = s.text;
-  if (s.url) {
-    const link = label ? `[${label.replace(/[[\]\\]/g, "\\$&")}](${s.url})` : `<${s.url}>`;
-    body = body.includes(s.url) ? (label ? linkify(body, s.url, label) : body.replace(s.url, link)) : [link, body].filter(Boolean).join("\n\n");
-  }
-  return body ? `${body.trimEnd()}\n` : "";
-}
-
 /** A clip as the Shared the phone's share text is made from: its text (the summary when there is one, the owner's note, the
  *  line on what it is (the summary says it better: left out then), then the selection), its link and title. */
 const shared = (clip, line, note, summary = "") =>
-  ({ text: [summary, note, summary ? "" : line, clip.selection].filter(Boolean).join("\n\n"), url: clip.url, title: clip.title || null });
+  ({ text: [summary, note, summary ? "" : line, clip.selection].filter(Boolean).join("\n\n"), url: clip.url, title: clip.title || null,
+    images: [], pdfs: clip.pdfs });
 
 /** The body's image line for a picture stored as `name` in the note `noteId`'s attachments: photos.ts photoMarkdown,
  *  with the page's words for the picture (its caption, else its alt text) as the alt text. */
@@ -265,26 +238,21 @@ function embedOf(image, noteId, name) {
   return `![${alt.replace(/[[\]\\]/g, "\\$&")}](../${linkPath(noteId, name)})`;
 }
 
-/** A PDF's line in the body, as the web app links one (photos.ts fileMarkdown): its name as shared is the text. */
-const pdfLine = (noteId, name, label) => `[${label.replace(/[[\]\\]/g, "\\$&")}](../${linkPath(noteId, name)})`;
-
 /** The names the clip's files are stored under in the note `noteId`, the pictures' then the PDFs' (`taken`: the names the
  *  note has already, filled as it goes), and the body's lines for them: the pictures' image lines, then the PDFs' links. */
 function filesUnder(clip, noteId, taken, now) {
   const names = [], lines = [];
   for (const image of clip.images) { const n = photoName(now, taken); taken.add(n); names.push(n); lines.push(embedOf(image, noteId, n)); }
-  for (const pdf of clip.pdfs) { const n = pdfName(pdf.name, taken); taken.add(n); names.push(n); lines.push(pdfLine(noteId, n, pdf.name)); }
+  for (const pdf of clip.pdfs) { const n = pdfName(pdf.name, taken); taken.add(n); names.push(n); lines.push(fileMarkdown(noteId, n, pdf.name)); }
   return { names, embed: lines.join("\n") };
 }
 
 /** What a clip writes: a new note's title and body, or the entry appended to an existing note (the same text).
  *  `note` the owner's note as it goes in (written up, or as typed); `embed` the files' lines, first; `summary`
  *  the summary's block (summaryBlock), right under the link. A clip of files alone (no url, no words) is titled by its
- *  first PDF's name, else as the phone titles photos, by the day `now` falls on. A title the owner gave the new note
+ *  first PDF's name, else as the phone titles photos, by the day (core titleFor). A title the owner gave the new note
  *  (`target.title`) wins over all of it. */
-const titleOf = (clip, line, now = Date.now()) =>
-  (clip.target && clip.target.title) || titleFor(shared(clip, line, ""), null)
-  || (clip.pdfs.length ? clip.pdfs[0].name.replace(/\.pdf$/i, "") : "") || `Photos ${localDay(now)}`;
+const titleOf = (clip, line) => (clip.target && clip.target.title) || titleFor(shared(clip, line, ""), null);
 function bodyOf(clip, line, note = "", embed = "", summary = "") {
   const b = bodyFor(shared(clip, line, note, summary), null);
   return embed ? `${embed}\n\n${b}` : b;
@@ -308,11 +276,7 @@ function taskNotes(notes, body) {
   return next.length > TASK_NOTES ? null : next;
 }
 
-// ---- the notes index (mirrors server/agent/src/tools.ts ago, indexLine, noteIndex)
-
-const DAY = 86400000;
-const ago = (updated, now) => { const d = Math.floor((now - updated) / DAY); return d <= 0 ? "today" : `${d}d ago`; };
-const indexLine = (n, now) => [n.path, n.title, n.tags.length ? `[${n.tags.join(", ")}]` : "", n.pinned && "pinned", ago(n.updated, now)].filter(Boolean).join(" · ");
+// ---- the notes index: the agent's prompt's (server/agent/src/note-index.ts indexLine, listed; lib/core.js)
 
 /** A `notes` row as read by the hook: `tags` the JSON column's text, `updated` PocketBase's "YYYY-MM-DD HH:MM:SS.sssZ". */
 function row(r) {
@@ -320,10 +284,7 @@ function row(r) {
 }
 
 /** The notes the agent's prompt lists, in its order: every pinned one, then the newest RECENT of the rest. */
-function noteIndex(rows) {
-  const N = rows.filter((x) => x.path.startsWith("notes/")).sort((a, b) => b.updated - a.updated);
-  return [...N.filter((x) => x.pinned), ...N.filter((x) => !x.pinned).slice(0, RECENT)];
-}
+const noteIndex = (rows) => listed(rows, RECENT).notes;
 
 // ---- the open tasks
 
@@ -543,4 +504,4 @@ function summarise(clip, io) {
   }
 }
 
-module.exports = { lensTag, savedTags, DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
+module.exports = { lensTag, savedTags, DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, TASKS, input, saveInput, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, taskNotes, taskRow, taskLine, taskIndex, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };

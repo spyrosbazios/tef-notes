@@ -1,19 +1,12 @@
-// The writing model's lib (pb_hooks/lib/llm.js): each provider's request and answer, and that its table agrees with the
-// chat agent's (server/agent/src/models.ts), so the hooks and the chat use the same provider, model and endpoint.
+// The writing model's lib (pb_hooks/lib/llm.js): each provider's request and answer. Which provider, model and endpoint
+// is the chat agent's own table (server/agent/src/providers.ts, through the hooks' bundle lib/core.js).
 import { describe, expect, test } from "bun:test";
-import { make, PROVIDERS } from "../pb_hooks/lib/llm.js";
-import { PROVIDERS as AGENT } from "../agent/src/models.ts";
+import { make } from "../pb_hooks/lib/llm.js";
 
 const none = () => "";
 const envOf = (vars) => (name) => vars[name] || "";
 
 describe("the providers", () => {
-  test("the same ones as the agent, with the same names, models and endpoints", () => {
-    expect(Object.keys(PROVIDERS).sort()).toEqual(Object.keys(AGENT).sort());
-    for (const [id, p] of Object.entries(PROVIDERS)) {
-      expect([id, p.label, p.model, p.base]).toEqual([id, AGENT[id].label, AGENT[id].model, AGENT[id].base]);
-    }
-  });
   test("an unknown one is refused", () => {
     expect(() => make("nope", none)).toThrow("TEF_NOTES_PROVIDER=nope");
   });
