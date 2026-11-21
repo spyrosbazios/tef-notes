@@ -14,9 +14,9 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link as RecordLink } from "@/core/record-links";
-import { dateOf } from "@/core/things";
+import { dateOf, sectionsOf } from "@/core/things";
 import { landing, reorder } from "@/core/task-order";
-import { views as viewsOf, type Task, type Views } from "@/core/todo";
+import type { Task } from "@/core/todo";
 import { TASK_ICON } from "@/components/task-icons";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
 import { DeleteTask } from "@/components/task-delete";
@@ -52,17 +52,6 @@ const NO_LINKS: RecordLink[] = [];
 
 /** A day's heading counts as the list's top once it is this far (px) below the box's top edge: its own margin and a little more. */
 const HEADING_REACH = 44;
-
-/** The Logbook shows this many of the latest, as the phone's does. */
-const LOGBOOK = 100;
-
-/** What a view lists, in the order its rows sit in. */
-const listOf = (v: Views, kind: TaskView): Task[] =>
-  kind === "today" ? [...v.today, ...v.evening] : kind === "upcoming" ? v.upcoming.flatMap((g) => g.tasks) : kind === "logbook" ? v.logbook.slice(0, LOGBOOK) : v[kind];
-type Section = { key: string; rows: Task[] };
-
-/** Which section of the view a task sits in: Today's two, Upcoming's days, the Logbook's days; the rest are one. */
-const sectionOf = (kind: TaskView, t: Task) => (kind === "today" ? (t.evening ? "evening" : "today") : kind === "upcoming" ? t.when : kind === "logbook" ? t.done : "");
 
 /** A section's title over a hairline, as the phone draws it: This Evening, a day. */
 /** The box's fades (px), and the room a day scrolled to keeps above its heading, so the fade never covers it */
@@ -136,23 +125,8 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
 
   const noteTitles = useMemo(() => new Map((notes ?? []).map((n) => [n.rec, n.note.title])), [notes]);
 
-  const base = useMemo(() => listOf(views, kind), [views, kind]);
-
-  // The list in its sections, with each task still lingering slipped back in where it was: in its section, by `order`
-  const sections = useMemo((): Section[] => {
-    const m = new Map<string, Task[]>();
-    for (const t of base) { const k = sectionOf(kind, t); m.set(k, [...(m.get(k) ?? []), t]); }
-    const have = new Set(base.map((t) => t.id));
-    for (const { task: t } of lingering.values()) {
-      const was = listOf(viewsOf([t], today), kind).length > 0;
-      if (have.has(t.id) || !was) continue;
-      const k = sectionOf(kind, t), rows = [...(m.get(k) ?? [])], at = kind === "logbook" ? rows.findIndex((r) => r.done < t.done) : rows.findIndex((r) => r.order > t.order);
-      rows.splice(at < 0 ? rows.length : at, 0, t);
-      m.set(k, rows);
-    }
-    const out = [...m].map(([key, rows]) => ({ key, rows }));
-    return kind === "today" ? out.sort((a, b) => (a.key === "today" ? -1 : b.key === "today" ? 1 : 0)) : out;
-  }, [base, lingering, kind, today]);
+  // The list in its sections, with each task still lingering slipped back in where it was (core/things.ts)
+  const sections = useMemo(() => sectionsOf(views, kind, [...lingering.values()].map((l) => l.task), today), [views, lingering, kind, today]);
   const byId = useMemo(() => new Map(sections.flatMap((x) => x.rows.map((t) => [t.id, t] as const))), [sections]);
   const hovered = useRef<string | null>(null);
   const hover = (day: string | null) => { if (day !== hovered.current) { hovered.current = day; onHoverDay?.(day); } };
