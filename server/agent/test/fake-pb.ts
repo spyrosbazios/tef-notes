@@ -1,7 +1,8 @@
 // A PocketBase for the tests: the few routes the sidecar calls, over Maps, with rev.pb.js's rev contract (tasks: a
 // client's own ids, rev 1 on create, a stale rev a 409), a note made
 // without a kind a `note` (notes.pb.js), and `links`: one per (from, to, role), made and deleted, either end's delete
-// taking it (the relations' cascade). A links filter is `column = "id"` terms joined by ` || `.
+// taking it (the relations' cascade). A links filter is `column = "id"` terms joined by ` || `. A listing pages the way the
+// record protocol asks (keyset): `(<filter>)`, and ` && id > "<last>"` after its first page, sorted by id.
 // `attachments`: records listed by `note = "id"`, their bytes at /api/files/attachments/<rec>/<file>.
 // `/api/tefnotes/link-preview`: a canned preview, 400 for a private address.
 // `before`: a hook run ahead of each PATCH and note DELETE, so a test can slip in a write made meanwhile.
@@ -23,6 +24,12 @@ export function fakePb() {
   let n = 0, before: ((r: Rec) => void) | undefined;
   const stamp = () => new Date(Date.now() + n).toISOString().replace("T", " ");
   const err = (status: number, body: object = {}) => Response.json(body, { status });
+  /** A listing's filter without the keyset paging's wrapping, and the id it pages after. */
+  const keyset = (raw: string) => {
+    const m = /^(?:\((.*)\))?(?: && )?(?:id > "(.*)")?$/.exec(raw);
+    return m ? { filter: m[1] ?? "", after: m[2] } : { filter: raw, after: undefined };
+  };
+  const page = (rows: Rec[], after: string | undefined) => rows.filter((r) => after == null || r.id > after).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   const srv = Bun.serve({
     port: 0, hostname: "127.0.0.1",
@@ -88,8 +95,9 @@ export function fakePb() {
       }
       if (col === "links") {
         if (req.method === "GET") {
-          const terms = (u.searchParams.get("filter") ?? "").split(" || ").filter(Boolean).map((t) => /^(\w+) = "(.*)"$/.exec(t)!);
-          return Response.json({ items: [...links.values()].filter((l) => !terms.length || terms.some(([, c, v]) => l[c] === v)) });
+          const { filter, after } = keyset(u.searchParams.get("filter") ?? "");
+          const terms = filter.split(" || ").filter(Boolean).map((t) => /^(\w+) = "(.*)"$/.exec(t)!);
+          return Response.json({ items: page([...links.values()].filter((l) => !terms.length || terms.some(([, c, v]) => l[c] === v)), after) });
         }
         if (req.method === "DELETE") return links.delete(id ?? "") ? new Response(null, { status: 204 }) : err(404);
         const body = await req.json() as Rec;
@@ -104,10 +112,10 @@ export function fakePb() {
       if (!map) return err(404);
       const own = col === "tasks";           // keyed by the client's id
       if (req.method === "GET" && !id) {
-        const filter = u.searchParams.get("filter") ?? "", f = /^path = "(.*)"$/.exec(filter), tainted = filter === "tainted = true";
+        const { filter, after } = keyset(u.searchParams.get("filter") ?? ""), f = /^path = "(.*)"$/.exec(filter), tainted = filter === "tainted = true";
         const items = [...map.values()].filter((r) => (!f || r.path === f[1]) && (!tainted || r.tainted));
-        const per = Number(u.searchParams.get("perPage") ?? 30), page = Number(u.searchParams.get("page") ?? 1);
-        return Response.json({ items: items.slice((page - 1) * per, page * per) });
+        const per = Number(u.searchParams.get("perPage") ?? 30), at = Number(u.searchParams.get("page") ?? 1);
+        return Response.json({ items: u.searchParams.get("sort") === "id" ? page(items, after).slice(0, per) : items.slice((at - 1) * per, at * per) });
       }
       const rec = id ? (col === "notes" ? [...notes.values()].find((r) => r.id === id) : map.get(id)) : undefined;
       if (req.method === "GET") return rec ? Response.json(rec) : err(404);
