@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from "bun:test";
 import {
   appendToNote, appended, attachmentOf, isNotePath, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
-  pastedNote, picturesOf, mosaicCells, slugify, snippetOf, withFlags,
+  pastedNote, picturesOf, mosaicCells, slugify, snippetOf, withBody, withFlags,
 } from "../src/notes";
 import { localDay } from "../src/time";
 
@@ -232,6 +232,28 @@ describe("merge", () => {
     expect(merge3(base, saved, typed)).toBe(typed);
     expect(merge3(base, base + "\nthis is a co", base + "\nthis is a code block")).toBe(base + "\nthis is a code block");
     expect(merge3(base, base + "\nmine\n", base + "\ntheirs\n")).toBeNull();
+  });
+});
+
+describe("withBody", () => {
+  const text = "---\r\ntitle: Old\r\ncreated: 2026-10-05\r\nsource: laptop\r\naliases: [x]\r\n---\r\nBody.\r\n";
+
+  it("keeps a file's other keys, its quoting and its line ends through a retitle", () => {
+    const next = withBody(text, parseNote(P, text), "New body.\r\n", "New");
+    expect(next).toBe("---\r\ntitle: New\r\ncreated: 2026-10-05\r\nsource: laptop\r\naliases: [x]\r\n---\r\nNew body.\r\n");
+    expect(parseNote(P, next)).toMatchObject({ title: "New", body: "New body.\r\n" });
+  });
+
+  it("adds the title line to a frontmatter that had none, and a frontmatter to a bare file", () => {
+    const f = "---\nauthor: me\n---\n# Heading\n";
+    expect(withBody(f, parseNote(P, f), "x\n", "Named")).toBe("---\ntitle: Named\nauthor: me\n---\nx\n");
+    expect(withBody("# Heading\n", parseNote(P, "# Heading\n"), "x\n", "Named")).toMatch(/^---\ntitle: Named\n/);
+  });
+
+  it("leaves the frontmatter alone when the title is the same or none", () => {
+    const n = parseNote(P, text);
+    expect(withBody(text, n, "x", "Old")).toBe(text.slice(0, text.length - n.body.length) + "x");
+    expect(withBody(text, n, "x")).toBe(text.slice(0, text.length - n.body.length) + "x");
   });
 });
 

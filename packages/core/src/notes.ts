@@ -161,10 +161,12 @@ export function serializeNote(meta: Meta, body: string): string {
   return `---\n${KEYS.map((k) => lineFor(k, meta)).filter((l) => l != null).join("\n")}\n---\n${body}`;
 }
 
-/** The file with a new body under its frontmatter as is: keys the laptop added, and its quoting, stay. A retitle
- *  rewrites the frontmatter with serializeNote. */
-export const withBody = (text: string, n: Note, body: string, title?: string) =>
-  title && title !== n.title ? serializeNote({ ...n, title }, body) : text.slice(0, text.length - n.body.length) + body;
+/** The file with a new body under its frontmatter as is: keys the laptop added, its quoting and its line ends stay. A
+ *  retitle replaces the title line in place (withKeys), nothing else of the frontmatter. */
+export function withBody(text: string, n: Note, body: string, title?: string): string {
+  const kept = text.slice(0, text.length - n.body.length) + body;
+  return title && title !== n.title ? withKeys(kept, { ...n, title, body }, ["title"]) : kept;
+}
 
 /** The note with these flags, edited in place (withKeys). `color: null` clears. */
 export function withFlags(path: string, text: string, flags: FlagEdit): string {
@@ -176,12 +178,13 @@ export function withFlags(path: string, text: string, flags: FlagEdit): string {
 }
 
 /** `text` with these keys' lines as serializeNote would write them from `next`, in place: other frontmatter lines (keys
- *  the laptop added, its quoting) stay as they are; a file serializeNote wrote comes out as serializeNote would write it. */
+ *  the laptop added, its quoting, its line ends) stay as they are; a file serializeNote wrote comes out as serializeNote
+ *  would write it. */
 function withKeys(text: string, next: Note, keys: readonly string[]): string {
   const f = front(text);
   if (!f) return serializeNote(next, next.body);
   const es = entries(f.lines);
-  for (const k of KEYS.filter((k) => FLAG_KEYS.includes(k) && keys.includes(k))) {
+  for (const k of KEYS.filter((k) => keys.includes(k))) {
     const line = lineFor(k, next), i = es.findIndex((e) => e.key === k);
     if (i >= 0) { if (line == null) es.splice(i, 1); else es[i] = { key: k, lines: line.split("\n") }; continue; }
     if (line == null) continue;
