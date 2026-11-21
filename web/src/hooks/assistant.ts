@@ -3,9 +3,15 @@
 import type { Chat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
 import type { NoteRef } from "@/core/handoff";
-import type { PromptAction, Run } from "@/core/note-actions";
+import type { Run } from "@/core/note-actions";
 import type { Held } from "@/editor";
+import type { ChatQueue, Queues } from "@/lib/chat-queue";
 import { createContext, useContext } from "react";
+
+/** What a transient chat's requests carry while its panel holds it: an ask's words (`held`, its context, which the selection
+ *  tools change), or a note action's run (`scope`, which the server narrows the turn to). Each returns null once let go: a plain
+ *  chat from then on. */
+export type Binding = { held?: () => Held | null; scope?: () => Run | null };
 
 export type Assistant = {
   /** The conversation; null until the saved one named in the browser's settings has loaded. */
@@ -28,13 +34,16 @@ export type Assistant = {
   /** A chat with nothing in it yet. */
   newChat: () => void;
   openChat: (id: string) => void;
-  /** Ask about words held in a note (the selection bar): `text` goes as the first message of a chat of its own, beside the
-   *  dock's, whose context is `held()`'s words while it returns them. Null when the chat's record could not be made. */
-  ask: (text: string, held: () => Held | null) => Promise<Chat<UIMessage> | null>;
-  /** Run a note action (core/note-actions.ts) on `note`: its prompt goes as the first message of a chat of its own, like an
-   *  ask's, narrowed by the server to what the action may do for as long as `scope()` returns the run (null once the chat is
-   *  let go: a plain chat from then on). Null when the chat's record could not be made. */
-  run: (action: PromptAction, note: NoteRef, scope: () => Run | null) => Promise<Chat<UIMessage> | null>;
+  /** A chat of its own beside the dock's (an ask, a note action's run: hooks/transient-chat.ts), its record made and titled from
+   *  `title` (core/share.ts `chatTitle`), nothing sent. Its requests are bound by `binding` while it returns something. Null when the record could not be made, or
+   *  when `wanted()` turned false meanwhile (the panel closed: the record is removed again). */
+  transient: (title: string, binding: Binding, wanted: () => boolean) => Promise<Chat<UIMessage> | null>;
+  /** Messages typed while a reply ran, each chat's own (lib/chat-queue.ts): the dock moving to another chat keeps them. */
+  queues: Queues;
+  /** Changes `chat`'s queue. */
+  requeue: (chat: string, change: (q: ChatQueue) => ChatQueue) => void;
+  /** Queues `text`, with its `files`, on `chat`. */
+  enqueue: (chat: string, text: string, files: FileUIPart[]) => void;
   /** Make `chat` the dock's and open the dock on it: an ask carried on in the full chat. */
   adopt: (chat: Chat<UIMessage>) => void;
   /** Stop any chat's reply, and close the tool calls it left unfinished (`stop` is the dock's). */

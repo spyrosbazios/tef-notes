@@ -117,7 +117,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   };
   /** The run wrote: the panel closes and a toast says what it did; a note's change can be put back as it was. */
   const ran = (said: string) => {
-    const r = runs.run;
+    const r = runs.run?.meta;
     if (!r) return;
     runs.close();
     // What the run wrote, once it has reached this browser's copy: Undo takes back that edit and keeps what was written after
@@ -177,8 +177,8 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
         <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
         <input ref={file} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
-        <NoteHeaderActions pinned={!!note.pinned} archived={!!note.archived} color={note.color} raw={raw} saveVerb={out.verb} running={running ? runs.run?.action.id ?? null : null}
-          onFile={() => file.current?.click()} onDraw={() => openDrawing(note.id, null)} onPin={() => { void flag({ pinned: !note.pinned }); }}
+        <NoteHeaderActions pinned={!!note.pinned} archived={!!note.archived} color={note.color} raw={raw} saveVerb={out.verb} running={running ? runs.run?.meta.action.id ?? null : null}
+          onFile={() => file.current?.click()} onDraw={() => { void openDrawing(note.id, null); }} onPin={() => { void flag({ pinned: !note.pinned }); }}
           onAsk={() => { void sendOut("ask"); }} onRaw={setRaw} onSave={() => { void sendOut("save"); }} onColor={(color) => { void flag({ color }); }}
           onCopyLink={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}
           onArchive={() => { void flag(archivePatch([note])).then(() => toast(note.archived ? "Brought back from the archive" : "Archived")); }}
@@ -187,7 +187,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
 
       <div className="relative min-h-0 flex-1">
       <RunSheen on={running} />
-      <NoteRunPanel run={runs.run} onClose={runs.close} onCarry={runs.carry} onAgain={() => { if (runs.run) void runAction(runs.run.action); }} onWrote={ran} />
+      <NoteRunPanel run={runs.run} onClose={runs.close} onCarry={runs.carry} onAgain={() => { if (runs.run) void runAction(runs.run.meta.action); }} onWrote={ran} />
       <div ref={scroller} data-scroll-restoration-id={noteScroll(note.id)} className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-8 pb-24 md:px-10">
           <textarea ref={title} rows={1} value={d.title} onChange={(e) => d.setTitle(e.target.value.replace(/\s*\n\s*/g, " "))}
@@ -212,7 +212,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           <LinkedTasks n={n} className="mb-6" />
           {raw ? source : (
             <>
-            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => openDrawing(note.id, name)} onEditor={setEd} />
+            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => { void openDrawing(note.id, name); }} onEditor={setEd} />
             {ed ? <SelectionBar editor={ed} /> : null}
             </>
           )}

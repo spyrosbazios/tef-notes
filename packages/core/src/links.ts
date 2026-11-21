@@ -13,6 +13,12 @@ function trimUrl(u: string) {
 const urls = (s: string) => (s.match(URL_RE) ?? []).map(trimUrl);
 /** The first http(s) URL in `text`, as a reader would take it; null when there is none. */
 export const firstUrl = (text: string): string | null => urls(text)[0] ?? null;
+
+/** The site a URL is on, `www.` dropped; null when it is not an absolute URL with a host (`https://` alone, a relative link):
+ *  a link in a note is the owner's typing, and `new URL` throws on it. */
+export function hostOf(url: string): string | null {
+  try { return new URL(url).hostname.replace(/^www\./, "") || null; } catch { return null; }
+}
 const ENT: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", mdash: "—", ndash: "–", hellip: "…", middot: "·",
   lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", bull: "•", copy: "©", reg: "®", trade: "™",

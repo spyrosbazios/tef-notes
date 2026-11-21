@@ -13,6 +13,7 @@ import { AnimatePresence, motion, useIsPresent, type MotionProps } from "motion/
 import { useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { Panel } from "@/components/assistant/panel";
+import { Boundary } from "@/components/boundary";
 import { clampWidth, DOCK_WIDTH, setDock, useDock } from "@/hooks/dock";
 import { useMedia, useNarrow } from "@/hooks/media";
 
@@ -62,7 +63,7 @@ function Aside({ width, moves }: { width: number; moves: MotionProps }) {
       // The rail (240px) and a list with its pane (660px) keep their room: the dock takes what is left, up to its own width
       className="fixed inset-0 z-40 bg-bg max-md:pb-(--dock-bottom) md:left-auto md:w-(--dock-w) md:max-w-full md:border-l md:border-line md:shadow-xl xl:relative xl:inset-auto xl:z-auto xl:max-w-[calc(100vw-900px)] xl:min-w-80 xl:shrink-0 xl:shadow-none">
       <Edge width={width} />
-      <Panel />
+      <Boundary what="The assistant"><Panel /></Boundary>
     </motion.aside>
   );
 }

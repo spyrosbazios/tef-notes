@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { contextOf, uiToolsFor } from "../src/assistant";
-import { DRAW_COLORS, DRAWING_LIMITS, editProblem, editWords, shapesOf } from "../src/drawing";
+import { DRAW_COLORS, DRAWING_LIMITS, editProblem, editWords, readScene, shapesOf } from "../src/drawing";
+
+describe("readScene", () => {
+  test("a saved scene, empty or not, opens", () => {
+    expect(readScene('{"type":"excalidraw","elements":[]}')).toEqual({ scene: { type: "excalidraw", elements: [] } });
+  });
+  test("a damaged file is an error, never a throw", () => {
+    expect(readScene('{"type":"excal')).toEqual({ error: "the file is not JSON" });
+    expect(readScene('{"type":"other","elements":[]}')).toEqual({ error: "the file is not an Excalidraw scene" });
+    expect(readScene("[]")).toEqual({ error: "the file is not an Excalidraw scene" });
+  });
+});
 import { widgetOf } from "../src/widgets";
 
 // A scene as Excalidraw saves it, cut to the fields shapesOf reads

@@ -13,3 +13,20 @@ export function deal<T>(items: T[], n: number): T[][] {
   items.forEach((item, i) => cols[i % n].push(item));
   return cols;
 }
+
+/** The tiles on screen in one masonry, by id. A tile that changes column is a second element with its id while the first one
+ *  leaves (each column has its own presence): the newcomer comes in without a fade and the one it replaces is hidden at once,
+ *  instead of two tiles fading over each other. One per masonry: a note shown in two of them (two chat answers, two tag groups)
+ *  is two tiles, and neither hides the other. */
+export class OnScreen<T> {
+  private readonly tiles = new Map<string, Set<T>>();
+  /** Whether a tile with `id` is on screen already: one arriving now is it moving, not new. */
+  has(id: string): boolean { return this.tiles.has(id); }
+  /** `node` is on screen as `id`: the ones it replaces (to hide), and its leaving. */
+  arrive(id: string, node: T): { replaced: T[]; leave: () => void } {
+    const all = this.tiles.get(id) ?? new Set<T>(), replaced = [...all];
+    all.add(node);
+    this.tiles.set(id, all);
+    return { replaced, leave: () => { all.delete(node); if (!all.size && this.tiles.get(id) === all) this.tiles.delete(id); } };
+  }
+}

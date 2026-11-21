@@ -6,11 +6,12 @@
 //  - the UI tools (core/assistant.ts): a call to open a note, a task or a view is done in the app through the nav
 //    and answered with `addToolOutput`, always, even when it fails;
 //  - `sendAutomaticallyWhen` (`resumes`): the turn resumes after a card's answer and after a UI tool's answer;
-//  - asks from the selection bar (`ask`): each a chat of its own beside the dock's, saved and listed like any, whose
-//    context is the words it holds in the note (the selection tools change them); `adopt` hands one to the dock. The
-//    dock's own doings (its badge, opening for a card) are for the dock's chat only: an ask shows its reply where it was made;
-//  - a note action's runs (`run`, core/note-actions.ts): each a chat of its own too, its requests carrying `action` (which
-//    action, on which note) for as long as the note's panel holds it, so the server narrows the turn to that action.
+//  - chats of their own beside the dock's (`transient`, hooks/transient-chat.ts), saved and listed like any: an ask from the
+//    selection bar, whose context is the words it holds in the note (the selection tools change them), and a note action's run
+//    (core/note-actions.ts), its requests carrying `action` (which action, on which note) so the server narrows the turn to it,
+//    each for as long as its panel holds it; `adopt` hands one to the dock. The dock's own doings (its badge, opening for a card)
+//    are for the dock's chat only: these show their reply where they were made.
+//  - each chat's queued messages (`queues`, lib/chat-queue.ts), so the dock moving to another chat and back keeps them.
 // The writes the agent makes reach the screen through `useLive` (realtime), as any other client's do.
 import { Chat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,9 +22,9 @@ import { choiceFrom, isAskTool, isUiTool, uiError, uiToolsFor, type UiToolName }
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import type { NoteRef } from "@/core/handoff";
-import { runMessage, runTitle, type PromptAction, type Run } from "@/core/note-actions";
+import type { Run } from "@/core/note-actions";
 import { CHATS, settingsNow } from "@/hooks/agent";
-import { AssistantContext, type Assistant } from "@/hooks/assistant";
+import { AssistantContext, type Assistant, type Binding } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
 import { dockNow, onDock, setDock } from "@/hooks/dock";
 import { prefsNow } from "@/hooks/prefs";
@@ -35,9 +36,10 @@ import { TASKS } from "@/hooks/todo";
 import type { Held } from "@/editor";
 import { closeUnfinished, notOffered, pageContext, resumes, runUiTool } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
+import { added, requeued, type ChatQueue, type Queues } from "@/lib/chat-queue";
 import { STORAGE } from "@/lib/storage-keys";
 import { message } from "@/services/api";
-import { chat as loadChat, createChat, newChatId } from "@/services/agent";
+import { chat as loadChat, createChat, newChatId, removeChat } from "@/services/agent";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
 
@@ -220,25 +222,20 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const stop = useCallback(async () => { if (chat) await halt(chat); }, [chat]);
 
-  const ask = useCallback(async (text: string, held: () => Held | null) => {
+  const transient = useCallback(async (title: string, { held, scope }: Binding, wanted: () => boolean) => {
     const id = newChatId();
-    try { await createChat(id, chatTitle(text)); } catch (e) { toast.error(message(e)); return null; }
+    try { await createChat(id, chatTitle(title)); } catch (e) { toast.error(message(e)); return null; }
+    // Its panel closed while the record was being made: nothing goes, and the empty record goes again
+    if (!wanted()) { void removeChat(id).finally(() => qc.invalidateQueries({ queryKey: CHATS })); return null; }
     made.current.add(id);
     void qc.invalidateQueries({ queryKey: CHATS });
-    const c = build(id, [], held);
-    void c.sendMessage({ text });
-    return c;
+    return build(id, [], held, scope);
   }, [build, qc]);
 
-  const run = useCallback(async (action: PromptAction, note: NoteRef, scope: () => Run | null) => {
-    const id = newChatId();
-    try { await createChat(id, chatTitle(runTitle(action, note))); } catch (e) { toast.error(message(e)); return null; }
-    made.current.add(id);
-    void qc.invalidateQueries({ queryKey: CHATS });
-    const c = build(id, [], undefined, scope);
-    void c.sendMessage({ text: runMessage(action, note) });
-    return c;
-  }, [build, qc]);
+  // Each chat's queued messages, here rather than in the panel's thread, which a chat switch remounts
+  const [queues, setQueues] = useState<Queues>({}), queuedId = useRef(0);
+  const requeue = useCallback((id: string, change: (q: ChatQueue) => ChatQueue) => setQueues((all) => requeued(all, id, change)), []);
+  const enqueue = useCallback((id: string, text: string, files: FileUIPart[]) => requeue(id, added({ id: queuedId.current++, text, files })), [requeue]);
 
   const adopt = useCallback((c: Chat<UIMessage>) => {
     opening.current++;
@@ -248,7 +245,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setFocusKey((k) => k + 1);
   }, []);
 
-  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, ask, run, adopt, halt }),
-    [chat, input, about, focusKey, show, send, stop, newChat, openChat, ask, run, adopt]);
+  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, transient, queues, requeue, enqueue, adopt, halt }),
+    [chat, input, about, focusKey, show, send, stop, newChat, openChat, transient, queues, requeue, enqueue, adopt]);
   return <AssistantContext value={value}>{children}</AssistantContext>;
 }

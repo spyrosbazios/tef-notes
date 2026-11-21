@@ -124,6 +124,20 @@ version is one semver number for the whole repository, set by the git tag (see [
   a race reads the newer record and puts only the settings it changed over it, and the assistant's own writes (the widget's
   lens, a note action it saves) go through the same path instead of saving the whole record.
 
+### Fixed
+
+- A part of the web app that fails to draw (a note, the assistant, Reader, a PDF, a drawing) says so in its own place with
+  Try again, instead of blanking the whole app; a link left half typed (`[x](https://)`) no longer gets a Reader button
+  that crashed the app.
+- A note shown in two of the assistant's answers no longer makes the first tile vanish.
+- A drawing with unsaved strokes is no longer closed without asking when you leave its note (Back, ⌘K, the assistant opening
+  another note) or reload the page; holding ⌘S, or ⌘S while the assistant saves, no longer makes the drawing twice. A
+  damaged drawing file says it can't be opened instead of crashing the note.
+- Closing a note action's panel (or a selection ask) while it says "Starting…" now stops it: its prompt no longer goes on as
+  a plain chat with every tool.
+- Messages queued while the assistant replies, and their files, are kept when you open another chat, and go once you are
+  back on theirs.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

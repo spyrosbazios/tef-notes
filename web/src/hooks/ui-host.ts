@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { uiError, UI_OK, type OpenDrawing } from "@/core/assistant";
 import { DRAWING_LIMITS, type DrawEdit } from "@/core/drawing";
 import { isDrawing } from "@/core/photos";
-import { liveFor, liveNow, openDrawing, openedNow, saverNow } from "@/hooks/drawing";
+import { drawingNow, liveFor, liveNow, openDrawing, saveDrawing, saverNow } from "@/hooks/drawing";
 import { photoListQuery } from "@/hooks/photos";
 import { NOTES } from "@/hooks/notes";
 import { TASKS } from "@/hooks/todo";
@@ -35,7 +35,7 @@ export function openDrawingNow(notes: NoteRec[] | undefined): OpenDrawing | unde
   const { shapes, selected } = l.shapes(), shown = shapes.slice(0, DRAWING_LIMITS.shown);
   return {
     path: n.path, ...(l.name ? { name: l.name } : {}), shapes: shown, ...(shapes.length > shown.length ? { more: shapes.length - shown.length } : {}),
-    ...(selected.length ? { selected } : {}), ...(l.unsaved() ? { unsaved: true as const } : {}),
+    ...(selected.length ? { selected } : {}), ...(drawingNow().unsaved ? { unsaved: true as const } : {}),
   };
 }
 
@@ -68,10 +68,12 @@ export function useUiHost(navNow: RefObject<ReturnType<typeof useNav>>): UiHost 
         const there = (await qc.fetchQuery(photoListQuery(id))).filter((p) => isDrawing(p.name)).map((p) => p.name);
         if (!there.includes(name)) return uiError(`${path} has no drawing ${name}${there.length ? ` (it has ${there.join(", ")})` : ""}. Leave the name out to start a new one.`);
       }
-      const o = openedNow(), same = !!o && o.noteId === id && (!name || o.name === name);
-      if (o && !same && liveNow()?.unsaved()) return uiError("Another drawing is open with changes not saved yet: ask the owner to save or close it first. Nothing was drawn.");
+      const { opened: o, unsaved } = drawingNow(), same = !!o && o.noteId === id && (!name || o.name === name);
+      if (o && !same && unsaved) return uiError("Another drawing is open with changes not saved yet: ask the owner to save or close it first. Nothing was drawn.");
       navNow.current.openNote(id);
-      const live = await liveFor(same ? o.seq : openDrawing(id, name ?? null));
+      const at = same ? o.seq : await openDrawing(id, name ?? null);
+      if (at === null) return uiError("The owner kept the drawing that was open, with changes not saved yet. Nothing was drawn.");
+      const live = await liveFor(at);
       if (!live) return uiError("The drawing editor didn't open in time. Nothing was drawn.");
       const r = await live.apply({ add, update, remove });
       if ("error" in r) return uiError(`${r.error} Nothing was drawn.`);
@@ -79,9 +81,9 @@ export function useUiHost(navNow: RefObject<ReturnType<typeof useNav>>): UiHost 
     },
     // Only the drawing open over that note, by the same Save the owner presses (drawing-layer.tsx)
     saveDrawing: async (path: string) => {
-      const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path), o = openedNow(), s = saverNow();
+      const n = await find<NoteRec>(qc, NOTES, (x) => x.path === path), o = drawingNow().opened, s = saverNow();
       if (!n || !o || o.noteId !== n.note.id || s?.seq !== o.seq) return { error: `No drawing is open over ${path}: open one with draw first.` };
-      const r = await s.save();
+      const r = await saveDrawing();
       return "error" in r ? r : { ok: true, name: r.name };
     },
   }), [qc, navNow]);
