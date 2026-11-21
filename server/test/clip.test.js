@@ -7,6 +7,7 @@ import { make } from "../pb_hooks/lib/llm.js";
 
 const ds = make("deepseek", () => "");
 import { bodyFor, titleFor } from "../../packages/core/src/share";
+import { CLIP_FILES, CLIP_TEXT } from "../../packages/core/src/clip";
 import { linkify } from "../../packages/core/src/links";
 import { fileMarkdown, linkPath, pdfName, photoMarkdown, photoName } from "../../packages/core/src/photos";
 
@@ -111,6 +112,13 @@ describe("the request", () => {
       { url: U, pdfs: [{}] }, { url: U, pdfs: [{ name: " " }] }, { url: U, pdfs: {} }, { url: U, images: Array(6).fill({ src: "" }), pdfs: Array(5).fill({ name: "a.pdf" }) }]) {
       expect(() => lib.input(bad)).toThrow(lib.Bad);
     }
+  });
+  test("the limits are core's (the hook cannot load it at runtime): its file count, and the page text it sends whole", () => {
+    expect(lib.FILES).toBe(CLIP_FILES);
+    const files = (n) => ({ url: U, title: "t", images: Array(n).fill({ src: "" }) });
+    expect(lib.input(files(CLIP_FILES)).images.length).toBe(CLIP_FILES);
+    expect(() => lib.input(files(CLIP_FILES + 1))).toThrow(lib.Bad);
+    expect(lib.input({ url: U, title: "t", text: "x".repeat(CLIP_TEXT) }).text.length).toBe(CLIP_TEXT);
   });
   test("a picture: its address, the page's words for it, its file name; the bytes JEV sees on suggest only", () => {
     const image = { src: "https://cdn.example.com/a/b%20c.png?x=1", alt: " A\n cat ", caption: "Fig. 1", look: "/9j/4AAQ==" };
