@@ -4,8 +4,8 @@
 // and saves it with the tag the normal way (the `tags` collection's `description`, the hint the auto-tagger's JEV gets).
 // The hourly job below does save one, only for a tag whose description the owner didn't write (`describedBy`): drawn from
 // the notes the owner filed under it by hand, first at 3 of them, then each time they double (lib/tags.js due). A
-// description saved through the API (a client, the agent's tools) is the owner's: the request hooks below mark it, and
-// the job never writes over it. The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
+// description saved through the API is the owner's, unless the request marks it an agent's (the request hooks below),
+// and the job never writes over the owner's. The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
 // used for the notes asked about from then on and sends no note back to be asked again; the owner's own edit does.
 //
 // POST /api/tefnotes/tags/describe JSON { tag: "<name>" } | { all: true }
@@ -21,7 +21,7 @@
 //
 // POST /api/tefnotes/tags/rename JSON { from: "<name>", to: "<new name>" }
 // Renames a tag everywhere, in one transaction: every note's tags line (its text, the `tags` column, what the
-// auto-tagger added, `autotagged`) and every task's tags, each a write that bumps `rev` like any other; every lens's
+// auto-tagger added, `autotagged`) and every task's tags, each a write that bumps `rev` like any other (lib/records.js); every lens's
 // tags and hidden tags; the notes list's folded groups in the preferences; and the definition. A `to` already defined
 // (case and tonos ignored) merges the two: the existing definition stays, taking the other's colour and description
 // where it has none, and the other is deleted; the items take its name as written there. A `from` nothing defines is
@@ -29,7 +29,7 @@
 // 200 { tag, notes, tasks, lenses, merged }   tag: the name the items carry now; the counts of records changed
 // 400 bad body. Errors are { error }.
 routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
-  const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`);
+  const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`), records = require(`${__hooks}/lib/records.js`);
   let req;
   try { req = lib.renameInput(e.requestInfo().body); } catch (err) {
     if (err instanceof lib.Bad) return e.json(400, { error: err.message });
@@ -55,22 +55,19 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
       tx.db().newQuery(`SELECT id, CAST(IFNULL(tags, '[]') AS TEXT) AS tags FROM ${coll}`).all(rows);
       return rows.filter((r) => lib.renamed(names(r.tags), req.from, to)).map((r) => r.id);
     };
+    // A note's `tags` column is a copy of its frontmatter, which lib/records.js copies out of the text again: a note whose
+    // column alone carried the old name is rewritten all the same, which puts the copy right.
     for (const id of ids("notes")) {
-      const rec = tx.findRecordById("notes", id), path = rec.getString("path");
-      const next = lib.renamed(notes.parse(path, rec.getString("text")).tags, req.from, to);
-      if (next) { const c = notes.columns(path, notes.withTags(path, rec.getString("text"), next)); rec.set("text", c.text); rec.set("tags", c.tags); }
-      else rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to));      // the column alone was stale
-      const auto = lib.renamed(names(rec.getString("autotagged")), req.from, to);
-      if (auto) rec.set("autotagged", auto);
-      rec.set("rev", rec.getInt("rev") + 1);
-      tx.save(rec);
+      records.casWrite(tx, "notes", id, (rec) => {
+        const path = rec.getString("path"), next = lib.renamed(notes.parse(path, rec.getString("text")).tags, req.from, to);
+        if (next) rec.set("text", notes.withTags(path, rec.getString("text"), next));
+        const auto = lib.renamed(names(rec.getString("autotagged")), req.from, to);
+        if (auto) rec.set("autotagged", auto);
+      });
       out.notes++;
     }
     for (const id of ids("tasks")) {
-      const rec = tx.findRecordById("tasks", id);
-      rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to));
-      rec.set("rev", rec.getInt("rev") + 1);
-      tx.save(rec);
+      records.casWrite(tx, "tasks", id, (rec) => { rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to)); });
       out.tasks++;
     }
     for (const rec of tx.findAllRecords("lenses")) {
@@ -151,15 +148,20 @@ cronAdd("tag-describe", "17 * * * *", () => {
   }
 });
 
-// A description that arrives through the API is the owner's (the tag editors, the agent's tag tools): the hourly job
-// above never writes over it, and the auto-tagger's definitions hash holds it. The job's own save is no request, so it
-// fires neither hook.
+// Who wrote a description that arrives through the API, decided here and nowhere else: "agent" when the request says
+// so (an outside agent: the CLI under TEF_NOTES_AGENT=1), else the owner's (the tag editors). A client can only lower
+// the trust: "owner" and "auto" are never taken from a request, and a write that leaves the description as it was
+// leaves `describedBy` too. Only the owner's is trusted: the hourly job above never writes over it, and the
+// auto-tagger's definitions hash holds it (lib/autotag.js). The job's own save is no request, so it fires neither hook.
 onRecordCreateRequest((e) => {
-  e.record.set("describedBy", e.record.getString("description").trim() ? "owner" : "");
+  const by = e.requestInfo().body["describedBy"] === "agent" ? "agent" : "owner";
+  e.record.set("describedBy", e.record.getString("description").trim() ? by : "");
   e.next();
 }, "tags");
 
 onRecordUpdateRequest((e) => {
-  if (e.record.getString("description") !== e.record.original().getString("description")) e.record.set("describedBy", "owner");
+  const was = e.record.original();
+  if (e.record.getString("description") === was.getString("description")) e.record.set("describedBy", was.getString("describedBy"));
+  else e.record.set("describedBy", e.requestInfo().body["describedBy"] === "agent" ? "agent" : "owner");
   e.next();
 }, "tags");

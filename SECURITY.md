@@ -1,6 +1,6 @@
 # Security
 
-<!-- reviewed: 2026-11-15 -->
+<!-- reviewed: 2026-11-21 -->
 
 ## The model: no sign-in, a private network
 
@@ -42,6 +42,12 @@ on every device would add friction without keeping out anyone the network does n
 - The link-preview and clip-image routes fetch URLs from your server. They refuse private and loopback addresses at every
   redirect hop; report any bypass. The push route posts to a subscribed browser's push-service URL (https, and its name
   resolved and checked as public before every send); it stores at most 20 devices.
+- Other websites you visit can't write to your notes. With no sign-in, a page could otherwise post to the server from
+  your browser, so PocketBase refuses any request that changes something, or makes the server fetch a URL, when the
+  browser says it comes from another site (`server/pb_hooks/origin.pb.js`): only the web app (same origin), the
+  extension (the one your server serves, by its id) and clients that aren't browsers (CLI, agent, Android companion)
+  get through. CORS names only the extension, so no other site can read an answer either. A browser too old to send
+  `Sec-Fetch-Site` is judged by its `Origin`, so a proxy in front must pass `Host` or `X-Forwarded-Host` through.
 - TEF Notes has no backups of its own. See the README's "Backups".
 
 ## Reporting a vulnerability

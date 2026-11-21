@@ -206,6 +206,29 @@ describe("curlFile", () => {
   });
 });
 
+describe("curl", () => {
+  test("both fetches ignore any proxy in the environment: a proxy would connect past the pinned address", () => {
+    for (const make of [(run) => lib.curl(run), (run) => lib.curlFile(run, "/tmp/f")]) {
+      let call;
+      make((...a) => { call = a; return "HTTP/1.1 200 OK\r\n\r\n"; })(["--", "https://a.example/"], 9);
+      expect(call[2]).toContain("--noproxy '*'");
+    }
+  });
+});
+
+describe("informational responses", () => {
+  test("a 100 or 103 before the response is skipped, for a page and for a picture's headers", () => {
+    const early = "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 103 Early Hints\r\nlink: </a.css>; rel=preload\r\n\r\n";
+    const io = net({ "https://a.example.org/": `${early}${reply(200, { "content-type": "text/html" }, "<title>Hi</title>")}` });
+    expect(fetchPage("https://a.example.org/", io)).toMatchObject({ status: 200, type: "text/html", body: "<title>Hi</title>" });
+    const moved = net({
+      "https://a.example.org/": `${early}${reply(302, { location: "/b" })}`,
+      "https://a.example.org/b": reply(200, { "content-type": "image/png" }),
+    });
+    expect(fetchPage("https://a.example.org/", moved)).toMatchObject({ url: "https://a.example.org/b", status: 200, type: "image/png" });
+  });
+});
+
 describe("pageText", () => {
   const html = (body) => `<!doctype html><html><head><title>T</title><style>p { color: red }</style><script>var x = "<p>in a script</p>";</script></head><body>${body}</body></html>`;
   test("blocks on their own lines; scripts, styles, menus, footers and comments left out; entities decoded", () => {

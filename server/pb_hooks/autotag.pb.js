@@ -30,8 +30,8 @@
 // next run retries; the log gets its status, never the key. pb_migrations/1792500002_autotag.js adds the columns to
 // notes, 1793500000_task_tags.js to tasks.
 //
-// The rev contract (rev.pb.js) is enforced by request hooks, and a save from here fires none of them, so the bump is
-// ours: the record is read again inside a transaction and the write is dropped if `rev` moved since it was read. The
+// The rev contract (rev.pb.js) is enforced by request hooks, and a save from here fires none of them, so the write goes
+// through lib/records.js casWrite: read again inside a transaction and dropped if `rev` moved since it was read. The
 // phone's write wins and this run's answer is forgotten; the next run asks again. A verdict with no tag to add (only
 // `tagged`) is a plain UPDATE guarded by the same `rev`: no bump, and no new `updated`, which would float every note the
 // backlog touches to the top of the lists (and sends no realtime event).
@@ -40,7 +40,7 @@ cronAdd("autotag", "* * * * *", () => {
   const jev = require(`${__hooks}/lib/jev.js`);
   const key = require(`${__hooks}/lib/keys.js`).read("typesafe");   // no key: tag nothing
   if (!key || $app.store().get("autotag-running")) return;     // a run still going when the next minute starts
-  const lib = require(`${__hooks}/lib/autotag.js`), notes = require(`${__hooks}/lib/notes.js`), images = require(`${__hooks}/lib/images.js`);
+  const lib = require(`${__hooks}/lib/autotag.js`), notes = require(`${__hooks}/lib/notes.js`), images = require(`${__hooks}/lib/images.js`), records = require(`${__hooks}/lib/records.js`);
 
   const defs = lib.load($app);
   if (!defs.length) return;
@@ -85,7 +85,7 @@ cronAdd("autotag", "* * * * *", () => {
       const path = rec.getString("path"), text = rec.getString("text"), note = notes.parse(path, text);
       return {
         item: note, askable: !!note.body.trim(), tags: note.tags, photos: () => photosOf(note),
-        withTags: (cur, tags) => { cur.set("text", notes.withTags(path, text, tags)); cur.set("tags", tags); },
+        withTags: (cur, tags) => { cur.set("text", notes.withTags(path, text, tags)); },
       };
     },
   };
@@ -148,20 +148,19 @@ cronAdd("autotag", "* * * * *", () => {
         const add = lib.decide(found, defs, room);
 
         $app.runInTransaction((tx) => {
-          const cur = tx.findRecordById(coll, id);
-          if (cur.getInt("rev") !== rev) return;                // edited since it was read: that edit wins, next run asks again
           if (add.length) {
-            sub.withTags(cur, sub.tags.concat(lib.without(add, sub.tags)));
-            cur.set("autotagged", had.concat(lib.without(add, had)));
-            cur.set("rev", rev + 1);
-            cur.set("tagged", lib.taggedKey(rev + 1, hash, content));
-            tx.save(cur);
-            added += add.length;
+            // Edited since it was read: that edit wins (nothing written), and the next run asks again
+            const saved = records.casWrite(tx, coll, id, (cur) => {
+              sub.withTags(cur, sub.tags.concat(lib.without(add, sub.tags)));
+              cur.set("autotagged", had.concat(lib.without(add, had)));
+              cur.set("tagged", lib.taggedKey(rev + 1, hash, content));
+            }, { expectRev: rev });
+            if (saved) { added += add.length; done++; }
           } else {
             // A verdict is not an edit, and a save stamps `updated` (which the lists sort by) however it is set
             stamp(tx);
+            done++;
           }
-          done++;
         });
       } catch (err) {
         log(`${noun} skipped`, noun, id, "error", String(err).slice(0, 200));

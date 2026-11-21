@@ -47,11 +47,14 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
   if (!fresh) {
     const run = (name, ...args) => toString($os.exec(name, ...args).output());
     let page = null;
-    let blocked = false;
-    try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) { blocked = err instanceof lib.Blocked; }
+    // A URL refused on the way (its name resolves to a private address, a redirect leads to one): a 400 like one refused
+    // up front, and nothing cached for it
+    try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) {
+      if (err instanceof lib.Blocked) throw new BadRequestError(err.message);
+    }
     // the site didn't answer (down, slow, rate-limited) and there is nothing to fall back on: a 502, not cached, so the
     // editor asks again later instead of drawing an empty card for an hour
-    if (!page && !out && !blocked) return e.json(502, { error: "The site didn't answer." });
+    if (!page && !out) return e.json(502, { error: "The site didn't answer." });
     if (page || !out) {                                  // a failed refresh keeps the stale preview there is
       out = page || Object.fromEntries(FIELDS.map((f) => [f, ""]));
       const r = rec || new Record(e.app.findCollectionByNameOrId("link_previews"));

@@ -52,7 +52,12 @@ COPY --from=web /src/web/dist /pb/pb_public
 COPY server/pb_migrations /pb/pb_migrations
 COPY server/pb_hooks /pb/pb_hooks
 EXPOSE 8090
-CMD ["./pocketbase", "serve", "--http=0.0.0.0:8090", "--migrationsDir=/pb/pb_migrations", "--hooksDir=/pb/pb_hooks", "--publicDir=/pb/pb_public"]
+# CORS: no web page reads this API from another origin (the web app is served here, and the extension's host permission
+# needs no CORS), so --origins (PocketBase's default "*") names only the extension: the one this image serves, by the id
+# in its update.xml, or any when it serves none. What another site may *send* is pb_hooks/origin.pb.js's.
+CMD id=$(grep -o 'appid="[a-p]*"' /pb/pb_public/extension/update.xml 2>/dev/null | cut -d'"' -f2); \
+    exec ./pocketbase serve --http=0.0.0.0:8090 "--origins=chrome-extension://${id:-*}" \
+      --migrationsDir=/pb/pb_migrations --hooksDir=/pb/pb_hooks --publicDir=/pb/pb_public
 
 FROM base AS with-extension
 COPY --from=extension /src/extension/out /pb/pb_public/extension
