@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { decode, linkify, noteLinkPath, titleFromHtml, youtubeVideo } from "../src/links";
+import { decode, linkify, noteLinkPath, safeHref, titleFromHtml, youtubeVideo } from "../src/links";
 
 describe("titleFromHtml", () => {
   it("prefers og:title, whichever order the attributes come in", () => {
@@ -51,5 +51,16 @@ describe("youtubeVideo", () => {
     expect(youtubeVideo("https://www.youtube.com/playlist?list=PL1")).toBeNull();
     expect(youtubeVideo("https://example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
     expect(youtubeVideo("not a url")).toBeNull();
+  });
+});
+
+describe("safeHref", () => {
+  it("keeps web, mail and the app's own relative links", () => {
+    for (const h of ["https://a.io/x", "HTTP://a.io", "mailto:me@x.org", "notes/foo.md", "../attachments/n1/a.pdf", "#top", "foo.md#b"]) expect(safeHref(h)).toBe(h);
+  });
+  it("refuses any other scheme, however it is dressed", () => {
+    for (const h of ["javascript:alert(1)", " JavaScript:alert(1)", "java\tscript:alert(1)", "\u0001javascript:x", "data:text/html,<b>", "file:///etc/passwd", "vbscript:x", "blob:https://a.io/1"]) expect(safeHref(h)).toBeNull();
+    expect(safeHref("")).toBeNull();
+    expect(safeHref(null)).toBeNull();
   });
 });

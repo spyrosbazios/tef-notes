@@ -1,8 +1,9 @@
 // The editor's markdown: parse then serialize must reach a fixed point, and say what the note said.
 import { describe, expect, test } from "bun:test";
+import type { TagParseRule } from "prosemirror-model";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { commands, isActive } from "../src/editor/commands";
-import { normalizeBody, parse, serialize } from "../src/editor/markdown";
+import { normalizeBody, parse, schema, serialize } from "../src/editor/markdown";
 
 const once = (md: string) => serialize(parse(md));
 
@@ -205,5 +206,17 @@ describe("format tools", () => {
     expect(serialize(state.doc)).toBe("- [ ] one\n- three\n- [x] two\n  - under\n");
     expect(run("moveDown")).toBe(false);
     expect(commands.moveUp(at("plain\n", "plain"))).toBe(false);
+  });
+});
+
+describe("pasted links", () => {
+  // The rule ProseMirror's DOM parser applies to a pasted `<a>`; an element is all it reads from
+  const rule: TagParseRule = schema.marks.link.spec.parseDOM![0] as TagParseRule;
+  const anchor = (href: string) => ({ getAttribute: (name: string) => (name === "href" ? href : null) }) as unknown as HTMLElement;
+  test("keep web, mail and the app's own links", () => {
+    for (const href of ["https://a.io/x", "mailto:me@x.org", "notes/foo.md"]) expect(rule.getAttrs!(anchor(href))).toEqual({ href, title: null });
+  });
+  test("drop a script or data link to its text", () => {
+    for (const href of ["javascript:alert(1)", " javascript:alert(1)", "data:text/html,<b>x</b>"]) expect(rule.getAttrs!(anchor(href))).toBe(false);
   });
 });

@@ -57,6 +57,16 @@ export function noteLinkPath(url: string): string | null {
   return `notes/${name}`;
 }
 
+/** `href` when a note may hold it as a link and a click may open it: `http(s):`, `mailto:`, or the app's own relative
+ *  links (a note, an attachment). null for any other scheme (`javascript:`, `data:`, `file:`, `vbscript:`…), which a
+ *  page's pasted HTML can carry. Leading blanks and controls are dropped first, as a browser does when it reads one. */
+export function safeHref(href: string | null | undefined): string | null {
+  if (!href) return null;
+  const h = href.replace(/^[\u0000- ]+/, "");
+  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(h.replace(/[\t\n\r]/g, ""))?.[1]?.toLowerCase();
+  return scheme === undefined || scheme === "http" || scheme === "https" || scheme === "mailto" ? h : null;
+}
+
 /** The video a YouTube link plays, and where to start (seconds): a watch page, a short, a live, an embed or a youtu.be
  *  link. null for anything else (a channel, a playlist alone, another site). */
 export function youtubeVideo(url: string): { id: string; start: number } | null {

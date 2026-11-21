@@ -16,6 +16,11 @@ version is one semver number for the whole repository, set by the git tag (see [
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
 
+### Security
+
+- A link pasted into a note from a web page keeps only an `http(s):`, `mailto:` or the app's own address; a
+  `javascript:` or `data:` link becomes plain text, and Ctrl-click never opens one.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

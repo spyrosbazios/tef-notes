@@ -22,7 +22,7 @@ import type { Summarize } from "./link-tools";
 import { outlineOf, sameOutline, type OutlineItem } from "./outline";
 import { slashMenu } from "./slash";
 import { ImageView, ListItemView } from "./views";
-import { noteLinkPath } from "@/core/links";
+import { noteLinkPath, safeHref } from "@/core/links";
 import { spliced } from "@/core/voice";
 import type { ResolveImage } from "./views";
 
@@ -183,7 +183,10 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
 
   // Focus lands after the event that reports it: tell the listeners once it has
   const notify = () => { queueMicrotask(() => listeners.forEach((l) => l())); };
-  const open = (href: string) => { if (!options.onLink?.(href)) window.open(href, "_blank", "noopener,noreferrer"); };
+  const open = (raw: string) => {
+    const href = safeHref(raw);
+    if (href !== null && !options.onLink?.(href)) window.open(href, "_blank", "noopener,noreferrer");
+  };
 
   const stateFor = (doc: Node) => EditorState.create({
     doc,
