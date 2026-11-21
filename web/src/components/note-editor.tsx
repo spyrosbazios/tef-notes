@@ -33,20 +33,22 @@ type Props = {
   onDrawing: (name: string) => void;
   /** The editor once it is up, null when it goes: what the note pane's format tools drive. */
   onEditor: (editor: Editor | null) => void;
+  /** A model's words were put in the body (a link's summary): the save of that change carries the `tainted` mark. */
+  onTainted: () => void;
   ref?: React.Ref<NoteEditorHandle>;
 };
 
-export function NoteEditor({ noteId, markdown, onChange, onFiles, onNote, onDrawing, onEditor, ref }: Props) {
+export function NoteEditor({ noteId, markdown, onChange, onFiles, onNote, onDrawing, onEditor, onTainted, ref }: Props) {
   const host = useRef<HTMLDivElement>(null), editorRef = useRef<Editor | null>(null);
   const qc = useQueryClient();
   const resolve = useResolveImage(noteId, markdown);
-  const resolveRef = useRef(resolve), props = useRef({ onChange, onFiles, onNote, onDrawing, onEditor }), opened = useRef(markdown), sent = useRef(markdown);
+  const resolveRef = useRef(resolve), props = useRef({ onChange, onFiles, onNote, onDrawing, onEditor, onTainted }), opened = useRef(markdown), sent = useRef(markdown);
   const [pictures, setPictures] = useState<{ items: LightboxItem[]; index: number | null }>({ items: [], index: null });
   const [pdf, setPdf] = useState<{ url: string; name: string } | null>(null);
   const [reading, setReading] = useState<string | null>(null);
 
   // What the editor's callbacks read, kept current
-  useEffect(() => { resolveRef.current = resolve; props.current = { onChange, onFiles, onNote, onDrawing, onEditor }; });
+  useEffect(() => { resolveRef.current = resolve; props.current = { onChange, onFiles, onNote, onDrawing, onEditor, onTainted }; });
 
   // One editor per note: the host remounts it with the note id
   useEffect(() => {
@@ -74,7 +76,7 @@ export function NoteEditor({ noteId, markdown, onChange, onFiles, onNote, onDraw
         return !!path;
       },
       onRead: setReading,
-      summarize,
+      summarize: async (url) => ({ block: await summarize(url), inserted: () => props.current.onTainted() }),
       resolveLink: (url) => qc.fetchQuery(previewQuery(url)),
       placeholder: "Write something…",
     });

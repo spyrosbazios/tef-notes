@@ -1,13 +1,13 @@
 // Query projections of the local copy. Task changes also refresh their links; feature hooks
 // need not coordinate each other's caches. Query data is derived, never a second writable store.
 import type { QueryClient } from "@tanstack/react-query";
+import type { Topic } from "@/core/changes";
 import { isNotePath, parseNote } from "@/core/notes";
-import { visibleLinks, type NoteRow } from "@/core/sync";
+import { visibleLinks, type NoteRow, type TaskRow } from "@/core/sync";
 import { taskOf } from "@/core/todo";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
 import { local } from "./local";
-import { edited } from "./sync";
 
 export const NOTES = ["notes"] as const;
 
@@ -39,23 +39,21 @@ export function readNotes(): NoteRec[] {
 export const TASKS = ["tasks"] as const;
 export const LINKS = ["links"] as const;
 
-export function taskRec(id: string): TaskRec {
-  const r = local.tasks.get(id)!;
-  return { ...taskOf(r.data), rev: r.rev ?? 0 };
-}
+/** A row's task as the lists read it: `rev` 0 for one made here and not up yet. */
+export const taskRecOf = (r: TaskRow): TaskRec => ({ ...taskOf(r.data), rev: r.rev ?? 0 });
 
 export function readTasks(): TaskRec[] {
-  return local.tasks.all().filter((r) => !r.deleted).map((r) => taskRec(r.id)).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  return local.tasks.all().filter((r) => !r.deleted).map(taskRecOf).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
-/** A task change may also delete or carry its links. The same projection serves local edits and sync. */
-export function projectLocal(qc: QueryClient, topic?: "notes" | "tasks" | "links"): void {
-  if (!topic || topic === "notes") qc.setQueryData(NOTES, readNotes());
-  if (!topic || topic === "tasks") qc.setQueryData(TASKS, readTasks());
-  if (topic !== "notes") qc.setQueryData(LINKS, visibleLinks(local));
-}
+/** The links to show (core/sync.ts `visibleLinks`). */
+export const readLinks = () => visibleLinks(local);
 
-export function localEdited(qc: QueryClient, topic: "notes" | "tasks" | "links"): void {
-  projectLocal(qc, topic);
-  edited();
+/** The lists `topics` names (every one when none) from the copy. A task change may also hide its links, so a change to the
+ *  tasks redraws the links too. The same projection serves writes and syncs (lib/sync-controller.ts `onRedraw`). */
+export function projectLocal(qc: QueryClient, topics?: readonly Topic[]): void {
+  const all = !topics;
+  if (all || topics.includes("notes")) qc.setQueryData(NOTES, readNotes());
+  if (all || topics.includes("tasks")) qc.setQueryData(TASKS, readTasks());
+  if (all || topics.includes("tasks") || topics.includes("links")) qc.setQueryData(LINKS, readLinks());
 }

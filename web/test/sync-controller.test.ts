@@ -28,36 +28,36 @@ function idle(sync: ReturnType<typeof createSync>): Promise<void> {
 
 test("controllers isolate stores, status and redraw subscriptions; route loaders can sync before mounting", async () => {
   const a = fixture(), b = fixture();
-  let draws = 0;
-  const unsubscribe = a.sync.onRedraw(() => draws++);
+  const draws: (readonly string[] | undefined)[] = [];
+  const unsubscribe = a.sync.onRedraw((topics) => draws.push(topics));
   await b.sync.opened();
   expect(b.lists()).toBe(1);
-  expect(draws).toBe(0);
+  expect(draws).toEqual([]);
   a.offline();
-  addNote(a.store, "a1", "notes/a.md", "offline edit");
-  a.sync.edited();
+  expect(a.sync.apply([{ kind: "note.add", rec: "a1", path: "notes/a.md", text: "offline edit" }])).toBe(true);
+  expect(draws).toEqual([["notes"]]);                     // a write redraws the list it touched
   expect(a.sync.getStatus().waiting).toBe(1);
   expect(b.sync.getStatus().waiting).toBe(0);
   expect(a.queued.size).toBe(0); // no background work before mount
   await a.sync.syncNow();
-  expect(draws).toBe(1);
+  expect(draws).toEqual([["notes"], undefined]);           // a sync, every list
   unsubscribe();
   await a.sync.syncNow();
-  expect(draws).toBe(1);
+  expect(draws).toHaveLength(2);
 });
 
 test("the last lifecycle owner cancels pending work, cleanup is idempotent and remount restarts", async () => {
   const f = fixture();
   const mounted = idle(f.sync), first = f.sync.start(), second = f.sync.start();
   await mounted;
-  f.sync.edited();
+  f.sync.apply([{ kind: "task.save", task: newTask("t1", { title: "x" }) }]);
   f.sync.heard("links", "create", { id: "news" });
   expect([...f.queued.values()].sort((a, b) => a - b)).toEqual([250, 1500]);
   first(); first();
   expect(f.queued.size).toBe(2);
   second();
   expect(f.queued.size).toBe(0);
-  f.sync.edited();
+  f.sync.apply([{ kind: "task.save", task: newTask("t2", { title: "y" }) }]);
   f.sync.heard("links", "create", { id: "later" });
   expect(f.queued.size).toBe(0);
   const before = f.lists(), mountedAgain = idle(f.sync), stop = f.sync.start();
@@ -129,4 +129,33 @@ test("a change the server refused is shown, not retried by itself, and is sent a
   expect(f.sync.getStatus().refused).toEqual([]);
   expect(f.store.tasks.get("t1")).toBeUndefined();
   stop();
+});
+
+test("a write that changes nothing schedules and redraws nothing; one the copy refuses stops there, those before it kept", async () => {
+  const f = fixture();
+  const draws: unknown[] = [];
+  f.sync.onRedraw((t) => draws.push(t));
+  const stop = f.sync.start();
+  await idle(f.sync);
+  f.queued.clear();
+  draws.length = 0;
+  expect(f.sync.apply([{ kind: "note.remove", path: "notes/none.md" }])).toBe(false);
+  expect([draws, f.queued.size]).toEqual([[], 0]);
+  expect(() => f.sync.apply([
+    { kind: "note.add", rec: "a1", path: "notes/a.md", text: "a" },
+    { kind: "note.add", rec: "a2", path: "notes/a.md", text: "taken" },
+  ])).toThrow("taken");
+  expect(f.store.notes.get("notes/a.md")?.text).toBe("a");
+  expect(draws.at(-1)).toEqual(["notes"]);
+  stop();
+});
+
+test("a round lets the work it was asked to wait for finish before it pulls", async () => {
+  const f = fixture();
+  const order: string[] = [];
+  const list = f.transport.notes.list;
+  f.transport.notes.list = async () => { order.push("pull"); return list(); };
+  f.sync.beforeRound(async () => { await Promise.resolve(); order.push("typing kept"); });
+  await f.sync.syncNow();
+  expect(order).toEqual(["typing kept", "pull"]);
 });

@@ -4,16 +4,13 @@
 // restored or dismissed. Tasks never get here: their edits merge field by field.
 // And Refused: changes the server answered no to (a note, task or link it won't take as sent). They are not tried again by
 // themselves; the owner sends one again as it is, or lets it go (back to the server's version). Editing it sends it again too.
-import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { parseNote } from "@/core/notes";
-import { Button } from "@/components/ui/button";
-import { settleNote } from "@/hooks/notes";
-import { useSyncStatus } from "@/hooks/sync";
-import { local } from "@/lib/local";
-import { projectLocal } from "@/lib/local-records";
-import { resolveRefused, type Settle } from "@/lib/sync";
 import type { Refusal } from "@/core/sync";
+import { Button } from "@/components/ui/button";
+import { settleNote, useNoteRow } from "@/hooks/notes";
+import { resolveRefused, useSyncStatus } from "@/hooks/sync";
+import type { Settle } from "@/hooks/notes";
 
 /** The most of a version shown: a note may be long, and this is only to tell the two apart. */
 const SHOWN = 1200;
@@ -29,7 +26,7 @@ function Version({ label, text, path }: { label: string; text: string; path: str
 }
 
 function Row({ path }: { path: string }) {
-  const qc = useQueryClient(), n = local.notes.get(path);
+  const n = useNoteRow(path);
   if (!n) return null;
   const clash = n.conflict_rev != null && n.conflict_text != null;
   const pick: [Settle, string][] = clash ? [["mine", "Keep mine"], ["theirs", "Use the server's"]] : [["restore", "Restore mine"], ["dismiss", "Dismiss"]];
@@ -45,7 +42,7 @@ function Row({ path }: { path: string }) {
       {clash ? <Version label="On the server" text={n.conflict_text!} path={path} /> : <Version label="Your replaced edits" text={n.lost ?? ""} path={path} />}
       <div className="flex gap-2">
         {pick.map(([how, label], i) => (
-          <Button key={how} size="sm" variant={i ? "outline" : "default"} className="flex-1 rounded-full" onClick={() => settleNote(qc, path, how)}>{label}</Button>
+          <Button key={how} size="sm" variant={i ? "outline" : "default"} className="flex-1 rounded-full" onClick={() => settleNote(path, how)}>{label}</Button>
         ))}
       </div>
     </div>
@@ -72,10 +69,7 @@ const what = (r: Refusal) => r.kind === "link" ? (r.deleted ? "Removing a link" 
   : `${r.deleted ? "Deleting" : "Saving"} ${r.kind === "note" ? "the note" : "the task"} “${r.title || "Untitled"}”`;
 
 function RefusedRow({ r }: { r: Refusal }) {
-  const qc = useQueryClient();
-  const act = (how: "retry" | "discard") => {
-    if (resolveRefused(r, how)) projectLocal(qc, r.kind === "note" ? "notes" : r.kind === "task" ? "tasks" : "links");
-  };
+  const act = (how: "retry" | "discard") => { resolveRefused(r, how); };
   return (
     <div className="space-y-2 px-3 py-2.5" data-refused={`${r.kind}:${r.key}`}>
       <div className="min-w-0">

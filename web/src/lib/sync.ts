@@ -2,7 +2,7 @@
 // (lib/local.ts) and this app's services. Edits are made on the local copy first and shown from it; a sync sends them. One sync
 // runs at a time: a request while one runs asks for one more after it. Triggers:
 // the app opening, the page coming to the front or going to the back, the browser coming back online, 1.5 s after the last
-// edit (`edited`), leaving a note (hooks/draft.ts) and any realtime event that is news (`heard`).
+// edit (`apply`, lib/records.ts: every write), leaving a note and any realtime event that is news (`heard`).
 //
 // Writes this covers: notes, tasks and links. What it does not (attachment uploads, chats, clips, lenses, tags, push
 // subscriptions) has no local copy to wait in and fails at once while offline: services/api.ts says which and how.
@@ -37,7 +37,7 @@ export const LOCAL_QUERY = { networkMode: "always", staleTime: Infinity, retry: 
 
 // The browser's one controller; tests can construct independent controllers over memory stores.
 export const sync = createSync({ store: local, ready, transport, online: () => getNet().browser, stored: storeError });
-export const { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle, resolveRefused } = sync;
+export const { getStatus, watchStatus, onRedraw, beforeRound, movedTo, opened, syncNow, syncing, apply, heard, settle, resolveRefused } = sync;
 
 /** Mounted by the app's live-data hook; importing storage or a feature installs no lifecycle listeners. */
 export function startSync(): () => void {

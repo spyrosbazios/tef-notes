@@ -6,11 +6,10 @@
 // open task, so a tick from either fades the same row. The wait's timing is core/tick.ts.
 import { haptic } from "@/lib/haptics";
 import { useSyncExternalStore } from "react";
-import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ticker, TICK_MS } from "@/core/tick";
 import type { Task } from "@/core/todo";
-import { flushLocal } from "@/lib/local";
+import { flushLocal } from "@/lib/records";
 import { message } from "@/services/api";
 import { touching } from "./media";
 import { tickTask } from "./todo";
@@ -24,7 +23,6 @@ export type Lingering = { task: Task; checked: boolean };
 let state: ReadonlyMap<string, Lingering> = new Map();
 const subscribers = new Set<() => void>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
-const clients = new Map<string, QueryClient>();
 
 const set = (next: ReadonlyMap<string, Lingering>) => { state = next; subscribers.forEach((f) => f()); };
 const forget = (id: string) => { const n = new Map(state); n.delete(id); set(n); };
@@ -34,15 +32,12 @@ export const useLingering = (): ReadonlyMap<string, Lingering> =>
 
 /** The wait is over: the tick is written, and the row leaves whether it was or not (a refused one shows as it was). */
 const waiting = ticker((id) => {
-  const qc = clients.get(id);
-  clients.delete(id);
-  if (!qc) return;
-  void tickTask(qc, id, true).catch((e) => toast.error(message(e))).finally(() => forget(id));
+  void tickTask(id, true).catch((e) => toast.error(message(e))).finally(() => forget(id));
 });
 
 // A timer may not get to run once the page is hidden: write what is waiting now. The write is to the local copy, whose own flush
 // to IndexedDB (lib/local.ts) is listening to the same events and, being registered first, has already run: it is asked again,
-// so the tick is stored before the page goes. The sync that sends it is the visibility listener lib/sync.ts adds, which runs after.
+// so the tick is stored before the page goes. The sync that sends it is the visibility listener lib/sync.ts adds (through lib/records.ts), which runs after.
 const hide = () => { waiting.flush(); void flushLocal(); };
 addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") hide(); });
 addEventListener("pagehide", hide);
@@ -50,28 +45,26 @@ addEventListener("pagehide", hide);
 const toastId = (id: string) => `tick:${id}`;
 
 /** Tick the task, or take the tick back while it waits; untick it when it shows ticked and is written. */
-export async function toggleTask(qc: QueryClient, task: Task): Promise<void> {
+export async function toggleTask(task: Task): Promise<void> {
   const cur = state.get(task.id), checked = !(cur ? cur.checked : !!task.done);
   clearTimeout(timers.get(task.id));
   if (checked) {
     set(new Map(state).set(task.id, { task: cur?.task ?? task, checked }));
-    clients.set(task.id, qc);
     waiting.toggle(task.id);
     haptic("tick");
     if (touching()) {
-      toast(`“${task.title}” done`, { id: toastId(task.id), duration: TICK_MS, action: { label: "Undo", onClick: () => { void toggleTask(qc, task); } } });
+      toast(`“${task.title}” done`, { id: toastId(task.id), duration: TICK_MS, action: { label: "Undo", onClick: () => { void toggleTask(task); } } });
     }
     return;
   }
   if (waiting.cancel(task.id)) {
-    clients.delete(task.id);
     toast.dismiss(toastId(task.id));
     forget(task.id);
     return;
   }
   set(new Map(state).set(task.id, { task: cur?.task ?? task, checked }));
   try {
-    await tickTask(qc, task.id, false);
+    await tickTask(task.id, false);
     timers.set(task.id, setTimeout(() => forget(task.id), LINGER));
   } catch (e) { forget(task.id); toast.error(message(e)); }
 }

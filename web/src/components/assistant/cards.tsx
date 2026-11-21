@@ -1,7 +1,6 @@
 // The records the agent shows or leaves behind, as cards under its step: a note, a task. A card is drawn
 // from the web app's own copy of the record when it has one (so a tick or an edit shows at once), else from the
 // snapshot the tool returned; one whose record is gone is dimmed and opens nothing.
-import { useQueryClient } from "@tanstack/react-query";
 import { Bell, Calendar, Flag, ListChecks, MapPin, Moon, Repeat } from "lucide-react";
 import { useMemo, type KeyboardEvent, type ReactNode } from "react";
 import { Markdown } from "@/components/markdown";
@@ -105,11 +104,11 @@ function TaskView({ card, today, onTick, gone }: { card: TaskCard; today: string
 }
 
 export function LiveTask({ card }: { card: TaskCard }) {
-  const qc = useQueryClient(), today = useToday();
+  const today = useToday();
   const tasks = useTasks();
   const local = tasks.data?.find((t) => t.id === card.id);
   const live = useMemo(() => (local ? taskCardOf(local) : card), [local, card]);
-  return <TaskView card={live} today={today} gone={!local && !tasks.isPending} onTick={local ? () => { void toggleTask(qc, local); } : undefined} />;
+  return <TaskView card={live} today={today} gone={!local && !tasks.isPending} onTick={local ? () => { void toggleTask(local); } : undefined} />;
 }
 
 /** The cards one after another; each is drawn live where the app has the record. `live`: the reply is coming, so a card that appears

@@ -25,7 +25,7 @@ import { MAX_PDF } from "@/core/photos";
 import { downscale, look } from "@/lib/picture";
 import { INSETS } from "@/hooks/shell";
 import { cn } from "@/lib/utils";
-import { syncNow } from "@/lib/sync";
+import { syncNow } from "@/hooks/sync";
 import { message } from "@/services/api";
 import * as clips from "@/services/clip";
 

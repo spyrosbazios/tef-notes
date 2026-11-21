@@ -55,7 +55,7 @@ import { useOffered, useTalkOn } from "@/hooks/talk";
 import { useSyncStatus } from "@/hooks/sync";
 import { usePush } from "@/hooks/push";
 import { clearOffline, keptFiles } from "@/lib/offline";
-import { syncNow } from "@/lib/sync";
+import { syncNow } from "@/hooks/sync";
 import { useTasks } from "@/hooks/todo";
 import { useNotes } from "@/hooks/notes";
 import { downloadZip } from "@/lib/export";

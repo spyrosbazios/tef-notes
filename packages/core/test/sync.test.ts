@@ -7,7 +7,7 @@ import { Conflict, Unavailable, type Remote, type Versioned } from "../src/pocke
 import { outcomeOf } from "../src/record-protocol";
 import { sameLink, type Link } from "../src/record-links";
 import {
-  addLink, addNote, carryLinks, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
+  addLink, addNote, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
   restoreMine, retryRefused, saveTask, syncRound, takeTheirs, tick, visibleLinks, waiting, writeNote,
   type LinkRow, type NoteRow, type Run, type Store, type TaskRow, type Transport,
 } from "../src/sync";
@@ -161,6 +161,23 @@ describe("coalesced", () => {
 });
 
 describe("notes", () => {
+  test("a write of someone else's text goes up with the tainted mark, once; the owner's own writes carry none", async () => {
+    const server = fakeServer(), s = store(), marks: string[] = [];
+    const { create, update } = server.api.notes;
+    server.api.notes.create = (rec, path, text, mark) => { marks.push(`create ${JSON.stringify(mark)}`); return create(rec, path, text, mark); };
+    server.api.notes.update = (e, text, mark) => { marks.push(`update ${JSON.stringify(mark)}`); return update(e, text, mark); };
+    addNote(s, "r1", P, note("A", "mine"));
+    await run(s, server).go();
+    writeNote(s, P, note("A", "mine\n> **Summary**\n> a model's words"), { tainted: true });
+    writeNote(s, P, note("A", "mine, typed on\n> **Summary**\n> a model's words"));      // typed on before the push: still marked
+    expect(s.notes.get(P)!.tainted).toBe(true);
+    await run(s, server).go();
+    expect(s.notes.get(P)!.tainted).toBeUndefined();                                    // the server keeps it from now on
+    writeNote(s, P, note("A", "mine, later"));
+    await run(s, server).go();
+    expect(marks).toEqual(["create {}", 'update {"tainted":true}', "update {}"]);
+  });
+
   test("a pull brings the server's notes down, in step with their rev", async () => {
     const server = fakeServer(), s = store();
     server.put(P, note("A", "one"));
@@ -219,7 +236,7 @@ describe("notes", () => {
     const server = fakeServer(), s = store();
     addNote(s, "mine1", P, note("A", "one"));
     const create = server.api.notes.create;
-    server.api.notes.create = async (rec, path, text) => { const r = await create(rec, path, text); writeNote(s, P, note("A", "one\nmore")); return r; };   // typed while the create is out
+    server.api.notes.create = async (rec, path, text, mark) => { const r = await create(rec, path, text, mark); writeNote(s, P, note("A", "one\nmore")); return r; };   // typed while the create is out
     await run(s, server).go();
     expect(s.notes.get(P)!.text).toBe(note("A", "one\nmore"));
     expect(waiting(s)).toBe(1);                              // the second edit is still unsent
@@ -300,7 +317,7 @@ describe("notes", () => {
     const server = fakeServer(), s = store();
     addNote(s, "mine1", P, note("A", "one"));
     const create = server.api.notes.create;
-    server.api.notes.create = async (rec, path, text) => { await create(rec, path, text); throw new Unavailable("reply lost"); };
+    server.api.notes.create = async (rec, path, text, mark) => { await create(rec, path, text, mark); throw new Unavailable("reply lost"); };
     await run(s, server).go();
     expect(server.notes.get("mine1")).toMatchObject({ path: P, rev: 1 });
     expect(waiting(s)).toBe(1);
@@ -642,15 +659,6 @@ describe("links", () => {
     expect(s.links.all()).toEqual([]);
   });
 
-  test("a repeating task's next round gets its links again", () => {
-    const s = store();
-    saveTask(s, newTask("task1", { title: "x" }));
-    saveTask(s, newTask("task2", { title: "x" }));
-    addLink(s, "l1", { type: "task", id: "task1" }, { type: "note", id: "n1" }, "about");
-    let i = 0;
-    carryLinks(s, "task1", "task2", () => `new${++i}`);
-    expect(visibleLinks(s).map((l) => [l.id, l.from.id])).toEqual([["l1", "task1"], ["new1", "task2"]]);
-  });
 });
 
 describe("waiting", () => {

@@ -4,7 +4,6 @@
 // The list stays the same list as it changes (interactions/list.md of the animate-ui skill): a row added rises in, one removed
 // (ticked and lingered, deleted, moved elsewhere) fades out of the flow at once and the rest close the gap, a dropped row's
 // neighbours glide to their places. A change of view, lens or tag filter is a new list: it replaces the old one, no cascade.
-import { useQueryClient } from "@tanstack/react-query";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
 import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
@@ -118,7 +117,6 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
  * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves.
  * `onView`: Upcoming scrolled by hand: the day whose section is at the top of the list, reported as it changes (the phone's strip follows). */
 export function TaskList({ view, onAdd, embedded = false, focus = null, magnify = false, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; focus?: { day: string; n: number } | null; magnify?: boolean; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
-  const qc = useQueryClient();
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
   const { taskLink, showTask, closeTask, task: open } = useNav();
@@ -212,7 +210,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
     const rows = sections.find((s) => s.key === group)?.rows ?? [];
     const from = rows.findIndex((r) => r.id === id), at = rows.findIndex((r) => r.id === over);
     if (from < 0 || at < 0) return;
-    report(Promise.all(reorder(rows, from, landing(from, at, after)).map((w) => editTask(qc, w.id, { order: w.order }))));
+    report(Promise.all(reorder(rows, from, landing(from, at, after)).map((w) => editTask(w.id, { order: w.order }))));
   });
 
   /** A row in `section`. */
@@ -223,8 +221,8 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
         notes={noteSummary(links, t.id, noteTitles)}
         showWhen={kind === "today" && !!t.when && t.when < today}
         drag={reorderable && !l ? rowDrag(section, t.id) : undefined}
-        onTick={() => { void toggleTask(qc, t); }} link={taskLink(t.id)} onOpen={() => showTask(t.id)}
-        onSchedule={(s) => report(editTask(qc, t.id, scheduleOf(s)))} onDue={(d) => report(editTask(qc, t.id, { due: d ?? "" }))} onDelete={() => setDeleting(t.id)} />
+        onTick={() => { void toggleTask(t); }} link={taskLink(t.id)} onOpen={() => showTask(t.id)}
+        onSchedule={(s) => report(editTask(t.id, scheduleOf(s)))} onDue={(d) => report(editTask(t.id, { due: d ?? "" }))} onDelete={() => setDeleting(t.id)} />
     );
   };
 
