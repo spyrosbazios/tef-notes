@@ -188,7 +188,10 @@ describe("two writers, one record", () => {
 function pocketbase() {
   const state = { rec: null as { id: string; key: string; rev: number; data: unknown } | null, requests: [] as { path: string; method: string; body?: any }[] };
   const transport: RecordTransport = {
-    status: (e) => (e as { status?: number }).status,
+    answer: (e) => {
+      const status = (e as { status?: number }).status;
+      return status === undefined ? undefined : { status, body: {} };
+    },
     async request(path, req = {}) {
       const method = req.method ?? "GET", body = req.body as any;
       state.requests.push({ path, method, body });

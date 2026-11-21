@@ -169,6 +169,7 @@ test("search: a typed % or _ matches itself, not any text (PocketBase reads a ba
   expect(await found("zq_name")).toEqual([under.rec]);
   expect(await found("zq")).toEqual([percent.rec, wild.rec, under.rec, other.rec].sort());
   for (const n of [percent, wild, under, other]) await pb.remove(s, n);
+});
 
 test("preferences: made at rev 1, saves are compare-and-swap, and a stale writer goes over the newer record", async () => {
   const remote = prefsRemote(pb.transport(s));
@@ -188,7 +189,7 @@ test("preferences: made at rev 1, saves are compare-and-swap, and a stale writer
   const real = pb.transport(s);
   let raced = false;
   const stale = prefsRemote({
-    status: real.status,
+    answer: real.answer,
     async request(p, r) {
       const out = await real.request(p, r);
       if (!raced && r?.method === undefined) { raced = true; await patchPrefs(remote, { accent: "rose" }); }

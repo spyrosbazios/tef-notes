@@ -43,7 +43,7 @@ export function prefsRemote(s: RecordTransport): PrefsRemote {
       if (base) return stored(await s.request(`${RECORDS}/${base.rec}`, { method: "PATCH", body: { data: prefs, rev: base.rev } }));
       try { return stored(await s.request(RECORDS, { method: "POST", body: { key: PREFS_KEY, data: prefs } })); } catch (e) {
         // `key` is unique: a 400 here is another device having made the record first
-        if (s.status(e) === 400) throw new Conflict("The preferences record exists already.");
+        if (s.answer(e)?.status === 400) throw new Conflict("The preferences record exists already.");
         throw e;
       }
     },

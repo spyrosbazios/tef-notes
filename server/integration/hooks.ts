@@ -4,6 +4,7 @@ import { expect, test } from "bun:test";
 import * as pb from "../../packages/core/src/pocketbase";
 import { newTask } from "../../packages/core/src/todo";
 import { serverError } from "../../packages/core/src/http";
+import { patchPrefs, prefsRemote } from "../../packages/core/src/prefs-sync";
 
 const url = process.env.TEF_CONTRACT_URL;
 if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun --no-env-file server/integration/run.ts");
@@ -57,7 +58,9 @@ test("clip: an append to a task bumps rev; a new task starts at rev 1", async ()
 
 test("clip: under the owner's lens, a new note or task takes its tag on the server; an append takes the picks alone", async () => {
   const lens = await pb.call(s, "collections/lenses/records", pb.json("POST", { name: "Work", tags: [" #Work ", "clients"] }));
-  const prefs = await pb.call(s, "collections/prefs/records", pb.json("POST", { key: "owner", data: { lens: lens.id } }));
+  // The one preferences record may exist already (another suite made it): the lens goes on through the rev contract
+  const prefs = prefsRemote(pb.transport(s));
+  await patchPrefs(prefs, { lens: lens.id });
   try {
     const note = await clip({ target: { kind: "new" }, tags: ["ideas"] });
     expect((await record("notes", (await pb.read(s, note.path))!.rec)).tags).toEqual(["ideas", "Work"]);
@@ -67,7 +70,7 @@ test("clip: under the owner's lens, a new note or task takes its tag on the serv
     await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
     expect((await record("notes", n.rec)).tags).toEqual(["a", "b"]);
   } finally {
-    await pb.call(s, `collections/prefs/records/${prefs.id}`, { method: "DELETE" });
+    await patchPrefs(prefs, { lens: null });
   }
 });
 
