@@ -5,8 +5,10 @@
 // request's), whether the conversation has read someone else's text (its history's tool parts, and the notes and tasks a
 // tainted chat wrote, read fresh from the server), the confirm cards (tool approvals, signed: approval-secret.ts), the
 // tools a step is offered, and how long the model may take.
-// A turn ends on a card or on a tool the app does itself (no `execute`): the caller answers it in the history (an
-// `approval-responded` part, or an `output-available` one) and runs the next turn, which picks up where this one stopped.
+// A turn ends on a card or on a tool the app does itself (no `execute`): the caller puts the app's answer into the history it
+// holds (an `approval-responded` part, or an `output-available` one, matched to what the reply waits on: history.ts,
+// talkAgent.ts) and runs the next turn, which picks up where this one stopped. The history is always the server's own (the
+// chat's record), never a client's copy.
 import {
   createAgentUIStream, generateId, isStepCount, smoothStream, ToolLoopAgent,
   type Experimental_Steering as Steering, type InferUITools, type ModelMessage, type UIMessage, type UIMessageChunk,
@@ -29,6 +31,7 @@ import { Todo } from "./todo";
 import { model as pickModel, sees, Unavailable } from "./models";
 import { ownerPrefs } from "./prefs";
 import { withoutPictures } from "./drawings";
+import { inlinePictures } from "./chat-files";
 import { inlinePdfs, preview } from "./pdfs";
 import { PLACES, SYSTEM, TALK, today, WEB } from "./systemPrompt";
 import { noteIndex, readWeb, tools, toolPolicies, policyFor, type Tools } from "./tools";
@@ -137,7 +140,7 @@ export async function runTurn(r: TurnRequest): Promise<Turn> {
     return {
       stream: await createAgentUIStream({
         agent,
-        uiMessages: withContext(await inlinePdfs(messages), ctx.text),
+        uiMessages: withContext(await inlinePictures(r.server, await inlinePdfs(r.server, messages)), ctx.text),
         originalMessages: r.history,
         generateMessageId: generateId,
         abortSignal: r.abortSignal,

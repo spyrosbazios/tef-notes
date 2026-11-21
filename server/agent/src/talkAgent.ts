@@ -1,7 +1,8 @@
 // One turn of Talk, the agent's side: the chat's own turn (turn.ts runTurn, `spoken`), so the instructions, tools, the
 // owner's rules, the confirm cards, the taint checks and the model's timeout are the chat's, read for every turn. What
-// Talk adds is where the turn's answers come from: the chat's client resends the conversation with a card's answer or the
-// app's output, and here the turn waits for them over the socket (talk.ts) and runs the next round itself. Nothing here
+// Talk adds is where the turn's answers come from: the chat's client sends the reply with a card's answer or the app's
+// output in it (history.ts takes them through `waitingOn` and `answered`, as here), and here the turn waits for them over
+// the socket (talk.ts) and runs the next round itself. Nothing here
 // touches the speech: the reply's words go to `words`, and what is said of them is talk.ts's business.
 import { getToolName, isToolUIPart, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 import { isUiTool } from "@/core/assistant";
@@ -17,8 +18,8 @@ export const MAX_ROUNDS = 8;
 
 /** What the reply is waiting on: the owner's tap on a card (`approval`), or the app doing one of its own tools (`output`). */
 export type Asked = { kind: "approval"; id: string } | { kind: "output"; toolCallId: string };
-/** Its answer, as the app sent it. */
-export type Answer = { approved: boolean; reason?: string } | { output: unknown };
+/** Its answer, as the app sent it: a tap, the tool's output, or why the app couldn't do it (a chat's client after a Stop). */
+export type Answer = { approved: boolean; reason?: string } | { output: unknown } | { error: string };
 
 export type TalkTurn = {
   server: Server;
@@ -62,6 +63,7 @@ export function answered<M extends UIMessage>(m: M, asked: readonly Asked[], ans
       const a = answers[i];
       if (i < 0 || !a) return p;
       if ("output" in a) return { ...p, state: "output-available", output: a.output };
+      if ("error" in a) return { ...p, state: "output-error", errorText: a.error };
       return p.state !== "approval-requested" ? p : { ...p, state: "approval-responded", approval: { ...p.approval, approved: a.approved, ...(a.reason && { reason: a.reason }) } };
     }),
   } as M;

@@ -231,8 +231,13 @@ the agent writes it the same way). Links are outside it (above).
   `context` with each message (`packages/core/src/assistant.ts`). The agent reads it as the last part of the newest message's
   `<context>` (never the instructions), resolves "this note" from it, and gets UI tools (`open_note`, `open_task`,
   `go_view`) that the client does itself: no server `execute`, no confirm card, answered through `addToolOutput`.
-- A chat is a record in `chats`: a client creates it empty, and the agent writes `messages`, `title` and `model` as the
-  reply streams and when it ends. `packages/core/src/chat-history.ts` owns the persistence envelope: `historyVersion`
+- A chat is a record in `chats`: a client creates it empty, and from then on the agent is its one writer: it holds the
+  history (a client sends only its newest message, or the reply with its answers to a card or a UI tool:
+  `server/agent/src/history.ts`), runs one turn per chat at a time (a Talk conversation holds its chat throughout), and writes
+  `messages`, `title` and `model` as the reply streams and when it ends, each save in order under the `rev` compare-and-swap
+  (`server/agent/src/chats.ts`, `1795700000_chats_rev.js`). A final save that fails ends the reply's stream with the error.
+  A file the owner attaches is stored as a `chat_files` record under the chat (`1795700001_chat_files.js`) and the message
+  points at it; older chats keep theirs inline as data URLs. `packages/core/src/chat-history.ts` owns the persistence envelope: `historyVersion`
   is additive, missing/zero versions read as legacy, and newer unsupported versions fail without replacing history.
   Historical tool inputs and outputs remain intact for display and export. Schema repair and prompt trimming operate
   on an execution copy; taint is classified before repair, and both streaming and final saves retain the historical parts.

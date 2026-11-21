@@ -8,6 +8,7 @@
 // (`tasks` below; their shape: core/todo.ts); links between records are records too, outside it (`links`
 // below; their shape: core/record-links.ts).
 import { SEARCH_PATH, searchHitsOf, type SearchHit } from "./find";
+import { CHAT_FIELDS, chatOf, type StoredChat } from "./chat-history";
 import { getJson, HttpError } from "./http";
 import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
 import { noteKindOf, type NoteKind } from "./notes";
@@ -244,43 +245,16 @@ export const pdfPages = async (s: Server, note: string, name: string): Promise<n
   }
 };
 
-export type ChatRec = { id: string; title: string; updated: string };
-export type Chat = ChatRec & { messages: unknown[] };
-
-const CHAT_FIELDS = "id,title,updated";
-
 /** A record id as PocketBase makes them (15 of [a-z0-9]): a client names a new chat or task before it exists
  *  on the server. */
 export const recordId = () => Array.from({ length: 15 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
 
-/** The saved chats, newest activity first. */
-export async function chats(s: Server): Promise<ChatRec[]> {
-  return (await call(s, `collections/chats/records?fields=${CHAT_FIELDS}&sort=-updated&perPage=200&skipTotal=1`)).items;
-}
-
-/** One chat with its messages; null when there's none by that id (yet). */
-export async function chat(s: Server, id: string): Promise<Chat | null> {
-  try {
-    const r = await call(s, `collections/chats/records/${id}?fields=${CHAT_FIELDS},messages`);
-    return { ...r, messages: Array.isArray(r.messages) ? r.messages : [] };
-  } catch (e) {
+/** A chat as its one writer, the agent, reads it (server/agent/src/chats.ts): the history in any version chat-history.ts
+ *  reads, and the rev its next save names; null when there is no such record. Throws ChatHistoryError on a history it
+ *  can't read. */
+export async function chat(s: Server, id: string): Promise<StoredChat | null> {
+  try { return chatOf(await call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=${CHAT_FIELDS}`)); } catch (e) {
     if (e instanceof HttpError && e.status === 404) return null;
-    throw e;
-  }
-}
-
-/** The empty record a first send names. Already there (a retry after a create that did land) is done. */
-export async function createChat(s: Server, id: string, title: string): Promise<void> {
-  try { await call(s, `collections/chats/records?fields=id`, json("POST", { id, title, messages: [] })); } catch (e) {
-    if (e instanceof HttpError && e.status === 400 && e.body?.data?.id?.code === "validation_not_unique") return;
-    throw e;
-  }
-}
-
-/** A chat gone. Already gone is done. */
-export async function removeChat(s: Server, id: string): Promise<void> {
-  try { await call(s, `collections/chats/records/${id}`, { method: "DELETE" }); } catch (e) {
-    if (e instanceof HttpError && e.status === 404) return;
     throw e;
   }
 }

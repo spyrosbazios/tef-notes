@@ -10,6 +10,7 @@ import { parseNote } from "@/core/notes";
 import type { EarEvent, EarSession, Voice } from "../src/fish";
 import type { model } from "../src/models";
 import { startTalk, type Deps } from "../src/talk";
+import { chat } from "../src/agent";
 import { fakePb } from "./fake-pb";
 
 const pb = fakePb();
@@ -168,6 +169,21 @@ describe("cards over the socket", () => {
     expect(pb.notes.has(NOTE)).toBe(true);
     await c.talk.end();
     expect(JSON.stringify(pb.chats.get("chat1")!.messages)).toContain("output-denied");
+  });
+
+  it("holds its chat: the text assistant can't run a turn on it until it ends", async () => {
+    const c = await talking();
+    const res = await chat(new Request("http://x/agent/chat", { method: "POST", body: JSON.stringify({
+      id: "chat1", model: "m", effort: "normal", message: { id: "u9", role: "user", parts: [{ type: "text", text: "typed" }] },
+    }) }), { url: pb.url }, pick);
+    expect(res.status).toBe(409);
+    await c.talk.end();
+    replies = [text("Typed.")];
+    const after = await chat(new Request("http://x/agent/chat", { method: "POST", body: JSON.stringify({
+      id: "chat1", model: "m", effort: "normal", message: { id: "u9", role: "user", parts: [{ type: "text", text: "typed" }] },
+    }) }), { url: pb.url }, pick);
+    expect(after.status).toBe(200);
+    await after.text();
   });
 });
 

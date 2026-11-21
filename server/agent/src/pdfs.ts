@@ -10,6 +10,7 @@ import type { UIMessage } from "ai";
 import { isPdf, PDF } from "@/core/photos";
 import { parseNote } from "@/core/notes";
 import * as pb from "@/core/pocketbase";
+import { fileBytes } from "./chat-files";
 import { ocr } from "./ocr";
 import { render, RenderError } from "./render";
 import { MAX_PAGES, type Doc } from "./semantic";
@@ -257,14 +258,13 @@ export async function thumbRoute(req: Request, server: pb.Server): Promise<Respo
 // ---- PDFs the owner attached to a chat message (core/assistant.ts "Attachments") ----
 const attached = new Map<string, Promise<string>>();
 
-/** An attached PDF's text, its first READ_CHARS; a data URL's bytes are read once per server run (it rides in every later request). */
-function attachedText(url: string): Promise<string> {
-  const key = String(Bun.hash(url)), hit = attached.get(key);
+/** An attached PDF's text, its first READ_CHARS; its bytes are read once per server run (it rides in every later turn): a
+ *  stored chat file's by its address, an older chat's inline data URL's by a hash of it. */
+function attachedText(server: pb.Server, url: string): Promise<string> {
+  const key = url.startsWith("data:") ? String(Bun.hash(url)) : url, hit = attached.get(key);
   if (hit) return hit;
   const run = (async () => {
-    const comma = url.indexOf(",");
-    if (!url.startsWith("data:") || comma < 0) throw new Error("not a data URL");
-    const text = await textOf(async () => new Uint8Array(Buffer.from(url.slice(comma + 1), "base64")));
+    const text = await textOf(() => fileBytes(server, url));
     const all = text.map((t, i) => `[page ${i + 1}]\n${t}`).join("\n\n");
     return all.length > READ_CHARS ? `${all.slice(0, READ_CHARS)}\n(cut at ${READ_CHARS} of ${all.length} characters)` : all;
   })();
@@ -275,14 +275,14 @@ function attachedText(url: string): Promise<string> {
 }
 
 /** The history with each attached PDF as its text: no provider is asked to read a PDF itself. A copy: the chat as saved
- *  keeps the file. Photos stay file parts, sent to the model as pictures. */
-export async function inlinePdfs<M extends UIMessage>(ms: M[]): Promise<M[]> {
+ *  keeps the file. Photos stay file parts, sent to the model as pictures (chat-files.ts `inlinePictures`). */
+export async function inlinePdfs<M extends UIMessage>(server: pb.Server, ms: M[]): Promise<M[]> {
   return Promise.all(ms.map(async (m) => (m.role !== "user" || !m.parts.some((p) => p.type === "file" && p.mediaType === PDF) ? m : {
     ...m,
     parts: await Promise.all(m.parts.map(async (p) => {
       if (p.type !== "file" || p.mediaType !== PDF) return p;
       const name = p.filename ?? "attachment.pdf";
-      const body = await attachedText(p.url).catch((e: unknown) => `(Could not read it: ${(e as Error).message})`);
+      const body = await attachedText(server, p.url).catch((e: unknown) => `(Could not read it: ${(e as Error).message})`);
       return { type: "text" as const, text: `<attachment name=${JSON.stringify(name)}>\n${body}\n</attachment>` };
     })),
   } as M)));

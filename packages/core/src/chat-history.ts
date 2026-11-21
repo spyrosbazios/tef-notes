@@ -43,6 +43,19 @@ export function readChatHistory(record: unknown): HistoryMessage[] {
   return messages as HistoryMessage[];
 }
 
+/** A chat as the agent holds it between saves: its history and the `rev` the next save names (pb_hooks/rev.pb.js; a chat
+ *  from before the rev column reads as 0, which its first save makes 1). */
+export type StoredChat = { rev: number; messages: HistoryMessage[] };
+
+/** The columns `chatOf` reads. */
+export const CHAT_FIELDS = "id,rev,messages,historyVersion";
+
+/** The one reader of a chat record (core/pocketbase.ts `chat`). */
+export function chatOf(record: unknown): StoredChat {
+  const messages = readChatHistory(record), rev = (record as { rev?: unknown }).rev;
+  return { rev: typeof rev === "number" && Number.isInteger(rev) && rev > 0 ? rev : 0, messages };
+}
+
 /** The single writer: additive version column, keeping the array readable by older clients. */
 export function serializeChatHistory(messages: unknown) {
   return { historyVersion: CHAT_HISTORY_VERSION, messages: readChatHistory({ historyVersion: CHAT_HISTORY_VERSION, messages }) };

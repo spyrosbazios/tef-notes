@@ -25,11 +25,14 @@ test("chat history: additive version preserves legacy messages and opaque histor
   expect(created.historyVersion).toBe(0);
   expect(readChatHistory(created)).toEqual(messages);
   const path = record("chats", created.id);
-  await pb.call(s, path, pb.json("PATCH", serializeChatHistory(readChatHistory(created))));
+  expect(created.rev).toBe(1);
+  expect((await raw(path, "PATCH", serializeChatHistory(readChatHistory(created)))).status).toBe(400);   // a chat's save names its rev
+  await pb.call(s, path, pb.json("PATCH", { ...serializeChatHistory(readChatHistory(created)), rev: 1 }));
   const updated = await pb.call(s, path);
-  expect(updated).toMatchObject({ historyVersion: 1, messages });
+  expect(updated).toMatchObject({ rev: 2, historyVersion: 1, messages });
   expect(readChatHistory(updated)).toEqual(messages);
-  await pb.call(s, path, pb.json("PATCH", { historyVersion: 2 }));
+  expect((await raw(path, "PATCH", { rev: 1, title: "Stale" })).status).toBe(409);
+  await pb.call(s, path, pb.json("PATCH", { historyVersion: 2, rev: 2 }));
   const future = await pb.call(s, path);
   expect(() => readChatHistory(future)).toThrow("Unsupported chat history version");
   expect(await pb.call(s, path)).toEqual(future);

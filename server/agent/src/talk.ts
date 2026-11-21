@@ -23,7 +23,7 @@ import type { Effort } from "@/core/agent";
 import { talkThinking } from "@/core/prefs";
 import type * as pb from "@/core/pocketbase";
 import { bytesOf, costOf, talkClientEventOf, TALK_LIMITS, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
-import { history, saver } from "./chats";
+import { hold, load, saver } from "./chats";
 import { ownerPrefs } from "./prefs";
 import { settle } from "./guard";
 import { key } from "./keys";
@@ -113,10 +113,18 @@ const waitKey = (a: Asked) => (a.kind === "approval" ? `approval:${a.id}` : `out
 /** Starts a conversation: the chat's history, the ear listening. Throws when it can't, and then nothing of it is open: the
  *  ear is the last thing opened, and the timers start once it is. */
 export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> {
-  const prior = await history(d.server, start.chat);
-  if (!prior) throw new Error(`No chat ${start.chat}: create it in chats first.`);
-  let messages = settle(prior as AgentMessage[]);
-  const keep = saver(d.server, start.chat, d.model);
+  // The conversation holds its chat from start to end (chats.ts `hold`): the text assistant can't run a turn on it meanwhile,
+  // and its saves are the only ones
+  const chatHold = await hold(start.chat);
+  if (!chatHold) throw new Error("A reply is still being written in this chat: wait for it, or stop it.");
+  const letGo = chatHold.release;
+  let prior;
+  try { prior = await load(d.server, start.chat); } catch (e) { letGo(); throw e; }
+  if (!prior) { letGo(); throw new Error(`No chat ${start.chat}: create it in chats first.`); }
+  let messages = settle(prior.messages);
+  const save = saver(d.server, start.chat, prior.rev, d.model);
+  /** A save; one that fails ends the conversation with why, while there is one to end. */
+  const keep = (ms: AgentMessage[]) => save(ms).catch((e: Error) => fail(e.message));
 
   let ended = false, dirty = false, strikes = 0, saidBytes = 0;
   let ear: EarSession | undefined, voice: Voice | undefined, opening: Promise<Voice> | undefined, generation = 0;
@@ -375,10 +383,11 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     generation++;
     voice?.stop();
     voice = undefined;
-    await keep(withoutPictures(settle(messages, true)));
+    // The last save: nobody is left to tell when it fails
+    await save(withoutPictures(settle(messages, true))).catch((e: Error) => console.error(`agent: talk: ${e.message}`)).finally(letGo);
   }
 
-  ear = await openEar();                           // throws with nothing open: the timers start below
+  try { ear = await openEar(); } catch (e) { letGo(); throw e; }   // nothing else is open yet: the timers start below
   timer = setInterval(() => { if (dirty) { dirty = false; void keep(withoutPictures(settle(messages))); } }, SAVE_EVERY);
   /** The speaking clock (the voice stops counting when the last frame it sent has played), and the ear's caps. */
   beat = setInterval(() => {

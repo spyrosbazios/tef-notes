@@ -1,10 +1,10 @@
 // attach_file: a file attached in the chat filed into a note, against a fake PocketBase (fake-pb.ts).
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { DEFAULT_ACTIONS } from "@/core/actions";
-import { attachedBlock, attachedFiles, type Attached } from "@/core/assistant";
+import { attachedBlock, attachedFiles, chatFileOf, type Attached } from "@/core/assistant";
 import { parseNote } from "@/core/notes";
 import { approvals } from "../src/turn";
-import { bytesOf } from "../src/fileTools";
+import { dataOf, fileBytes, storeFiles } from "../src/chat-files";
 import { Notes } from "../src/notes";
 import { Todo } from "../src/todo";
 import { tools } from "../src/tools";
@@ -38,10 +38,20 @@ describe("attachedFiles", () => {
     expect(attachedBlock(files)).toBe("<attached>\nb.pdf (PDF)\na.jpg (picture)\n</attached>");
     expect(attachedBlock([])).toBe("");
   });
-  it("bytesOf: base64 and plain data URLs", () => {
-    expect(new TextDecoder().decode(bytesOf(pic.url)!)).toBe("JPEG");
-    expect(new TextDecoder().decode(bytesOf("data:,a%20b")!)).toBe("a b");
-    expect(bytesOf("https://x")).toBeNull();
+  it("dataOf: base64 and plain data URLs", () => {
+    expect(new TextDecoder().decode(dataOf(pic.url)!.bytes)).toBe("JPEG");
+    expect(new TextDecoder().decode(dataOf("data:,a%20b")!.bytes)).toBe("a b");
+    expect(dataOf("https://x")).toBeNull();
+  });
+  it("fileBytes: a stored chat file from the server, an older chat's data URL as it is, nothing else", async () => {
+    pb.chats.set("c1", { id: "c1", messages: [] });
+    const stored = await storeFiles({ url: pb.url }, "c1", { id: "u", role: "user", parts: [{ type: "file", mediaType: "image/jpeg", filename: "r.jpg", url: pic.url }] });
+    const url = (stored.parts[0] as { url: string }).url;
+    expect(chatFileOf(url)).not.toBeNull();
+    expect(new TextDecoder().decode(await fileBytes({ url: pb.url }, url))).toBe("JPEG");
+    expect(new TextDecoder().decode(await fileBytes({ url: pb.url }, pdf.url))).toBe("%PDF");
+    await expect(fileBytes({ url: pb.url }, "https://example.com/x.pdf")).rejects.toThrow("not a file of this chat");
+    await expect(storeFiles({ url: pb.url }, "nochat", { id: "u", role: "user", parts: [{ type: "file", mediaType: "image/jpeg", url: pic.url }] })).rejects.toThrow("Couldn't store");
   });
 });
 

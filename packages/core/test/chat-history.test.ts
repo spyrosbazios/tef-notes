@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readChatHistory, serializeChatHistory } from "../src/chat-history";
+import { chatOf, readChatHistory, serializeChatHistory } from "../src/chat-history";
 
 const messages = [{ id: "a", role: "assistant" as const, metadata: { old: true }, parts: [
   { type: "tool-retired", toolCallId: "c", state: "output-available", input: { old: 1 }, output: { card: { title: "Keep" } } },
@@ -26,4 +26,10 @@ test("malformed and unsupported records fail explicitly without discarding histo
     expect(() => readChatHistory(record)).toThrow("Unsupported chat history version");
     expect(record.messages).toEqual(messages);
   }
+});
+test("a chat record reads with the rev its next save names; one from before the rev column is 0", () => {
+  expect(chatOf({ id: "c", rev: 3, historyVersion: 1, messages })).toEqual({ rev: 3, messages });
+  for (const rev of [undefined, null, 0]) expect(chatOf({ id: "c", rev, messages }).rev).toBe(0);
+  expect(chatOf({ id: "c", rev: 1, historyVersion: 0, messages: null })).toEqual({ rev: 1, messages: [] });
+  expect(() => chatOf({ id: "c", rev: 1, historyVersion: 2, messages })).toThrow("Unsupported chat history version");
 });

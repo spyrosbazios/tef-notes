@@ -244,15 +244,27 @@ export function chosenOf(output: unknown): string[] | null {
 }
 
 // ---- Attachments: photos and PDFs the owner adds to a message ----
-// They ride in the user message as the AI SDK's file parts (data URLs) and are saved with the chat. A photo goes as the
-// picture the model looks at (photos.ts `lookSize`, JPEG); a PDF as it is, which the server turns into its text before the
-// model sees it (server/agent/src/pdfs.ts `inlinePdfs`). Either is someone else's content: a turn that carries one is
-// tainted like one that read the web (its writes ask).
+// They go up in the user message as the AI SDK's file parts (data URLs); the agent stores each as a `chat_files` record
+// (server/agent/src/chat-files.ts) and the saved message points at it (`chatFileUrl`), so a chat's record never holds the
+// bytes (a chat saved before then keeps them inline, and is read as it is). A photo goes as the picture the model looks at
+// (photos.ts `lookSize`, JPEG); a PDF as it is, which the server turns into its text before the model sees it
+// (server/agent/src/pdfs.ts `inlinePdfs`). Either is someone else's content: a turn that carries one is tainted like one
+// that read the web (its writes ask).
 
 /** What the field's file picker takes. */
 export const ATTACH_ACCEPT = "image/*,application/pdf";
-/** At most this many files on one message, and a PDF no bigger than this (it is resent with every later message). */
+/** At most this many files on one message, and a PDF no bigger than this. */
 export const ATTACH_MAX = 6, ATTACH_PDF_MAX = 8 * 1024 * 1024;
+
+/** Where a stored chat file is served (PocketBase's file route, same origin as the app): what a saved file part's `url` is. */
+export const chatFileUrl = (rec: string, file: string) => `/api/files/chat_files/${rec}/${encodeURIComponent(file)}`;
+
+/** The stored chat file a file part's `url` names, or null for anything else (a data URL, an older chat's). */
+export function chatFileOf(url: string): { rec: string; file: string } | null {
+  const m = /^\/api\/files\/chat_files\/([a-z0-9]{1,32})\/([^/?#]+)$/.exec(url);
+  if (!m) return null;
+  try { return { rec: m[1], file: decodeURIComponent(m[2]) }; } catch { return null; }
+}
 
 /** Whether a message history holds a file the owner attached (the server's taint check). */
 export const hasAttachment = (messages: readonly { role?: unknown; parts?: readonly { type?: unknown }[] }[]) =>
@@ -265,7 +277,8 @@ export const STEER_MAX = 4000;
 export type SteerBody = { text: string };
 export type SteerResult = { delivered: boolean };
 
-/** One file the owner attached, as the agent's attach_file finds it: its name as the message gave it, its type, the data URL. */
+/** One file the owner attached, as the agent's attach_file finds it: its name as the message gave it, its type, where it is
+ *  (`chatFileUrl`, or an older chat's data URL). */
 export type Attached = { name: string; mediaType: string; url: string };
 
 /** Every file the owner attached in the chat, oldest first, a name taken twice kept by its newest (what the owner means by it). */

@@ -5,6 +5,8 @@
 // record protocol asks (keyset): `(<filter>)`, and ` && id > "<last>"` after its first page, sorted by id.
 // `attachments`: records listed by `note = "id"`, their bytes at /api/files/attachments/<rec>/<file>.
 // `/api/tefnotes/link-preview`: a canned preview, 400 for a private address.
+// `chats`: under the rev contract too (a record without one reads as 0), `messages` capped at 20 MB as the field is;
+// `chat_files`: a chat's attached files, their bytes at /api/files/chat_files/<rec>/<file>.
 // `before`: a hook run ahead of each PATCH and note DELETE, so a test can slip in a write made meanwhile.
 
 import { noteColumns } from "@/core/pocketbase";
@@ -19,7 +21,10 @@ export function fakePb() {
   /** Links whose column names any of `ids`: what an end's delete takes. */
   const unlink = (ids: Set<string>) => { for (const l of links.values()) if (LINK_COLUMNS.some((c) => ids.has(l[c]))) links.delete(l.id); };
   const tags: Rec[] = [], lenses: Rec[] = [], prefs: Rec[] = [];
-  const attachments = new Map<string, Rec & { bytes: Uint8Array }>();
+  const attachments = new Map<string, Rec & { bytes: Uint8Array }>(), chatFiles = new Map<string, Rec & { bytes: Uint8Array }>();
+  /** `chats.messages`' cap (pb_migrations/1792600000_chats.js), and how many chat saves landed. */
+  const CHAT_MAX = 20_000_000;
+  let chatSaves = 0;
   const withoutBytes = (r: Rec & { bytes: Uint8Array }) => { const { bytes: _, ...a } = r; return a; };
   const created: { col: string; body: Rec }[] = [];
   let n = 0, before: ((r: Rec) => void) | undefined;
@@ -37,6 +42,18 @@ export function fakePb() {
     async fetch(req) {
       const u = new URL(req.url), f = /^\/api\/files\/attachments\/([\w-]+)\/([^/]+)$/.exec(u.pathname);
       if (f) { const a = attachments.get(f[1]); return a && a.file === decodeURIComponent(f[2]) ? new Response(new Blob([a.bytes as Uint8Array<ArrayBuffer>])) : err(404); }
+      const cf = /^\/api\/files\/chat_files\/([\w-]+)\/([^/]+)$/.exec(u.pathname);
+      if (cf) { const a = chatFiles.get(cf[1]); return a && a.file === decodeURIComponent(cf[2]) ? new Response(new Blob([a.bytes as Uint8Array<ArrayBuffer>])) : err(404); }
+      if (u.pathname.startsWith("/api/collections/chat_files/records")) {   // a chat's attached file: under a chat that exists
+        const del = /records\/([\w-]+)$/.exec(u.pathname)?.[1];
+        if (req.method === "DELETE") return del && chatFiles.delete(del) ? new Response(null, { status: 204 }) : err(404);
+        const form = await req.formData(), chat = String(form.get("chat")), file = form.get("file") as File;
+        if (!chats.has(chat)) return err(400, { data: { chat: { code: "validation_missing_rel_records" } } });
+        if (file.size > 8 * 1024 * 1024) return err(400, { data: { file: { code: "validation_file_size_limit" } } });
+        const rid = `f${++n}`, rec = { id: rid, chat, name: String(form.get("name") ?? ""), file: `${file.name.replace(/\.(\w+)$/, "")}_${rid}.${/\.(\w+)$/.exec(file.name)?.[1] ?? "bin"}`, bytes: new Uint8Array(await file.arrayBuffer()) };
+        chatFiles.set(rid, rec);
+        return Response.json(withoutBytes(rec));
+      }
       if (u.pathname === "/api/tefnotes/link-preview") {      // the server's route: a private address is refused, a page named "empty" says nothing
         const page = u.searchParams.get("url") ?? "";
         if (/\/\/(localhost|10\.)/.test(page)) return err(400, { message: "blocked" });
@@ -154,7 +171,13 @@ export function fakePb() {
       }
       if (req.method === "PATCH") {
         if (!rec) return err(404);
-        if (col === "chats") { Object.assign(rec, body); return Response.json(rec); }
+        if (col === "chats") {                                // a chat from before its rev column reads as 0
+          if (body.rev !== (rec.rev ?? 0)) return err(409, { message: "This chat changed since that version." });
+          if (JSON.stringify(body.messages ?? null).length > CHAT_MAX) return err(400, { data: { messages: { code: "validation_json_size_limit" } } });
+          chatSaves++;
+          Object.assign(rec, body, { rev: (rec.rev ?? 0) + 1 });
+          return Response.json(rec);
+        }
         before?.(rec);
         if (body.rev !== rec.rev) return err(409);
         Object.assign(rec, body, { rev: rec.rev + 1, updated: stamp() });
@@ -179,7 +202,8 @@ export function fakePb() {
   };
 
   return {
-    url: `http://127.0.0.1:${srv.port}`, notes, chats, tags, lenses, prefs, tasks, links, created, put, attach, attachments,
+    url: `http://127.0.0.1:${srv.port}`, notes, chats, tags, lenses, prefs, tasks, links, created, put, attach, attachments, chatFiles,
+    chatSaves: () => chatSaves,
     meanwhile: (f?: (r: Rec) => void) => { before = f; },
     stop: () => srv.stop(true),
   };

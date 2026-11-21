@@ -7,6 +7,13 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- A chat with large attachments is kept: photos and PDFs attached to a message are stored as files beside the chat
+  instead of inside it, so two 8 MB PDFs no longer stop every later save. A save that does fail now shows as an error
+  in the reply instead of the chat vanishing on reload.
+- The assistant holds each chat's history itself: the app sends only the new message or the answer to a card, a
+  second message while a reply is still running is refused instead of running a second reply, and no request can
+  approve a card the agent never showed or rewrite what the chat already read.
+
 - A clip saved as a new note or task under a lens gets the lens's tag whichever way it was saved: the clipper used to
   leave it off, the share page to drop your picked tags. The server adds it now; every client sends just your picks.
 - Auto-tagging: a note the tagging service keeps refusing no longer holds up the rest; it is retried less and less
