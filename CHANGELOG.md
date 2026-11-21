@@ -10,6 +10,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Text the server writes for a clip or a share (a new note, an append, a new task) is marked as someone else's, like
   a page the assistant read, so the assistant asks before it writes after reading it. Once marked, a note or task keeps
   the mark. A tag description an outside agent saves is marked as the agent's, not yours.
+- Link previews never go through a proxy set in the server's environment, and a link that turns out to lead to a
+  private address is refused instead of kept as an empty preview.
 
 ### Changed
 

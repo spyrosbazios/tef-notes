@@ -6,7 +6,8 @@
 // pasted, so a fetch must never reach loopback, a private or tailnet address, or anything that resolves to one, and
 // a redirect is a new URL to check, not something to follow. $http.send can do none of that (it follows ten
 // redirects unseen and reads the whole body), hence curl: one hop at a time, the checked address pinned with
-// --resolve so the name cannot resolve elsewhere between the check and the connect, the body cut at MAX_BYTES.
+// --resolve so the name cannot resolve elsewhere between the check and the connect, the body cut at MAX_BYTES. Never
+// through a proxy (--noproxy '*', whatever the environment says): a proxy would make the connection, not the pin.
 
 const MAX_BYTES = 300000;
 const PAGE_BYTES = 3000000;                  // a whole page for the reader (htmlOf): an article's HTML runs past a preview's head
@@ -146,19 +147,23 @@ function addressFor(u, lookup) {
   return ips.find((ip) => v4(ip) !== null) || ips[0];
 }
 
-/** Status, headers (lowercase names) and body of curl's `-i` output for a single response. */
+/** Status, headers (lowercase names) and body of curl's `-i` output for a single response. curl writes the header
+ *  blocks of informational responses (100 Continue, 103 Early Hints) first: they are skipped for the final one. */
 function splitResponse(out) {
-  const end = out.indexOf("\r\n\r\n");
-  if (end < 0) return null;
-  const lines = out.slice(0, end).split("\r\n");
-  const status = /^HTTP\/\S+ (\d{3})/.exec(lines[0]);
-  if (!status) return null;
-  const headers = {};
-  for (const l of lines.slice(1)) {
-    const i = l.indexOf(":");
-    if (i > 0) headers[l.slice(0, i).trim().toLowerCase()] = l.slice(i + 1).trim();
+  for (;;) {
+    const end = out.indexOf("\r\n\r\n");
+    if (end < 0) return null;
+    const lines = out.slice(0, end).split("\r\n");
+    const status = /^HTTP\/\S+ (\d{3})/.exec(lines[0]);
+    if (!status) return null;
+    if (status[1][0] === "1") { out = out.slice(end + 4); continue; }
+    const headers = {};
+    for (const l of lines.slice(1)) {
+      const i = l.indexOf(":");
+      if (i > 0) headers[l.slice(0, i).trim().toLowerCase()] = l.slice(i + 1).trim();
+    }
+    return { status: Number(status[1]), headers, body: out.slice(end + 4) };
   }
-  return { status: Number(status[1]), headers, body: out.slice(end + 4) };
 }
 
 /**
@@ -191,13 +196,13 @@ function fetchPage(raw, io, now = Date.now) {
 /** The `io.get` over a command runner: `run(name, ...args)` returns stdout as a string and throws on failure. The
  *  response is cut at `max` bytes, headers included. */
 function curl(run, max = MAX_BYTES) {
-  return (args, seconds) => run("sh", "-c", `curl -sS -i --compressed --proto =http,https --max-redirs 0 --connect-timeout 5 --max-time ${seconds} -A '${UA}' -H 'Accept: text/html,application/xhtml+xml,image/*;q=0.5' -H 'Accept-Language: en,el;q=0.8' "$@" | head -c ${max}`, "sh", ...args);
+  return (args, seconds) => run("sh", "-c", `curl -sS -i --noproxy '*' --compressed --proto =http,https --max-redirs 0 --connect-timeout 5 --max-time ${seconds} -A '${UA}' -H 'Accept: text/html,application/xhtml+xml,image/*;q=0.5' -H 'Accept-Language: en,el;q=0.8' "$@" | head -c ${max}`, "sh", ...args);
 }
 
 /** The `io.get` for a picture (the clip route's): the body goes to the file `file`, cut at IMAGE_BYTES, and stdout
  *  carries the headers alone, so its bytes never pass through a JS string. Each hop overwrites the file. */
 function curlFile(run, file) {
-  return (args, seconds) => run("sh", "-c", `f="$1"; shift; curl -sS -D "$f.h" -o - --compressed --proto =http,https --max-redirs 0 --connect-timeout 5 --max-time ${seconds} -A '${UA}' -H 'Accept: image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8' "$@" | head -c ${IMAGE_BYTES} > "$f"; cat "$f.h" 2>/dev/null; rm -f "$f.h"`, "sh", file, ...args);
+  return (args, seconds) => run("sh", "-c", `f="$1"; shift; curl -sS -D "$f.h" -o - --noproxy '*' --compressed --proto =http,https --max-redirs 0 --connect-timeout 5 --max-time ${seconds} -A '${UA}' -H 'Accept: image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8' "$@" | head -c ${IMAGE_BYTES} > "$f"; cat "$f.h" 2>/dev/null; rm -f "$f.h"`, "sh", file, ...args);
 }
 
 /** The `io.lookup` over a command runner: `getent ahosts`, which answers like the resolver curl would use. */
