@@ -158,7 +158,9 @@ note (its backlinks), a task made from a clipped picture (about the new note hol
 
 ## The write contract
 
-Every write to a note or task carries the `rev` it was based on. Links are outside it (above).
+Every write to a note or task carries the `rev` it was based on, and so does one to the preferences record (`prefs`, whose `data`
+holds every setting: a device that is refused re-reads and puts the paths it changed over the newer record, `packages/core/src/prefs-sync.ts`;
+the agent writes it the same way). Links are outside it (above).
 
 - `server/pb_hooks/rev.pb.js` (logic in `lib/rev.js`) is a compare-and-swap: a write whose `rev` is not the record's
   current one is refused, and a successful write bumps it.

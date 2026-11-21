@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Compare-and-swap on `rev` for notes and tasks (lib/rev.js): a create starts at rev 1; an update sends the
+// Compare-and-swap on `rev` for notes, tasks and the preferences record (lib/rev.js): a create starts at rev 1; an update sends the
 // rev it read and gets rev + 1; a delete passes `?rev=`. A stale one is a 409, a missing one a 400. A handler runs in
 // its own VM and sees none of this file's top level: the lib is required inside each (and once here, for the list).
 

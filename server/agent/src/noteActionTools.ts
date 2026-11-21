@@ -7,22 +7,28 @@ import { tool } from "ai";
 import { z } from "zod";
 import { ACTION_ICONS, LIMITS, newActionId, promptProblem, RESULTS, type PromptAction } from "@/core/note-actions";
 import type { Server } from "@/core/pocketbase";
-import { withPatch } from "@/core/prefs";
-import { ownerPrefs, saveOwnerPrefs } from "./prefs";
+import { ownerPrefs, patchOwnerPrefs } from "./prefs";
 import type { Policies } from "./tool-policy";
 
 export type SaveInput = { id?: string; label: string; prompt: string; result: PromptAction["result"]; icon?: PromptAction["icon"] };
 
-/** Why save_note_action can't go ahead, or null: a name and a prompt that fit, an id that exists, room for one more. Checked
- *  before the confirm card too. */
-export async function saveProblem(server: Server, i: SaveInput): Promise<string | null> {
+/** Why a save of `i` can't go ahead over the actions `noteActions`, or null: a name and a prompt that fit, an id that exists,
+ *  room for one more. */
+function problem(i: SaveInput, noteActions: readonly PromptAction[]): string | null {
   const bad = promptProblem(i);
   if (bad) return bad;
-  const { noteActions } = (await ownerPrefs(server)).prefs;
   if (i.id && !noteActions.some((a) => a.id === i.id)) return `No note action ${i.id}. Take the id from list_note_actions, or leave it out to add a new one.`;
   if (!i.id && noteActions.length >= LIMITS.actions) return `There are ${LIMITS.actions} note actions already, the most there can be. Change one, or the owner deletes one in Settings.`;
   return null;
 }
+
+/** Why save_note_action can't go ahead, or null. Checked before the confirm card too. */
+export async function saveProblem(server: Server, i: SaveInput): Promise<string | null> {
+  return problem(i, (await ownerPrefs(server)).prefs.noteActions);
+}
+
+/** A save the newest record refuses: another device changed the actions between the card and the write. */
+class Refused extends Error {}
 
 export function noteActionTools(server: Server) {
   return {
@@ -42,14 +48,25 @@ export function noteActionTools(server: Server) {
         icon: z.enum(ACTION_ICONS).optional().describe("The button's icon"),
       }),
       execute: async (i) => {
-        const bad = await saveProblem(server, i);
-        if (bad) return { error: bad };
-        const { rec, prefs } = await ownerPrefs(server), all = prefs.noteActions, old = all.find((a) => a.id === i.id);
-        const action: PromptAction = {
-          id: old?.id ?? newActionId(i.label, all.map((a) => a.id)), label: i.label, prompt: i.prompt, result: i.result, icon: i.icon ?? old?.icon ?? "sparkles",
-        };
-        await saveOwnerPrefs(server, rec, withPatch(prefs, { noteActions: old ? all.map((a) => (a === old ? action : a)) : [...all, action] }));
-        return { saved: action, where: old ? "Changed where it already sits." : "It is in every note's menu now. The owner pins it to the header from that menu or in Settings → Notes." };
+        // Over the newest record, and redone over a newer one when another device saved meanwhile: the list is read and checked each time
+        let saved = undefined as { action: PromptAction; changed: boolean } | undefined;
+        try {
+          await patchOwnerPrefs(server, ({ noteActions: all }) => {
+            const bad = problem(i, all);
+            if (bad) throw new Refused(bad);
+            const old = all.find((a) => a.id === i.id);
+            const action: PromptAction = {
+              id: old?.id ?? newActionId(i.label, all.map((a) => a.id)), label: i.label, prompt: i.prompt, result: i.result, icon: i.icon ?? old?.icon ?? "sparkles",
+            };
+            saved = { action, changed: !!old };
+            return { noteActions: old ? all.map((a) => (a === old ? action : a)) : [...all, action] };
+          });
+        } catch (e) {
+          if (e instanceof Refused) return { error: e.message };
+          throw e;
+        }
+        if (!saved) return { error: "Nothing was saved." };
+        return { saved: saved.action, where: saved.changed ? "Changed where it already sits." : "It is in every note's menu now. The owner pins it to the header from that menu or in Settings → Notes." };
       },
     }),
   };

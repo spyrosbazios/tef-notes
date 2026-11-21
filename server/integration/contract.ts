@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import * as pb from "../../packages/core/src/pocketbase";
+import { DEFAULT_PREFS } from "../../packages/core/src/prefs";
+import { patchPrefs, prefsRemote } from "../../packages/core/src/prefs-sync";
 import { newTask } from "../../packages/core/src/todo";
 import { linkRecord, newLink } from "../../packages/core/src/record-links";
 import { readChatHistory, serializeChatHistory } from "../../packages/core/src/chat-history";
@@ -136,4 +138,42 @@ test("attachments: multipart, exact download, name uniqueness and note deletion 
   await pb.removePhoto(s, survivor.rec);
   await pb.removePhoto(s, survivor.rec);
   expect(await pb.photos(s, otherOwner)).toEqual([]);
+});
+
+test("preferences: made at rev 1, saves are compare-and-swap, and a stale writer goes over the newer record", async () => {
+  const remote = prefsRemote(pb.transport(s));
+  expect(await remote.get()).toBeNull();
+  const first = await remote.save(null, DEFAULT_PREFS);
+  expect(first.rev).toBe(1);
+  await expect(remote.save(null, DEFAULT_PREFS)).rejects.toBeInstanceOf(pb.Conflict);
+  const path = record("prefs", first.rec);
+  expect((await raw(path, "PATCH", { data: {} })).status).toBe(400);
+  const second = await patchPrefs(remote, { theme: "dawn" });
+  expect(second.rev).toBe(2);
+  const before = await pb.call(s, path);
+  expect((await raw(path, "PATCH", { rev: 1, data: {} })).status).toBe(409);
+  await expect(remote.save({ rec: first.rec, rev: 1 }, DEFAULT_PREFS)).rejects.toBeInstanceOf(pb.Conflict);
+  expect(await pb.call(s, path)).toEqual(before);
+  // A writer that read rev 2 and lost to another's save redoes its path over the newer one
+  const real = pb.transport(s);
+  let raced = false;
+  const stale = prefsRemote({
+    status: real.status,
+    async request(p, r) {
+      const out = await real.request(p, r);
+      if (!raced && r?.method === undefined) { raced = true; await patchPrefs(remote, { accent: "rose" }); }
+      return out;
+    },
+  });
+  const saved = await patchPrefs(stale, { lens: "work" });
+  expect(saved.prefs).toMatchObject({ theme: "dawn", accent: "rose", lens: "work" });
+});
+
+test("tasks: a repeat takes a month's anchor on months and years only", async () => {
+  const t = await pb.tasks.create(s, newTask(id(), { title: "Rent", when: "2027-02-28", every: "1m@30" }));
+  expect(t.every).toBe("1m@30");
+  await pb.tasks.create(s, newTask(id(), { title: "Birthday", when: "2029-02-28", every: "1y@29" }));
+  for (const every of ["1w@30", "1m@28", "+1m@30", "1m@"]) {
+    expect((await raw("collections/tasks/records", "POST", { ...newTask(id(), { title: "Bad" }), every })).status).toBe(400);
+  }
 });

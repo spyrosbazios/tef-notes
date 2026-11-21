@@ -13,11 +13,15 @@ describe("refusal", () => {
     expect(refusal("tasks", "edit", 2, 3)).toEqual([409, "This task changed since that version."]);
     expect(refusal("notes", "delete", "4", 3)).toEqual([409, "This note changed since that version."]);
   });
+  test("the preferences record is under it too", () => {
+    expect(refusal("prefs", "edit", 1, 2)).toEqual([409, "This preferences record changed since that version."]);
+    expect(refusal("prefs", "edit", 2, 2)).toBeNull();
+  });
   test("no rev is a 400", () => {
     for (const base of [undefined, null, ""]) expect(refusal("tasks", "edit", base, 1)?.[0]).toBe(400);
     expect(refusal("tasks", "delete", "", 1)).toEqual([400, "rev is required: the version this delete was based on."]);
   });
   test("covers every collection the clients edit", () => {
-    expect(COLLECTIONS.sort()).toEqual(["notes", "tasks"]);
+    expect(COLLECTIONS.sort()).toEqual(["notes", "prefs", "tasks"]);
   });
 });

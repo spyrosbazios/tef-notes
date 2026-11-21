@@ -57,7 +57,8 @@ export async function call(s: Server, path: string, init: RequestInit = {}): Pro
   }
 }
 
-const transport = (s: Server): RecordTransport => ({
+/** The record protocols (core/record-protocol.ts) over `s`: the agent's and the CLI's fetch. */
+export const transport = (s: Server): RecordTransport => ({
   request: (path, request = {}) => call(s, path, request.body === undefined ? { method: request.method } : json(request.method ?? "POST", request.body)),
   status: (e) => e instanceof HttpError ? e.status : undefined,
 });

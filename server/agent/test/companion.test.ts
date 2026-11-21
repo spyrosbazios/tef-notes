@@ -118,6 +118,18 @@ describe("the lens", () => {
     await pick("w");
     expect(pb.prefs[0].data.lens).toBe("w");
   });
+  it("keeps a change another device saved between the read and the write: the lens goes over the newer record", async () => {
+    lensOn();
+    let once = true;
+    pb.meanwhile((rec) => {
+      if (!once) return;
+      once = false;
+      rec.data = { ...rec.data, theme: "dawn", accent: "rose" };
+      rec.rev = 2;
+    });
+    expect((await pick("")).status).toBe(200);
+    expect(pb.prefs[0]).toMatchObject({ rev: 3, data: { lens: null, theme: "dawn", accent: "rose", clip: { summary: true } } });
+  });
   it("makes the record when no preference was saved yet", async () => {
     pb.lenses.push({ id: "w", name: "Work", tags: ["work"], exclude: [], accent: "", theme: "" });
     await pick("w");

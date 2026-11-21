@@ -6,20 +6,20 @@
 import { helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, taskListOf, tasksFeed } from "@/core/companion";
 import { activeLens, inheritTags, type Lens } from "@/core/lens";
 import * as pb from "@/core/pocketbase";
-import { withPatch, type Prefs } from "@/core/prefs";
-import { ownerPrefs, saveOwnerPrefs } from "./prefs";
+import type { Prefs } from "@/core/prefs";
+import { ownerPrefs, patchOwnerPrefs } from "./prefs";
 import { localDay } from "@/core/time";
 import { NoteService } from "./application/notes";
 import { TaskService } from "./application/todo";
 
 const refuse = (status: number, error: string) => Response.json({ error }, { status });
 
-type Owner = { rec: string | null; prefs: Prefs; lenses: Lens[]; lens: Lens | null };
+type Owner = { prefs: Prefs; lenses: Lens[]; lens: Lens | null };
 
 /** The owner's preferences (none saved yet: the defaults, and no record), their lenses and the one they have on. */
 async function owner(server: pb.Server): Promise<Owner> {
-  const [{ rec, prefs }, lenses] = await Promise.all([ownerPrefs(server), pb.lenses.list(server)]);
-  return { rec, prefs, lenses, lens: activeLens(lenses, prefs.lens) };
+  const [{ prefs }, lenses] = await Promise.all([ownerPrefs(server), pb.lenses.list(server)]);
+  return { prefs, lenses, lens: activeLens(lenses, prefs.lens) };
 }
 
 export async function helloRoute(server: pb.Server): Promise<Response> {
@@ -54,13 +54,13 @@ export async function tickRoute(server: pb.Server, id: string): Promise<Response
   return "error" in r ? refuse(409, r.error) : Response.json({ ok: true });
 }
 
-/** The lens on, changed from a widget: for every screen of the owner's, as when the web app's switcher changes it (the
- *  record is saved whole with the one path changed; the web app hears over the realtime feed). */
+/** The lens on, changed from a widget: for every screen of the owner's, as when the web app's switcher changes it (the one
+ *  path over the record at its rev, prefs.ts; the web app hears over the realtime feed). */
 export async function lensRoute(req: Request, server: pb.Server): Promise<Response> {
   const pick = lensPickOf(await req.json().catch(() => null));
   if (pick === null) return refuse(400, "Which lens?");
-  const { rec, prefs, lenses } = await owner(server);
+  const { lenses } = await owner(server);
   if (pick && !lenses.some((l) => l.rec === pick)) return refuse(404, "That lens is gone.");
-  await saveOwnerPrefs(server, rec, withPatch(prefs, { lens: pick || null }));
+  await patchOwnerPrefs(server, { lens: pick || null });
   return Response.json({ ok: true });
 }

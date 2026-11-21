@@ -87,7 +87,7 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
       let data = null;
       try { data = JSON.parse(prefs.getString("data") || "null"); } catch (_) { /* unreadable: left */ }
       const folded = data && data.notes && Array.isArray(data.notes.collapsed) ? lib.renamed(data.notes.collapsed.filter((s) => typeof s === "string"), req.from, to) : null;
-      if (folded) { data.notes.collapsed = folded; prefs.set("data", data); tx.save(prefs); }
+      if (folded) { data.notes.collapsed = folded; prefs.set("data", data); prefs.set("rev", prefs.getInt("rev") + 1); tx.save(prefs); }
     }
   });
   e.app.logger().info("tags: renamed", "from", req.from, "to", out.tag, "notes", out.notes, "tasks", out.tasks, "lenses", out.lenses, "merged", out.merged);

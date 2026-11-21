@@ -3,7 +3,7 @@
 // an edit it hasn't seen. A pure function, so `cd server && bun test` can check it; the hook throws what it returns.
 
 /** What each collection's record is called in a refusal. */
-const NOUN = { notes: "note", tasks: "task" };
+const NOUN = { notes: "note", tasks: "task", prefs: "preferences record" };
 
 /** The collections under the rev contract. */
 const COLLECTIONS = Object.keys(NOUN);

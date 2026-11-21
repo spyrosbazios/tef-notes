@@ -700,6 +700,20 @@ describe("note actions", () => {
     expect(await run(T.save_note_action, { ...sum, id: "nope" })).toHaveProperty("error");
     expect(await run(T.save_note_action, { ...sum, prompt: " " })).toHaveProperty("error");
   });
+  it("adds over the newer record when another device saved first: its change is kept, and the list is checked again", async () => {
+    await run(T.save_note_action, { ...sum });
+    let once = true;
+    pb.meanwhile((rec) => {
+      if (!once) return;
+      once = false;
+      rec.data = { ...rec.data, theme: "dawn", noteActions: [...(rec.data as { noteActions: unknown[] }).noteActions, { id: "other", label: "Other", prompt: "x", result: "answer", icon: "sparkles" }] };
+      rec.rev = (rec.rev as number) + 1;
+    });
+    expect(await run(T.save_note_action, { ...sum, label: "Digest" })).toMatchObject({ saved: { id: "digest" } });
+    const saved = pb.prefs[0].data as { theme: string; noteActions: { id: string }[] };
+    expect(saved.theme).toBe("dawn");
+    expect(saved.noteActions.map((a) => a.id)).toEqual(["tidy", "task", "summarise", "other", "digest"]);
+  });
   it("follows the owner's rule, and is withdrawn once the turn has read someone else's text", async () => {
     expect(await approvals(notes, todo, DEFAULT_ACTIONS).save_note_action({ ...sum }, { messages: [] })).toBe("user-approval");
     expect(await approvals(notes, todo, { ...DEFAULT_ACTIONS, noteActions: "auto" }).save_note_action({ ...sum }, { messages: [] })).toBe("not-applicable");
