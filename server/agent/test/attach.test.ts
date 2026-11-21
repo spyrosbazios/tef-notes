@@ -5,8 +5,8 @@ import { attachedBlock, attachedFiles, type Attached } from "@/core/assistant";
 import { parseNote } from "@/core/notes";
 import { approvals } from "../src/turn";
 import { bytesOf } from "../src/fileTools";
-import { Notes } from "../src/notes";
-import { Todo } from "../src/todo";
+import { NoteService } from "../src/application/notes";
+import { TaskService } from "../src/application/todo";
 import { tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
@@ -19,11 +19,11 @@ const pdf: Attached = { name: "Lease 2026.pdf", mediaType: "application/pdf", ur
 const file = (title: string, body = "- x\n") => `---\ntitle: ${title}\ncreated: 2026-10-01\n---\n${body}`;
 const run = (T: ReturnType<typeof tools>, i: object) => T.attach_file.execute!(i as never, { toolCallId: "c", messages: [] } as never) as Promise<any>;
 
-let notes: Notes, T: ReturnType<typeof tools>;
+let notes: NoteService, T: ReturnType<typeof tools>;
 beforeEach(() => {
   pb.notes.clear(); pb.attachments.clear(); pb.created.length = 0;
-  notes = new Notes({ url: pb.url });
-  T = tools(notes, new Todo({ url: pb.url }), undefined, [pic, pdf]);
+  notes = new NoteService({ url: pb.url });
+  T = tools(notes, new TaskService({ url: pb.url }), undefined, [pic, pdf]);
 });
 
 describe("attachedFiles", () => {
@@ -67,12 +67,12 @@ describe("attach_file", () => {
     expect([...pb.attachments.values()].map((a) => a.name)).toEqual(["lease-2026.pdf"]);
   });
 
-  it("a bad call goes back to the agent without a card", async () => {
-    const ask = approvals(notes, new Todo({ url: pb.url }), DEFAULT_ACTIONS, undefined, [pic]);
+  it("a bad call is refused with its reason, without a card", async () => {
+    const ask = approvals(notes, new TaskService({ url: pb.url }), DEFAULT_ACTIONS, undefined, [pic]);
     pb.put("notes/a.md", file("A"));
     expect(await run(T, { file: "nope.png", path: "notes/a.md" })).toMatchObject({ error: expect.stringContaining("receipt.jpg") });
     expect(await run(T, { file: "receipt.jpg" })).toMatchObject({ error: expect.stringContaining("either path") });
-    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/nope.md" }, { messages: [] })).toBe("not-applicable");
+    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/nope.md" }, { messages: [] })).toMatchObject({ type: "denied", reason: expect.stringContaining("No note") });
     expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/a.md" }, { messages: [] })).toBe("user-approval");
     expect(pb.attachments.size).toBe(0);
   });

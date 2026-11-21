@@ -7,10 +7,10 @@ import { localDay } from "@/core/time";
 import { newTask, type Task } from "@/core/todo";
 import { widgetOf } from "@/core/widgets";
 import { fromWeb } from "../src/tools";
-import type { Meta } from "../src/notes";
-import { Notes } from "../src/notes";
+import type { Meta } from "../src/application/notes";
+import { NoteService } from "../src/application/notes";
 import { dayOfTasks, freeSlots, quoteIn, reviewOf, STALLED_DAYS, weekOfTasks, type Stamp } from "../src/plan";
-import { Todo } from "../src/todo";
+import { TaskService } from "../src/application/todo";
 import { tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
@@ -123,12 +123,12 @@ describe("a quote", () => {
 describe("the tools", () => {
   const pb = fakePb();
   afterAll(() => pb.stop());
-  let notes: Notes, todo: Todo, T: ReturnType<typeof tools>;
+  let notes: NoteService, todo: TaskService, T: ReturnType<typeof tools>;
   beforeEach(() => {
     pb.notes.clear(); pb.chats.clear(); pb.tasks.clear(); pb.links.clear(); pb.meanwhile();
     pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "" }, { id: "t2", name: "work", description: "" }, { id: "t3", name: "archive", description: "" });
-    notes = new Notes({ url: pb.url });
-    todo = new Todo({ url: pb.url });
+    notes = new NoteService({ url: pb.url });
+    todo = new TaskService({ url: pb.url });
     T = tools(notes, todo);
   });
   const run = <I,>(t: { execute?: (i: I, o: never) => unknown }, i: I, messages: ModelMessage[] = []) => t.execute!(i, { toolCallId: "c", messages } as never);

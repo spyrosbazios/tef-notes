@@ -13,7 +13,7 @@ import {
 } from "ai";
 import type { Actions } from "@/core/actions";
 import { EFFORT, type Effort } from "@/core/agent";
-import { attachedBlock, attachedFiles, hasAttachment, SELECTION_TOOL_NAMES, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
+import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
 import type { Run } from "@/core/note-actions";
 import { MEMORY, parseNote } from "@/core/notes";
 import type { Server } from "@/core/pocketbase";
@@ -24,14 +24,15 @@ import { key } from "./keys";
 import { approvalSecret } from "./approval-secret";
 import { lastStep, stepTools, trim } from "./loop";
 import { instructions as runInstructions, offeredTo, scoped, scopeOf, type Scope } from "./note-action";
-import { Notes } from "./notes";
-import { Todo } from "./todo";
+import { NoteService } from "./application/notes";
+import { TaskService } from "./application/todo";
 import { model as pickModel, sees, Unavailable } from "./models";
 import { ownerPrefs } from "./prefs";
 import { withoutPictures } from "./drawings";
 import { inlinePdfs, preview } from "./pdfs";
 import { PLACES, SYSTEM, TALK, today, WEB } from "./systemPrompt";
-import { noteIndex, readWeb, tools, toolPolicies, policyFor, type Tools } from "./tools";
+import { noteIndex } from "./notes";
+import { readWeb, tools, toolPolicies, policyFor, type Tools } from "./tools";
 
 /** A message as useChat holds it, tool parts typed: what `chats.messages` holds. */
 export type AgentMessage = UIMessage<unknown, never, InferUITools<Tools>>;
@@ -42,18 +43,12 @@ export type AgentMessage = UIMessage<unknown, never, InferUITools<Tools>>;
  *  have their own limits (pdfs.ts, reader.ts, the link-preview guard). */
 export const MODEL_TIMEOUT = { firstChunkMs: 120_000, chunkMs: 60_000 } as const;
 
-/** What Talk leaves out of the chat's tools, and why: a drawing is a picture on a canvas the owner looks at and a spoken
- *  model cannot check (draw answers with one), the selection tools write into words the owner selected with the mouse (a
- *  spoken conversation has no selection bar), and attach_file files what the owner attached to a chat message (Talk has no
- *  messages to attach to). */
-export const TALK_LEAVES_OUT: ReadonlySet<string> = new Set(["draw", "save_drawing", "read_drawing", "show_drawing", "diagram_guide", ...SELECTION_TOOL_NAMES, "attach_file"]);
-
 /** The date, memory, the notes index and what is on the owner's screen (and the first pages of the open note's PDFs):
  *  they change from one message to the next, so they ride on the newest user message (withContext), not in the
  *  instructions — those stay byte for byte the same, the prompt cache's prefix. The live screen comes last: it changes
  *  most. `foreign`: whether someone else's text is in it, which taints the turn (approvals): a PDF's, or words selected
  *  in an open note a chat that read the web wrote (its `tainted` column: the selection is that note's text, read back). */
-export async function context(notes: Notes, page: AssistantContext | undefined, files: readonly Attached[] = []) {
+export async function context(notes: NoteService, page: AssistantContext | undefined, files: readonly Attached[] = []) {
   const memory = (await notes.meta(MEMORY))?.text.trim() || "(empty)";
   const open = page?.note && await notes.meta(page.note.path);
   const pdfs = open ? await preview(notes.server, { id: parseNote(open.path, open.text).id, path: open.path }) : "";
@@ -67,8 +62,8 @@ export async function context(notes: Notes, page: AssistantContext | undefined, 
 
 /** Notes and tasks are the user's: each write asks, goes ahead or is refused by the owner's rule for its action (`rules`, their
  *  preferences' `actions`, @/core/actions), and one allowed without asking still asks once the chat has read the web or a PDF
- *  (`web`), where a page can carry instructions aimed at the agent. A bad path skips the card: the tool's error goes straight back. */
-export function approvals(notes: Notes, todo: Todo, rules: Actions, web = readWeb(notes, todo), files: readonly Attached[] = []) {
+ *  (`web`), where a page can carry instructions aimed at the agent. A call its check fails (a bad path) is refused with the reason. */
+export function approvals(notes: NoteService, todo: TaskService, rules: Actions, web = readWeb(notes, todo), files: readonly Attached[] = []) {
   return policyApprovals(toolPolicies(), { notes, todo, files }, rules, web);
 }
 
@@ -108,7 +103,7 @@ export type Turn = { stream: ReadableStream<UIMessageChunk> } | { error: string 
 
 /** Starts one turn of `r.history`. The owner's rules, web guard and note actions are read now, from their preferences. */
 export async function runTurn(r: TurnRequest): Promise<Turn> {
-  const notes = new Notes(r.server), todo = new Todo(r.server), files = attachedFiles(r.history);
+  const notes = new NoteService(r.server), todo = new TaskService(r.server), files = attachedFiles(r.history);
   const ctx = await context(notes, r.page, files);
   // Classify before schema repair: an obsolete input must never erase a past untrusted read. The taint marks are read fresh
   // for every turn (a note a chat that read the web wrote since this conversation began counts)
@@ -155,7 +150,7 @@ export async function runTurn(r: TurnRequest): Promise<Turn> {
 }
 
 type Build = {
-  notes: Notes; todo: Todo; r: TurnRequest; rules: Actions; webGuard: boolean;
+  notes: NoteService; todo: TaskService; r: TurnRequest; rules: Actions; webGuard: boolean;
   /** Someone else's text is in this turn's context (`context`), in the history, or the owner attached a file to the chat:
    *  its writes are tainted and ask, like after reading the web. */
   foreign: boolean;
@@ -171,9 +166,10 @@ async function build({ notes, todo, r, rules, webGuard, foreign, files, scope }:
   // Out of the prompt: the web tools without an Exa key, the tools the client does itself unless this page can do them,
   // what a spoken conversation has no screen for, the writes the owner never allows (a call made anyway is refused by
   // toolApproval), and in a note action's run all but the tools that action needs
-  const ui = uiToolsFor(r.page), off = new Set<string>([...UI_TOOL_NAMES.filter((n) => !ui.includes(n)), ...(r.spoken ? TALK_LEAVES_OUT : [])]);
+  const ui = uiToolsFor(r.page), off = new Set<string>(UI_TOOL_NAMES.filter((n) => !ui.includes(n)));
   const base = (Object.keys(all) as (keyof Tools)[])
-    .filter((n) => !off.has(n) && (web || !policyFor(n)?.requiresExa) && allowed(policyFor(n), rules) && (!scope || offeredTo(scope, n)));
+    .filter((n) => !off.has(n) && !(r.spoken && policyFor(n)?.unavailableInTalk) && (web || !policyFor(n)?.requiresExa) && allowed(policyFor(n), rules)
+      && (!scope || offeredTo(scope, policyFor(n))));
   const gate = approvals(notes, todo, rules, guarded(webGuard, untrusted), files);
   return new ToolLoopAgent({
     model: m,
@@ -188,7 +184,7 @@ async function build({ notes, todo, r, rules, webGuard, foreign, files, scope }:
       ...(stepNumber === 0 && { messages: trim(messages) }),
       ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : lastStep()),
     }),
-    toolApproval: scope ? scoped(gate, scope) : gate,
+    toolApproval: scope ? scoped(gate, scope, policyFor) : gate,
     // A card's answer runs its write only if this server issued the card (approval-secret.ts)
     experimental_toolApprovalSecret: await approvalSecret(),
     providerOptions,

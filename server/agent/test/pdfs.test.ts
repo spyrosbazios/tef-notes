@@ -5,10 +5,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { ModelMessage } from "ai";
 import { parseNote } from "@/core/notes";
 import { fromWeb } from "../src/tools";
-import { Notes } from "../src/notes";
+import { NoteService } from "../src/application/notes";
 import { BACKOFF_MS, Ocr, Unready, useOcr, type Reader } from "../src/ocr";
 import { allPdfs, pageRange, pages, pagesRoute, preview, PREVIEW_CHARS, readNow, readScans, thumbRoute } from "../src/pdfs";
-import { Todo } from "../src/todo";
+import { TaskService } from "../src/application/todo";
 import { tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 import { makePdf } from "./pdf";
@@ -33,7 +33,7 @@ beforeEach(() => {
 });
 
 const run = async (name: string, input: object) =>
-  (tools(new Notes(server), new Todo(server)) as any)[name].execute(input, { messages: [], toolCallId: "t" });
+  (tools(new NoteService(server), new TaskService(server)) as any)[name].execute(input, { messages: [], toolCallId: "t" });
 
 describe("pdfs", () => {
   it("reads a PDF's text page by page", async () => {

@@ -1,7 +1,6 @@
 // attach_file: a photo or PDF the owner attached in the chat filed into a note, as the app's own upload would: an
 // `attachments` record under the note's id and a line in its body pointing at it. The bytes come from the chat's file part
 // (its data URL); the model only names the file. Someone else's content: the write is always marked tainted.
-import type { Policies } from "./tool-policy";
 import { tool } from "ai";
 import { z } from "zod";
 import type { Attached } from "@/core/assistant";
@@ -9,8 +8,9 @@ import { parseNote, serializeNote, withBody } from "@/core/notes";
 import { fileMarkdown, PDF, pdfName, photoMarkdown, photoName } from "@/core/photos";
 import * as pb from "@/core/pocketbase";
 import { localDay } from "@/core/time";
-import { definedTags, TAGS, type Notes } from "./notes";
-import { checkWrite } from "./tools";
+import { definedTags, type NoteService } from "./application/notes";
+import { checkWrite, noteSaved, TAGS } from "./notes";
+import { toolModule } from "./tool-policy";
 
 export const ATTACH = z.object({
   file: z.string().min(1).describe("The attached file's name, as the <attached> block lists it"),
@@ -29,7 +29,7 @@ export function bytesOf(url: string): Uint8Array | null {
 }
 
 /** Why the call can't go ahead, or null: checked before the owner is asked, so a bad one goes back to the agent. */
-export async function attachProblem(notes: Notes, files: readonly Attached[], i: AttachInput): Promise<string | null> {
+export async function attachProblem(notes: NoteService, files: readonly Attached[], i: AttachInput): Promise<string | null> {
   if (!files.some((f) => f.name === i.file)) return files.length
     ? `No attached file "${i.file}". Attached: ${files.map((f) => f.name).join(", ")}.`
     : "Nothing is attached in this chat.";
@@ -37,51 +37,48 @@ export async function attachProblem(notes: Notes, files: readonly Attached[], i:
   return i.path ? checkWrite(notes, i.path) : null;
 }
 
-export function fileTools(notes: Notes, files: readonly Attached[]) {
-  return {
-    attach_file: tool({
-      description: "File a photo or PDF the owner attached in this chat into a note: the file is saved to the note and shown in it, as if they had added it in the app, with your line on what it is above it. Into a note that fits (path), or a new one (title, tags from list_tags). The owner confirms. Read it first: you have it in the message.",
-      inputSchema: ATTACH,
-      execute: async (i) => {
-        const bad = await attachProblem(notes, files, i);
-        if (bad) return { error: bad };
-        const f = files.find((x) => x.name === i.file)!, bytes = bytesOf(f.url);
-        if (!bytes) return { error: `${f.name} couldn't be read.` };
-        const t = i.tags && await definedTags(notes, i.tags);
-        if (t && "error" in t) return t;
-        const text = i.text?.trim() ?? "";
+export const fileModule = toolModule(({ notes, files }) => ({
+  attach_file: tool({
+    description: "File a photo or PDF the owner attached in this chat into a note: the file is saved to the note and shown in it, as if they had added it in the app, with your line on what it is above it. Into a note that fits (path), or a new one (title, tags from list_tags). The owner confirms. Read it first: you have it in the message.",
+    inputSchema: ATTACH,
+    execute: async (i) => {
+      const bad = await attachProblem(notes, files, i);
+      if (bad) return { error: bad };
+      const f = files.find((x) => x.name === i.file)!, bytes = bytesOf(f.url);
+      if (!bytes) return { error: `${f.name} couldn't be read.` };
+      const t = i.tags && await definedTags(notes, i.tags);
+      if (t && "error" in t) return t;
+      const text = i.text?.trim() ?? "";
 
-        // A new note is made first, with the line, so the file has an id to go under
-        let path = i.path!;
-        if (i.title) {
-          const meta = { title: i.title.trim(), created: localDay(), ...(t ? { tags: t.tags } : {}) };
-          const made = await notes.create(meta.title, () => serializeNote(meta, text ? `${text}\n` : ""), true);
-          if ("error" in made) return made;
-          path = made.saved;
-        }
-        const cur = await notes.read(path);
-        if (!cur) return { error: `No note ${path}.` };
-        const id = parseNote(path, cur.text).id;
-        const taken = new Set((await pb.photos(notes.server, id)).map((p) => p.name));
-        const pdf = f.mediaType === PDF, name = pdf ? pdfName(f.name, taken) : photoName(Date.now(), taken);
-        let rec: string;
-        try { rec = (await pb.upload(notes.server, id, name, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: pdf ? PDF : "image/jpeg" }))).rec; }
-        catch (e) { return { error: `Couldn't save ${f.name}: ${(e as Error).message}` }; }
+      // A new note is made first, with the line, so the file has an id to go under
+      let path = i.path!;
+      if (i.title) {
+        const meta = { title: i.title.trim(), created: localDay(), ...(t ? { tags: t.tags } : {}) };
+        const made = noteSaved(await notes.create(meta.title, () => serializeNote(meta, text ? `${text}\n` : ""), true));
+        if ("error" in made) return made;
+        path = made.saved;
+      }
+      const cur = await notes.read(path);
+      if (!cur) return { error: `No note ${path}.` };
+      const id = parseNote(path, cur.text).id;
+      const taken = new Set((await pb.photos(notes.server, id)).map((p) => p.name));
+      const pdf = f.mediaType === PDF, name = pdf ? pdfName(f.name, taken) : photoName(Date.now(), taken);
+      let rec: string;
+      try { rec = (await pb.upload(notes.server, id, name, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: pdf ? PDF : "image/jpeg" }))).rec; }
+      catch (e) { return { error: `Couldn't save ${f.name}: ${(e as Error).message}` }; }
 
-        const line = pdf ? fileMarkdown(id, name, f.name) : photoMarkdown(id, [name]);
-        const add = i.title ? line : [text, line].filter(Boolean).join("\n");
-        const saved = await notes.change(path, (file) => {
-          const n = parseNote(path, file);
-          return withBody(file, n, `${n.body.trimEnd()}${n.body.trim() ? "\n\n" : ""}${add}\n`);
-        }, { taint: true });
-        if ("error" in saved) await pb.removePhoto(notes.server, rec).catch(() => {});
-        return saved;
-      },
-    }),
-  };
-}
+      const line = pdf ? fileMarkdown(id, name, f.name) : photoMarkdown(id, [name]);
+      const add = i.title ? line : [text, line].filter(Boolean).join("\n");
+      const saved = noteSaved(await notes.change(path, (file) => {
+        const n = parseNote(path, file);
+        return withBody(file, n, `${n.body.trimEnd()}${n.body.trim() ? "\n\n" : ""}${add}\n`);
+      }, { taint: true }));
+      if ("error" in saved) await pb.removePhoto(notes.server, rec).catch(() => {});
+      return saved;
+    },
+  }),
+}), {
+  // Needs a file attached to a chat message, which Talk has none of
+  attach_file: { approval: "files", result: "plain", unavailableInTalk: true, check: ({ notes, files }, i) => attachProblem(notes, files, i) },
+});
 
-/** Complete policy for this module: adding a tool requires an explicit classification. */
-export const filePolicies = {
-  attach_file: { approval: "files", result: "plain", check: ({ notes, files }, i) => attachProblem(notes, files, i) },
-} satisfies Policies<ReturnType<typeof fileTools>>;

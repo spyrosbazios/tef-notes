@@ -28,7 +28,7 @@ import { ownerPrefs } from "./prefs";
 import { settle } from "./guard";
 import { key } from "./keys";
 import { DEFAULT as DEFAULT_MODEL, type model as pickModel } from "./models";
-import { Notes } from "./notes";
+import { NoteService } from "./application/notes";
 import { withoutPictures } from "./drawings";
 import { sameOrigin } from "./request-guard";
 import type { ConnectEar, ConnectVoice, EarEvent, EarSession, Sea, Voice } from "./fish";
@@ -331,7 +331,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   };
 
   async function openEar(): Promise<EarSession> {
-    const terms = (await new Notes(d.server).list()).map((n) => n.title).filter(Boolean).slice(0, 100);
+    const terms = (await new NoteService(d.server).list()).map((n) => n.title).filter(Boolean).slice(0, 100);
     const s = await d.connectEar(terms);
     if (ended) { s.close(); throw new Error("ended"); }
     s.listen(hear);

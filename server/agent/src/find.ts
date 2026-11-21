@@ -9,7 +9,7 @@ import { DEFAULT, model, Unavailable } from "./models";
 import { NoteService } from "./application/notes";
 import { today } from "./systemPrompt";
 import { TaskService } from "./application/todo";
-import { noteReadTools } from "./tools";
+import { noteReadTools } from "./notes";
 import { taskReadTools } from "./todoTools";
 
 const STEPS = 6;

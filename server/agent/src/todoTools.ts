@@ -2,16 +2,39 @@
 // the reason it can't be: tool and check share it, so the check before a confirm card (agent.ts approvals) tries exactly
 // what the write would do, on the records as they are now, and a bad date, note or id goes straight back to the agent
 // instead of through a card.
-import type { Policies } from "./tool-policy";
-import { tool, type ModelMessage } from "ai";
+import { tool } from "ai";
 import { z } from "zod";
+import { taskCardOf, type TaskCard } from "@/core/agent";
 import { views, newTask, type Task, type TaskPatch } from "@/core/todo";
 import { fold, NOTES as NOTE_DIR, parseNote, snippetOf } from "@/core/notes";
 import { localDay } from "@/core/time";
 import { capList, clip } from "./guard";
-import { definedTags, TAGS, type Notes } from "./notes";
+import { definedTags, type NoteService } from "./application/notes";
+import { checklistEdit, taskEdit, type Edit, type TagOps, type TaskBatch, type TaskSaved, type TaskService } from "./application/todo";
+import { TAGS } from "./notes";
 import { slotOf, type Slot } from "./plan";
-import { checklistEdit, taskEdit, type Edit, type TagOps, type Todo } from "./todo";
+import { toolModule } from "./tool-policy";
+
+/** A task write as the agent is answered: what was saved, with the task's card. */
+export type TodoSaved = { saved: "task"; id: string; rev: number; card?: TaskCard; next?: string; unchanged?: true } | { error: string };
+
+export function taskSaved(result: TaskSaved): TodoSaved {
+  if ("error" in result) return result;
+  const { task, ...saved } = result;
+  return { ...saved, ...(task ? { card: taskCardOf(task) } : {}) };
+}
+
+function tasksSaved(result: TaskBatch): { saved: "tasks"; ids: string[]; cards: TaskCard[] } | { error: string } {
+  if ("error" in result) return result;
+  const { tasks, ...saved } = result;
+  return { ...saved, cards: tasks.map(taskCardOf) };
+}
+
+/** A task's card by its id, or undefined when there is no such task. */
+export async function taskCard(todo: TaskService, id: string) {
+  const task = await todo.task(id);
+  return task && taskCardOf(task);
+}
 
 const TASKS = 100, NOTES_SNIPPET = 300;
 
@@ -69,7 +92,7 @@ type Plan<T> = { error: string } | T;
 const bad = (p: Plan<object>) => ("error" in p ? p.error : null);
 
 /** The notes' record ids by their paths: the ones a task is linked to. */
-async function noteRecs(notes: Notes, paths: string[]): Promise<Plan<{ recs: string[] }>> {
+async function noteRecs(notes: NoteService, paths: string[]): Promise<Plan<{ recs: string[] }>> {
   const recs: string[] = [];
   for (const path of paths) {
     const m = path.startsWith("notes/") ? await notes.meta(path) : undefined;
@@ -81,7 +104,7 @@ async function noteRecs(notes: Notes, paths: string[]): Promise<Plan<{ recs: str
 
 /** The refusal of a double booking: the open tasks (and `also`, earlier ones of the same add_tasks) in `t`'s slot, other
  *  than `self`. Allowed, but only once the user knows: the agent tells them and retries with `overlap`. */
-async function clash(todo: Todo, t: Slot, self = "", also: (Slot & { title: string })[] = []): Promise<string | null> {
+async function clash(todo: TaskService, t: Slot, self = "", also: (Slot & { title: string })[] = []): Promise<string | null> {
   const slot = slotOf(t);
   if (!slot) return null;
   const open = (await todo.tasks()).filter((o) => !o.done && o.id !== self);
@@ -95,7 +118,7 @@ async function clash(todo: Todo, t: Slot, self = "", also: (Slot & { title: stri
 type TaskPlan = { fields: TaskPatch & { title: string }; checklist: string[]; about: string[] };
 
 /** add_task: the fields of the new task, its checklist and its notes; refused when a note or a value is bad. */
-export async function planAdd(notes: Notes, todo: Todo, i: AddInput, earlier: TaskPlan[] = []): Promise<Plan<TaskPlan>> {
+export async function planAdd(notes: NoteService, todo: TaskService, i: AddInput, earlier: TaskPlan[] = []): Promise<Plan<TaskPlan>> {
   const { checklist = [], link = [], tags, overlap, ...rest } = i;
   const fields: TaskPatch & { title: string } = { ...rest };
   const about = await noteRecs(notes, link);
@@ -112,7 +135,7 @@ export async function planAdd(notes: Notes, todo: Todo, i: AddInput, earlier: Ta
 
 /** add_tasks: each task's fields and checklist; refused when any task's value is bad (the error names the task: nothing
  *  is written until all of them are right). */
-export async function planAddMany(notes: Notes, todo: Todo, i: AddManyInput): Promise<Plan<{ items: TaskPlan[] }>> {
+export async function planAddMany(notes: NoteService, todo: TaskService, i: AddManyInput): Promise<Plan<{ items: TaskPlan[] }>> {
   const items: TaskPlan[] = [];
   for (const t of i.tasks) {
     const plan = await planAdd(notes, todo, t, items);
@@ -127,7 +150,7 @@ export const withNotes = (notes: string, more: string) => [notes.trimEnd(), more
 
 /** update_task: the edit to apply to the task (its fresh copy, on a retry too) and the notes to link and unlink (record
  *  ids); refused when there is no such task, a note is none, or the edit, tried on it as it is now, is. */
-export async function planUpdate(notes: Notes, todo: Todo, i: UpdateInput): Promise<Plan<{ id: string; edit: Edit<Task>; link: string[]; unlink: string[] }>> {
+export async function planUpdate(notes: NoteService, todo: TaskService, i: UpdateInput): Promise<Plan<{ id: string; edit: Edit<Task>; link: string[]; unlink: string[] }>> {
   const task = await todo.task(i.id);
   if (!task) return { error: `No task ${i.id}. list_tasks has the ids.` };
   const { id, about: _, checklist, link: toLink = [], unlink: toUnlink = [], addTags, removeTags, overlap, addNotes, ...rest } = i;
@@ -153,10 +176,10 @@ export async function planUpdate(notes: Notes, todo: Todo, i: UpdateInput): Prom
 }
 
 /** The checks the approvals run before a card: null when the write can go ahead. */
-export const checkAdd = async (notes: Notes, todo: Todo, i: AddInput) => bad(await planAdd(notes, todo, i));
-export const checkAddMany = async (notes: Notes, todo: Todo, i: AddManyInput) => bad(await planAddMany(notes, todo, i));
-export const checkUpdate = async (notes: Notes, todo: Todo, i: UpdateInput) => bad(await planUpdate(notes, todo, i));
-export const checkTask = async (todo: Todo, id: string) => ((await todo.task(id)) ? null : `No task ${id}. list_tasks has the ids.`);
+export const checkAdd = async (notes: NoteService, todo: TaskService, i: AddInput) => bad(await planAdd(notes, todo, i));
+export const checkAddMany = async (notes: NoteService, todo: TaskService, i: AddManyInput) => bad(await planAddMany(notes, todo, i));
+export const checkUpdate = async (notes: NoteService, todo: TaskService, i: UpdateInput) => bad(await planUpdate(notes, todo, i));
+export const checkTask = async (todo: TaskService, id: string) => ((await todo.task(id)) ? null : `No task ${id}. list_tasks has the ids.`);
 
 /** A task as the model reads it: only what is set. `linked`: the paths of the notes it is about. */
 function listed(t: Task, linked: string[]) {
@@ -194,94 +217,93 @@ export function tagged(have: string[], want: string[], all = false) {
   return all ? want.every(hit) : want.some(hit);
 }
 
-/** The tools over tasks for one request. `notes`: a linked note is a path here, a record id in its link.
- *  `fromPage`: whether the chat has read the web (tools.ts), so a write marks its record `tainted`. */
-export function todoTools(notes: Notes, todo: Todo, fromPage: (messages: ModelMessage[]) => Promise<boolean>) {
-  return {
-    ...taskReadTools(notes, todo),
-    list_tagged: tool({
-      description: "Notes and tasks carrying tags, in one call: any of `tags`, or every one with `match: all` (case and accents ignored). Notes newest edit first, each with a snippet; tasks open ones only unless `done`, each as list_tasks gives it. Use it for \"everything about X\", or to see what a tag holds.",
-      inputSchema: z.object({
-        tags: z.array(z.string().min(1).max(40)).min(1).max(10).describe("Tag names, as list_tags gives them"),
-        match: z.enum(["any", "all"]).optional().describe("any (default): an item with one of them; all: only those with every one"),
-        done: z.boolean().optional().describe("Also tasks already done"),
-        limit: z.number().int().min(1).max(TASKS).optional().describe(`Of each, notes and tasks; default 30, at most ${TASKS}`),
-      }),
-      execute: async ({ tags, match = "any", done = false, limit = 30 }) => {
-        const all = match === "all", [tasks, list] = [await todo.tasks(), await notes.list()];
-        const ns = list.filter((n) => n.path.startsWith(NOTE_DIR) && tagged(n.tags, tags, all)).sort((a, b) => b.updated - a.updated);
-        const ts = tasks.filter((t) => (done || !t.done) && tagged(t.tags, tags, all));
-        const N = capList(ns, limit), T = capList(ts, limit), paths = new Map(list.map((n) => [n.rec, n.path]));
-        const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
-        return {
-          notes: N.list.map((n) => ({ path: n.path, title: n.title, snippet: snippetOf(parseNote(n.path, n.text).body), tags: n.tags })),
-          ...(N.left_out ? { notes_left_out: N.left_out } : {}),
-          tasks: await Promise.all(T.list.map(async (t) => listed(t, await linked(t)))),
-          ...(T.left_out ? { tasks_left_out: T.left_out } : {}),
-        };
-      },
+/** The tools over tasks. A linked note is a path here, a record id in its link. `fromPage`: whether the chat has read the web
+ *  (tools.ts), so a write marks its record `tainted`. */
+export const todoModule = toolModule(({ notes, todo, fromPage }) => ({
+  ...taskReadTools(notes, todo),
+  list_tagged: tool({
+    description: "Notes and tasks carrying tags, in one call: any of `tags`, or every one with `match: all` (case and accents ignored). Notes newest edit first, each with a snippet; tasks open ones only unless `done`, each as list_tasks gives it. Use it for \"everything about X\", or to see what a tag holds.",
+    inputSchema: z.object({
+      tags: z.array(z.string().min(1).max(40)).min(1).max(10).describe("Tag names, as list_tags gives them"),
+      match: z.enum(["any", "all"]).optional().describe("any (default): an item with one of them; all: only those with every one"),
+      done: z.boolean().optional().describe("Also tasks already done"),
+      limit: z.number().int().min(1).max(TASKS).optional().describe(`Of each, notes and tasks; default 30, at most ${TASKS}`),
     }),
+    execute: async ({ tags, match = "any", done = false, limit = 30 }) => {
+      const all = match === "all", [tasks, list] = [await todo.tasks(), await notes.list()];
+      const ns = list.filter((n) => n.path.startsWith(NOTE_DIR) && tagged(n.tags, tags, all)).sort((a, b) => b.updated - a.updated);
+      const ts = tasks.filter((t) => (done || !t.done) && tagged(t.tags, tags, all));
+      const N = capList(ns, limit), T = capList(ts, limit), paths = new Map(list.map((n) => [n.rec, n.path]));
+      const linked = async (t: Task) => (await todo.notesOf(t.id)).flatMap((rec) => paths.get(rec) ?? []);
+      return {
+        notes: N.list.map((n) => ({ path: n.path, title: n.title, snippet: snippetOf(parseNote(n.path, n.text).body), tags: n.tags })),
+        ...(N.left_out ? { notes_left_out: N.left_out } : {}),
+        tasks: await Promise.all(T.list.map(async (t) => listed(t, await linked(t)))),
+        ...(T.left_out ? { tasks_left_out: T.left_out } : {}),
+      };
+    },
+  }),
 
-    add_task: tool({
-      description: "Add a task (a to-do): a record of its own, not a line in a note. The user is shown it and must confirm. Several tasks at once are add_tasks. A shopping list or steps for one thing is one task with a checklist, not a task per item. Title and notes in the user's words and language. No when or due: it stays in the Inbox. `link`: notes it is about, linked to it (paths; as many as fit). Another open task in the same hour of the same day is refused as a double booking: tell the user what it clashes with and let them pick.",
-      inputSchema: ADD,
-      execute: async (i, { messages }) => {
-        const plan = await planAdd(notes, todo, i);
-        return "error" in plan ? plan : todo.addTask(plan.fields, plan.checklist, await fromPage(messages), plan.about);
-      },
-    }),
+  add_task: tool({
+    description: "Add a task (a to-do): a record of its own, not a line in a note. The user is shown it and must confirm. Several tasks at once are add_tasks. A shopping list or steps for one thing is one task with a checklist, not a task per item. Title and notes in the user's words and language. No when or due: it stays in the Inbox. `link`: notes it is about, linked to it (paths; as many as fit). Another open task in the same hour of the same day is refused as a double booking: tell the user what it clashes with and let them pick.",
+    inputSchema: ADD,
+    execute: async (i, { messages }) => {
+      const plan = await planAdd(notes, todo, i);
+      return "error" in plan ? plan : taskSaved(await todo.addTask(plan.fields, plan.checklist, await fromPage(messages), plan.about));
+    },
+  }),
 
-    add_tasks: tool({
-      description: "Add several tasks at once, in one confirm card. Use it when the user lists several separate things to do (\"add: book flights, book hotel, renew passport\"), or asks to break a goal into tasks. They go after the last task, in the order you give. Steps of ONE thing are not tasks: that is one task's checklist (add_task, or update_task on an existing one). One task alone is add_task. The user is shown them all and must confirm. Titles and notes in the user's words and language.",
-      inputSchema: ADD_MANY,
-      execute: async (i, { messages }) => {
-        const plan = await planAddMany(notes, todo, i);
-        return "error" in plan ? plan : todo.addTasks(plan.items, await fromPage(messages));
-      },
-    }),
+  add_tasks: tool({
+    description: "Add several tasks at once, in one confirm card. Use it when the user lists several separate things to do (\"add: book flights, book hotel, renew passport\"), or asks to break a goal into tasks. They go after the last task, in the order you give. Steps of ONE thing are not tasks: that is one task's checklist (add_task, or update_task on an existing one). One task alone is add_task. The user is shown them all and must confirm. Titles and notes in the user's words and language.",
+    inputSchema: ADD_MANY,
+    execute: async (i, { messages }) => {
+      const plan = await planAddMany(notes, todo, i);
+      return "error" in plan ? plan : tasksSaved(await todo.addTasks(plan.items, await fromPage(messages)));
+    },
+  }),
 
-    update_task: tool({
-      description: "Change a task: only the fields you pass change; null clears one. Evening needs a when. `addNotes` adds to its notes (`notes` replaces them all). `checklist` adds subtasks (boxes), rewords, ticks or removes them by item id. `addTags` and `removeTags` change its tags. `link` and `unlink` add or drop notes it is about (paths). The user confirms. Ids from list_tasks. To tick the task itself use complete_task.",
-      inputSchema: UPDATE,
-      execute: async (i, { messages }) => {
-        const plan = await planUpdate(notes, todo, i);
-        return "error" in plan ? plan : todo.editTask(plan.id, plan.edit, await fromPage(messages), plan.link, plan.unlink);
-      },
-    }),
+  update_task: tool({
+    description: "Change a task: only the fields you pass change; null clears one. Evening needs a when. `addNotes` adds to its notes (`notes` replaces them all). `checklist` adds subtasks (boxes), rewords, ticks or removes them by item id. `addTags` and `removeTags` change its tags. `link` and `unlink` add or drop notes it is about (paths). The user confirms. Ids from list_tasks. To tick the task itself use complete_task.",
+    inputSchema: UPDATE,
+    execute: async (i, { messages }) => {
+      const plan = await planUpdate(notes, todo, i);
+      return "error" in plan ? plan : taskSaved(await todo.editTask(plan.id, plan.edit, await fromPage(messages), plan.link, plan.unlink));
+    },
+  }),
 
-    complete_task: tool({
-      description: "Tick a task done (or reopen it). The user confirms. A repeating task gets its next round by itself (the result's `next`). Ids from list_tasks.",
-      inputSchema: z.object({ id: z.string().describe("The task's id"), about: ABOUT, done: z.boolean().optional().describe("Default true; false reopens a done task") }),
-      execute: async ({ id, done = true }, { messages }) => {
-        const why = await checkTask(todo, id);
-        return why ? { error: why } : todo.completeTask(id, done, await fromPage(messages));
-      },
-    }),
+  complete_task: tool({
+    description: "Tick a task done (or reopen it). The user confirms. A repeating task gets its next round by itself (the result's `next`). Ids from list_tasks.",
+    inputSchema: z.object({ id: z.string().describe("The task's id"), about: ABOUT, done: z.boolean().optional().describe("Default true; false reopens a done task") }),
+    execute: async ({ id, done = true }, { messages }) => {
+      const why = await checkTask(todo, id);
+      return why ? { error: why } : taskSaved(await todo.completeTask(id, done, await fromPage(messages)));
+    },
+  }),
 
-    delete_task: tool({
-      description: "Delete a task for good — only when the user asked to remove it (finishing one is complete_task). The user always confirms. Ids from list_tasks.",
-      inputSchema: z.object({ id: z.string().describe("The task's id"), about: ABOUT }),
-      execute: async ({ id }) => {
-        const why = await checkTask(todo, id);
-        return why ? { error: why } : todo.deleteTask(id);
-      },
-    }),
-  };
-}
-
-/** Complete policy for this module: adding a tool requires an explicit classification. */
-export const todoPolicies = {
-  list_tasks: { approval: "none", result: "records" },
-  list_tagged: { approval: "none", result: "records" },
-  add_task: { approval: "createTask", result: "plain", check: ({ notes, todo }, i) => checkAdd(notes, todo, i) },
+  delete_task: tool({
+    description: "Delete a task for good — only when the user asked to remove it (finishing one is complete_task). The user always confirms. Ids from list_tasks.",
+    inputSchema: z.object({ id: z.string().describe("The task's id"), about: ABOUT }),
+    execute: async ({ id }) => {
+      const why = await checkTask(todo, id);
+      return why ? { error: why } : taskSaved(await todo.deleteTask(id));
+    },
+  }),
+}), {
+  list_tasks: { approval: "none", result: "records", run: { results: ["task", "answer"] } },
+  list_tagged: { approval: "none", result: "records", run: { results: ["task", "answer"] } },
+  add_task: {
+    approval: "createTask", result: "plain", check: ({ notes, todo }, i) => checkAdd(notes, todo, i),
+    // A run's task is about the note it was pressed on
+    run: { results: ["task"], scope: (note, { link }) => (link?.includes(note) ? null : `Link the task to the note it comes from: pass ${note} in \`link\`.`) },
+  },
   add_tasks: { approval: "createTask", result: "plain", check: ({ notes, todo }, i) => checkAddMany(notes, todo, i) },
-  update_task: { approval: "editTask", result: "plain", check: ({ notes, todo }, i: UpdateInput) => checkUpdate(notes, todo, i) },
-  complete_task: { approval: "editTask", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
-  delete_task: { approval: "deleteTask", result: "plain", check: ({ todo }, { id }: { id: string }) => checkTask(todo, id) },
-} satisfies Policies<ReturnType<typeof todoTools>>;
+  update_task: { approval: "editTask", result: "plain", check: ({ notes, todo }, i) => checkUpdate(notes, todo, i) },
+  complete_task: { approval: "editTask", result: "plain", check: ({ todo }, { id }) => checkTask(todo, id) },
+  delete_task: { approval: "deleteTask", result: "plain", check: ({ todo }, { id }) => checkTask(todo, id) },
+});
 
 /** Read tools shared by chat and search, independent of write-card adapters. */
-export function taskReadTools(notes: Pick<import("./application/notes").NoteService, "list">, todo: Pick<import("./application/todo").TaskService, "tasks" | "notesOf">) {
+export function taskReadTools(notes: Pick<NoteService, "list">, todo: Pick<TaskService, "tasks" | "notesOf">) {
   return {
     list_tasks: tool({
       description: "The user's tasks, as Things shows them, in a view: inbox (unscheduled), today (on or before today, or due by it; This Evening ones flagged), upcoming (a later day, soonest first), logbook (done, latest first), open (every task not done, any day), all (done ones too). `query` keeps those holding any of its words in the title, notes or checklist (case and accents ignored), the ones holding most first; `tag` those carrying it: to find a task, open with a query. Each with its id (update_task, complete_task and delete_task take it), checklist items with theirs, dates, `tags`, and `linked`: the notes it is about. Check before saying what's due.",

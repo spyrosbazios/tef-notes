@@ -6,14 +6,15 @@ import { DEFAULT_ACTIONS, type Actions } from "@/core/actions";
 import { cardsOf } from "@/core/agent";
 import { parseNote } from "@/core/notes";
 import { approvals, guarded } from "../src/turn";
-import { Notes } from "../src/notes";
+import { NoteService } from "../src/application/notes";
 import { newTask, type Task } from "@/core/todo";
 import { localDay } from "@/core/time";
 import { linkRecord, newLink } from "@/core/record-links";
-import { Todo } from "../src/todo";
+import { TaskService } from "../src/application/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";
 import { stepTools } from "../src/loop";
-import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, policyFor, readWeb, tools, type Line } from "../src/tools";
+import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, type Line } from "../src/notes";
+import { policyFor, readWeb, tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
 /** The owner's rules as the old switch left them (pb_migrations/1795000000_agent_actions.js): off is the defaults; on, the
@@ -24,12 +25,12 @@ const UNASKED: Actions = { ...DEFAULT_ACTIONS, createTask: "auto", editTask: "au
 const pb = fakePb();
 afterAll(() => pb.stop());
 
-let notes: Notes, todo: Todo, T: ReturnType<typeof tools>;
+let notes: NoteService, todo: TaskService, T: ReturnType<typeof tools>;
 beforeEach(() => {
   pb.notes.clear(); pb.chats.clear(); pb.tasks.clear(); pb.links.clear(); pb.created.length = 0; pb.meanwhile();
   pb.lenses.length = 0; pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "" }, { id: "t2", name: "work", description: "" });
-  notes = new Notes({ url: pb.url });
-  todo = new Todo({ url: pb.url });
+  notes = new NoteService({ url: pb.url });
+  todo = new TaskService({ url: pb.url });
   T = tools(notes, todo);
 });
 
@@ -321,12 +322,12 @@ describe("writes", () => {
     expect(await run(T.set_place, { task: "nope", name: "Pool" })).toMatchObject({ error: expect.stringContaining("No task nope") });
   });
 
-  it("set_place: the confirm card is skipped only for a bad request, which goes back to the agent", async () => {
+  it("set_place: a bad request is refused with its reason, never waved past the card", async () => {
     const added = await run(T.add_task, { title: "Swim" } as never) as { id: string };
     const ask = approvals(notes, todo, ASKED).set_place, o = { messages: [] as ModelMessage[] };
     expect(await ask({ task: added.id, name: "Home" }, o)).toBe("user-approval");
-    expect(await ask({ task: added.id }, o)).toBe("not-applicable");
-    expect(await ask({ task: "nope", name: "Home" }, o)).toBe("not-applicable");
+    expect(await ask({ task: added.id }, o)).toMatchObject({ type: "denied", reason: expect.stringContaining("exactly one") });
+    expect(await ask({ task: "nope", name: "Home" }, o)).toMatchObject({ type: "denied", reason: expect.stringContaining("nope") });
   });
 
   it("update_memory: creates the file the first time, refuses one too long", async () => {
@@ -604,11 +605,11 @@ describe("delete_note", () => {
     expect(await run(T.delete_note, { path: "agent/memory.md" })).toEqual({ error: expect.stringMatching(/^Not a note path/) });
   });
 
-  it("always asks, whatever the setting; a bad path goes straight back", async () => {
+  it("always asks, whatever the setting; a bad path is refused with its reason", async () => {
     pb.notes.set("notes/a.md", { id: "r1", path: "notes/a.md", rev: 1, tainted: false, updated: "2026-10-05 10:00:00.000Z", text: file("A"), title: "A", tags: [] });
     const ask = approvals(notes, todo, UNASKED);
     expect(await ask.delete_note({ path: "notes/a.md" }, { messages: [] })).toBe("user-approval");
-    expect(await ask.delete_note({ path: "notes/zz.md" }, { messages: [] })).toBe("not-applicable");
+    expect(await ask.delete_note({ path: "notes/zz.md" }, { messages: [] })).toMatchObject({ type: "denied", reason: expect.stringContaining("No note notes/zz.md") });
   });
 });
 
@@ -667,17 +668,17 @@ describe("approvals", () => {
     ({ role: "tool", content: [{ type: "tool-result", toolCallId: "r", toolName: "read_note", output: { type: "json", value: { path, text: "x" } } }] });
   const o = (messages: ModelMessage[] = []) => ({ messages });
 
-  it("a write asks, unless writes without asking are on and the chat hasn't read the web; a bad path skips the card", async () => {
+  it("a write asks, unless writes without asking are on and the chat hasn't read the web; a bad path is refused with its reason", async () => {
     pb.put("notes/a.md", file("a"));
     const ask = approvals(notes, todo, ASKED), auto = approvals(notes, todo, UNASKED);
     expect(await ask.append_to_note({ path: "notes/a.md" }, o())).toBe("user-approval");
-    expect(await ask.append_to_note({ path: "notes/nope.md" }, o())).toBe("not-applicable");
-    expect(await ask.rewrite_note({ path: "notes/a.md", text: "---\nx\n" }, o())).toBe("not-applicable");
+    expect(await ask.append_to_note({ path: "notes/nope.md" }, o())).toMatchObject({ type: "denied", reason: expect.stringContaining("No note") });
+    expect(await ask.rewrite_note({ path: "notes/a.md", text: "---\nx\n" }, o())).toMatchObject({ type: "denied", reason: expect.stringContaining("frontmatter") });
     expect(await auto.create_note({}, o())).toBe("not-applicable");
     expect(await auto.append_to_note({ path: "notes/a.md" }, o([web]))).toBe("user-approval");
   });
 
-  it("a task write asks like a note write; a bad task or value skips the card; a delete always asks; list_tasks never asks", async () => {
+  it("a task write asks like a note write; a bad task or value is refused; a delete always asks; list_tasks never asks", async () => {
     const t = newTask("ff11".padEnd(15, "0"), { title: "Call" });
     pb.tasks.set(t.id, { ...t, rev: 1 });
     const ask = approvals(notes, todo, ASKED), auto = approvals(notes, todo, UNASKED);
@@ -685,17 +686,17 @@ describe("approvals", () => {
     expect(await ask.update_task({ id: t.id, when: "2999-01-01" }, o())).toBe("user-approval");
     expect(await ask.complete_task({ id: t.id }, o())).toBe("user-approval");
     expect(await ask.add_tasks({ tasks: [{ title: "x" }] }, o())).toBe("user-approval");
-    expect(await ask.add_tasks({ tasks: [{ title: "x", remind: "9am" }] }, o())).toBe("not-applicable");
+    expect(await ask.add_tasks({ tasks: [{ title: "x", remind: "9am" }] }, o())).toMatchObject({ type: "denied" });
     expect(await auto.add_tasks({ tasks: [{ title: "x" }] }, o([web]))).toBe("user-approval");
-    expect(await ask.complete_task({ id: "zzzz" }, o())).toBe("not-applicable");
-    expect(await ask.update_task({ id: t.id, when: "soon" }, o())).toBe("not-applicable");
-    expect(await ask.add_task({ title: "x", link: ["notes/nope.md"] }, o())).toBe("not-applicable");
+    expect(await ask.complete_task({ id: "zzzz" }, o())).toMatchObject({ type: "denied" });
+    expect(await ask.update_task({ id: t.id, when: "soon" }, o())).toMatchObject({ type: "denied" });
+    expect(await ask.add_task({ title: "x", link: ["notes/nope.md"] }, o())).toMatchObject({ type: "denied", reason: expect.stringContaining("notes/nope.md") });
     expect(await auto.add_task({ title: "x" }, o())).toBe("not-applicable");
     expect(await auto.update_task({ id: t.id, notes: "n" }, o())).toBe("not-applicable");
     expect(await auto.add_task({ title: "x" }, o([web]))).toBe("user-approval");
     expect(await auto.complete_task({ id: t.id }, o([web]))).toBe("user-approval");
     expect(await auto.delete_task({ id: t.id }, o())).toBe("user-approval");
-    expect(await auto.delete_task({ id: "zzzz" }, o())).toBe("not-applicable");
+    expect(await auto.delete_task({ id: "zzzz" }, o())).toMatchObject({ type: "denied" });
     expect("list_tasks" in ask).toBe(false);
   });
 
@@ -725,7 +726,7 @@ describe("approvals", () => {
     expect(await a.update_memory({ text: "x" }, o())).toBe("not-applicable");
     expect(await a.update_memory({ text: "x" }, o([web]))).toBe("user-approval");
     expect(await a.update_memory({ text: "x" }, o([readOf("notes/w.md")]))).toBe("user-approval");
-    expect(await a.update_memory({ text: "x".repeat(6001) }, o([web]))).toBe("not-applicable");   // its own error, straight back
+    expect(await a.update_memory({ text: "x".repeat(6001) }, o([web]))).toMatchObject({ type: "denied", reason: expect.stringContaining("Too long") });   // refused, with its reason
   });
 });
 

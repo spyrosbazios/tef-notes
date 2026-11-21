@@ -5,6 +5,7 @@
 // each write (@/core/actions) and the taint checks.
 import type { ModelMessage } from "ai";
 import type { PromptAction, Result, Run } from "@/core/note-actions";
+import type { Policy, PolicyLookup } from "./tool-policy";
 
 /** A run as the turn is built with it: the owner's action and the note it was pressed on. */
 export type Scope = { action: PromptAction; note: string };
@@ -15,18 +16,9 @@ export const scopeOf = (run: Run, actions: readonly PromptAction[]): Scope | und
   return action && { action, note: run.note };
 };
 
-const READS = ["read_note", "search_notes", "list_notes", "list_tags", "read_attachment", "read_image", "read_drawing"] as const;
-
-/** The tools a run is offered, by what it ends in. No web, no memory, none of the app's own tools: a button has no chat to
- *  wander in, and nobody to answer a question. */
-const OFFERED: Record<Result, readonly string[]> = {
-  edit: [...READS, "rewrite_note", "append_to_note"],
-  task: [...READS, "list_tasks", "list_tagged", "find_place", "add_task", "set_place"],
-  answer: [...READS, "list_tasks", "list_tagged"],
-};
-
-/** Whether a run may be offered `tool`. */
-export const offeredTo = (scope: Scope, tool: string): boolean => OFFERED[scope.action.result].includes(tool);
+/** Whether a run may be offered the tool with this policy: its policy names the run's result (tool-policy.ts `run`). No web, no
+ *  memory, none of the app's own tools: a button has no chat to wander in, and nobody to answer a question. */
+export const offeredTo = (scope: Scope, policy: Policy | undefined): boolean => !!policy?.run?.results.includes(scope.action.result);
 
 const DOES: Record<Result, string> = {
   edit: "Then make the change with one rewrite_note call on that note and no other, sending its whole new body; the owner is shown it as a diff to accept. After it, reply with one short sentence saying what changed. If the note needs no change, say so and write nothing.",
@@ -41,24 +33,17 @@ export const instructions = ({ action, note }: Scope): string =>
 type Status = "not-applicable" | "user-approval" | { type: "denied"; reason: string };
 type Check = (input: unknown, options: { messages: ModelMessage[] }) => Promise<Status>;
 
-const str = (v: unknown) => (typeof v === "string" ? v : "");
-const field = (input: unknown, key: string): unknown => (input && typeof input === "object" ? (input as Record<string, unknown>)[key] : undefined);
-
-/** Why a run may not make this call, or null: a note write is for its own note, and a new task links to it. */
-export function outOfScope({ note }: Scope, tool: string, input: unknown): string | null {
-  if ((tool === "rewrite_note" || tool === "append_to_note") && str(field(input, "path")) !== note) return `This action changes ${note} and no other note.`;
-  const link = field(input, "link");
-  if (tool === "add_task" && !(Array.isArray(link) && link.includes(note))) return `Link the task to the note it comes from: pass ${note} in \`link\`.`;
-  return null;
-}
+/** Why a run may not make this call, or null: its policy's `run.scope` (a note write is for its own note, a new task links to it). */
+export const outOfScope = ({ note }: Scope, policy: Policy | undefined, input: unknown): string | null =>
+  policy?.run?.scope?.(note, input as never) ?? null;
 
 /** The chat's approvals, narrowed to a run: a call out of its scope is refused with the reason, any other asks as it would. */
-export function scoped<A extends Record<string, unknown>>(approvals: A, scope: Scope): A {
+export function scoped<A extends Record<string, unknown>>(approvals: A, scope: Scope, policyFor: PolicyLookup): A {
   const all = approvals as Record<string, Check | undefined>, out: Record<string, Check> = {};
   for (const [tool, check] of Object.entries(all)) {
     if (!check) continue;
     out[tool] = async (input, options) => {
-      const bad = outOfScope(scope, tool, input);
+      const bad = outOfScope(scope, policyFor(tool), input);
       return bad ? { type: "denied", reason: bad } : check(input, options);
     };
   }

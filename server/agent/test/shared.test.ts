@@ -5,8 +5,8 @@ import type { ModelMessage } from "ai";
 import { parseNote } from "@/core/notes";
 import { fromWeb } from "../src/tools";
 import { imageType } from "../src/images";
-import { Notes } from "../src/notes";
-import { Todo } from "../src/todo";
+import { NoteService } from "../src/application/notes";
+import { TaskService } from "../src/application/todo";
 import { tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
@@ -24,7 +24,7 @@ beforeEach(() => {
   pb.attach(id, "lease.pdf", new Uint8Array([1]));
 });
 
-const all = () => tools(new Notes(server), new Todo(server)) as any;
+const all = () => tools(new NoteService(server), new TaskService(server)) as any;
 const run = (name: string, input: object) => all()[name].execute(input, { messages: [], toolCallId: "t" });
 
 describe("read_image", () => {

@@ -1,41 +1,7 @@
-// The confirm cards' words for the task tools (server/agent/src/todoTools.ts is the authority on the inputs).
 import { describe, expect, it } from "bun:test";
-import { cardKey, cardsByPart, cardsOf, gist, kindOf, label, noteCardOf, previewOf, taskCardOf, todoLines, todoWords } from "../src/agent";
+import { cardKey, cardsByPart, cardsOf, gist, kindOf, label, noteCardOf, previewOf, taskCardOf } from "../src/agent";
 import { newTask } from "../src/todo";
 import { WIDGET_TOOLS } from "../src/widgets";
-
-describe("todoWords", () => {
-  it("names the record by the title the agent gave", () => {
-    expect(todoWords("add_task", { title: "Call plumber" })).toMatchObject({ head: "Add task “Call plumber”?", yes: "Add it", subject: "“Call plumber”" });
-    expect(todoWords("update_task", { id: "x", about: "Call plumber" })).toMatchObject({ head: "Change “Call plumber”?", done: "Changed" });
-    expect(todoWords("complete_task", { id: "x", about: "Bins" })).toMatchObject({ head: "Complete “Bins”?", done: "Completed" });
-    expect(todoWords("complete_task", { id: "x", about: "Bins", done: false })).toMatchObject({ head: "Reopen “Bins”?", skipped: "reopen" });
-    expect(todoWords("delete_task", { id: "x", about: "Bins" })).toMatchObject({ head: "Delete “Bins”?", yes: "Delete it" });
-  });
-  it("says 'a task' when the agent named none, and nothing for a note write", () => {
-    expect(todoWords("delete_task", { id: "x" })?.head).toBe("Delete a task?");
-    expect(todoWords("append_to_note", {})).toBeNull();
-  });
-});
-
-describe("todoLines", () => {
-  it("add_task: dates, where it goes, the checklist", () => {
-    expect(todoLines("add_task", { title: "Lidl", when: "2026-11-01", evening: true, checklist: ["milk", "eggs"] }))
-      .toEqual(["2026-11-01, this evening", "In the Inbox", "Checklist: milk, eggs"]);
-    expect(todoLines("add_task", { title: "Book", link: ["notes/a.md", "notes/b.md"] })).toEqual(["No day", "In the Inbox", "About notes/a.md, notes/b.md"]);
-  });
-  it("update_task: only what changes, null as its own words", () => {
-    expect(todoLines("update_task", { id: "x", when: null, due: "2026-11-05", checklist: { add: ["pay"], remove: ["ab12"] } }))
-      .toEqual(["No day · due 2026-11-05", "Add to the checklist: pay", "Remove 1 checklist item"]);
-    expect(todoLines("update_task", { id: "x" })).toEqual([]);
-    expect(todoLines("update_task", { id: "x", link: ["notes/a.md"], unlink: ["notes/b.md"] })).toEqual(["Link notes/a.md", "Unlink notes/b.md"]);
-  });
-  it("ticks and deletes", () => {
-    expect(todoLines("complete_task", { id: "x" })).toEqual(["Mark it done"]);
-    expect(todoLines("complete_task", { id: "x", done: false })).toEqual(["Open it again"]);
-    expect(todoLines("delete_task", { id: "x" })).toEqual(["Delete it for good"]);
-  });
-});
 
 describe("labels", () => {
   it("every task tool is labelled and folded as tasks, not notes", () => {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { chunks, Semantic } from "../src/semantic";
-import type { Meta } from "../src/notes";
+import type { Meta } from "../src/application/notes";
 import { fakeEmbed } from "./embed";
 
 const note = (path: string, title: string, body: string): Meta =>
