@@ -17,6 +17,8 @@ version is one semver number for the whole repository, set by the git tag (see [
   re-tags every note. The ones it wrote before are rewritten once this way.
 - Searching for a word with a `%` or `_` in it (the CLI's `search`, the clipper's "any note") finds that character, not any
   text: `100%` no longer matches everything that begins "100".
+- The Android widgets say so when the server and the app are of different versions ("update the app" or "update the
+  server", as Settings does) instead of "Loading" for good.
 
 ## 0.13.0 - 2026-11-19
 

@@ -67,6 +67,18 @@ class ContractTest {
     }
 
     @Test
+    fun aFeedOfAnotherContractIsNamedSoAWidgetDoesNotSayLoadingForever() {
+        val newer = feed.replace("\"contract\":3", "\"contract\":4")
+        val older = feed.replace("\"contract\":3", "\"contract\":2")
+        assertEquals(mismatchMessage(4), feedMismatch(newer))
+        assertEquals(mismatchMessage(2), feedMismatch(older))
+        assertEquals("That server and this app are of different versions: update the app.", mismatchMessage(CONTRACT + 1))
+        assertEquals("That server and this app are of different versions: update the server.", mismatchMessage(CONTRACT - 1))
+        assertNull(feedMismatch(feed))
+        for (none in listOf(null, "<html>", "{}", "")) assertNull(feedMismatch(none))
+    }
+
+    @Test
     fun aTickedTaskLeavesTheFeedAndAnEmptySectionWithIt() {
         val f = tasksFeedOf(withoutTask(feed, "c"))!!
         assertEquals(listOf(""), f.sections.map { it.label })
@@ -106,14 +118,5 @@ class ContractTest {
         assertEquals(ClipTags(listOf(ScoredTag("work", 0.91), ScoredTag("home", 0.0)), listOf("work")), t)
         assertEquals(ClipTags(emptyList(), emptyList()), clipTagsOf(JSONObject("{}")))
         assertEquals("91%", percent(0.91))
-    }
-
-    @Test
-    fun theServersAddress() {
-        assertEquals("https://notes.example.ts.net", serverAddress(" Notes.Example.ts.net/ "))
-        assertEquals("https://notes.example.ts.net:8443", serverAddress("https://notes.example.ts.net:8443/today?t=1"))
-        assertNull(serverAddress("http://notes.example.ts.net"))
-        assertNull(serverAddress("not an address"))
-        assertNull(serverAddress(""))
     }
 }

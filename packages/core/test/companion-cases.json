@@ -744,5 +744,173 @@
       ]
     }
 
+  ],
+
+  "contract": 3,
+
+  "taskLists": [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]],
+
+  "jpeg": {"stored": 82, "look": 80},
+
+  "addresses": [
+    {"input": "https://notes.example.ts.net", "origin": "https://notes.example.ts.net"},
+    {"input": " Notes.Example.ts.net/ ", "origin": "https://notes.example.ts.net"},
+    {"input": "notes.example.ts.net:8443", "origin": "https://notes.example.ts.net:8443"},
+    {"input": "https://notes.example.ts.net:8443/today?t=1", "origin": "https://notes.example.ts.net:8443"},
+    {"input": "http://notes.example.ts.net", "origin": null},
+    {"input": "not an address", "origin": null},
+    {"input": "", "origin": null}
+  ],
+
+  "withoutTask": [
+    {
+      "name": "the last of an evening section takes the section with it",
+      "tasks": [
+        {"id": "a", "evening": false, "order": 1},
+        {"id": "b", "evening": false, "order": 2},
+        {"id": "c", "evening": true, "order": 3}
+      ],
+      "tick": "c",
+      "feed": {
+        "contract": 3,
+        "list": "today",
+        "title": "Today",
+        "url": "/today",
+        "sections": [
+          {
+            "label": "",
+            "tasks": [
+              {"id": "a", "title": "Task a", "detail": "", "late": false, "url": "/today?t=a"},
+              {"id": "b", "title": "Task b", "detail": "", "late": false, "url": "/today?t=b"}
+            ]
+          },
+          {
+            "label": "This Evening",
+            "tasks": [{"id": "c", "title": "Task c", "detail": "", "late": false, "url": "/today?t=c"}]
+          }
+        ],
+        "more": 0,
+        "lenses": [],
+        "ask": "/?ask=1"
+      },
+      "after": {
+        "contract": 3,
+        "list": "today",
+        "title": "Today",
+        "url": "/today",
+        "sections": [
+          {
+            "label": "",
+            "tasks": [
+              {"id": "a", "title": "Task a", "detail": "", "late": false, "url": "/today?t=a"},
+              {"id": "b", "title": "Task b", "detail": "", "late": false, "url": "/today?t=b"}
+            ]
+          }
+        ],
+        "more": 0,
+        "lenses": [],
+        "ask": "/?ask=1"
+      }
+    },
+    {
+      "name": "a task of the first section leaves the others in place",
+      "tasks": [
+        {"id": "a", "evening": false, "order": 1},
+        {"id": "b", "evening": false, "order": 2},
+        {"id": "c", "evening": true, "order": 3}
+      ],
+      "tick": "a",
+      "feed": {
+        "contract": 3,
+        "list": "today",
+        "title": "Today",
+        "url": "/today",
+        "sections": [
+          {
+            "label": "",
+            "tasks": [
+              {"id": "a", "title": "Task a", "detail": "", "late": false, "url": "/today?t=a"},
+              {"id": "b", "title": "Task b", "detail": "", "late": false, "url": "/today?t=b"}
+            ]
+          },
+          {
+            "label": "This Evening",
+            "tasks": [{"id": "c", "title": "Task c", "detail": "", "late": false, "url": "/today?t=c"}]
+          }
+        ],
+        "more": 0,
+        "lenses": [],
+        "ask": "/?ask=1"
+      },
+      "after": {
+        "contract": 3,
+        "list": "today",
+        "title": "Today",
+        "url": "/today",
+        "sections": [
+          {"label": "", "tasks": [{"id": "b", "title": "Task b", "detail": "", "late": false, "url": "/today?t=b"}]},
+          {
+            "label": "This Evening",
+            "tasks": [{"id": "c", "title": "Task c", "detail": "", "late": false, "url": "/today?t=c"}]
+          }
+        ],
+        "more": 0,
+        "lenses": [],
+        "ask": "/?ask=1"
+      }
+    },
+    {
+      "name": "a task the feed does not hold changes nothing",
+      "tasks": [
+        {"id": "a", "evening": false, "order": 1},
+        {"id": "b", "evening": false, "order": 2},
+        {"id": "c", "evening": true, "order": 3}
+      ],
+      "tick": "zzz",
+      "feed": {
+        "contract": 3,
+        "list": "today",
+        "title": "Today",
+        "url": "/today",
+        "sections": [
+          {
+            "label": "",
+            "tasks": [
+              {"id": "a", "title": "Task a", "detail": "", "late": false, "url": "/today?t=a"},
+              {"id": "b", "title": "Task b", "detail": "", "late": false, "url": "/today?t=b"}
+            ]
+          },
+          {
+            "label": "This Evening",
+            "tasks": [{"id": "c", "title": "Task c", "detail": "", "late": false, "url": "/today?t=c"}]
+          }
+        ],
+        "more": 0,
+        "lenses": [],
+        "ask": "/?ask=1"
+      },
+      "after": {
+        "contract": 3,
+        "list": "today",
+        "title": "Today",
+        "url": "/today",
+        "sections": [
+          {
+            "label": "",
+            "tasks": [
+              {"id": "a", "title": "Task a", "detail": "", "late": false, "url": "/today?t=a"},
+              {"id": "b", "title": "Task b", "detail": "", "late": false, "url": "/today?t=b"}
+            ]
+          },
+          {
+            "label": "This Evening",
+            "tasks": [{"id": "c", "title": "Task c", "detail": "", "late": false, "url": "/today?t=c"}]
+          }
+        ],
+        "more": 0,
+        "lenses": [],
+        "ask": "/?ask=1"
+      }
+    }
   ]
 }

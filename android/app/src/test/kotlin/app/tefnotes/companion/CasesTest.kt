@@ -85,6 +85,32 @@ class CasesTest {
     }
 
     @Test
+    fun theContractIsTheServers() = assertEquals(cases.getInt("contract"), CONTRACT)
+
+    @Test
+    fun theTaskListsAndTheirNames() {
+        val l = cases.getJSONArray("taskLists")
+        assertEquals((0 until l.length()).map { l.getJSONArray(it).let { p -> p.getString(0) to p.getString(1) } }, TASK_LISTS)
+    }
+
+    @Test
+    fun theJpegQualities() {
+        val q = cases.getJSONObject("jpeg")
+        assertEquals(q.getInt("stored"), STORED_QUALITY)
+        assertEquals(q.getInt("look"), LOOK_QUALITY)
+    }
+
+    @Test
+    fun theServersAddressAsTyped() = each("addresses") { c ->
+        assertEquals(c.getString("input"), if (c.isNull("origin")) null else c.getString("origin"), serverAddress(c.getString("input")))
+    }
+
+    @Test
+    fun aTickedTaskLeavesTheFeedAsTheServerWouldSendIt() = each("withoutTask") { c ->
+        same(c.getJSONObject("after"), JSONObject(withoutTask(c.getJSONObject("feed").toString(), c.getString("tick"))), c.getString("name"))
+    }
+
+    @Test
     fun whatASaveSays() = each("results") { c ->
         val r = clipResultOf(c.getJSONObject("result"))
         assertEquals(c.getString("line"), describe(r))

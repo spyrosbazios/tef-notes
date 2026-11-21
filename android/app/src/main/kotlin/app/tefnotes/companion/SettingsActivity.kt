@@ -93,7 +93,7 @@ class SettingsActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 val hello = Api(origin).hello()
-                if (hello.contract != CONTRACT) no("That server and this app are of different versions: update the ${if (hello.contract > CONTRACT) "app" else "server"}.")
+                if (hello.contract != CONTRACT) no(mismatchMessage(hello.contract))
                 else {
                     Store.setServer(this@SettingsActivity, origin, hello)
                     server = origin

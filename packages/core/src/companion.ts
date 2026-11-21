@@ -6,10 +6,13 @@
 // lets a second one be written in another language without a second copy of the rules.
 //
 // What a companion does copy is small, and checked: how a share reads as a clip (`shareClip`), the sizes a picture is
-// sent at (photos.ts `fit`, `lookSize`), how many files a clip takes and how large a PDF (clip.ts `CLIP_FILES`, photos.ts
-// `MAX_PDF`), the choices a clip offers, its tags and what its save says (clip.ts `filesWord`,
-// `choices`, `unpickedTags`, `savedTags`, `describe`, `summaryNotice`). They run before the server is reached, or beside its answer. test/companion-cases.json holds the
-// cases; this core's tests and each companion's run the same file.
+// sent at and its JPEG qualities (photos.ts `storedSize`, `lookSize`, `QUALITY`, `LOOK_QUALITY`), how many files a clip takes and how
+// large a PDF (clip.ts `CLIP_FILES`, photos.ts `MAX_PDF`), the choices a clip offers, its tags and what its save says (clip.ts
+// `filesWord`, `choices`, `unpickedTags`, `savedTags`, `describe`, `summaryNotice`), the contract number (`COMPANION_CONTRACT`), the task
+// lists and their names (prefs.ts `TASK_LISTS`), the server's address as typed (no core copy: held to the URL standard's origin), and
+// the feed a widget shows from a tick until the server has it (held to `tasksFeed` of the tasks without it). They run before the
+// server is reached, or beside its answer. test/companion-cases.json holds the cases; this core's tests and each companion's run the
+// same file.
 //
 // Routes, all under /agent/companion (server/agent/src/companion.ts), errors `{error}`:
 //   GET  hello                 -> Hello: is this a TEF Notes server, at which contract, in which colours
