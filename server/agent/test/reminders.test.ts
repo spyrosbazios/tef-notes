@@ -28,6 +28,14 @@ describe("dueReminders", () => {
     expect(dueReminders([cand(task(), at(9, 0))], new Set(), at(9, 1))).toEqual([]);
     expect(dueReminders([cand(task(), at(9, 0) + 5000)], new Set(), at(9, 1))).toEqual([]);
   });
+  it("a reminder an earlier scan saw ahead of its time rings though the task was touched after it (a tag rename, the auto-tagger)", () => {
+    const t = task();
+    const touched = [cand(t, at(9, 0) + 30_000)], armed = new Set([dueKey(t)]);
+    expect(dueReminders(touched, new Set(), at(9, 1))).toEqual([]);
+    expect(ids(dueReminders(touched, new Set(), at(9, 1), { armed }))).toEqual([t.id]);
+    // Armed for another time is no help: moving the task makes a reminder of its own
+    expect(dueReminders([cand({ ...t, remind: "08:30" }, at(8, 45))], new Set(), at(9, 1), { armed })).toEqual([]);
+  });
   it("a task moved to another time is a new reminder", () => {
     const t = task(), moved = { ...t, remind: "09:30" };
     expect(ids(dueReminders([cand(moved)], new Set([dueKey(t)]), at(9, 31)))).toEqual([t.id]);
@@ -98,6 +106,33 @@ describe("scan", () => {
     const t = task(), r = ports({ tasks: [cand(t)], outcome: (s) => (s.rec === "s1" ? "failed" : "dropped") });
     expect(await scan(r.p, at(9, 1))).toEqual([]);
     expect(r.claimed.size).toBe(0);
+  });
+  it("a scan before the time arms the reminder: a touch after the time (a tag rename) no longer drops it", async () => {
+    const t = task(), armed = new Set<string>(), r = ports({ tasks: [cand(t, at(8))] });
+    expect(await scan(r.p, at(8, 59), armed)).toEqual([]);
+    expect([...armed]).toEqual([dueKey(t)]);
+    // The auto-tagger touches the task just after its time, before the next scan
+    r.p.candidates = async () => [cand(t, at(9, 0) + 20_000)];
+    expect(await scan(r.p, at(9, 1), armed)).toEqual([dueKey(t)]);
+    expect(r.delivered).toHaveLength(2);
+  });
+  it("one no scan saw ahead of its time (set after it, or after a restart) still goes by when the task was last saved", async () => {
+    const t = task(), late = ports({ tasks: [cand(t, at(9, 0) + 20_000)] });
+    expect(await scan(late.p, at(9, 1), new Set())).toEqual([]);
+    expect(late.delivered).toEqual([]);
+    const early = ports({ tasks: [cand(t, at(8, 30))] });
+    expect(await scan(early.p, at(9, 1), new Set())).toEqual([dueKey(t)]);
+  });
+  it("forgets a reminder that is done, moved or gone", async () => {
+    const t = task(), armed = new Set<string>(), r = ports({ tasks: [cand(t)] });
+    await scan(r.p, at(8, 0), armed);
+    expect(armed.size).toBe(1);
+    r.p.candidates = async () => [cand({ ...t, done: "2026-11-08" }), cand({ ...t, remind: "10:00" })];
+    await scan(r.p, at(8, 1), armed);
+    expect([...armed]).toEqual([dueKey({ ...t, remind: "10:00" })]);
+    r.p.candidates = async () => [];
+    await scan(r.p, at(8, 2), armed);
+    expect(armed.size).toBe(0);
   });
   it("keeps the claim when any delivery was sent or its subscription gone", async () => {
     for (const outcome of [(s: Sub) => (s.rec === "s1" ? "sent" : "failed"), (s: Sub) => (s.rec === "s1" ? "gone" : "failed")] as ((s: Sub) => Outcome)[]) {

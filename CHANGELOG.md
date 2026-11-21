@@ -24,6 +24,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 - The assistant's Tidy and other whole-note rewrites no longer overwrite what you typed while the card was open: the
   rewrite is made over the version the assistant read and merged with your edits (refused where they touch the same lines),
   and the card shows the merged result. Its memory file is updated the same way.
+- A task reminder is no longer dropped because something else touched the task around its time (a tag rename, the
+  auto-tagger), and a push endpoint that keeps failing is removed after five failed sends instead of five scans.
 - Settings no longer undo each other: the preferences record carries a `rev` like notes and tasks, a device whose save lost
   a race reads the newer record and puts only the settings it changed over it, and the assistant's own writes (the widget's
   lens, a note action it saves) go through the same path instead of saving the whole record.
