@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Renderer, render, RenderError, TIMEOUT_MS } from "../src/render";
 import { makePdf } from "./pdf";
 
-const jpeg = (b: Uint8Array) => [...b.slice(0, 2)];
+const jpeg = (b: Uint8Array) => Array.from(b.subarray(0, 2));
 
 describe("render process", () => {
   afterAll(() => render().stop());
@@ -20,7 +20,7 @@ describe("render process", () => {
     expect(jpeg(small)).toEqual([0xff, 0xd8]);
     expect(small.length).toBeLessThan(big.length);
     const png = await render().run("drawing", { scene: { type: "excalidraw", elements: [{ id: "a", type: "rectangle", x: 0, y: 0, width: 100, height: 50 }] } });
-    expect([...png.slice(1, 4)].map((c) => String.fromCharCode(c)).join("")).toBe("PNG");
+    expect(Array.from(png.subarray(1, 4), (c) => String.fromCharCode(c)).join("")).toBe("PNG");
   });
 
   it("fails a job whose file is broken without ending the process", async () => {

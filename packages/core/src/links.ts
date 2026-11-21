@@ -62,8 +62,10 @@ export function noteLinkPath(url: string): string | null {
  *  page's pasted HTML can carry. Leading blanks and controls are dropped first, as a browser does when it reads one. */
 export function safeHref(href: string | null | undefined): string | null {
   if (!href) return null;
-  const h = href.replace(/^[\u0000- ]+/, "");
-  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(h.replace(/[\t\n\r]/g, ""))?.[1]?.toLowerCase();
+  let i = 0;
+  while (i < href.length && href.charCodeAt(i) <= 0x20) i++;
+  const h = href.slice(i);
+  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(h.replaceAll("\t", "").replaceAll("\n", "").replaceAll("\r", ""))?.[1]?.toLowerCase();
   return scheme === undefined || scheme === "http" || scheme === "https" || scheme === "mailto" ? h : null;
 }
 
