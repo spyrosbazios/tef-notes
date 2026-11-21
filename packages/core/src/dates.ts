@@ -2,7 +2,9 @@
 // "nov 12" mean (parseWhen), and how a stored day reads back (dayLabel, dayParts, everyLabel). Pure and local-day:
 // `today` is the caller's `YYYY-MM-DD` (localDay()), never read here.
 
-/** `1d 2w 1m 1y` (fixed: from the scheduled date), `+3d` (from the day it was done), `mon,thu` (those weekdays). */
+/** `1d 2w 1m 1y` (fixed: from the scheduled date), `+3d` (from the day it was done), `mon,thu` (those weekdays). A monthly
+ *  or yearly one may end `@29`, `@30` or `@31`: the day of the month it is meant for, kept once a short month clamped it
+ *  (everyOn). */
 export type Every = string;
 
 // ---- arithmetic
@@ -16,16 +18,45 @@ export const addDays = (day: string, n: number) => fmt(ms(day) + n * DAY_MS);
 export const daysBetween = (a: string, b: string) => Math.round((ms(b) - ms(a)) / DAY_MS);
 const daysIn = (y: number, m0: number) => new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
 
-/** `n` months on. A month's last day stays a last day (Jan 31 → Feb 28 → Mar 31); a day the month lacks becomes its last. */
-export function addMonths(day: string, n: number): string {
-  const y = +day.slice(0, 4), m = +day.slice(5, 7) - 1, d = +day.slice(8, 10);
-  const t = new Date(Date.UTC(y, m + n, 1)), ty = t.getUTCFullYear(), tm = t.getUTCMonth(), last = daysIn(ty, tm);
-  return `${ty}-${two(tm + 1)}-${two(d === daysIn(y, m) ? last : Math.min(d, last))}`;
+/** `n` months on, on day `anchor` of that month (the day's own by default); a month without that day gets its last. */
+export function addMonths(day: string, n: number, anchor = +day.slice(8, 10)): string {
+  const t = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1 + n, 1)), ty = t.getUTCFullYear(), tm = t.getUTCMonth();
+  return `${ty}-${two(tm + 1)}-${two(Math.min(anchor, daysIn(ty, tm)))}`;
 }
 
-function step(day: string, every: string): string {
-  const m = /^\+?(\d+)([dwmy])$/.exec(every)!, n = +m[1];
-  return m[2] === "d" ? addDays(day, n) : m[2] === "w" ? addDays(day, 7 * n) : addMonths(day, m[2] === "m" ? n : 12 * n);
+const dayOf = (day: string) => +day.slice(8, 10);
+
+/** A repeat split at its anchor: `1m@30` is `{ core: "1m", anchor: 30 }`; one without an `@` has no anchor. */
+export function everyParts(every: Every): { core: string; anchor: number | null } {
+  const at = every.indexOf("@");
+  return at < 0 ? { core: every, anchor: null } : { core: every.slice(0, at), anchor: +every.slice(at + 1) };
+}
+
+const monthly = (core: string) => /^[1-9]\d*[my]$/.test(core);
+
+function step(day: string, core: string, anchor: number): string {
+  const m = /^\+?(\d+)([dwmy])$/.exec(core)!, n = +m[1];
+  return m[2] === "d" ? addDays(day, n) : m[2] === "w" ? addDays(day, 7 * n) : addMonths(day, m[2] === "m" ? n : 12 * n, anchor);
+}
+
+/** The `every` the round scheduled on `day` stores, its schedule having run from `base`. A monthly or yearly repeat on a
+ *  day its month lacks (the 30th in February) lands on the month's last day; the day it is meant for rides on as `@30`, so
+ *  the next round counts from that and never from the clamped day (Jan 30 → Feb 28 → Mar 30, not Mar 31). Written only
+ *  while `day` is short of the anchor. */
+export function everyOn(every: Every, base: string, day: string): Every {
+  const { core, anchor } = everyParts(every);
+  if (!monthly(core)) return every;
+  const a = anchor ?? dayOf(base);
+  return a > dayOf(day) ? `${core}@${a}` : core;
+}
+
+/** `every` as a task scheduled for `base` may hold it: an anchor stays only while `base` is the clamped day it stands for
+ *  (the month's last day, short of the anchor). Move the task to any other day and that day is the anchor. */
+export function everyAt(every: Every, base: string): Every {
+  const { core, anchor } = everyParts(every);
+  if (anchor === null || !monthly(core) || anchor < 29 || anchor > 31) return every; // not an anchor: the task's check says so
+  const clamped = !!base && anchor > dayOf(base) && dayOf(base) === daysIn(+base.slice(0, 4), +base.slice(5, 7) - 1);
+  return clamped ? every : core;
 }
 
 const DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -33,15 +64,16 @@ const DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 /** The next day a repeating task falls on, done `today`. Fixed (`1w`, `mon,thu`): the schedule's next day after both
  *  `base` (its scheduled day) and today, so a late tick never leaves a backlog. `+3d`: three days after today. */
 export function nextOccurrence(every: Every, base: string, today: string): string {
-  if (every.startsWith("+")) return step(today, every.slice(1));
+  if (every.startsWith("+")) return step(today, every.slice(1), dayOf(today));
   if (/^[a-z]/.test(every)) {
     const days = new Set(every.split(",").map((d) => DAY_NAMES.indexOf(d)));
     let d = addDays(base > today ? base : today, 1);
     while (!days.has(new Date(ms(d)).getUTCDay())) d = addDays(d, 1);
     return d;
   }
-  let d = step(base, every);
-  while (d <= today) d = step(d, every);
+  const { core, anchor } = everyParts(every), a = anchor ?? dayOf(base);
+  let d = step(base, core, a);
+  while (d <= today) d = step(d, core, a);
   return d;
 }
 
@@ -143,6 +175,6 @@ const UNIT: Record<string, string> = { d: "day", w: "week", m: "month", y: "year
 /** `1w` as "Every week", `2d` "Every 2 days", `+3d` "3 days after done", `mon,thu` "Every Mon, Thu". */
 export function everyLabel(every: Every): string {
   if (/^[a-z]/.test(every)) return `Every ${every.split(",").map(cap).join(", ")}`;
-  const m = /^(\+?)(\d+)([dwmy])$/.exec(every)!, n = +m[2], u = UNIT[m[3]], span = n === 1 ? u : `${n} ${u}s`;
+  const m = /^(\+?)(\d+)([dwmy])$/.exec(everyParts(every).core)!, n = +m[2], u = UNIT[m[3]], span = n === 1 ? u : `${n} ${u}s`;
   return m[1] ? `${span} after done` : n === 1 ? `Every ${u}` : `Every ${span}`;
 }

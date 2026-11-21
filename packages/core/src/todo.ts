@@ -3,7 +3,7 @@
 // Logbook and goes on as a new record), sort them into Things' lists, and merge two edits of one record field by field.
 // Unset text is "", as PocketBase stores it. `today` is the caller's local `YYYY-MM-DD` (localDay()), never read here.
 
-import { addDays, daysBetween, nextOccurrence, type Every } from "./dates";
+import { addDays, daysBetween, everyAt, everyOn, nextOccurrence, type Every } from "./dates";
 import { fold } from "./notes";
 import { placeOf, type Place } from "./places";
 
@@ -14,8 +14,10 @@ export const isDay = (s: string) => {
   const d = new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)));
   return `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}` === s;
 };
-/** `1d 2w 1m 1y` (fixed: from the scheduled date), `+3d` (from the day it was done), `mon,thu` (those weekdays). */
-export const EVERY = /^(\+?[1-9]\d{0,2}[dwmy]|(mon|tue|wed|thu|fri|sat|sun)(,(mon|tue|wed|thu|fri|sat|sun))*)$/;
+/** `1d 2w 1m 1y` (fixed: from the scheduled date), `+3d` (from the day it was done), `mon,thu` (those weekdays); `1m@30`: a
+ *  month's or year's repeat remembering the day it is meant for (core/dates.ts everyOn). The server's `every` pattern says the
+ *  same (pb_migrations/1795600000_every_anchor.js). */
+export const EVERY = /^(\+?[1-9]\d{0,2}[dwmy]|[1-9]\d{0,2}[my]@(29|30|31)|(mon|tue|wed|thu|fri|sat|sun)(,(mon|tue|wed|thu|fri|sat|sun))*)$/;
 /** `HH:MM`. */
 export const REMIND = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -35,7 +37,7 @@ export type Task = {
   evening: boolean;
   /** The deadline. */
   due: string;
-  /** `1d 2w 1m 1y`, `+3d`, `mon,thu` (core/dates.ts nextOccurrence). */
+  /** `1d 2w 1m 1y`, `+3d`, `mon,thu`, `1m@30` (core/dates.ts nextOccurrence). */
   every: Every;
   /** `HH:MM` on the `when` day. */
   remind: string;
@@ -102,13 +104,15 @@ const oneLine = (s: string) => s.replace(/\s*[\r\n]+\s*/g, " ").trim();
 function check(t: Task) {
   if (!t.title) throw new Error("A task needs a title.");
   for (const k of ["when", "due", "done"] as const) if (t[k] && !isDay(t[k])) throw new Error(`${k}: ${t[k]} is not a YYYY-MM-DD day.`);
-  if (t.every && !EVERY.test(t.every)) throw new Error(`every: ${t.every} is not 1d, 2w, 1m, 1y, +3d or mon,thu.`);
+  if (t.every && !EVERY.test(t.every)) throw new Error(`every: ${t.every} is not 1d, 2w, 1m, 1y, +3d, mon,thu or 1m@30.`);
   if (t.remind && !REMIND.test(t.remind)) throw new Error(`remind: ${t.remind} is not HH:MM.`);
   for (const g of t.tags) if (g.length > TAG_MAX || /[\r\n,]/.test(g)) throw new Error(`tags: "${g.slice(0, 20)}" is not a tag name (up to ${TAG_MAX} characters, no comma or line break).`);
 }
 
 /** The exclusion kept: `evening` needs a `when`. What a merge of two edits can break, so it is mended after one. */
-export const normalizeTask = (t: Task): Task => ({ ...t, evening: t.evening && !!t.when, tags: dedupeTags(t.tags), where: placeOf(t.where) });
+export const normalizeTask = (t: Task): Task => ({
+  ...t, evening: t.evening && !!t.when, tags: dedupeTags(t.tags), where: placeOf(t.where), every: everyAt(t.every, t.when || t.due),
+});
 
 /** A new open task. Throws on a value the server would refuse (an empty title, a day that isn't one). */
 export function newTask(id: string, fields: TaskPatch & { title: string }): Task {
@@ -144,6 +148,7 @@ export function complete(t: Task, today: string, newId: () => string): { task: T
   if (t.when) { next.when = day; if (t.due) next.due = addDays(day, daysBetween(t.when, t.due)); }
   else if (t.due) next.due = day;
   else next.when = day;
+  next.every = everyOn(t.every, t.when || t.due || today, day);
   return { task: { ...t, done: today, every: "" }, next: normalizeTask(next) };
 }
 

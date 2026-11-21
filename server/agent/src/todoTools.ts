@@ -18,7 +18,7 @@ const TASKS = 100, NOTES_SNIPPET = 300;
 export const DAY_RE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const WHEN = DAY_RE.describe("The day to do it (the Things 'when'), YYYY-MM-DD, worked out from today's date in <context>");
 const DUE = DAY_RE.describe("The deadline, YYYY-MM-DD");
-const EVERY = z.string().describe("Repeat: 1d, 2w, 1m, 1y (from its day), +3d (from the day it's done), or weekdays mon,thu");
+const EVERY = z.string().describe("Repeat: 1d, 2w, 1m, 1y (from its day), +3d (from the day it's done), or weekdays mon,thu. A tick may leave 1m@30 (a short month moved it; the 30th is kept): pass it back as it is");
 const REMIND = z.string().describe("HH:MM on its day (needs when)");
 const EVENING = z.boolean().describe("This Evening: only with when");
 const NOTES = z.string().describe("Markdown notes on the task, in the user's words");

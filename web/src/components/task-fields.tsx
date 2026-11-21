@@ -3,7 +3,7 @@
 // the caller writes it.
 import { Check, X, type LucideIcon } from "lucide-react";
 import { useState } from "react";
-import { everyLabel } from "@/core/dates";
+import { everyLabel, everyParts } from "@/core/dates";
 import { REMIND_TIMES, REPEATS } from "@/core/things";
 import { EVERY, type TaskPatch } from "@/core/todo";
 import { Pick } from "@/components/pick";
@@ -35,13 +35,13 @@ export function RepeatPicker({ value, onChange }: { value: string; onChange: (ev
   const [open, setOpen] = useState(false), [custom, setCustom] = useState("");
   const set = (every: string) => { setOpen(false); setCustom(""); onChange(every); };
   const typed = custom.trim().toLowerCase(), valid = EVERY.test(typed);
-  const preset = REPEATS.find((r) => r.every === value);
+  const core = everyParts(value).core, preset = REPEATS.find((r) => r.every === core);
   return (
     <Pick title="Repeat" open={open} onOpenChange={setOpen} trigger={<button type="button" className={cn(chip, !value && "text-faint")}>{value ? everyLabel(value) : "Never"}</button>}>
       <div className="space-y-0.5">
         {[{ every: "", label: "Never" }, ...REPEATS].map((r) => (
-          <button key={r.every} type="button" aria-pressed={value === r.every} onClick={() => set(r.every)} className={cn(option, value === r.every && "font-semibold")}>
-            <span className="flex-1">{r.label}</span>{value === r.every ? <Check className="size-3.5 text-brand" /> : null}
+          <button key={r.every} type="button" aria-pressed={core === r.every} onClick={() => set(r.every)} className={cn(option, core === r.every && "font-semibold")}>
+            <span className="flex-1">{r.label}</span>{core === r.every ? <Check className="size-3.5 text-brand" /> : null}
           </button>
         ))}
         {value && !preset ? <p className={cn(option, "font-semibold hover:bg-transparent")}><span className="flex-1">Custom: {everyLabel(value)}</span><Check className="size-3.5 text-brand" /></p> : null}

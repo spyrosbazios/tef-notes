@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-20 -->
+<!-- reviewed: 2026-11-21 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -101,7 +101,11 @@ Things-style to-dos, records of their own (`tasks`; schema in
 - Values: days are `YYYY-MM-DD`, and there is no "today" value: a past `when` is Today. `evening` (This Evening) only goes
   with `when`. `remind` is `HH:MM` on the `when` day. `every` is `Nd Nw Nm Ny` fixed (next from
   the scheduled day, skipping to after today), `+Nd` and so on from the day it was done, or `mon,thu` weekdays. A
-  month's last day stays the last day (Jan 31, Feb 28, Mar 31).
+  monthly or yearly repeat keeps the day of the month it was set for: a short month clamps one round to its last day and
+  the `every` of that round carries the anchor (`1m@30`, `1y@29`; `everyOn` in `packages/core/src/dates.ts`), so the next
+  counts from it (Jan 30, Feb 28, Mar 30). An anchor stays only while the task sits on that clamped day (`everyAt`, in
+  `normalizeTask`); move the task and its new day is the anchor. The `every` pattern in
+  `server/pb_migrations/1795600000_every_anchor.js` allows `@29` to `@31` on `m` and `y` only.
 - `tainted` is the chat agent's, as on notes: set in the same write when it writes a task with web text in
   view, never cleared, never sent by a client (`taskOf` drops it, so a client's PATCH leaves it).
 - A client names a new record itself (`recordId`, 15 characters of `[a-z0-9]`), so a record made

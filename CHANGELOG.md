@@ -16,6 +16,12 @@ version is one semver number for the whole repository, set by the git tag (see [
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
 
+### Fixed
+
+- A task repeating monthly or yearly on the 29th, 30th or 31st no longer drifts: January 30 goes to February 28 and back to
+  March 30 (it used to land on March 31), and a leap day comes back on the next leap year. A short month's round carries the
+  day it is meant for (`1m@30`) until the task is moved.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

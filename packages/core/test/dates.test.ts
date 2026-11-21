@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { dayLabel, dayParts, everyLabel, parseWhen, whenLabel } from "../src/dates";
+import { addMonths, dayLabel, dayParts, everyAt, everyLabel, everyOn, everyParts, nextOccurrence, parseWhen, whenLabel } from "../src/dates";
 
 // 2026-10-31 is a Saturday.
 const T = "2026-10-31";
@@ -74,5 +74,34 @@ describe("labels", () => {
     expect(everyLabel("2d")).toBe("Every 2 days");
     expect(everyLabel("+3d")).toBe("3 days after done");
     expect(everyLabel("mon,thu")).toBe("Every Mon, Thu");
+    expect(everyLabel("1m@30")).toBe("Every month");
+    expect(everyLabel("2y@29")).toBe("Every 2 years");
+  });
+  it("counts months from the anchor, clamping to the month's last day", () => {
+    expect(addMonths("2027-01-30", 1)).toBe("2027-02-28");
+    expect(addMonths("2027-02-28", 1, 30)).toBe("2027-03-30");
+    expect(addMonths("2028-01-31", 1)).toBe("2028-02-29");
+    expect(addMonths("2027-02-28", 1)).toBe("2027-03-28");
+    expect(addMonths("2028-02-29", 12, 29)).toBe("2029-02-28");
+    expect(addMonths("2027-11-30", 3)).toBe("2028-02-29");
+  });
+  it("the next round of a monthly repeat counts from its anchor, stored or the base's own day", () => {
+    expect(nextOccurrence("1m", "2027-01-30", "2027-01-30")).toBe("2027-02-28");
+    expect(nextOccurrence("1m@30", "2027-02-28", "2027-02-28")).toBe("2027-03-30");
+    expect(nextOccurrence("1m", "2027-01-30", "2027-04-01")).toBe("2027-04-30");
+    expect(nextOccurrence("+1m", "2027-01-30", "2027-01-31")).toBe("2027-02-28");
+  });
+  it("splits an anchor, writes it only while a short month holds the day, and drops it once the task moved", () => {
+    expect(everyParts("1m@30")).toEqual({ core: "1m", anchor: 30 });
+    expect(everyParts("1w")).toEqual({ core: "1w", anchor: null });
+    expect(everyOn("1m", "2027-01-30", "2027-02-28")).toBe("1m@30");
+    expect(everyOn("1m@30", "2027-02-28", "2027-03-30")).toBe("1m");
+    expect(everyOn("1w", "2027-01-30", "2027-02-06")).toBe("1w");
+    expect(everyOn("mon,thu", "2027-01-30", "2027-02-01")).toBe("mon,thu");
+    expect(everyAt("1m@30", "2027-02-28")).toBe("1m@30");
+    expect(everyAt("1m@30", "2027-02-27")).toBe("1m");
+    expect(everyAt("1m@30", "")).toBe("1m");
+    expect(everyAt("1m@29", "2028-02-29")).toBe("1m");
+    expect(everyAt("1m", "2027-02-28")).toBe("1m");
   });
 });

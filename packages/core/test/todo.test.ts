@@ -93,6 +93,58 @@ describe("ticking", () => {
     expect(done).toMatchObject({ id: t.id, done: T, every: "" });
     expect(next).toMatchObject({ id: "next", done: "", when: "2026-11-03", due: "2026-11-05", every: "1w", remind: "09:00", checklist: [{ id: "a", text: "n", done: false }] });
   });
+  /** Ticks `t` on the day it is scheduled for, `rounds` times: the day and `every` of each round. */
+  const run = (t: Task, rounds: number) => {
+    const out: string[] = [];
+    for (let i = 0; i < rounds; i++) {
+      const next = complete(t, t.when || t.due, id).next!;
+      out.push(`${next.when || next.due} ${next.every}`);
+      t = next;
+    }
+    return out;
+  };
+  it("a monthly repeat on the 30th clamps in February and goes back to the 30th", () => {
+    expect(run(task("Rent", { when: "2027-01-30", every: "1m" }), 13)).toEqual([
+      "2027-02-28 1m@30", "2027-03-30 1m", "2027-04-30 1m", "2027-05-30 1m", "2027-06-30 1m", "2027-07-30 1m", "2027-08-30 1m",
+      "2027-09-30 1m", "2027-10-30 1m", "2027-11-30 1m", "2027-12-30 1m", "2028-01-30 1m", "2028-02-29 1m@30",
+    ]);
+  });
+  it("the 31st stays the 31st through the short months, and a leap February gets its 29th", () => {
+    expect(run(task("Bills", { when: "2028-01-31", every: "1m" }), 6)).toEqual([
+      "2028-02-29 1m@31", "2028-03-31 1m", "2028-04-30 1m@31", "2028-05-31 1m", "2028-06-30 1m@31", "2028-07-31 1m",
+    ]);
+  });
+  it("a day every month has is never anchored, and the 28th is no last day", () => {
+    expect(run(task("Gym", { when: "2027-01-28", every: "1m" }), 3)).toEqual(["2027-02-28 1m", "2027-03-28 1m", "2027-04-28 1m"]);
+  });
+  it("a yearly repeat on Feb 29 comes back on the next leap day", () => {
+    expect(run(task("Birthday", { when: "2028-02-29", every: "1y" }), 5)).toEqual([
+      "2029-02-28 1y@29", "2030-02-28 1y@29", "2031-02-28 1y@29", "2032-02-29 1y", "2033-02-28 1y@29",
+    ]);
+  });
+  it("every other month and a late tick keep the anchor", () => {
+    expect(run(task("Filter", { when: "2027-01-31", every: "2m" }), 3)).toEqual(["2027-03-31 2m", "2027-05-31 2m", "2027-07-31 2m"]);
+    const late = complete(task("Rent", { when: "2027-01-30", every: "1m" }), "2027-04-05", id).next!;
+    expect(late).toMatchObject({ when: "2027-04-30", every: "1m" });
+    expect(complete(task("Rent", { when: "2027-01-30", every: "1m" }), "2027-02-27", id).next).toMatchObject({ when: "2027-02-28", every: "1m@30" });
+  });
+  it("a due alone and nothing scheduled keep the anchor too", () => {
+    expect(run(task("Tax", { due: "2027-01-30", every: "1m" }), 2)).toEqual(["2027-02-28 1m@30", "2027-03-30 1m"]);
+    const t = task("Pay", { every: "1m" });
+    expect(complete(t, "2027-01-31", id).next).toMatchObject({ when: "2027-02-28", every: "1m@31" });
+  });
+  it("an anchor stays only while the task sits on the clamped day: move it and the new day is the anchor", () => {
+    const t = task("Rent", { when: "2027-02-28", every: "1m@30" });
+    expect(t.every).toBe("1m@30");
+    expect(patchTask(t, { when: "2027-02-27" }).every).toBe("1m");
+    expect(patchTask(t, { when: "2027-03-30" }).every).toBe("1m");
+    expect(patchTask(t, { when: "" }).every).toBe("1m");
+    expect(complete(patchTask(t, { when: "2027-03-15" }), "2027-03-15", id).next).toMatchObject({ when: "2027-04-15", every: "1m" });
+  });
+  it("only a monthly or yearly repeat takes an anchor, and only 29 to 31", () => {
+    for (const bad of ["1d@30", "+1m@30", "mon@30", "1m@28", "1m@32", "1m@", "1m@3"]) expect(() => task("x", { when: "2027-02-28", every: bad })).toThrow(/every/);
+    expect(task("x", { when: "2027-02-28", every: "1y@29" }).every).toBe("1y@29");
+  });
   it("due only moves the due; nothing scheduled gets a when", () => {
     expect(complete(task("Rent", { due: "2026-11-01", every: "1m" }), T, id).next).toMatchObject({ due: "2026-12-01", when: "" });
     expect(complete(task("Gym", { every: "mon" }), T, id).next).toMatchObject({ when: "2026-11-02" });
