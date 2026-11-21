@@ -25,6 +25,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 - A drawing with unsaved strokes is no longer closed without asking when you leave its note (Back, ⌘K, the assistant opening
   another note) or reload the page; holding ⌘S, or ⌘S while the assistant saves, no longer makes the drawing twice. A
   damaged drawing file says it can't be opened instead of crashing the note.
+- Closing a note action's panel (or a selection ask) while it says "Starting…" now stops it: its prompt no longer goes on as
+  a plain chat with every tool.
 
 ## 0.13.0 - 2026-11-19
 

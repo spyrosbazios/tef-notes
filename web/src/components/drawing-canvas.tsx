@@ -74,9 +74,9 @@ export default function DrawingCanvas({ initial, opening, ref }: Props) {
     saved() {
       if (!api) return;
       savedAt.current = getSceneVersion(api.getSceneElementsIncludingDeleted());
-      track(api.getSceneElementsIncludingDeleted());
+      markUnsaved(seq, false);
     },
-  }), [api]);
+  }), [api, seq]);
 
   // The assistant's hands on this canvas, for as long as it is up
   useEffect(() => {

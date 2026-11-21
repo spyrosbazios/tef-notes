@@ -23,6 +23,7 @@ import type { CommandName, Editor } from "@/editor";
 import { useModel } from "@/hooks/agent";
 import { useHovers } from "@/hooks/hover";
 import { useNarrow } from "@/hooks/media";
+import { keepFocus } from "@/lib/keys";
 
 const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘" : "Ctrl+";
 const ALT = MOD === "⌘" ? "⌥" : "Alt+";
@@ -61,7 +62,7 @@ function StyleTool({ editor, hovers, below, onOpenChange }: { editor: Editor; ho
     <DropdownMenu onOpenChange={onOpenChange}>
       <Label hovers={hovers} text="Text style">
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size={hovers ? "sm" : "lg"} aria-label={`Text style: ${current?.label ?? "Text"}`} className="gap-0.5 px-1.5 text-dim" onMouseDown={(e) => e.preventDefault()}>
+          <Button variant="ghost" size={hovers ? "sm" : "lg"} aria-label={`Text style: ${current?.label ?? "Text"}`} className="gap-0.5 px-1.5 text-dim" onMouseDown={keepFocus}>
             <Icon /><ChevronDown className="size-3 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
@@ -146,7 +147,7 @@ export function SelectionBar({ editor }: { editor: Editor }) {
                         <div className="mx-0.5 h-5 w-px bg-line" />
                         {TOOLS.map(({ name, label, keys, icon: Icon }) => (
                           <Label key={name} hovers={hovers} text={label} keys={keys}>
-                            <Toggle size={hovers ? "sm" : "lg"} aria-label={label} pressed={editor.isActive(name)} onMouseDown={(e) => e.preventDefault()} onPressedChange={() => editor.run(name)}>
+                            <Toggle size={hovers ? "sm" : "lg"} aria-label={label} pressed={editor.isActive(name)} onMouseDown={keepFocus} onPressedChange={() => editor.run(name)}>
                               <Icon />
                             </Toggle>
                           </Label>
@@ -156,7 +157,7 @@ export function SelectionBar({ editor }: { editor: Editor }) {
                         </>)}
                         <Label hovers={hovers} text={model ? "Ask the assistant" : "The assistant is off: no model key"}>
                           <Button variant="ghost" size={hovers ? "icon-sm" : "icon-lg"} aria-label="Ask the assistant about this" className="text-brand"
-                            disabled={!model} onMouseDown={(e) => e.preventDefault()} onClick={() => ask.start()}>
+                            disabled={!model} onMouseDown={keepFocus} onClick={() => ask.start()}>
                             <Sparkles />
                           </Button>
                         </Label>
