@@ -1,15 +1,16 @@
 // One sync controller per local store. All mutable status, timers and subscriptions belong to this
-// instance; browser events and realtime are attached by the app, not by importing this module.
+// instance; browser events and realtime are attached by the app, not by importing this module. In the browser only the tab that
+// leads runs one (lib/tab-sync.ts); the others hand it their changes.
 import { applyChange, topicOf, type Change, type Topic } from "@/core/changes";
-import { isNotePath } from "@/core/notes";
 import {
-  coalesced, conflicted, discardRefused, dismissLost, keepMine, refusals, restoreMine, retryRefused, syncRound, takeTheirs, waiting,
-  type Refusal, type Store, type Transport,
+  coalesced, conflicted, discardRefused, dismissLost, keepMine, refusals, restoreMine, retryRefused, syncRound, takeHeard, takeTheirs, waiting,
+  type Heard, type Refusal, type Store, type Transport,
 } from "@/core/sync";
 
 /** `refused`: changes the server refused, parked until the owner sends them again or lets them go (Settings lists them).
- *  `unsaved`: why the copy couldn't be written to this device's storage, until a write goes through (lib/local.ts). */
-export type SyncStatus = { waiting: number; conflicts: string[]; refused: Refusal[]; syncing: boolean; error?: string; unsaved?: string };
+ *  `unsaved`: why the copy couldn't be written to this device's storage, until a write goes through (lib/local.ts).
+ *  `feed`: why the realtime feed isn't telling this app of other devices' changes, until it is again (services/realtime.ts). */
+export type SyncStatus = { waiting: number; conflicts: string[]; refused: Refusal[]; syncing: boolean; error?: string; unsaved?: string; feed?: string };
 
 export type Settle = "mine" | "theirs" | "restore" | "dismiss";
 
@@ -20,8 +21,8 @@ const later: Later = (work, ms) => { const timer = setTimeout(work, ms); return 
 /** What the copy's storage says about its writes (lib/local.ts `storeError`); a copy kept in memory alone has none. */
 type Stored = { get: () => string | undefined; watch: (l: () => void) => () => void };
 
-export function createSync({ store: local, ready, transport, online, schedule = later, stored }: {
-  store: Store; ready: Promise<void>; transport: Transport; online: () => boolean; schedule?: Later; stored?: Stored;
+export function createSync({ store: local, transport, online, schedule = later, stored }: {
+  store: Store; transport: Transport; online: () => boolean; schedule?: Later; stored?: Stored;
 }) {
   let mounts = 0;
   // ---- what the app shows of it
@@ -37,9 +38,10 @@ export function createSync({ store: local, ready, transport, online, schedule = 
   }
 
   const refusedKey = (r: Refusal[]) => r.map((x) => `${x.kind}:${x.key}:${x.title}:${x.reason}`).join("\n");
-  function refresh(over: Partial<Pick<SyncStatus, "syncing" | "error">> = {}) {
+  function refresh(over: Partial<Pick<SyncStatus, "syncing" | "error" | "feed">> = {}) {
     const next: SyncStatus = { ...status, waiting: waiting(local), conflicts: conflicted(local), refused: refusals(local), unsaved: stored?.get(), ...over };
     if (next.waiting === status.waiting && next.syncing === status.syncing && next.error === status.error && next.unsaved === status.unsaved
+      && next.feed === status.feed
       && next.conflicts.join("\n") === status.conflicts.join("\n") && refusedKey(next.refused) === refusedKey(status.refused)) return;
     status = next;
     watchers.forEach((l) => l());
@@ -70,22 +72,27 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     const to = moved.get(path);
     return to && !local.notes.get(path) ? to : path;
   }
+  /** Every move aside so far, `[from, to]`: what a tab that follows this one is told (lib/tab-sync.ts). */
+  const moves = (): [string, string][] => [...moved];
 
   // ---- running
 
   /** How long after the last edit it goes up: a burst of edits is one push, and a note being typed into leaves "waiting" by itself. */
   const PUSH_AFTER = 1500;
-  /** After a round that couldn't finish with edits waiting, how long before trying again: the first wait, doubled after each
-   *  round that fails again up to the last, back to the first after a round that went through (a back-online or a realtime
-   *  reconnect asks sooner). A change the server refused is not waiting: it is never retried by itself. */
+  /** After a round that couldn't finish with edits waiting (or a pull owed), how long before trying again: the first wait,
+   *  doubled after each round that fails again up to the last, back to the first after a round that went through (a back-online
+   *  or a realtime reconnect asks sooner). A change the server refused is not waiting: it is never retried by itself. */
   const RETRY_FIRST = 5_000, RETRY_MOST = 300_000;
   let pushTimer: Cancel | undefined, retryTimer: Cancel | undefined, failures = 0;
+  /** A pull was asked for (`syncNow`) and hasn't gone through yet: the next round pulls first. */
+  let owed = false;
 
   const round = coalesced(async () => {
-    await ready;
     await Promise.all([...befores].map((f) => f()));
     retryTimer?.();
     if (!online()) { changed(); return; }                      // no network at all: everything stays waiting
+    const pull = owed;
+    owed = false;
     const errs: string[] = [];
     refresh({ syncing: true });
     let ok = false;
@@ -93,25 +100,33 @@ export function createSync({ store: local, ready, transport, online, schedule = 
       ok = await syncRound({
         store: local, api: transport, changed, moved: (from, to) => { moved.set(from, to); },
         fail: (what, e) => { errs.push(`${what}: ${e instanceof Error ? e.message : String(e)}`); },
-      });
+      }, { pull });
     } finally {
+      if (pull && !ok) owed = true;
       refresh({ syncing: false, error: errs[0] });
       redraw();
       failures = ok && !errs.length ? 0 : failures + 1;
-      if (mounts && failures && waiting(local)) retryTimer = schedule(() => { void syncNow(); }, Math.min(RETRY_FIRST * 2 ** (failures - 1), RETRY_MOST));
+      if (mounts && failures && (waiting(local) || owed)) retryTimer = schedule(() => { void round(); }, Math.min(RETRY_FIRST * 2 ** (failures - 1), RETRY_MOST));
     }
   });
 
-  /** What the first read of the copy waits for: what an earlier visit stored, and, when there is none (a first visit, a cleared
-   *  copy), one sync, so the lists don't open as an empty notebook that fills a moment later. Offline that sync ends at once. */
+  /** What the first read of the copy waits for, when it is empty (a first visit, a cleared copy): one sync, so the lists don't
+   *  open as an empty notebook that fills a moment later. Offline that sync ends at once. */
   async function opened(): Promise<void> {
-    await ready;
     if (!local.notes.all().length && !local.tasks.all().length && !local.links.all().length) await syncNow();
   }
 
-  /** Pull, then push. Safe to call from anywhere, any time: overlapping calls coalesce into one rerun. */
+  /** Pull, then push: for when this copy may have missed something (the realtime feed came back after a gap, the browser back
+   *  online, the owner asked). Safe to call from anywhere, any time: overlapping calls coalesce into one rerun. */
   function syncNow(): Promise<void> {
+    owed = true;
     pushTimer?.();                                           // this sync sends what the timer was waiting to
+    return round();
+  }
+
+  /** Push alone: what was edited here goes up. What other devices change comes from the realtime feed (`heard`). */
+  function pushNow(): Promise<void> {
+    pushTimer?.();
     return round();
   }
 
@@ -129,7 +144,7 @@ export function createSync({ store: local, ready, transport, online, schedule = 
       if (touched.size) {
         refresh();
         pushTimer?.();
-        if (mounts) pushTimer = schedule(() => { void syncNow(); }, PUSH_AFTER);
+        if (mounts) pushTimer = schedule(() => { void pushNow(); }, PUSH_AFTER);
         redraw([...touched]);
       }
     }
@@ -138,40 +153,32 @@ export function createSync({ store: local, ready, transport, online, schedule = 
 
   // ---- when
 
-  let news: Cancel | undefined;
-
-  /** A realtime record (PocketBase sends every column): news when the local copy lacks it or has another rev, not the echo of what
-   *  this app just sent. A delete is news while the copy still holds it. */
-  function heard(topic: "notes" | "tasks" | "links", action: string, r: { id: string; path?: unknown; rev?: unknown }): void {
-    const gone = action === "delete";
-    let isNews: boolean;
-    if (topic === "notes") {
-      if (typeof r.path !== "string" || !isNotePath(r.path)) return;
-      const n = local.notes.get(r.path);
-      isNews = gone ? !!n && !n.deleted && n.rec === r.id : !n || n.rec !== r.id || n.rev !== r.rev;
-    } else if (topic === "tasks") {
-      const t = local.tasks.get(r.id);
-      isNews = gone ? !!t && !t.deleted : !t || t.rev !== r.rev;
-    } else {
-      const l = local.links.get(r.id);
-      isNews = gone ? !!l && !l.deleted : !l;
-    }
-    if (!isNews) return;
-    news?.();
-    if (mounts) news = schedule(() => { void syncNow(); }, 250);
+  /** A record the realtime feed reported, into the copy at once (core/sync.ts `takeHeard`: rev-checked, so this app's own write
+   *  echoing back changes nothing), and the list it is in redrawn. No request: a pull is for a gap in the feed (`syncNow`). */
+  function heard(h: Heard): void {
+    if (!takeHeard(local, h)) return;
+    refresh();
+    redraw([h.topic]);
   }
 
-  /** Start background work. Explicit syncNow calls also work before mounting (route loaders).
-   *  Stopping prevents an in-flight round from scheduling another retry. */
+  /** Why the realtime feed is off (undefined: it is on again), for the status. */
+  const feed = (problem?: string) => refresh({ feed: problem });
+
+  /** The copy was filled from outside the engine (storage, another tab's): the status worked out again and every list redrawn. */
+  const loaded = () => changed();
+
+  /** Start background work: what waited since the last visit goes up (the pull comes with the realtime feed's first connect).
+   *  Explicit syncNow calls also work before mounting (route loaders). Stopping prevents an in-flight round from scheduling
+   *  another retry. */
   function start(): () => void {
     mounts++;
-    if (mounts === 1) void syncNow();
+    if (mounts === 1) void pushNow();
     let stopped = false;
     return () => {
       if (stopped) return;
       stopped = true;
       if (--mounts) return;
-      pushTimer?.(); retryTimer?.(); news?.();
+      pushTimer?.(); retryTimer?.();
     };
   }
 
@@ -196,7 +203,7 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     if (how === "retry") void syncNow();
     return true;
   }
-  return { getStatus, watchStatus, onRedraw, beforeRound, movedTo, opened, syncNow, syncing, apply, heard, settle, resolveRefused, start };
+  return { getStatus, watchStatus, onRedraw, beforeRound, movedTo, moves, opened, syncNow, pushNow, apply, heard, feed, loaded, settle, resolveRefused, start };
 }
 
 export type SyncController = ReturnType<typeof createSync>;

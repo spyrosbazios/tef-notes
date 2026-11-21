@@ -8,7 +8,7 @@ import { outcomeOf } from "../src/record-protocol";
 import { sameLink, type Link } from "../src/record-links";
 import {
   addLink, addNote, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
-  restoreMine, retryRefused, saveTask, syncRound, takeTheirs, tick, visibleLinks, waiting, writeNote,
+  restoreMine, retryRefused, saveTask, syncRound, takeHeard, takeTheirs, tick, visibleLinks, waiting, writeNote,
   type LinkRow, type NoteRow, type Run, type Store, type TaskRow, type Transport,
 } from "../src/sync";
 import { newTask, taskOf, type Task } from "../src/todo";
@@ -119,7 +119,7 @@ const P = "notes/20261101-a.md";
 function run(s: Store, server: ReturnType<typeof fakeServer>, over: Partial<Run> = {}) {
   const errs: string[] = [];
   const r: Run = { store: s, api: server.api, fail: (what, e) => errs.push(`${what}: ${e instanceof Error ? e.message : e}`), ...over };
-  return { errs, go: () => syncRound(r) };
+  return { errs, go: () => syncRound(r, { pull: true }), push: () => syncRound(r, { pull: false }) };
 }
 
 describe("coalesced", () => {
@@ -669,5 +669,99 @@ describe("waiting", () => {
     expect(waiting(s)).toBe(0);
     patch(s.notes, P, { updated: 5 });
     expect(waiting(s)).toBe(1);
+  });
+});
+
+describe("the realtime feed, one record at a time", () => {
+  const fetched = (r: NoteRec) => ({ rec: r.rec, path: r.path, rev: r.rev, text: r.text, kind: "note" as const });
+
+  test("a note changed elsewhere is taken at a newer rev; its own rev or an older one (an echo of this push) changes nothing", async () => {
+    const server = fakeServer(), s = store();
+    const r1 = { ...server.put(P, note("A", "one")) };
+    await run(s, server).go();
+    expect(takeHeard(s, { topic: "notes", note: fetched(r1) })).toBe(false);
+    const r2 = { ...server.put(P, note("A", "two")) };
+    expect(takeHeard(s, { topic: "notes", note: fetched(r2) })).toBe(true);
+    expect(s.notes.get(P)).toMatchObject({ text: note("A", "two"), rev: 2, base: note("A", "two") });
+    expect(waiting(s)).toBe(0);
+    expect(takeHeard(s, { topic: "notes", note: fetched(r1) })).toBe(false);
+    expect(s.notes.get(P)!.text).toBe(note("A", "two"));
+    writeNote(s, P, note("A", "mine"));
+    await run(s, server).push();
+    const echo = server.notes.get(r1.rec)!;
+    expect(takeHeard(s, { topic: "notes", note: fetched(echo) })).toBe(false);
+    expect(s.notes.get(P)).toMatchObject({ rev: echo.rev, text: note("A", "mine") });
+  });
+
+  test("a note edited here and not sent keeps its edit; the push merges the newer one in", async () => {
+    const server = fakeServer(), s = store();
+    server.put(P, note("A", "l1\nl2\nl3"));
+    await run(s, server).go();
+    writeNote(s, P, note("A", "l1\nl2\nl3 mine"));
+    const theirs = server.put(P, note("A", "l1 theirs\nl2\nl3"));
+    expect(takeHeard(s, { topic: "notes", note: fetched(theirs) })).toBe(false);
+    expect(s.notes.get(P)!.text).toBe(note("A", "l1\nl2\nl3 mine"));
+    await run(s, server).push();
+    expect(server.notes.get(theirs.rec)!.text).toBe(note("A", "l1 theirs\nl2\nl3 mine"));
+  });
+
+  test("a note created elsewhere is added; one gone is dropped unless edited here, and a tombstone's delete is done", async () => {
+    const server = fakeServer(), s = store();
+    const a = server.put(P, note("A")), b = server.put("notes/20261101-b.md", note("B"));
+    expect(takeHeard(s, { topic: "notes", note: fetched(a) })).toBe(true);
+    expect(takeHeard(s, { topic: "notes", note: fetched(b) })).toBe(true);
+    expect(takeHeard(s, { topic: "notes", note: { ...fetched(a), path: "memory/x.md" } })).toBe(false);   // not a note of the lists
+    writeNote(s, "notes/20261101-b.md", note("B", "edited"));
+    expect(takeHeard(s, { topic: "notes", gone: { rec: "another", path: P } })).toBe(false);
+    expect(takeHeard(s, { topic: "notes", gone: { rec: a.rec, path: P } })).toBe(true);
+    expect(takeHeard(s, { topic: "notes", gone: { rec: b.rec, path: "notes/20261101-b.md" } })).toBe(false);
+    expect(s.notes.get(P)).toBeUndefined();
+    expect(s.notes.get("notes/20261101-b.md")!.text).toBe(note("B", "edited"));
+    s.notes.put({ ...s.notes.get("notes/20261101-b.md")!, deleted: true });
+    expect(takeHeard(s, { topic: "notes", gone: { rec: b.rec, path: "notes/20261101-b.md" } })).toBe(true);
+    expect(s.notes.all()).toEqual([]);
+  });
+
+  test("a task: a newer rev taken, the same ignored, an unsent edit kept, a delete taken unless edited here", async () => {
+    const server = fakeServer(), s = store();
+    server.putTask(newTask("t1", { title: "one" }));
+    await run(s, server).go();
+    expect(takeHeard(s, { topic: "tasks", task: { ...newTask("t1", { title: "one" }), rev: 1 } })).toBe(false);
+    expect(takeHeard(s, { topic: "tasks", task: { ...newTask("t1", { title: "two" }), rev: 2 } })).toBe(true);
+    expect(s.tasks.get("t1")).toMatchObject({ rev: 2, data: { title: "two" } });
+    saveTask(s, { ...s.tasks.get("t1")!.data, title: "mine" });
+    expect(takeHeard(s, { topic: "tasks", task: { ...newTask("t1", { title: "three" }), rev: 3 } })).toBe(false);
+    expect(takeHeard(s, { topic: "tasks", gone: "t1" })).toBe(false);
+    expect(s.tasks.get("t1")!.data.title).toBe("mine");
+    expect(takeHeard(s, { topic: "tasks", task: { ...newTask("t2", { title: "new" }), rev: 1 } })).toBe(true);
+    expect(takeHeard(s, { topic: "tasks", gone: "t2" })).toBe(true);
+    expect(s.tasks.get("t2")).toBeUndefined();
+  });
+
+  test("a link: one made elsewhere is added, an add of ours that landed is marked sent, one gone is dropped", () => {
+    const s = store();
+    const theirs: Link = { id: "l1", from: { type: "task", id: "t1" }, to: { type: "note", id: "r1" }, role: "about" };
+    expect(takeHeard(s, { topic: "links", link: theirs })).toBe(true);
+    expect(takeHeard(s, { topic: "links", link: theirs })).toBe(false);
+    const mine = addLink(s, "l2", { type: "task", id: "t2" }, { type: "note", id: "r1" }, "about");
+    expect(takeHeard(s, { topic: "links", gone: mine })).toBe(false);          // not up yet: the push's to settle
+    expect(takeHeard(s, { topic: "links", link: { ...theirs, id: mine, from: { type: "task", id: "t2" } } })).toBe(true);
+    expect(s.links.get(mine)!.pushed).not.toBeNull();
+    expect(takeHeard(s, { topic: "links", gone: "l1" })).toBe(true);
+    expect(s.links.get("l1")).toBeUndefined();
+  });
+
+  test("a push alone lists nothing: it sends what was edited here", async () => {
+    const server = fakeServer(), s = store();
+    addNote(s, "r1", P, note("A"));
+    saveTask(s, newTask("t1", { title: "x" }));
+    expect(await run(s, server).push()).toBe(true);
+    expect(server.calls).toEqual(["notes.create", "tasks.create"]);
+    expect(waiting(s)).toBe(0);
+    server.take(true);
+    writeNote(s, P, note("A", "more"));
+    saveTask(s, { ...s.tasks.get("t1")!.data, title: "y" });
+    expect(await run(s, server).push()).toBe(false);              // the server out of reach ends it at the first failure
+    expect(server.calls.slice(2)).toEqual(["notes.update"]);
   });
 });

@@ -205,8 +205,14 @@ in a local copy in IndexedDB (`tefnotes-sync` database, `src/lib/local.ts`, over
 it); everything on screen is read from it, every edit is written to it first, and a sync reconciles it with the server. The sync
 is `packages/core/src/sync.ts` (the logic, tested over a fake server in
 `packages/core/test/sync.test.ts`), run by an instance of `src/lib/sync-controller.ts`. `src/lib/sync.ts` composes
-that controller with browser storage and services. `src/hooks/live.ts`, mounted by the root frame, owns the realtime feed and
-starts/stops browser lifecycle listeners; importing a feature does not attach them. The controller owns its timers,
+that controller with browser storage and services. `src/hooks/live.ts`, mounted by the root frame, starts the realtime feed and
+browser lifecycle listeners; importing a feature does not attach them.
+**One tab syncs for all** (`src/lib/tab-sync.ts`): the tab holding the `tefnotes-sync` Web Lock runs the engine, the realtime
+feed and the writes to IndexedDB; every other tab of the app mirrors its copy over a `BroadcastChannel`, applies a write to its
+own copy at once and hands the leader the change (data), which the leader applies, keeps, and answers. When the leader closes,
+the next tab in the lock's queue takes over and loads the copy from IndexedDB; a follower in front whose leader stops
+answering (a background tab the phone froze) takes the lock. A follower's change waits in its outbox until the leader says it
+is kept, so a leader closing mid-write loses nothing. The controller owns its timers,
 status and subscriptions, and stopping its last lifecycle owner prevents late requests from scheduling another retry.
 `src/lib/local-records.ts` owns the query projections, redrawn by the controller after a write or a sync; feature hooks use those
 projections rather than coordinating each other's caches. `src/lib/records.ts` is the one module that writes the copy: every write
@@ -220,9 +226,15 @@ reach records only through hooks, and hooks only through `records.ts` (`scripts/
   Summary put into a note is saved with the `tainted` mark (model text), as the server's clip writes are.
 
 - **Edits:** a note row holds its text, the `rev` it was last in step with and `base`, the text as of that `rev`; a task row its
-  record and `base`; a link its `pushed` time. An edit marks the row unsent and goes up 1.5 s after the last one, when the page
-  comes to the front or goes to the back, when the browser comes back online, on leaving a note, and on any realtime event that is
-  news (not the echo of what this app sent). One sync runs at a time; a request while one runs asks for one more after it.
+  record and `base`; a link its `pushed` time. An edit marks the row unsent and goes up by a push 1.5 s after the last one, when
+  the page comes to the front or goes to the back, and on leaving a note. One sync runs at a time; a request while one runs asks
+  for one more after it.
+- **Other devices' changes:** the realtime feed hands each note, task and link record to the engine, which takes it as a pull of
+  that record would (a rev the copy has, the echo of this app's own write, changes nothing; a row edited here keeps its edit for
+  the push). A full pull (every record's rev listed, those that differ fetched) is only for when events may have been missed:
+  the feed's first connect and any reconnect after a drop, the browser coming back online, and "Sync now". PocketBase closes a
+  quiet stream after 5 minutes and every stream after 30; that close is reopened at once without a pull or an "Offline". A
+  subscription that fails is retried on a growing delay, and Settings > Server & sync > Live updates says why it is off.
 - **Merging:** a push names the `rev` it was based on (the write contract, [`../ARCHITECTURE.md`](../ARCHITECTURE.md)); a stale
   one is never resent. A note both sides edited is merged by lines against `base`; where the edits overlap nothing is sent and the
   note is listed under **Settings > Server & sync > Conflicts**, where the owner keeps the text made here or uses the server's
@@ -256,8 +268,11 @@ reach records only through hooks, and hooks only through `records.ts` (`scripts/
   it.
 - **To clear it:** Settings > Server & sync > Clear the offline copy (refused while changes wait), or the browser's site data
   (the `tefnotes-sync` and `tefnotes` IndexedDB databases and the `attachment-files` cache in DevTools > Application). A cache
-  from another build is discarded: each build has an id (`vite.config.ts` `define`) used as the query cache's `buster`; the local
-  copy is not versioned, and a change to its rows is a migration or a reset of the database.
+  from another build is discarded: each build has an id (`vite.config.ts` `define`) used as the query cache's `buster`. The local
+  copy stores the shape of its rows (`v`, `packages/core/src/rows.ts` `ROWS_VERSION`): a tab reads it through defensive readers
+  that drop a row of another shape, migrates an older store as it reads it (`readStored`, `src/lib/local.ts`), and leaves a
+  store written by a newer build alone (the copy is then not kept on this device, and the status says so). A change to a row's
+  shape is a new `ROWS_VERSION` and a step there.
 
 ## Share target
 

@@ -5,6 +5,8 @@
 import { noteKindOf } from "./notes";
 import { Conflict, Gone, Refused, Unavailable, conflictOf, lit, noteColumns, type Entry, type Listed, type Mark, type RevEntry, type Versioned } from "./record-contracts";
 import { LINK_COLUMNS, linkOf, linkColumn, linkRecord, sameLink, type Link, type LinkEnd, type LinkSide } from "./record-links";
+import type { Heard } from "./sync";
+import { taskOf } from "./todo";
 
 export type RecordRequest = { method?: string; body?: unknown; timeout?: number };
 export type RecordTransport = {
@@ -25,6 +27,26 @@ export function outcomeOf(status: number, body: unknown, what: string): Conflict
   const said = typeof b?.message === "string" && b.message ? b.message : `HTTP ${status}`;
   const why = fields.map(([k, f]) => `${k}: ${typeof f?.message === "string" ? f.message : String(f?.code ?? "")}`).join("; ");
   return new Refused(why ? `${said} (${why})` : said);
+}
+
+/** A realtime event (PocketBase sends `action` and the whole record) for the sync engine (sync.ts `takeHeard`); null for a record
+ *  not of the shape it should have (the caller then pulls everything instead). A note's `at` is its `updated`. */
+export function heardOf(topic: Heard["topic"], action: unknown, r: any): Heard | null {
+  if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.id) return null;
+  const gone = action === "delete";
+  if (topic === "notes") {
+    if (typeof r.path !== "string") return null;
+    if (gone) return { topic, gone: { rec: r.id, path: r.path } };
+    if (typeof r.rev !== "number" || typeof r.text !== "string") return null;
+    return { topic, note: { rec: r.id, path: r.path, rev: r.rev, kind: noteKindOf(r.kind), text: r.text, at: Date.parse(r.updated) || undefined } };
+  }
+  if (topic === "tasks") {
+    if (gone) return { topic, gone: r.id };
+    return typeof r.rev === "number" ? { topic, task: { ...taskOf(r), rev: r.rev } } : null;
+  }
+  if (gone) return { topic, gone: r.id };
+  const link = linkOf(r);
+  return link ? { topic, link } : null;
 }
 
 /** One request, a failure as its typed outcome. */

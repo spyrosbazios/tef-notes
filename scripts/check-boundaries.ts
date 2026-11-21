@@ -32,8 +32,8 @@ const sdk = (name: string) => name === "external:ai" || name.startsWith("externa
 const filesUnder = (dir: string): string[] =>
   readdirSync(resolve(root, dir), { recursive: true, encoding: "utf8" }).filter((name) => /\.tsx?$/.test(name)).map((name) => `${dir}${name}`);
 /** What only the records module (web/src/lib/records.ts) loads: the local copy, the sync and its edit helpers. */
-const copy = new Set(["web/src/lib/local.ts", "web/src/lib/sync.ts", "web/src/lib/local-records.ts", "web/src/lib/sync-controller.ts", `${core}sync.ts`, `${core}changes.ts`]);
-const pure = ["notes", "todo", "sync", "changes", "prefs", "prefs-sync", "record-contracts", "record-protocol", "chat-history"];
+const copy = new Set(["web/src/lib/local.ts", "web/src/lib/sync.ts", "web/src/lib/local-records.ts", "web/src/lib/sync-controller.ts", "web/src/lib/tab-sync.ts", `${core}sync.ts`, `${core}changes.ts`, `${core}rows.ts`]);
+const pure = ["notes", "todo", "sync", "changes", "rows", "prefs", "prefs-sync", "record-contracts", "record-protocol", "chat-history"];
 
 function rules(): Boundary[] {
   return [
@@ -58,8 +58,8 @@ function rules(): Boundary[] {
       forbidden: (name) => adapters.has(name),
     },
     {
-      name: "Sync controller receives storage and transport; it must not load UI or services",
-      roots: ["web/src/lib/sync-controller.ts"],
+      name: "Sync controller and tabs receive storage, transport, lock and channel; they must not load UI or services",
+      roots: ["web/src/lib/sync-controller.ts", "web/src/lib/tab-sync.ts"],
       forbidden: (name) => /^web\/src\/(hooks|services|components)\//.test(name) || name.startsWith("external:"),
     },
     {

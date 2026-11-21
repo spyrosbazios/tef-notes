@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Conflict, Gone, Refused, Unavailable, conflictOf } from "../src/record-contracts";
-import { links, noteCollection, outcomeOf, revCollection, type RecordTransport, type RecordRequest } from "../src/record-protocol";
+import { heardOf, links, noteCollection, outcomeOf, revCollection, type RecordTransport, type RecordRequest } from "../src/record-protocol";
 import { linkRecord, type Link } from "../src/record-links";
 
 function transport(reply: (path: string, request: RecordRequest) => any) {
@@ -117,4 +117,19 @@ test("only stale revisions and known unique fields are conflicts", () => {
   }
   expect(conflictOf(400, { data: { title: { code: "validation_not_unique" } } }, "x")).toBeUndefined();
   expect(conflictOf(503, {}, "x")).toBeUndefined();
+});
+
+test("a realtime event is a record for the sync engine, or null when the record isn't of its shape", () => {
+  const note = { id: "r1", path: "notes/a.md", rev: 3, kind: "note", text: "t", updated: "2026-11-21T10:00:00.000Z" };
+  expect(heardOf("notes", "update", note)).toEqual({ topic: "notes", note: { rec: "r1", path: "notes/a.md", rev: 3, kind: "note", text: "t", at: Date.parse(note.updated) } });
+  expect(heardOf("notes", "delete", { id: "r1", path: "notes/a.md" })).toEqual({ topic: "notes", gone: { rec: "r1", path: "notes/a.md" } });
+  expect(heardOf("notes", "update", { ...note, text: undefined })).toBeNull();      // a record sent without its text
+  expect(heardOf("tasks", "create", { id: "t1", rev: 1, title: "x", extra: 1 })).toMatchObject({ topic: "tasks", task: { id: "t1", title: "x", rev: 1 } });
+  expect(heardOf("tasks", "create", { id: "t1", title: "x" })).toBeNull();
+  expect(heardOf("tasks", "delete", { id: "t1" })).toEqual({ topic: "tasks", gone: "t1" });
+  const link: Link = { id: "l1", from: { type: "task", id: "t1" }, to: { type: "note", id: "r1" }, role: "about" };
+  expect(heardOf("links", "create", linkRecord(link))).toEqual({ topic: "links", link });
+  expect(heardOf("links", "create", { id: "l2", role: "about" })).toBeNull();
+  expect(heardOf("links", "delete", { id: "l1" })).toEqual({ topic: "links", gone: "l1" });
+  expect(heardOf("notes", "update", null)).toBeNull();
 });

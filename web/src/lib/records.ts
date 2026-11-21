@@ -3,13 +3,14 @@
 // applies it, counts it, sends it a moment later and redraws the lists it touched; nothing else calls the core's edit helpers
 // or holds the copy. Hooks expose these (hooks/notes.ts, todo.ts, links.ts, draft.ts, sync.ts); components reach them through
 // the hooks (scripts/check-boundaries.ts keeps it so).
-// Because a write is data handed to one entry, a copy held by another tab (one tab syncing for all) can take the changes in
-// place of `apply` without a hook changing.
+// Because a write is data handed to one entry, the copy can be another tab's: only the tab that leads syncs, and the others'
+// `apply` hands it their changes (lib/tab-sync.ts), without a hook knowing which tab it is in.
 //
 // An open note's typing is a draft (lib/drafts.ts) this module owns, by the note's record id: it outlives the editor (a note
 // moved aside to `-2` on its first push keeps its record id, and its draft), every sync puts what is pending into the copy
 // before it pulls (`beforeRound`), so a pull sees the note edited here, and a draft whose note was deleted on another device
-// meanwhile puts it back under its record id with the text typed, as any edit made here outlives a delete elsewhere (core/sync.ts).
+// meanwhile puts it back under its record id with the text typed (core/changes.ts `note.write`), as any edit made here outlives a
+// delete elsewhere (core/sync.ts).
 // Nothing typed is dropped but by the owner deleting the note here.
 import { tickChanges, type Change } from "@/core/changes";
 import { NOTES as NOTE_DIR, newNotePath, noteIdOf, parseNote, serializeNote, withBody, withFlags, type FlagEdit } from "@/core/notes";
@@ -38,7 +39,7 @@ const NOTE_DELAY = 800;
 /** An open note's two drafts. */
 export type NoteDrafts = { body: Draft; title: Draft };
 
-type Controller = Pick<SyncController, "apply" | "movedTo" | "syncNow" | "settle" | "resolveRefused" | "beforeRound">;
+type Controller = Pick<SyncController, "apply" | "movedTo" | "syncNow" | "pushNow" | "settle" | "resolveRefused" | "beforeRound">;
 
 /** The records over one copy and its controller. `serverHas`: whether the server holds a note at a path (false when it can't
  *  be asked): a new note's name steps past one it has. */
@@ -62,7 +63,7 @@ export function createRecords({ store, sync, serverHas }: { store: Store; sync: 
   async function write(r: { rec: string; path: string }, edit: (text: string, path: string) => string, mark: Mark = {}): Promise<NoteRec> {
     const row = noteNow(r);
     if (!row) throw new Gone("This note was deleted on another device.");
-    sync.apply([{ kind: "note.write", path: row.path, text: edit(row.text, row.path), mark }]);
+    sync.apply([{ kind: "note.write", rec: row.rec, path: row.path, text: edit(row.text, row.path), mark }]);
     return noteOf(store.notes.get(row.path)!);
   }
 
@@ -86,7 +87,7 @@ export function createRecords({ store, sync, serverHas }: { store: Store; sync: 
   async function landed(path: string): Promise<string> {
     const row = store.notes.get(sync.movedTo(path));
     if (row && !row.deleted && row.rev != null) return row.path;
-    await sync.syncNow();
+    await sync.pushNow();
     const now = store.notes.get(sync.movedTo(path));
     if (!now || now.deleted) throw new Gone("This note was deleted.");
     if (now.rev == null) throw new Error(now.refused ? `The server refused this note: ${now.refused}` : "This note isn't on the server yet, so files can't be added to it. Try again when it's reachable.");
@@ -128,10 +129,10 @@ export function createRecords({ store, sync, serverHas }: { store: Store; sync: 
       read: () => { const n = row(); return n ? parseNote(n.path, n.text)[part] : undefined; },
       write: (typed, mark) => {
         const n = row();
-        if (n) return void sync.apply([{ kind: "note.write", path: n.path, text: typedInto(n.path, n.text, part, typed), mark }]);
-        if (byRec(seen.rec)?.deleted) return;                  // deleted here, by the owner
-        // Gone from the copy: deleted on another device while this was typed. The typed text puts it back, under its record id
-        sync.apply([{ kind: "note.add", rec: seen.rec, path: seen.path, text: typedInto(seen.path, seen.text, part, typed), mark }]);
+        if (!n && byRec(seen.rec)?.deleted) return;            // deleted here, by the owner
+        // Gone from the copy (deleted on another device while this was typed), the typed text puts it back under its record id
+        const at = n ?? seen;
+        sync.apply([{ kind: "note.write", rec: at.rec, path: at.path, text: typedInto(at.path, at.text, part, typed), mark }]);
         row();
       },
     });
@@ -269,5 +270,5 @@ export function startRecords(): () => void {
 // What hooks read beside the writes: the copy's lists, the sync's status and triggers. Hooks import them from here, never
 // lib/local or lib/sync.
 export { flushLocal };
-export { LOCAL_QUERY, getStatus, heard, onRedraw, opened, syncNow, watchStatus, type Settle, type SyncStatus } from "./sync";
+export { LOCAL_QUERY, getStatus, live, onRedraw, opened, pushNow, syncNow, watchStatus, type Relayed, type Settle, type SyncStatus } from "./sync";
 export { LINKS, NOTES, TASKS, projectLocal, readLinks, readNotes, readTasks } from "./local-records";
