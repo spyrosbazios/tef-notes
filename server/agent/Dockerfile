@@ -4,7 +4,7 @@
 # Debian, not Alpine: the embedding model's runtime (onnxruntime-node, src/semantic.ts) ships glibc binaries only.
 FROM oven/bun:1.3.9-slim
 WORKDIR /app/server/agent
-# Fonts for a PDF's first page (src/pdfs.ts `thumb`): a PDF that names Helvetica, Arial, Times or Courier without
+# Fonts for a PDF's first page and a drawing's text (the render process, src/render-child.ts): a PDF that names Helvetica, Arial, Times or Courier without
 # embedding it is drawn in Liberation's look-alikes (Greek too); without any font installed its text draws blank.
 # Tesseract reads scanned PDF pages (src/ocr.ts). Its language data is not the image's: the languages in TEF_NOTES_OCR are
 # downloaded into /data on first use, so any of them works without another image.

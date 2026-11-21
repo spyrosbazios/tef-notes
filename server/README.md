@@ -1,6 +1,6 @@
 # TEF Notes server
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-21 -->
 
 The server half of TEF Notes, a self-hosted personal notes and tasks system: [PocketBase](https://pocketbase.io) with
 JavaScript hooks (`pb_hooks/`) and migrations (`pb_migrations/`), plus a small bun sidecar that runs the chat agent
@@ -186,11 +186,15 @@ wrong letters.
 
 - **Check it**: `docker compose logs agent | grep scanned` says `agent: scanned PDFs are read by Tesseract (ell+eng)`,
   or why not (a code Tesseract doesn't have, a download that failed). `curl -s http://localhost:8098/agent/ocr` answers
-  `{"on":true,"languages":["ell","eng"],"read":57,"waiting":0,"failedPages":0,"failedPdfs":0,"problem":""}`: pages
+  `{"on":true,"languages":["ell","eng"],"ignored":[],"read":57,"waiting":0,"failedPages":0,"failedPdfs":0,"problem":""}`: pages
   read, pages still to read, pages and PDFs that couldn't be (a PDF that wants a password can't), and the last failure.
+  A code Tesseract has no data for (`TEF_NOTES_OCR=gre+eng`: Greek is `ell`) is logged once at start, listed under
+  `ignored` and left out; if none is left, OCR is off and the log says why.
 - **First use downloads each language's data** (`<code>.traineddata`, a few MB) from raw.githubusercontent.com, pinned
   to one commit of [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast), into the `agent_data` volume under
-  `tessdata/`. A server with no way out: put the files there yourself.
+  `tessdata/`. A server with no way out: put the files there yourself. While a download fails the agent logs it and
+  leaves OCR alone for a minute, then two, four and so on up to an hour, opening no PDF meanwhile (`problem` in
+  `/agent/ocr` says why); the first download that works starts the reading.
 - **It works in the background**, a page at a time on one core at low priority: every minute the agent looks for PDFs
   attached since and reads the scanned pages among each one's first 50 (what search indexes); a later page is read when
   the assistant asks for it, and a page the assistant is waiting for goes ahead of the rest. On a 4-core N100 a page
@@ -206,7 +210,8 @@ wrong letters.
   note (file it in a note first).
 
 The agent's half: `agent/src/ocr.ts` (the queue and what was read), `agent/src/ocr-run.ts` (the process that draws a
-page and runs Tesseract), `agent/src/pdfs.ts` (which pages are scans).
+page and runs Tesseract), `agent/src/pdfs.ts` (which pages are scans). The rest of the agent's pdf.js and canvas work (a PDF's text and tile
+picture, a drawing's PNG) is `agent/src/render.ts`'s one child process, so a big PDF never stalls a chat.
 
 ## The write contract
 

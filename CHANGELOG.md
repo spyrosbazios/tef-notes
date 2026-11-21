@@ -33,6 +33,7 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Smaller fixes to the installed app's plumbing: an unreadable reminder push still shows a notification, renaming a tag
   syncs the notes instead of refetching every query, link previews are kept for the full week offline, and the offline
   cache is no longer rewritten on every note edit.
+- The agent no longer stalls chats and Talk while it reads a big PDF or draws a tile or a drawing: that work runs in a process of its own. Scanned PDFs: a language code Tesseract has no data for is reported at start and dropped, and while its data can't be downloaded OCR backs off (a minute, doubling to an hour) instead of re-reading every PDF each minute.
 - The auto-tagger learns from you. Each tag is judged against a few notes you filed under it by hand and a few you took
   it off, a tag you keep removing needs a likelier match before it is added again, and a note gets at most three tags of
   its own. Taking a tag off no longer sends the note back to be tagged again (only a change to its title or text does).

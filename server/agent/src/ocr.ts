@@ -4,7 +4,9 @@
 // `readScans`); a page someone is waiting for (read_attachment) goes first, the background's run set aside for it.
 // Which languages: TEF_NOTES_OCR, Tesseract's codes joined by "+" (default "eng"; empty: off). Their data files are
 // downloaded once into the data directory, from one pinned commit of tessdata_fast; changing the languages reads every
-// scanned page again. What OCR reads is someone else's text, as a PDF's own is: it taints the same way (pdfs.ts).
+// scanned page again; a code Tesseract has no data for is reported once at start and dropped. While the reader can't work
+// (its data can't be downloaded) it is left alone for a back-off that doubles up to an hour, not tried every minute.
+// What OCR reads is someone else's text, as a PDF's own is: it taints the same way (pdfs.ts).
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { mkdir, rename } from "node:fs/promises";
@@ -18,7 +20,8 @@ export type Source = { key: string; url: string };
 /** Reads `pages` (1-based) of the PDF at `url`, handing each over as it is done; `stop` ends it early. Rejects when the
  *  PDF can't be opened, with `Unready` when it is the reader itself that can't work (no language data yet). */
 export type Reader = (url: string, pages: number[], got: (r: Read) => void, stop: AbortSignal) => Promise<void>;
-/** The reader can't read anything right now: nothing is held against the PDF it was asked for. */
+/** The reader can't read anything right now: nothing is held against the PDF it was asked for, and the reader is left
+ *  alone for a while (`Ocr.holding`). */
 export class Unready extends Error {}
 
 /** Pages of one PDF to read; `whole`: the background's share of the file, which is settled once it is through. */
@@ -28,6 +31,8 @@ type Task = { src: Source; pages: number[]; whole: boolean; done?: () => void };
 const SCHEMA = 1;
 /** A PDF the reader can't open is tried this many times (PocketBase may only be restarting), then given up on. */
 const TRIES = 3;
+/** A reader that can't work is left alone this long after its first failure, twice that after the second, and so on up to the cap. */
+export const BACKOFF_MS = 60_000, BACKOFF_MAX_MS = 60 * 60_000;
 
 export class Ocr {
   /** Why the last read failed; "" once one works. */
@@ -38,9 +43,11 @@ export class Ocr {
   private running?: { task: Task; stop: AbortController; urgent: boolean };
   private tries = new Map<string, number>();
   private idlers: (() => void)[] = [];
+  private unready = { fails: 0, until: 0 };
 
-  /** `engine` names the reader and its languages: what another engine read is forgotten, and read again. */
-  constructor(private reader: Reader, readonly engine: string, file = ":memory:") {
+  /** `engine` names the reader and its languages: what another engine read is forgotten, and read again. `now`: the
+   *  clock the back-off is kept by (the tests'). */
+  constructor(private reader: Reader, readonly engine: string, file = ":memory:", private now: () => number = Date.now) {
     this.db = new Database(file, { create: true });
     if ((this.db.query("PRAGMA user_version").get() as { user_version: number }).user_version !== SCHEMA) {
       this.db.run("DROP TABLE IF EXISTS pages");
@@ -79,14 +86,20 @@ export class Ocr {
     return this.rest.some((t) => t.src.key === key) || (this.running?.task.whole === true && this.running.task.src.key === key);
   }
 
+  /** Whether the reader has failed to work and is being left alone: `queue` and `want` do nothing until the back-off
+   *  is over, and the background (pdfs.ts `readScans`) doesn't even open the PDFs to queue. */
+  holding(): boolean { return this.now() < this.unready.until; }
+
   /** The background's share of a file: these pages, read when nobody is waiting; the file is settled after them. */
   queue(src: Source, pages: number[]) {
+    if (this.holding()) return;
     this.rest.push({ src, pages, whole: true });
     this.pump();
   }
 
   /** These pages now, ahead of the background. Resolves when they were read, or couldn't be: `stored` tells which. */
   want(src: Source, pages: number[]): Promise<void> {
+    if (this.holding()) return Promise.resolve();
     return new Promise((done) => { this.asked.push({ src, pages, whole: false, done }); this.pump(); });
   }
 
@@ -125,6 +138,15 @@ export class Ocr {
     this.db.run("INSERT OR REPLACE INTO pages (key, page, engine, conf, text) VALUES (?, ?, ?, ?, ?)", [key, r.page, this.engine, r.conf, r.text]);
   }
 
+  /** The reader can't work: waits out the back-off, and sets aside what was queued, which would fail the same way. */
+  private hold(why: Error) {
+    const fails = ++this.unready.fails, wait = Math.min(BACKOFF_MS * 2 ** (fails - 1), BACKOFF_MAX_MS);
+    this.unready.until = this.now() + wait;
+    this.rest = [];
+    for (const t of this.asked.splice(0)) t.done?.();
+    console.error(`agent: scanned PDFs can't be read yet: ${why.message}; trying again in ${Math.round(wait / 60_000)} min`);
+  }
+
   /** Starts the next task when none runs: what was asked for first. A background run in the way of an asker is stopped,
    *  and what it had left comes first once the asker is served. */
   private pump() {
@@ -134,6 +156,7 @@ export class Ocr {
     if (!task) { for (const done of this.idlers.splice(0)) done(); return; }
     const { key, url } = task.src, stop = new AbortController();
     const left = new Set(task.pages.filter((p) => !this.has(key, p)));
+    const reads = left.size > 0;                           // else the reader isn't asked, and its working or not is unknown
     this.running = { task, stop, urgent };
     const end = (failed?: Error) => {
       this.running = undefined;
@@ -142,6 +165,8 @@ export class Ocr {
         const tries = failed && !(failed instanceof Unready) ? (this.tries.get(key) ?? 0) + 1 : 0;
         this.problem = failed?.message ?? "";
         if (tries) this.tries.set(key, tries); else if (!failed) this.tries.delete(key);
+        if (failed instanceof Unready) this.hold(failed);
+        else if (!failed && reads) this.unready = { fails: 0, until: 0 };   // the reader worked
         const over = !failed || tries >= TRIES;                // read, or given up on; else the background's next pass tries again
         if (over) for (const page of left) this.store(key, { page, text: "", conf: -1 });   // never handed over: unreadable
         if (over && task.whole) this.settle(key, failed?.message ?? "");
@@ -156,6 +181,9 @@ export class Ocr {
 }
 
 // ---- Tesseract
+
+/** Every language `TESSDATA` has, by its `<code>.traineddata` at that commit (its pinned, so the list is exact). */
+const KNOWN = new Set(("afr amh ara asm aze aze_cyrl bel ben bod bos bre bul cat ceb ces chi_sim chi_sim_vert chi_tra chi_tra_vert chr cos cym dan deu div dzo ell eng enm epo equ est eus fao fas fil fin fra frk frm fry gla gle glg grc guj hat heb hin hrv hun hye iku ind isl ita ita_old jav jpn jpn_vert kan kat kat_old kaz khm kir kmr kor kor_vert lao lat lav lit ltz mal mar mkd mlt mon mri msa mya nep nld nor oci ori osd pan pol por pus que ron rus san sin slk slv snd spa spa_old sqi srp srp_latn sun swa swe syr tam tat tel tgk tha tir ton tur uig ukr urd uzb uzb_cyrl vie yid yor").split(" "));
 
 /** Tesseract's language data as `<code>.traineddata`: tessdata_fast at its 4.1.0 tag (what Debian packages), one commit. */
 const TESSDATA = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185";
@@ -172,15 +200,18 @@ export function langsOf(raw: string): string[] {
   return codes;
 }
 
-/** A language Tesseract doesn't have: no retry will find it. */
-class NoLanguage extends Unready {}
+/** TEF_NOTES_OCR's codes (`langsOf`) split into the ones to read in and the ones Tesseract has no data for, which are
+ *  dropped: no download would ever find them. */
+export function languagesOf(raw: string): { use: string[]; ignored: string[] } {
+  const codes = langsOf(raw);
+  return { use: codes.filter((c) => KNOWN.has(c)), ignored: codes.filter((c) => !KNOWN.has(c)) };
+}
 
 /** The language's data in `dir`, downloaded when it isn't there yet. */
 async function fetchLang(dir: string, lang: string) {
   const path = join(dir, `${lang}.traineddata`);
   if (await Bun.file(path).exists()) return;
   const res = await fetch(`${TESSDATA}/${lang}.traineddata`).catch((e: unknown) => { throw new Unready(`Tesseract's ${lang} data couldn't be downloaded: ${(e as Error).message}`); });
-  if (res.status === 404) throw new NoLanguage(`Tesseract has no language "${lang}" (all of them: ${CODES})`);
   if (!res.ok) throw new Unready(`Tesseract's ${lang} data couldn't be downloaded: HTTP ${res.status}`);
   await mkdir(dir, { recursive: true });
   await Bun.write(`${path}.part`, res);                        // whole or not at all: a cut download is never taken for the data
@@ -188,7 +219,7 @@ async function fetchLang(dir: string, lang: string) {
 }
 
 /** Tesseract over `langs`, its data in `dir`/tessdata. `ready` has the data there (once: a failed download is tried
- *  again, a language that doesn't exist isn't); `read` is the Reader, through the child (ocr-run.ts). */
+ *  again); `read` is the Reader, through the child (ocr-run.ts). */
 export function tesseract(dir: string, langs: string[]): { ready: () => Promise<void>; read: Reader } {
   const data = join(dir, "tessdata");
   let had: Promise<void> | undefined;
@@ -196,7 +227,7 @@ export function tesseract(dir: string, langs: string[]): { ready: () => Promise<
     if (had) return had;
     const run = Promise.all(langs.map((l) => fetchLang(data, l))).then(() => {});
     had = run;
-    run.catch((e: unknown) => { if (!(e instanceof NoLanguage) && had === run) had = undefined; });
+    run.catch(() => { if (had === run) had = undefined; });
     return run;
   };
   const read: Reader = async (url, pages, got, stop) => {
@@ -232,20 +263,22 @@ export function tesseract(dir: string, langs: string[]): { ready: () => Promise<
 
 // ---- the server's one
 
-type State = { on: true; languages: string[]; ocr: Ocr; ready: () => Promise<void> } | { on: false; why: string };
+type State = { on: true; languages: string[]; ignored: string[]; ocr: Ocr; ready: () => Promise<void> } | { on: false; why: string };
 let state: State | undefined;
+
+const list = (codes: string[]) => codes.map((c) => `"${c}"`).join(", ");
 
 /** OCR as this server is set up: on, with its languages, or off and why. */
 function setup(): State {
   if (state) return state;
   try {
-    const languages = langsOf(process.env.TEF_NOTES_OCR ?? "eng");
-    if (!languages.length) return (state = { on: false, why: "TEF_NOTES_OCR is empty" });
+    const { use: languages, ignored } = languagesOf(process.env.TEF_NOTES_OCR ?? "eng");
+    if (!languages.length) return (state = { on: false, why: ignored.length ? `Tesseract has no data for ${list(ignored)} (all of them: ${CODES})` : "TEF_NOTES_OCR is empty" });
     if (!Bun.which("tesseract")) return (state = { on: false, why: "tesseract is not installed" });
     const dir = process.env.TEF_NOTES_DATA ?? "./data";
     mkdirSync(dir, { recursive: true });
     const t = tesseract(dir, languages);
-    return (state = { on: true, languages, ready: t.ready, ocr: new Ocr(t.read, `${ENGINE}:${languages.join("+")}`, join(dir, "ocr.sqlite")) });
+    return (state = { on: true, languages, ignored, ready: t.ready, ocr: new Ocr(t.read, `${ENGINE}:${languages.join("+")}`, join(dir, "ocr.sqlite")) });
   } catch (e) {
     return (state = { on: false, why: (e as Error).message });
   }
@@ -259,7 +292,7 @@ export function ocr(): Ocr | null {
 
 /** Tests: a stand-in, or null for none. */
 export function useOcr(o: Ocr | null) {
-  state = o ? { on: true, languages: [], ocr: o, ready: () => Promise.resolve() } : { on: false, why: "off in tests" };
+  state = o ? { on: true, languages: [], ignored: [], ocr: o, ready: () => Promise.resolve() } : { on: false, why: "off in tests" };
 }
 
 /** Says in the log whether scanned PDFs are read, and fetches the languages' data now: a wrong code shows at start,
@@ -267,6 +300,7 @@ export function useOcr(o: Ocr | null) {
 export function startOcr(): boolean {
   const s = setup();
   if (!s.on) { console.error(`agent: scanned PDFs are not read: ${s.why}`); return false; }
+  if (s.ignored.length) console.error(`agent: TEF_NOTES_OCR: ignoring ${list(s.ignored)}, which Tesseract has no data for (all of them: ${CODES})`);
   s.ready().then(
     () => console.error(`agent: scanned PDFs are read by Tesseract (${s.languages.join("+")})`),
     (e: unknown) => { s.ocr.problem = (e as Error).message; console.error(`agent: scanned PDFs can't be read yet: ${s.ocr.problem}`); },
@@ -277,5 +311,5 @@ export function startOcr(): boolean {
 /** GET /agent/ocr: whether scanned PDFs are read, in which languages, and how far it has got. */
 export function ocrRoute(): Response {
   const s = setup();
-  return Response.json(s.on ? { on: true, languages: s.languages, ...s.ocr.status() } : { on: false, why: s.why });
+  return Response.json(s.on ? { on: true, languages: s.languages, ignored: s.ignored, ...s.ocr.status() } : { on: false, why: s.why });
 }

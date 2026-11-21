@@ -6,7 +6,7 @@ import type { ModelMessage } from "ai";
 import { parseNote } from "@/core/notes";
 import { fromWeb } from "../src/tools";
 import { Notes } from "../src/notes";
-import { Ocr, useOcr, type Reader } from "../src/ocr";
+import { BACKOFF_MS, Ocr, Unready, useOcr, type Reader } from "../src/ocr";
 import { allPdfs, pageRange, pages, pagesRoute, preview, PREVIEW_CHARS, readNow, readScans, thumbRoute } from "../src/pdfs";
 import { Todo } from "../src/todo";
 import { tools } from "../src/tools";
@@ -146,6 +146,32 @@ describe("scanned pages", () => {
     pb.attachments.clear();
     await readScans(server);
     expect(o.status().read).toBe(0);
+  });
+
+  it("opens no PDF while the reader waits out its back-off, and goes on after it", async () => {
+    let clock = 0, ready = false;
+    const calls: number[][] = [];
+    useOcr(o = new Ocr(async (_url, list, got, stop) => { calls.push(list); if (!ready) throw new Unready("no language data"); await reader(_url, list, got, stop); }, "test", ":memory:", () => clock));
+    const fetched: string[] = [], real = globalThis.fetch;
+    globalThis.fetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) => { fetched.push(String(input)); return real(input, init); }) as typeof fetch;
+    try {
+      await readScans(server);
+      await o.idle();
+      expect(calls).toEqual([[1, 3]]);
+      pb.attach(id, "later.pdf", makePdf(["", TEXT, ""]));
+      fetched.length = 0;
+      await readScans(server);                                 // the minute after: nothing to do but wait
+      await o.idle();
+      expect([calls.length, fetched.some((u) => u.includes("later_"))]).toEqual([1, false]);
+      clock += BACKOFF_MS;
+      ready = true;
+      await readScans(server);
+      await o.idle();
+      expect(calls.length).toBe(3);                            // the first PDF again, and the one attached meanwhile
+      expect(o.status()).toMatchObject({ read: 4, waiting: 0, problem: "" });
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 
   it("gives up at once on a PDF that can't be opened", async () => {
