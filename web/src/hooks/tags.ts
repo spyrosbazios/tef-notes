@@ -3,7 +3,10 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { useCallback, useEffect, useMemo } from "react";
 import { tagColor, tagGuesser, type TagDef, type TagFields } from "@/core/tags";
 import type { Color } from "@/core/notes";
+import { syncNow } from "@/lib/sync";
 import * as tags from "@/services/tags";
+import { LENSES } from "./lens";
+import { pullPrefs } from "./prefs";
 
 export const TAGS = ["tags"] as const;
 
@@ -24,11 +27,19 @@ function useChange<V>(fn: (v: V) => Promise<unknown>) {
 
 export const useCreateTag = () => useChange((t: TagFields) => tags.create(t));
 export const useUpdateTag = () => useChange((v: { rec: string; fields: TagFields }) => tags.update(v.rec, v.fields));
-/** A tag renamed everywhere (or merged into one by that name): notes, tasks, lenses and preferences change too, so every
- *  query is refetched, not just the definitions. */
+/** A tag renamed everywhere (or merged into one by that name): the definitions and lenses are refetched; the notes and tasks
+ *  are not queries but the local copy, so they come down by a sync (which redraws them), and the preferences (the folded
+ *  groups) by a pull. Nothing else the rename leaves alone is refetched. */
 export function useRenameTag() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (v: { from: string; to: string }) => tags.rename(v.from, v.to), onSuccess: () => qc.invalidateQueries() });
+  return useMutation({
+    mutationFn: (v: { from: string; to: string }) => tags.rename(v.from, v.to),
+    onSuccess: () => {
+      void syncNow();
+      void pullPrefs();
+      return Promise.all([qc.invalidateQueries({ queryKey: TAGS }), qc.invalidateQueries({ queryKey: LENSES })]);
+    },
+  });
 }
 export const useRemoveTag = () => useChange((t: TagDef) => tags.remove(t.rec));
 

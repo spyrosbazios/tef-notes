@@ -1,12 +1,12 @@
 // Link previews as query state, shared by the editor's cards and the list's thumbnails: a URL is asked of the server once
-// an hour however many notes show it.
+// an hour however many notes show it. It lives as long as the stored cache does (router.ts's `gcTime`, lib/persist.ts `MAX_AGE`).
 import { useQuery } from "@tanstack/react-query";
 import * as previews from "@/services/previews";
 
 const HOUR = 3_600_000;
 
 export const previewQuery = (url: string) => ({
-  queryKey: ["link-preview", url] as const, queryFn: () => previews.get(url), staleTime: HOUR, gcTime: 24 * HOUR,
+  queryKey: ["link-preview", url] as const, queryFn: () => previews.get(url), staleTime: HOUR,
 });
 
 /** The preview of `url`, once `enabled`; undefined while it loads or when it can't be had. */

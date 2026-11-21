@@ -7,7 +7,8 @@ import type { QueryKey } from "@tanstack/react-query";
  *  here on purpose: they are read from the local copy (lib/local.ts), which is what keeps them, with the edits not yet sent.
  *  `talk` (whether the server has Talk) is kept so its tab is there the moment the app opens rather than arriving with the answer.
  *  Everything else is left out on purpose, and so is anything added later until it is named here: the chats and models (the agent's), the reader's
- *  articles, and anything a person searched for (the palette's "find" is a route call, not a query at all). */
+ *  articles, and anything a person searched for (Talk's voice list is `talk-voices`, a different first element; the palette's "find"
+ *  is a route call, not a query at all). */
 const KEPT = new Set(["tags", "lenses", "photos", "link-preview", "talk"]);
 
 export const persistable = (key: QueryKey): boolean => typeof key[0] === "string" && KEPT.has(key[0]);
@@ -29,23 +30,35 @@ export type Keyed<S> = {
   del: (key: string, store?: S) => Promise<unknown>;
 };
 
-/** A persister that writes the latest client at most once per `wait` ms (the cache changes on every keystroke's save and
- *  every realtime event, and the notes list is the whole notebook), and at once when `flush` is called (the page is hiding).
+/** What of a dehydrated client is worth a write: which queries it holds and when each last got data. The notes, tasks and links
+ *  are projected into the cache on every keystroke's save and every sync, and each projection makes the provider hand the client
+ *  over again, though they are not in it (`persistable`): such an event changes nothing here, so nothing is written for it. */
+const signature = (c: PersistedClient): string =>
+  c.buster + c.clientState.queries.map((q) => `${q.queryHash}@${q.state.dataUpdatedAt}`).join("|") + c.clientState.mutations.length;
+
+/** A persister that writes the latest client at most once per `wait` ms, and only when what is kept changed (`signature`), and at
+ *  once when `flush` is called (the page is hiding).
  *  A write that fails (storage full, IndexedDB blocked in a private window) costs only the offline copy: the app goes on.
  *  `disable` ends the writing for good (a page about to reload with the copy cleared): what the cache does after it, and a
  *  flush as the page hides, is not stored. `removeClient` alone does not do that: the provider itself calls it to drop a cache
  *  that is too old or from another build, and the page goes on caching after. */
 export function throttled<S>(kv: Keyed<S>, key: string, wait: number, store?: S): Persister & { flush: () => Promise<void>; disable: () => void } {
   let latest: PersistedClient | undefined, timer: ReturnType<typeof setTimeout> | undefined, off = false;
+  /** The signature of the client last taken (written, or waiting to be); a failed write or a removal forgets it, so the next change writes. */
+  let taken: string | undefined;
   const flush = async () => {
     clearTimeout(timer); timer = undefined;
     const c = latest; latest = undefined;
-    if (c) await kv.set(key, c, store).catch(() => {});
+    if (c) await kv.set(key, c, store).catch(() => { taken = undefined; });
   };
   return {
-    persistClient: (c) => { if (off) return; latest = c; timer ??= setTimeout(() => { void flush(); }, wait); },
+    persistClient: (c) => {
+      const sig = signature(c);
+      if (off || sig === taken) return;
+      taken = sig; latest = c; timer ??= setTimeout(() => { void flush(); }, wait);
+    },
     restoreClient: () => kv.get(key, store),
-    removeClient: async () => { clearTimeout(timer); timer = undefined; latest = undefined; await kv.del(key, store); },
+    removeClient: async () => { clearTimeout(timer); timer = undefined; latest = undefined; taken = undefined; await kv.del(key, store); },
     flush,
     disable: () => { off = true; clearTimeout(timer); timer = undefined; latest = undefined; },
   };

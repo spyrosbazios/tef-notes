@@ -64,13 +64,15 @@ const sameOrigin = (url: unknown): string => {
   } catch { return scope.href; }
 };
 
+/** What an unreadable push shows. The subscription is `userVisibleOnly`, so every push must show something: a browser given
+ *  none makes up its own "this site was updated in the background". Its tag makes a second one replace the first. */
+const UNREADABLE = { title: "TEF Notes", body: "A reminder came that couldn't be read. Open the app to see what is due.", tag: "reminder-unreadable" };
+
 self.addEventListener("push", (e) => {
   let p;
   try { p = payloadOf(e.data?.json()); } catch { p = null; }
-  if (!p) return;
-  e.waitUntil(self.registration.showNotification(p.title, {
-    body: p.body, tag: p.tag, icon: new URL("icon.png", scope).href, data: { url: sameOrigin(p.url) },
-  }));
+  const { title, body, tag, url } = p ?? { ...UNREADABLE, url: scope.href };
+  e.waitUntil(self.registration.showNotification(title, { body, tag, icon: new URL("icon.png", scope).href, data: { url: sameOrigin(url) } }));
 });
 
 /** The app opened at `url`. An open window is focused and told to go there (`{ type: "navigate", url }`, taken by
