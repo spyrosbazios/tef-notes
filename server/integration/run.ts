@@ -63,7 +63,8 @@ try {
   reservation.stop(true);
   if ([8090, 8097, 8098].includes(port)) throw new Error("Refusing reserved production port");
   const url = `http://127.0.0.1:${port}`;
-  pb = Bun.spawn([binary, "serve", "--dev=false", `--http=127.0.0.1:${port}`, `--dir=${root}/pb_data`,
+  // --origins as server/Dockerfile gives it when the image serves no signed extension
+  pb = Bun.spawn([binary, "serve", "--dev=false", `--http=127.0.0.1:${port}`, "--origins=chrome-extension://*", `--dir=${root}/pb_data`,
     `--hooksDir=${root}/pb_hooks`, `--migrationsDir=${root}/pb_migrations`, `--publicDir=${root}/pb_public`],
     { cwd: root, env, stdout: "pipe", stderr: "pipe" });
   const drain = async (stream: ReadableStream) => {
@@ -80,7 +81,7 @@ try {
   if (!ready) throw new Error("PocketBase readiness timeout");
   // A wrapper outside the checkout opts into Bun discovery without adding a default-discovered test file.
   const wrapper = join(root, "contract.test.ts");
-  const suites = ["contract.ts", "hooks.ts", ...(application ? ["application.ts"] : [])];
+  const suites = ["contract.ts", "hooks.ts", "origin.ts",...(application ? ["application.ts"] : [])];
   await Bun.write(wrapper, suites.map((suite) => `import ${JSON.stringify(pathToFileURL(join(import.meta.dir, suite)).href)};`).join("\n"));
   if (interrupted) throw new Error("Integration run interrupted");
   tests = Bun.spawn([process.execPath, "--no-env-file", "test", wrapper, "--timeout", "15000"],

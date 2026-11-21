@@ -7,6 +7,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Security
 
+- Other websites can no longer write to your notes or use your server to fetch pages: a request from another site is
+  refused unless it is your extension, and only the extension may read the API across origins.
 - Text the server writes for a clip or a share (a new note, an append, a new task) is marked as someone else's, like
   a page the assistant read, so the assistant asks before it writes after reading it. Once marked, a note or task keeps
   the mark. A tag description an outside agent saves is marked as the agent's, not yours.

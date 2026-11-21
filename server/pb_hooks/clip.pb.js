@@ -26,8 +26,8 @@
 //   GET  /api/tefnotes/clip/image?url=  the picture at a public URL, for the extension when it can't fetch it itself;
 //     through lib/link-preview.js's guard, never $http.send. 400 for a URL refused, 502 when it is no picture.
 //
-// Errors are 4xx/5xx { error }. CORS is PocketBase's own (any origin, the chrome-extension:// one included); nothing is
-// signed in, the tailnet is the gate (pb_migrations/1792400000_open.js).
+// Errors are 4xx/5xx { error }. Nothing is signed in, the tailnet is the gate (pb_migrations/1792400000_open.js); a
+// browser request from another site is refused before it gets here (origin.pb.js), the extension's taken.
 //
 // JEV answers in a few seconds. Without a key, or when it fails, suggest still answers: no suggestions, pick "new", so
 // the owner can still save it as a note of its own. A picture it refuses (TypeSafe's images are opt-in and early) is
