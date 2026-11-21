@@ -136,6 +136,41 @@ describe("create_lens", () => {
   });
 });
 
+describe("tag descriptions", () => {
+  const listed = async (): Promise<ModelMessage[]> => [{ role: "tool", content: [{ type: "tool-result", toolCallId: "l", toolName: "list_tags", output: { type: "json", value: await run(T.list_tags, {}) as never } }] }];
+  const taints = async () => readWeb(notes, todo)(await listed());
+  const described = (describedBy: string | undefined) => pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "the house", describedBy }, { id: "t2", name: "work", description: "" });
+
+  it("only the owner's own description is trusted: any other is marked, and reading one taints the turn like a web read", async () => {
+    described("owner");
+    expect(await run(T.list_tags, {})).toEqual({ tags: [{ name: "Σπίτι", id: "t1", means: "the house" }, { name: "work", id: "t2" }] });
+    expect(await taints()).toBe(false);
+    for (const by of ["auto", "agent", "", undefined, "something else"]) {
+      described(by);
+      expect(await run(T.list_tags, {})).toMatchObject({ tags: [{ name: "Σπίτι", means: "the house", unverified: true }, { name: "work" }] });
+      expect(await taints()).toBe(true);
+    }
+  });
+
+  it("a tag with no description taints nothing, whoever it says wrote it", async () => {
+    pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "", describedBy: "auto" });
+    expect(await taints()).toBe(false);
+  });
+
+  it("a description the chat agent writes is sent marked as the agent's, one it leaves alone is not re-marked", async () => {
+    await run(T.create_tag, { name: "ideas", description: "things to try" });
+    expect(pb.tags.at(-1)).toMatchObject({ name: "ideas", description: "things to try", describedBy: "agent" });
+    await run(T.create_tag, { name: "plain" });
+    expect(pb.tags.at(-1)).not.toHaveProperty("describedBy");
+
+    pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "the house", describedBy: "owner" });
+    await run(T.update_tag, { id: "t1", color: "teal" });
+    expect(pb.tags[0]).toMatchObject({ description: "the house", describedBy: "owner" });
+    await run(T.update_tag, { id: "t1", description: "the family home" });
+    expect(pb.tags[0]).toMatchObject({ description: "the family home", describedBy: "agent" });
+  });
+});
+
 describe("list_tagged", () => {
   it("notes and tasks with any or all of the tags, folded; done tasks only when asked", async () => {
     pb.put("notes/a.md", file("a", "- x\n", "tags: [Σπίτι, work]\n"), { updated: "2026-10-04 12:00:00.000Z" });

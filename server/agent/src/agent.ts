@@ -25,7 +25,8 @@ import { exists, saver } from "./chats";
 import { Context, screen } from "./assistant";
 import { historyFromWeb, repair, settle, withContext } from "./guard";
 import { key } from "./keys";
-import { stepTools, trim } from "./loop";
+import { approvalSecret } from "./approval-secret";
+import { lastStep, stepTools, trim } from "./loop";
 import { steeringFor } from "./steer";
 import { instructions as runInstructions, offeredTo, scoped, scopeOf, type Scope } from "./note-action";
 import { Notes } from "./notes";
@@ -104,9 +105,11 @@ async function build(notes: Notes, todo: Todo, pick: typeof model, id: string, r
     // answer, or a tool call there ends the turn with no reply
     prepareStep: async ({ stepNumber, messages }) => ({
       ...(stepNumber === 0 && { messages: trim(messages) }),
-      ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : { toolChoice: "none" as const }),
+      ...(stepNumber < steps - 1 ? { activeTools: stepTools(base, await untrusted(messages), policyFor) } : lastStep()),
     }),
     toolApproval: scope ? scoped(gate, scope) : gate,
+    // A card's answer runs its write only if this server issued the card (approval-secret.ts)
+    experimental_toolApprovalSecret: await approvalSecret(),
     providerOptions,
   });
 }

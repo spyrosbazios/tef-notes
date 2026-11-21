@@ -34,8 +34,15 @@ on every device would add friction without keeping out anyone the network does n
 - Talk leaves your server too: what you say, and what the assistant says back, go to Fish Audio for as long as a
   conversation is open; the turns themselves go to your model provider as a chat's do. No audio is stored on your server.
   A write still asks with a card unless you ruled otherwise in Settings, and only a tap answers one: nothing that is heard
-  counts as a confirmation. Talk's WebSocket has no browser preflight to keep other websites out, so the agent refuses an
-  upgrade whose `Origin` is not the server's own host; a proxy in front must pass `Host` or `X-Forwarded-Host` through.
+  counts as a confirmation.
+- The agent's routes that take a body or change something refuse another website's browser: the body must be JSON (raw
+  bytes for dictation), which a page cannot send across sites without a preflight that nothing here answers, and an
+  `Origin` other than the server's own host, or `Sec-Fetch-Site: cross-site`, is refused (`server/agent/src/request-guard.ts`).
+  A client that is not a browser sends no `Origin` and is let through. Talk's WebSocket, which has no preflight at all, gets
+  the same `Origin` check. A proxy in front must pass `Host` or `X-Forwarded-Host` through. A confirm card's answer runs its
+  write only if this agent issued the card: each card is signed with a secret kept in the agent's data volume, so a request
+  body cannot approve a call the model never made. A page that reaches the agent under a name it controls (DNS
+  rebinding) is not stopped by any of this: the network is the gate.
 - Scanned PDFs are read on your server: Tesseract runs inside the agent, and the text it read stays in the agent's
   data volume until the PDF is deleted. The only traffic is the one-time download of each language's data file from
   raw.githubusercontent.com (pinned to one commit).

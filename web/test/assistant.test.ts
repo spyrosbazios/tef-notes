@@ -2,8 +2,8 @@
 // resumes by itself, and what a Stop leaves. The contract's own reading of the context is tested in packages/core.
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
-import { choiceOutput, LIMITS, UI_OK } from "@/core/assistant";
-import { assistantView, closeUnfinished, isAppTool, pageContext, resumes, runUiTool, uiTrouble, uiWords, webView, type UiHost } from "@/lib/assistant";
+import { choiceOutput, LIMITS, UI_OK, uiToolsFor } from "@/core/assistant";
+import { assistantView, closeUnfinished, isAppTool, notOffered, pageContext, resumes, runUiTool, uiTrouble, uiWords, webView, type UiHost } from "@/lib/assistant";
 import type { View } from "@/lib/nav";
 import { withNote, type NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
@@ -171,5 +171,16 @@ describe("a UI tool the SDK refused", () => {
   test("says the input didn't fit, not the whole input back", () => {
     expect(uiTrouble("draw", 'AI_InvalidToolInputError: Invalid input for tool draw: {"path":"notes/a.md","add":[…]}')).toBe("Couldn't draw: what the assistant sent didn't fit the tool");
     expect(uiTrouble("draw", "No note notes/x.md.")).toBe("Couldn't draw: No note notes/x.md.");
+  });
+});
+
+describe("a UI call the turn did not offer", () => {
+  test("is refused with an error the model reads; one offered is let through", () => {
+    const offered = uiToolsFor({ view: { kind: "home" } });     // no editable selection: the selection tools are not on offer
+    expect(notOffered(offered, "open_note")).toBeNull();
+    expect(notOffered(offered, "ask_choice")).toBeNull();
+    expect(notOffered(offered, "replace_selection")).toEqual({ error: expect.stringContaining("replace_selection was not on offer") });
+    expect(notOffered(uiToolsFor({ view: { kind: "home" } }), "draw")).toBeNull();
+    expect(notOffered([], "open_note")).not.toBeNull();         // no context at all: no UI tool is on offer
   });
 });

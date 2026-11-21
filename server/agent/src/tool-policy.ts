@@ -12,8 +12,11 @@ export type PolicyContext = { notes: Notes; todo: Todo; files: readonly Attached
 export type Policy<I = never> = {
   /** none: reads and the client's own edits, never a card. An action: the owner's rule for it decides (decide, @/core/actions). */
   approval: "none" | Action;
-  /** records follows ids/paths with tainted provenance; untrusted taints even an error result. */
-  result: "plain" | "records" | "untrusted";
+  /** records follows ids/paths with tainted provenance; untrusted taints even an error result; marked taints when `taints` says
+   *  this result carries text that isn't the owner's (a tool that lists text of mixed provenance). */
+  result: "plain" | "records" | "untrusted" | "marked";
+  /** For `marked`: whether a result (what `execute` returned) carries someone else's text. */
+  taints?: (output: unknown) => boolean;
   unavailableWhenTainted?: true;
   requiresExa?: true;
   check?: (context: PolicyContext, input: I) => string | null | Promise<string | null>;

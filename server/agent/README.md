@@ -91,7 +91,7 @@ Claude Code, Codex and other coding agents reach the notes through the CLI, driv
 | `TEF_NOTES_MODEL` | the provider's | The default model |
 | `TZ` | system zone | The day used in the prompt and for a new note's name |
 | `TEF_NOTES_OCR` | `eng` | The languages scanned PDFs are read in, Tesseract's codes joined by `+`; empty: off. Needs `tesseract` on the `PATH` (the image has it; from source, install it), else off |
-| `TEF_NOTES_DATA` | `./data` | Derived data: the search vectors and their model, PDF tile pictures, what OCR read and its language data |
+| `TEF_NOTES_DATA` | `./data` | Derived data: the search vectors and their model, PDF tile pictures, what OCR read and its language data; and `approval-secret`, which signs the confirm cards (losing it only voids the cards waiting at that moment) |
 
 Without the provider's key (`llm`) a chat is refused; without `exa` the web tools are left out.
 

@@ -27,6 +27,7 @@ import { settle } from "./guard";
 import { key } from "./keys";
 import { DEFAULT as DEFAULT_MODEL } from "./models";
 import { Notes } from "./notes";
+import { sameOrigin } from "./request-guard";
 import type { ConnectEar, ConnectVoice, EarEvent, EarSession, Sea, Voice } from "./fish";
 import { talkAgent, type Spoken, type TalkAgent } from "./talkAgent";
 import { checked, modelOutput, run } from "./talkTools";
@@ -437,18 +438,6 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
 
 /** What the socket carries: where the notes are, how it speaks and thinks, and the conversation once it started. */
 type Sock = { deps: Deps; first: boolean; closed: boolean; talk?: Talk };
-
-/** Whether a WebSocket upgrade may come from where it says: no `Origin` (a client that is not a browser) or one on this server's own host
- *  (`Host`, or `X-Forwarded-Host` behind the reverse proxy). A browser lets any website open a WebSocket to any address, and there is
- *  no sign-in here, so this is what keeps another website out (the JSON routes have the preflight). */
-export function sameOrigin(h: { get(name: string): string | null }): boolean {
-  const origin = h.get("origin");
-  if (origin === null) return true;
-  let host: string;
-  try { host = new URL(origin).host.toLowerCase(); } catch { return false; }
-  const own = [h.get("host") ?? "", ...(h.get("x-forwarded-host") ?? "").split(",")].map((x) => x.trim().toLowerCase());
-  return own.includes(host);
-}
 
 /** `GET /agent/talk`: the status, or with an upgrade the conversation. 404 without a Fish key; 403 from another website. */
 export type Fish = { speak: (sea: Sea) => ConnectVoice; hear: ConnectEar; voices: (q: string) => Promise<TalkVoice[]>; fallback: () => Promise<string> };

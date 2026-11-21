@@ -31,3 +31,9 @@ function stub(p: ToolResultPart): ToolResultPart {
  *  The tools one step is offered are the request's base, less those its policies withdraw. */
 export const stepTools = <T extends string>(base: readonly T[], tainted: boolean, policyFor: PolicyLookup): T[] =>
   tainted ? base.filter((n) => !policyFor(n)?.unavailableWhenTainted) : [...base];
+
+/** The last step has to answer, so no tool is sent at all and none may be called: `toolChoice: "none"` alone still sent every
+ *  tool (the withdrawn, the owner's "Never" and the out-of-scope ones among them), and a call there would end the turn with
+ *  no reply. Anthropic takes tool results in the history with no tools defined (refused until March 2025:
+ *  github.com/anthropics/anthropic-sdk-python/issues/849). */
+export const lastStep = () => ({ activeTools: [] as never[], toolChoice: "none" as const });

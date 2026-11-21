@@ -56,8 +56,13 @@ export async function repair<M extends UIMessage>(ms: M[], tools: ToolSet): Prom
  *  the paths of notes and ids of tasks written in a chat that had (their `tainted` column); one read back
  *  here is web text too, a chat later. */
 export const fromWeb = (ms: ModelMessage[], tainted: ReadonlySet<string>, policyFor: PolicyLookup) =>
-  ms.some((m) => m.role === "tool" && m.content.some((p) => p.type === "tool-result" && (policyFor(p.toolName)?.result === "untrusted"
-    || (policyFor(p.toolName)?.result === "records" && tainted.size > 0 && names(p.output, tainted)))));
+  ms.some((m) => m.role === "tool" && m.content.some((p) => {
+    if (p.type !== "tool-result") return false;
+    const policy = policyFor(p.toolName);
+    return policy?.result === "untrusted"
+      || (policy?.result === "records" && tainted.size > 0 && names(p.output, tainted))
+      || (policy?.result === "marked" && !!policy.taints?.(p.output.type === "json" ? p.output.value : undefined));
+  }));
 
 /** Whether a tool result names one of these paths or ids: as a JSON string value, so one quoted inside a note's text doesn't count. */
 function names(output: unknown, paths: ReadonlySet<string>) {
@@ -73,12 +78,14 @@ export const clip = (text: string, n: number) => (text.length > n ? { text: text
 export const capList = <T,>(xs: T[], n: number, end = false) =>
   xs.length <= n ? { list: xs } : { list: end ? xs.slice(-n) : xs.slice(0, n), left_out: xs.length - n };
 
-/** Read provenance from the intact UI history, before obsolete tool inputs are repaired away. */
+/** Read provenance from the intact UI history, before obsolete tool inputs are repaired away. A result and an error both count
+ *  (an untrusted tool's error text can carry the page's words, as `fromWeb` has it); a call with neither yet read nothing. */
 export function historyFromWeb(ms: UIMessage[], tainted: ReadonlySet<string>, policyFor: PolicyLookup) {
   return ms.some((m) => m.parts.some((p) => {
-    if (!isToolUIPart(p) || p.state !== "output-available") return false;
+    if (!isToolUIPart(p) || (p.state !== "output-available" && p.state !== "output-error")) return false;
     const policy = policyFor(getToolName(p));
     // A removed tool with an opaque result has no trustworthy provenance classification.
-    return !policy || policy.result === "untrusted" || (policy.result === "records" && names(p.output, tainted));
+    return !policy || policy.result === "untrusted"
+      || (p.state === "output-available" && ((policy.result === "records" && names(p.output, tainted)) || (policy.result === "marked" && !!policy.taints?.(p.output))));
   }));
 }

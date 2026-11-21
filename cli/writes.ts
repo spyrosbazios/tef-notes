@@ -6,14 +6,14 @@
 // by the write that links or replaces them) and tag renames (the server's route).
 import { importNotes, type ImportTally, type Source, type ImportLine } from "@/core/import";
 import * as pb from "@/core/pocketbase";
-import { createTag, updateTag, type TagDef, type TagFields } from "@/core/tags";
+import { createTag, updateTag, type TagDef, type TagFields, type TagMark } from "@/core/tags";
 import type { Task } from "@/core/todo";
 
 /** What the environment says every write carries. */
 export const markOf = (env: Record<string, string | undefined>): pb.Mark => (env.TEF_NOTES_AGENT === "1" ? { tainted: true } : {});
 
 export function writer(mark: pb.Mark) {
-  const described = (text: string) => (text.trim() ? mark : {});
+  const tagMark: TagMark | undefined = mark.tainted ? "agent" : undefined;
   return {
     /** Whether the writes are an agent's. */
     marks: mark.tainted === true,
@@ -27,8 +27,8 @@ export function writer(mark: pb.Mark) {
     },
     tags: {
       /** The mark rides only with a description being written: a colour change leaves who wrote the description as it was. */
-      create: (s: pb.Server, t: TagFields) => createTag(s, t, described(t.description)),
-      update: (s: pb.Server, was: TagDef, t: TagFields) => updateTag(s, was.rec, t, t.description.trim() === was.description.trim() ? {} : described(t.description)),
+      create: (s: pb.Server, t: TagFields) => createTag(s, t, tagMark),
+      update: (s: pb.Server, was: TagDef, t: TagFields) => updateTag(s, was.rec, t, t.description.trim() === was.description.trim() ? undefined : tagMark),
     },
     importNotes: (s: pb.Server, src: Source, o: { dry: boolean; update: boolean; today: string; onLine?: (l: ImportLine) => void }): Promise<ImportTally> =>
       importNotes(s, src, { ...o, mark }),

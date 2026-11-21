@@ -46,6 +46,15 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 - A link pasted into a note from a web page keeps only an `http(s):`, `mailto:` or the app's own address; a
   `javascript:` or `data:` link becomes plain text, and Ctrl-click never opens one.
+### Fixed
+
+- A tag description the server or the assistant wrote is treated like text from the web: when the assistant reads one it
+  asks before writing, and a description the assistant writes is marked as its own. Only what you wrote is trusted.
+- The agent no longer answers another website's browser: its routes need a JSON body (raw bytes for dictation) and an
+  `Origin` that is your server's own, and a confirm card's answer only runs a write the agent itself asked about (cards are
+  signed; one waiting while the agent updates has to be asked again).
+- The assistant's last step of a turn is sent no tools at all, and the app refuses a call to an app tool the turn did not
+  offer. What an untrusted tool's error said now counts as read from the web in the turns that follow, as in its own.
 
 ## 0.13.0 - 2026-11-19
 

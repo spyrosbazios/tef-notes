@@ -17,7 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { choiceFrom, isAskTool, isUiTool, uiError } from "@/core/assistant";
+import { choiceFrom, isAskTool, isUiTool, uiError, uiToolsFor, type UiToolName } from "@/core/assistant";
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import type { NoteRef } from "@/core/handoff";
@@ -33,7 +33,7 @@ import { NOTES } from "@/hooks/notes";
 import { persisted } from "@/hooks/store";
 import { TASKS } from "@/hooks/todo";
 import type { Held } from "@/editor";
-import { closeUnfinished, pageContext, resumes, runUiTool } from "@/lib/assistant";
+import { closeUnfinished, notOffered, pageContext, resumes, runUiTool } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
 import { STORAGE } from "@/lib/storage-keys";
 import { message } from "@/services/api";
@@ -80,6 +80,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   /** A chat; `held`: an ask's, the words it holds while it does (null once let go: a plain chat from then on); `scope`: a note
    *  action's run, while its panel holds it. */
   const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null, scope?: () => Run | null): Chat<UIMessage> => {
+    // The UI tools the request in flight offered (what its `context` allows): a call to any other is refused, not run
+    let offered: readonly UiToolName[] = [];
     const chat: Chat<UIMessage> = new Chat<UIMessage>({
       id, messages,
       transport: new DefaultChatTransport<UIMessage>({
@@ -89,6 +91,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           const context = pageContext({ view, open, task }, {
             notes: qc.getQueryData<NoteRec[]>(NOTES), tasks: qc.getQueryData<TaskRec[]>(TASKS),
           }, words ? words.markdown() : selected.current, activeLensOf(qc), !!words, openDrawingNow(qc.getQueryData<NoteRec[]>(NOTES)));
+          offered = uiToolsFor(context);
           const action = scope?.();
           return { body: { id, messages, ...settingsNow(qc), context, ...(action ? { action } : {}) } };
         },
@@ -97,6 +100,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       onToolCall: ({ toolCall }) => {
         const { toolName, toolCallId } = toolCall;
         if (!isUiTool(toolName)) return;
+        const refusal = notOffered(offered, toolName);
+        if (refusal) return chat.addToolOutput({ tool: toolName, toolCallId, output: refusal });
         // The question is the owner's to answer (choice.tsx); one that can never be drawn is answered here, so the call isn't left open
         if (isAskTool(toolName)) {
           if (!choiceFrom(toolCall.input)) return chat.addToolOutput({ tool: toolName, toolCallId, output: uiError("The question was malformed: it needs a question and 2 to 6 options.") });
