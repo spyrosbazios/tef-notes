@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { DEFAULT_ACTIONS } from "@/core/actions";
 import { attachedBlock, attachedFiles, type Attached } from "@/core/assistant";
 import { parseNote } from "@/core/notes";
-import { approvals } from "../src/agent";
+import { approvals } from "../src/turn";
 import { bytesOf } from "../src/fileTools";
 import { Notes } from "../src/notes";
 import { Todo } from "../src/todo";

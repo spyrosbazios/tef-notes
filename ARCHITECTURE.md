@@ -179,7 +179,8 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 
 - `POST /agent/chat` streams an [AI SDK](https://ai-sdk.dev) UI message stream (`useChat` with `DefaultChatTransport` on
   the clients). `GET /agent/models` lists the provider's models and says whether the server holds a key (`available`).
-- The prompt, the notes context, the memory and chat saving are in `src/agent.ts`. Its tools work on PocketBase through
+- The prompt, the notes context, the memory, the owner's rules and the model's timeout are in `src/turn.ts`, one turn of the
+  agent that the chat (`src/agent.ts`, which also saves the chat) and Talk share. Its tools work on PocketBase through
   the same `rev` compare-and-swap. `src/application/notes.ts` and `todo.ts` own persistence, revision retries, merges,
   links and recurrence, returning domain records/text. `src/notes.ts` and `todo.ts` are assistant card adapters;
   `src/tools.ts` and `todoTools.ts` expose them as tools. Companion routes, direct search and index warming use the
@@ -209,7 +210,7 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   approvals from them and supplies policy lookup to the pure guard and loop utilities.
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
   next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`. The owner can turn
-  the asking off in Settings (prefs `agent.webGuard`, `src/agent.ts` `guarded`): their rules then hold as set, while the
+  the asking off in Settings (prefs `agent.webGuard`, `src/turn.ts` `guarded`): their rules then hold as set, while the
   `tainted` mark and the withdrawal of memory, `save_note_action` and the selection tools stay. A tag's description counts
   as read from the web unless `describedBy` says the owner wrote it (the auto-tagger's and the agent's were written by a
   model): `list_tags` marks those `unverified` and reading one taints the turn (policy `result: "marked"`).
@@ -242,8 +243,10 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   without the `fish` key the route answers 404.
 - Talk (`src/talk.ts`, `src/talkAgent.ts`, `src/fish.ts`): one WebSocket at `/agent/talk`. Fish's realtime ear decides what
   each turn is (the owner's, a backchannel over the voice, or noise) and Fish's streaming voice speaks the reply, while the
-  turn itself is the chat's own agent over the chat's own tools — the same cards, actions rules and taint checks. Billing is
-  the voice's bytes and the ear's seconds, never the whole context again per turn. Contract: `packages/core/src/talk.ts`.
+  turn itself is the chat's own (`src/turn.ts`, the runner both share) — the same cards, actions rules and taint checks, read
+  every turn; a card's tap and the app's answer to its own tools come up the socket. Billing is the voice's bytes and the
+  ear's seconds, never the whole context again per turn; a conversation ends after a few idle minutes or an hour in all
+  (`TALK_LIMITS`). Contract: `packages/core/src/talk.ts`.
 
 ## Server jobs and routes
 

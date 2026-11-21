@@ -18,8 +18,14 @@ version is one semver number for the whole repository, set by the git tag (see [
 - A task's place card tries its map again when the map's address changes (another place or theme) after a failed load.
 - PDF viewer: the zoom buttons wait until the pages can zoom, so the percentage always matches what is shown.
 - The `n` key no longer creates a note behind an open dialog.
+- Talk: speaking over a reply stops it for good (it used to go on thinking, and could speak and bill a second reply over
+  the new one), and a model that stops answering ends the turn after a minute instead of holding it open. A conversation
+  ends after 5 minutes with nothing from you, and after an hour in all, so Fish's ear is never left billing.
 ### Security
 
+- Talk follows the same rules as the chat, read every turn: a chat that read the web is still treated as having read it
+  when you go on talking (its writes ask and are marked, memory is off, link cards aren't fetched), a rule you change in
+  Settings mid-conversation applies from the next turn, and a card runs its write only on the tap the server asked for.
 - Other websites can no longer write to your notes or use your server to fetch pages: a request from another site is
   refused unless it is your extension, and only the extension may read the API across origins.
 - Text the server writes for a clip or a share (a new note, an append, a new task) is marked as someone else's, like
