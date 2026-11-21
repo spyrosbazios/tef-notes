@@ -140,7 +140,7 @@ jobs:
       - run: bun run build
 
   cli:
-    name: CLI - typecheck
+    name: CLI - typecheck, tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -159,6 +159,7 @@ jobs:
             bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+      - run: bun test
 
   # The promo film's code and its storyboard's rules; film.yml renders it.
   video:
