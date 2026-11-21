@@ -25,6 +25,7 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Place picker: Enter pressed right after typing waits for the suggestions for those words instead of picking from the
   previous words' list.
 - A task's place card tries its map again when the map's address changes (another place or theme) after a failed load.
+- PDF viewer: the zoom buttons wait until the pages can zoom, so the percentage always matches what is shown.
 
 ## 0.13.0 - 2026-11-19
 
