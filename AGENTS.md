@@ -81,7 +81,7 @@ cd server && bun test                                  # hooks and the agent
 cd packages/core && bun run lint && bun test && bun run typecheck   # the shared core
 cd web && bun install && bun run build                 # tsc + vite; `bun run lint` is oxlint; `bun test`
 cd cli && bun install && bun run typecheck             # the CLI
-cd extension && bun install && bun run build           # -> extension/dist; `bun run typecheck`, `bun run lint`
+cd extension && bun install && bun run build           # -> extension/dist; `bun run typecheck`, `bun run lint`, `bun test`
 cd android && bun install && ./gradle.sh testDebugUnitTest lintRelease assembleRelease   # JAVA_HOME, ANDROID_HOME; android/README.md
 cd server/agent && bun install && bun run lint && bun test && bun run typecheck
 cd video && bun install && bun test && bun run typecheck && bun run stills   # the film's frames -> video/out/stills; video/README.md
