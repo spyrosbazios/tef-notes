@@ -5,6 +5,7 @@ import type { FileUIPart, UIMessage } from "ai";
 import type { NoteRef } from "@/core/handoff";
 import type { Run } from "@/core/note-actions";
 import type { Held } from "@/editor";
+import type { ChatQueue, Queues } from "@/lib/chat-queue";
 import { createContext, useContext } from "react";
 
 /** What a transient chat's requests carry while its panel holds it: an ask's words (`held`, its context, which the selection
@@ -37,6 +38,12 @@ export type Assistant = {
    *  `title` (core/share.ts `chatTitle`), nothing sent. Its requests are bound by `binding` while it returns something. Null when the record could not be made, or
    *  when `wanted()` turned false meanwhile (the panel closed: the record is removed again). */
   transient: (title: string, binding: Binding, wanted: () => boolean) => Promise<Chat<UIMessage> | null>;
+  /** Messages typed while a reply ran, each chat's own (lib/chat-queue.ts): the dock moving to another chat keeps them. */
+  queues: Queues;
+  /** Changes `chat`'s queue. */
+  requeue: (chat: string, change: (q: ChatQueue) => ChatQueue) => void;
+  /** Queues `text`, with its `files`, on `chat`. */
+  enqueue: (chat: string, text: string, files: FileUIPart[]) => void;
   /** Make `chat` the dock's and open the dock on it: an ask carried on in the full chat. */
   adopt: (chat: Chat<UIMessage>) => void;
   /** Stop any chat's reply, and close the tool calls it left unfinished (`stop` is the dock's). */

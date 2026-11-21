@@ -27,6 +27,8 @@ version is one semver number for the whole repository, set by the git tag (see [
   damaged drawing file says it can't be opened instead of crashing the note.
 - Closing a note action's panel (or a selection ask) while it says "Starting…" now stops it: its prompt no longer goes on as
   a plain chat with every tool.
+- Messages queued while the assistant replies, and their files, are kept when you open another chat, and go once you are
+  back on theirs.
 
 ## 0.13.0 - 2026-11-19
 

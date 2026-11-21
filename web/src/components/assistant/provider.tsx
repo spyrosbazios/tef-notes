@@ -11,6 +11,7 @@
 //    (core/note-actions.ts), its requests carrying `action` (which action, on which note) so the server narrows the turn to it,
 //    each for as long as its panel holds it; `adopt` hands one to the dock. The dock's own doings (its badge, opening for a card)
 //    are for the dock's chat only: these show their reply where they were made.
+//  - each chat's queued messages (`queues`, lib/chat-queue.ts), so the dock moving to another chat and back keeps them.
 // The writes the agent makes reach the screen through `useLive` (realtime), as any other client's do.
 import { Chat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ import { TASKS } from "@/hooks/todo";
 import type { Held } from "@/editor";
 import { closeUnfinished, pageContext, resumes, runUiTool } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
+import { added, requeued, type ChatQueue, type Queues } from "@/lib/chat-queue";
 import { STORAGE } from "@/lib/storage-keys";
 import { message } from "@/services/api";
 import { chat as loadChat, createChat, newChatId, removeChat } from "@/services/agent";
@@ -225,6 +227,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return build(id, [], held, scope);
   }, [build, qc]);
 
+  // Each chat's queued messages, here rather than in the panel's thread, which a chat switch remounts
+  const [queues, setQueues] = useState<Queues>({}), queuedId = useRef(0);
+  const requeue = useCallback((id: string, change: (q: ChatQueue) => ChatQueue) => setQueues((all) => requeued(all, id, change)), []);
+  const enqueue = useCallback((id: string, text: string, files: FileUIPart[]) => requeue(id, added({ id: queuedId.current++, text, files })), [requeue]);
+
   const adopt = useCallback((c: Chat<UIMessage>) => {
     opening.current++;
     if (!dockNow().open) handed.current = true;
@@ -233,7 +240,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setFocusKey((k) => k + 1);
   }, []);
 
-  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, transient, adopt, halt }),
-    [chat, input, about, focusKey, show, send, stop, newChat, openChat, transient, adopt]);
+  const value = useMemo<Assistant>(() => ({ chat, input, setInput, about, setAbout, focusKey, show, send, stop, newChat, openChat, transient, queues, requeue, enqueue, adopt, halt }),
+    [chat, input, about, focusKey, show, send, stop, newChat, openChat, transient, queues, requeue, enqueue, adopt]);
   return <AssistantContext value={value}>{children}</AssistantContext>;
 }

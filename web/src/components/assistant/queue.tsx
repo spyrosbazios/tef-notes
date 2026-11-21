@@ -1,15 +1,14 @@
 // Messages typed while a reply runs: they wait here, in order, and the panel sends the first once the turn is over (not while
-// a card or a choice waits on the owner, and not after Stop or an error: then the owner resumes). Local to the open chat's
-// panel, never sent to the server until its turn: switching chats drops it. "Send now" steers the running reply instead
-// (services/agent.ts `steer`): the agent reads it at its next step; if the reply ends first, it stays queued.
+// a card or a choice waits on the owner, and not after Stop or an error: then the owner resumes). Each chat's own, kept by the
+// provider (lib/chat-queue.ts) and never sent to the server until its turn: switching chats keeps it, and it goes on once that
+// chat is open again. "Send now" steers the running reply instead (services/agent.ts `steer`): the agent reads it at its next
+// step; if the reply ends first, it stays queued.
 import { askedAbout } from "@/core/handoff";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import type { FileUIPart } from "ai";
 import { CornerDownRight, Loader2, Paperclip, Pencil, Play, SendHorizontal, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-
-export type Queued = { id: number; text: string; files: FileUIPart[] };
+import type { Queued } from "@/lib/chat-queue";
 
 export function Queue({ items, paused, live, sending, onEdit, onRemove, onResume, onSteer }: {
   items: Queued[]; paused: boolean;

@@ -13,7 +13,7 @@ import { ChatReply } from "@/components/assistant/chat-reply";
 import { Loaded } from "@/components/loaded";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { NoteChip } from "@/components/assistant/note-chip";
-import { Queue, type Queued } from "@/components/assistant/queue";
+import { Queue } from "@/components/assistant/queue";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +34,7 @@ import { useNarrow } from "@/hooks/media";
 import { useTasks } from "@/hooks/todo";
 import { asking, held } from "@/lib/ask";
 import { attachment } from "@/lib/attach";
+import { pausedAs, queueOf, without, type Queued } from "@/lib/chat-queue";
 import { keepFocus } from "@/lib/keys";
 import { pageContext } from "@/lib/assistant";
 import { titleOf, useNav } from "@/lib/nav";
@@ -94,7 +95,7 @@ function Header({ children }: { children?: ReactNode }) {
 }
 
 function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory: () => void; listing: boolean }) {
-  const { input, setInput, about, setAbout, focusKey, show, send, stop, newChat } = useAssistant();
+  const { input, setInput, about, setAbout, focusKey, show, send, stop, newChat, queues, requeue, enqueue } = useAssistant();
   const choice = useModel(), { model, models } = choice;
   const notesAsk = usePrefs().actions.editNote === "ask";
   const live = useChat<UIMessage>({ chat }), { messages, regenerate, status, error } = live;
@@ -123,16 +124,18 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
   // Follow the newest line while it is being written, unless the user scrolled up to read
   const { el: scroller, onScroll, follow } = useStick<HTMLDivElement>(messages, status);
 
-  // Typed while a reply runs: queued, sent one at a time once the turn is over (queue.tsx). Stop and a failed turn pause it.
-  const [queue, setQueue] = useState<Queued[]>([]), [paused, setPaused] = useState(false), nextId = useRef(0);
+  // Typed while a reply runs: queued, sent one at a time once the turn is over (queue.tsx). Stop and a failed turn pause it. The
+  // queue is this chat's, kept by the provider: another chat opened and this one again finds it as it was
+  const id = chat.id, { items: queue, paused } = queueOf(queues, id);
+  const dequeue = (q: number) => requeue(id, without(q)), setPaused = (on: boolean) => requeue(id, pausedAs(on));
   const blocked = busy || held(last) || !!error;
   // Send now: into the running reply. Taken off the queue once the agent has it; if the reply ended first it stays, and goes next
   const [sending, setSending] = useState<ReadonlySet<number>>(new Set());
   const mark = (id: number, on: boolean) => setSending((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; });
   const steerNow = (q: Queued) => {
     mark(q.id, true);
-    steer(chat.id, q.text)
-      .then((delivered) => { if (delivered) setQueue((all) => all.filter((x) => x.id !== q.id)); })
+    steer(id, q.text)
+      .then((delivered) => { if (delivered) dequeue(q.id); })
       .catch((e: unknown) => toast.error(errorText(e)))
       .finally(() => mark(q.id, false));
   };
@@ -145,9 +148,9 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
     // Taken off the queue once the chat has it, so a failed send stays first and pauses the rest
     void send(first.text, first.files).then((ok) => {
       draining.current = false;
-      if (ok) setQueue((q) => q.filter((x) => x.id !== first.id)); else setPaused(true);
+      requeue(id, ok ? without(first.id) : pausedAs(true));
     });
-  }, [blocked, paused, model, queue, sending, send, follow]);
+  }, [blocked, paused, model, queue, sending, send, follow, requeue, id]);
 
   const go = async (raw: string) => {
     const typed = raw.trim(), sent = files, notes = about;
@@ -156,7 +159,7 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
     setInput("");
     setFiles([]);
     setAbout([]);
-    if (busy || queue.length) { setQueue((q) => [...q, { id: nextId.current++, text, files: sent }]); return; }
+    if (busy || queue.length) { enqueue(id, text, sent); return; }
     follow();
     if (!(await send(text, sent))) { setInput(typed); setFiles(sent); setAbout(notes); return; }
     // On the phone the answer is read, not typed over: the keyboard closes (the Send button's tap kept the focus so that tap landed)
@@ -200,8 +203,8 @@ function Thread({ chat, onHistory, listing }: { chat: Chat<UIMessage>; onHistory
 
           <div className="shrink-0 border-t border-line px-3 pt-3 pb-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Queue items={queue} paused={paused || (!!error && !busy)} live={busy} sending={sending} onSteer={steerNow} onResume={() => { setPaused(false); if (error) void regenerate(); }}
-              onRemove={(id) => setQueue((q) => q.filter((x) => x.id !== id))}
-              onEdit={(q) => { setQueue((all) => all.filter((x) => x.id !== q.id)); const a = askedAbout(q.text); setInput(a.rest); setAbout(a.notes); setFiles(q.files); field.current?.focus(); }} />
+              onRemove={dequeue}
+              onEdit={(q) => { dequeue(q.id); const a = askedAbout(q.text); setInput(a.rest); setAbout(a.notes); setFiles(q.files); field.current?.focus(); }} />
             <Seeing />
             <div className="rounded-3xl border border-line bg-card p-2 focus-within:border-ring">
               {about.length ? (
