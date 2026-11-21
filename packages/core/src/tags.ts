@@ -3,9 +3,9 @@
 // definition leaves notes alone; renaming a tag is the server's (renameTag), so every item carrying it follows. The server tags notes itself (its `autotagged` column);
 // a client's own tag edits go through applyTags.
 // Platform-neutral, like pocketbase.ts: fetch only, so the phone, the web app and the CLI share it.
-import { getJson } from "./http";
+import { getJson, HttpError } from "./http";
 import { fold, parseNote, withFlags, type Color } from "./notes";
-import { call, json, type Server } from "./pocketbase";
+import { call, createdUnder, json, recordId, type Server } from "./pocketbase";
 import type { Task } from "./todo";
 
 /** `describedBy`: who wrote the description (the server's column): only "owner" is the owner's own words; the auto-tagger's ("auto")
@@ -32,9 +32,11 @@ export async function listTags(s: Server): Promise<TagDef[]> {
   return j.items.map(tagDef);
 }
 
-/** A new definition. Conflict: a tag by that name (ignoring case) exists. */
-export const createTag = async (s: Server, t: TagFields, mark?: TagMark): Promise<TagDef> =>
-  tagDef(await call(s, "collections/tags/records", json("POST", tagColumns(t, mark))));
+/** A new definition, under an id of its own (`id`, made here when not given): sent again when no answer came, never twice.
+ *  Conflict: a tag by that name (ignoring case) exists. */
+export const createTag = (s: Server, t: TagFields, mark?: TagMark, id = recordId()): Promise<TagDef> => createdUnder(
+  async () => tagDef(await call(s, "collections/tags/records", json("POST", { id, ...tagColumns(t, mark) }))),
+  async () => { try { return tagDef(await call(s, `collections/tags/records/${id}`)); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; } });
 
 /** Conflict: the new name is taken. */
 export const updateTag = async (s: Server, rec: string, t: TagFields, mark?: TagMark): Promise<TagDef> =>

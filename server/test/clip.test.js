@@ -12,6 +12,7 @@ import { linkify } from "../../packages/core/src/links";
 import { fileMarkdown, linkPath, pdfName, photoMarkdown, photoName } from "../../packages/core/src/photos";
 
 const U = "https://www.example.com/a?b=1";
+const ID = "abcdefghij01234";
 const S = (p) => ({ text: "", url: U, images: [], pdfs: [], title: null, ...p });
 
 describe("the share text", () => {
@@ -34,27 +35,27 @@ describe("the share text", () => {
     expect(lib.titleOf(clip, "")).toBe("Page");
     expect(lib.titleOf({ ...clip, title: "" }, "")).toBe("clipped");
     expect(lib.titleOf({ ...clip, title: "", selection: "" }, "")).toBe("example.com");
-    const named = lib.saveInput({ url: U, title: "Page", target: { kind: "new", title: "  My\n title " } });
+    const named = lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: "  My\n title " } });
     expect(named.target).toEqual({ kind: "new", title: "My title" });
     expect(lib.titleOf(named, "")).toBe("My title");
-    expect(lib.titleOf(lib.saveInput({ url: U, title: "Page", target: { kind: "newtask", title: "Call them" } }), "")).toBe("Call them");   // a new task's too
-    expect(lib.saveInput({ url: U, title: "Page", target: { kind: "new", title: " " } }).target).toEqual({ kind: "new" });
-    expect(() => lib.saveInput({ url: U, title: "Page", target: { kind: "new", title: 5 } })).toThrow(lib.Bad);
-    expect(() => lib.saveInput({ url: U, title: "Page", target: { kind: "new", title: "x".repeat(201) } })).toThrow(lib.Bad);
+    expect(lib.titleOf(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "newtask", title: "Call them" } }), "")).toBe("Call them");   // a new task's too
+    expect(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: " " } }).target).toEqual({ kind: "new" });
+    expect(() => lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: 5 } })).toThrow(lib.Bad);
+    expect(() => lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: "x".repeat(201) } })).toThrow(lib.Bad);
   });
   test("no link (the phone's shared text or photo): the words, else the day, as the phone titles them", () => {
     const text = lib.input({ url: "", title: "", selection: "just words" });
     expect(lib.bodyOf(text, "")).toBe(bodyFor(S({ url: null, text: "just words" }), null));
     expect(lib.titleOf(text, "")).toBe(titleFor(S({ url: null, text: "just words" }), null));
-    const photo = lib.saveInput({ title: "", target: { kind: "new" }, images: [{ src: "" }] });
+    const photo = lib.saveInput({ id: ID, title: "", target: { kind: "new" }, images: [{ src: "" }] });
     const day = Date.parse("2026-10-30T09:08:07");
     expect(lib.titleOf(photo, "", day)).toBe("Photos 2026-10-30");
     expect(lib.bodyOf(photo, "", "", "![](../attachments/n/p.jpg)")).toBe("![](../attachments/n/p.jpg)\n\n");
-    const pdf = lib.saveInput({ title: "", target: { kind: "new" }, images: [{ src: "" }], pdfs: [{ name: "Lease 2026.pdf" }] });
+    const pdf = lib.saveInput({ id: ID, title: "", target: { kind: "new" }, images: [{ src: "" }], pdfs: [{ name: "Lease 2026.pdf" }] });
     expect(lib.titleOf(pdf, "", day)).toBe("Lease 2026");
   });
   test("several pictures and PDFs: stored under free names, the pictures' lines then the PDFs' links, as the web app attaches them", () => {
-    const clip = lib.saveInput({ title: "", target: { kind: "new" }, images: [{ src: "" }, { src: "" }], pdfs: [{ name: "Μίσθωση [v2].pdf" }, { name: "?.pdf" }] });
+    const clip = lib.saveInput({ id: ID, title: "", target: { kind: "new" }, images: [{ src: "" }, { src: "" }], pdfs: [{ name: "Μίσθωση [v2].pdf" }, { name: "?.pdf" }] });
     const at = Date.parse("2026-10-30T09:08:07");
     const { names, embed } = lib.filesUnder(clip, "n", new Set(["20261030-090807.jpg", "misthosi-v2.pdf"]), at);
     expect(names).toEqual(["20261030-090807-2.jpg", "20261030-090807-3.jpg", pdfName("Μίσθωση [v2].pdf", new Set(["misthosi-v2.pdf"])), "document.pdf"]);
@@ -63,7 +64,7 @@ describe("the share text", () => {
     expect(lib.fileLines(clip)).toBe("Picture\nPicture\nPDF: Μίσθωση \\[v2\\].pdf\nPDF: ?.pdf");
   });
   test("a task gets the same text, after what its notes hold; a picture as an image line to its address (no attachment)", () => {
-    const clip = lib.saveInput({ url: U, title: "Page", target: { kind: "new" }, images: [{ src: "https://cdn.example.com/a/b%20c.png", alt: "A [cat]", caption: "" }] });
+    const clip = lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new" }, images: [{ src: "https://cdn.example.com/a/b%20c.png", alt: "A [cat]", caption: "" }] });
     expect(lib.pictureLine(clip.images[0])).toBe("![A \\[cat\\]](https://cdn.example.com/a/b%20c.png)");
     expect(lib.pictureLine({ src: "data:image/png;base64,AAAA", alt: "", caption: "", file: "" })).toBe("Picture");
     expect(lib.pictureLine({ src: "", alt: "", caption: "Fig 1", file: "" })).toBe("Picture: Fig 1");
@@ -74,7 +75,7 @@ describe("the share text", () => {
     expect(lib.taskNotes("x".repeat(99990), "y".repeat(5))).toHaveLength(99997);
   });
   test("a picture: its image line as the phone embeds a photo, then the link, the owner's note, the line, the selection", () => {
-    const clip = lib.saveInput({ url: U, title: "Page", target: { kind: "new" }, images: [{ src: "https://cdn.example.com/a/b%20c.png?x=1", alt: " A\n cat ", caption: "" }] });
+    const clip = lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new" }, images: [{ src: "https://cdn.example.com/a/b%20c.png?x=1", alt: " A\n cat ", caption: "" }] });
     const embed = lib.embedOf(clip.images[0], "20261030-page", photoName(Date.parse("2026-10-30T09:08:07"), new Set()));
     expect(embed).toBe(`![A cat](../${linkPath("20261030-page", "20261030-090807.jpg")})`);
     expect(lib.bodyOf(clip, "What it is.", "My note.", embed)).toBe(`${embed}\n\n[Page](${U})\n\nMy note.\n\nWhat it is.\n`);
@@ -158,41 +159,46 @@ describe("the request", () => {
   test("a picture: its address, the page's words for it, its file name; the bytes JEV sees on suggest only", () => {
     const image = { src: "https://cdn.example.com/a/b%20c.png?x=1", alt: " A\n cat ", caption: "Fig. 1", look: "/9j/4AAQ==" };
     expect(lib.input({ url: U, title: "t", images: [image] }).images).toEqual([{ src: image.src, alt: "A cat", caption: "Fig. 1", file: "b c.png", look: "/9j/4AAQ==" }]);
-    expect(lib.saveInput({ url: U, title: "t", target: { kind: "new" }, images: [image] }).images).toEqual([{ src: image.src, alt: "A cat", caption: "Fig. 1", file: "b c.png" }]);
+    expect(lib.saveInput({ id: ID, url: U, title: "t", target: { kind: "new" }, images: [image] }).images).toEqual([{ src: image.src, alt: "A cat", caption: "Fig. 1", file: "b c.png" }]);
     expect(lib.input({ url: U, title: "t", images: [{ src: "data:image/png;base64,AAAA" }] }).images[0].file).toBe("");
     expect(lib.input({ url: U, title: "t" }).images).toEqual([]);
     expect(lib.input({ url: U, title: "t", pdfs: [{ name: " a\n b.pdf " }] }).pdfs).toEqual([{ name: "a b.pdf" }]);
   });
   test("a save: the page, the line suggest picked, the note, and a target that is a note, a task or new", () => {
-    expect(lib.saveInput({ url: U, title: "Page", line: " What\n it is. ", note: " mine ", target: { kind: "note", path: "notes/20261030-a.md" }, text: "ignored" }))
-      .toEqual({ url: U, title: "Page", selection: "", line: "What it is.", note: "mine", images: [], pdfs: [], target: { kind: "note", path: "notes/20261030-a.md" }, summary: false, text: "", tags: [] });
-    expect(lib.saveInput({ url: U, title: "Page", target: { kind: "new" } }).target).toEqual({ kind: "new" });
-    expect(lib.saveInput({ url: U, title: "Page", target: { kind: "task", id: "abc123def456ghi", extra: 1 } }).target).toEqual({ kind: "task", id: "abc123def456ghi" });
-    expect(lib.saveInput({ url: U, title: "Page", target: { kind: "newtask" } }).target).toEqual({ kind: "newtask" });
-    expect(lib.saveInput({ url: U, title: "Page", target: { kind: "newtask", title: " Call\n them " } }).target).toEqual({ kind: "newtask", title: "Call them" });
-    expect(() => lib.saveInput({ url: U, title: "Page", target: { kind: "newtask", title: "x".repeat(201) } })).toThrow(lib.Bad);
+    expect(lib.saveInput({ id: ID, url: U, title: "Page", line: " What\n it is. ", note: " mine ", target: { kind: "note", path: "notes/20261030-a.md" }, text: "ignored" }))
+      .toEqual({ id: ID, url: U, title: "Page", selection: "", line: "What it is.", note: "mine", images: [], pdfs: [], target: { kind: "note", path: "notes/20261030-a.md" }, summary: false, text: "", tags: [] });
+    expect(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new" } }).target).toEqual({ kind: "new" });
+    expect(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "task", id: "abc123def456ghi", extra: 1 } }).target).toEqual({ kind: "task", id: "abc123def456ghi" });
+    expect(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "newtask" } }).target).toEqual({ kind: "newtask" });
+    expect(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "newtask", title: " Call\n them " } }).target).toEqual({ kind: "newtask", title: "Call them" });
+    expect(() => lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "newtask", title: "x".repeat(201) } })).toThrow(lib.Bad);
     const note = { kind: "note", path: "notes/a.md" };
     for (const bad of [{ url: U, title: "t" }, { url: U, target: "new" }, { url: U, target: "notes/a.md" }, { url: U, target: { kind: "note", path: "agent/memory.md" } },
       { url: U, target: { kind: "note", path: "notes/../x.md" } }, { url: U, target: { kind: "note", path: "notes/a b.md" } }, { url: U, target: { kind: "note" } },
       { url: U, target: { kind: "task", id: "short" } }, { url: U, target: { kind: "task", id: "ABC123DEF456GHI" } }, { url: U, target: { kind: "task", id: "abc123def456gh/" } },
       { url: U, target: { kind: "other" } }, { url: U, target: [] }, { url: U, target: 1 }, { url: "file:///etc/passwd", target: { kind: "new" } },
       { url: U, target: { kind: "new" }, line: "x".repeat(601) }, { target: note }, { title: "t", target: note }]) {
-      expect(() => lib.saveInput(bad)).toThrow(lib.Bad);
+      expect(() => lib.saveInput({ id: ID, ...bad })).toThrow(lib.Bad);
     }
+  });
+  test("a save carries the id the client made for it: 15 of a-z0-9, or it is refused", () => {
+    const ok = { url: U, title: "t", target: { kind: "new" } };
+    expect(lib.saveInput({ ...ok, id: ID }).id).toBe(ID);
+    for (const bad of [undefined, null, "", "short", "ABCDEFGHIJ01234", "abcdefghij012345", "abcdefghij0123-", 15]) expect(() => lib.saveInput({ ...ok, id: bad })).toThrow(lib.Bad);
   });
   test("a save's summary: asked for with true, and the page's text is read only then", () => {
     const t = { kind: "new" }, text = "p ".repeat(40000);
-    expect(lib.saveInput({ url: U, title: "t", target: t, summary: true, text: " page text " })).toMatchObject({ summary: true, text: "page text" });
-    expect(lib.saveInput({ url: U, title: "t", target: t, summary: true, text }).text).toHaveLength(60000);
-    expect(lib.saveInput({ url: U, title: "t", target: t, summary: false, text: "page text" })).toMatchObject({ summary: false, text: "" });
-    expect(lib.saveInput({ url: U, title: "t", target: t })).toMatchObject({ summary: false, text: "" });
-    for (const bad of ["yes", 1, {}, "true"]) expect(() => lib.saveInput({ url: U, title: "t", target: t, summary: bad })).toThrow(lib.Bad);
+    expect(lib.saveInput({ id: ID, url: U, title: "t", target: t, summary: true, text: " page text " })).toMatchObject({ summary: true, text: "page text" });
+    expect(lib.saveInput({ id: ID, url: U, title: "t", target: t, summary: true, text }).text).toHaveLength(60000);
+    expect(lib.saveInput({ id: ID, url: U, title: "t", target: t, summary: false, text: "page text" })).toMatchObject({ summary: false, text: "" });
+    expect(lib.saveInput({ id: ID, url: U, title: "t", target: t })).toMatchObject({ summary: false, text: "" });
+    for (const bad of ["yes", 1, {}, "true"]) expect(() => lib.saveInput({ id: ID, url: U, title: "t", target: t, summary: bad })).toThrow(lib.Bad);
   });
   test("no url: only with a selection, a picture or a PDF", () => {
     expect(lib.input({ title: "", selection: "words" })).toMatchObject({ url: "", selection: "words" });
     expect(lib.input({ selection: "", images: [{ src: "" }] }).images[0]).toMatchObject({ src: "" });
     expect(lib.input({ pdfs: [{ name: "a.pdf" }] }).pdfs).toEqual([{ name: "a.pdf" }]);
-    expect(lib.saveInput({ selection: "words", target: { kind: "new" } }).url).toBe("");
+    expect(lib.saveInput({ id: ID, selection: "words", target: { kind: "new" } }).url).toBe("");
     for (const bad of [{}, { title: "only a title" }, { url: "", title: "t", note: "n" }, { images: [], pdfs: [] }]) expect(() => lib.input(bad)).toThrow(lib.Bad);
   });
 });
@@ -292,7 +298,7 @@ describe("asking JEV", () => {
     expect(body.state.saved_web_page).toEqual({ title: "", image: { picture: "picture-r4nd0m" }, more_pictures: 1, pdfs: ["Lease.pdf"] });
     const pdfs = lib.request(lib.input({ pdfs: [{ name: "Lease.pdf" }] }), idx, [], "", [], 0, null);
     expect(pdfs.questions.target.instructions).toContain("these PDFs (`saved_web_page.pdfs`");
-    expect(lib.noteRequest(lib.saveInput({ target: { kind: "new" }, note: "n", pdfs: [{ name: "Lease.pdf" }] }), "").user).toContain("PDF: Lease.pdf");
+    expect(lib.noteRequest(lib.saveInput({ id: ID, target: { kind: "new" }, note: "n", pdfs: [{ name: "Lease.pdf" }] }), "").user).toContain("PDF: Lease.pdf");
   });
   test("suggestions: notes and tasks at FLOOR or above, best first, at most four; pick is the top option, new included", () => {
     const ps = [prose(1), prose(2)];
@@ -318,7 +324,7 @@ describe("asking JEV", () => {
 
 describe("the owner's note", () => {
   test("asked to be tidied, never added to: what was saved for context, then the note", () => {
-    const clip = lib.saveInput({ url: U, title: "Page", target: { kind: "new" }, note: "να το δοκιμασω το σαβ/κο", images: [{ src: "https://a.b/cat.jpg", caption: "A cat" }] });
+    const clip = lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new" }, note: "να το δοκιμασω το σαβ/κο", images: [{ src: "https://a.b/cat.jpg", caption: "A cat" }] });
     const q = lib.noteRequest(clip, "What it is.");
     expect(q.system).toContain("Never translate");
     expect(q.system).toContain("Add nothing that is not in the note");
@@ -340,7 +346,7 @@ describe("the owner's note", () => {
 
 describe("the summary", () => {
   const PROSE = "The council voted on Tuesday to extend the tram line to the harbour. ".repeat(5);
-  const save = (p) => lib.saveInput({ url: U, title: "Page", target: { kind: "new" }, summary: true, ...p });
+  const save = (p) => lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new" }, summary: true, ...p });
 
   test("a page: its text when it has enough, else the fetched text, else the text shared; none when there is not enough", () => {
     expect(lib.summaryContent(save({ text: PROSE }))).toEqual({ kind: "page", text: PROSE.trim(), context: "" });
@@ -420,7 +426,7 @@ describe("tags on a clip", () => {
     expect(r.picked).toEqual(["b"]);
   });
   test("saveInput carries the tags", () => {
-    expect(lib.saveInput({ url: "https://x.org", title: "X", target: { kind: "new" }, tags: ["work"] }).tags).toEqual(["work"]);
+    expect(lib.saveInput({ id: ID, url: "https://x.org", title: "X", target: { kind: "new" }, tags: ["work"] }).tags).toEqual(["work"]);
   });
 });
 
@@ -441,5 +447,18 @@ describe("summarise", () => {
     expect(lib.summarise(link, io({ page: () => { throw new Blocked("private"); } })).outcome).toBe("skipped");
     expect(lib.summarise(link, io({ page: () => "short" })).outcome).toBe("skipped");
     expect(lib.summarise(link, io({ ask: () => ({ status: 200, text: "NONE" }) })).outcome).toBe("skipped");
+  });
+});
+
+describe("the saves kept for a re-send", () => {
+  test("those older than a week are deleted, a recent one stays", () => {
+    const now = Date.parse("2026-11-21T12:00:00Z"), day = 86400000;
+    const rows = [8, 9, 6, 1].map((d, i) => ({ id: `s${i}`, created: new Date(now - d * day).toISOString().replace("T", " ") }));
+    const app = {
+      findRecordsByFilter: (_c, _f, _s, limit, _o, { t }) => rows.filter((r) => r.created < t).slice(0, limit),
+      delete: (r) => rows.splice(rows.indexOf(r), 1),
+    };
+    expect(lib.pruneSaves(app, now)).toBe(2);
+    expect(rows.map((r) => r.id)).toEqual(["s2", "s3"]);
   });
 });

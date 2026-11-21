@@ -101,24 +101,23 @@ export class TaskService {
     return { error: "The task keeps changing under this edit; try again in a moment." };
   }
 
-  /** A new record under an id of its own (a taken one: the next); its id and the rev it is at. */
-  private async insert(make: (id: string) => Task, taint: boolean): Promise<{ id: string; rev: number } | { error: string }> {
-    for (let i = 0; i < TRIES; i++) {
-      let r: Task & { tainted?: true };
-      try { r = make(pb.recordId()); if (taint) r = { ...r, tainted: true }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
-      try {
-        const saved = await pb.tasks.create(this.server, r);
-        return { id: saved.id, rev: saved.rev };
-      } catch (e) {
-        if (!(e instanceof pb.Conflict)) throw e;
-      }
+  /** A new record under an id of its own (`id`, made here when not given), sent again when no answer came back (pb.tasks.create:
+   *  the id is held once, so a repeat that finds it taken is the earlier send having landed). Its id and the rev it is at. */
+  private async insert(make: (id: string) => Task, taint: boolean, id = pb.recordId()): Promise<{ id: string; rev: number } | { error: string }> {
+    let r: Task & { tainted?: true };
+    try { r = make(id); if (taint) r = { ...r, tainted: true }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+    try {
+      const saved = await pb.tasks.create(this.server, r);
+      return { id: saved.id, rev: saved.rev };
+    } catch (e) {
+      if (e instanceof pb.Conflict) return { error: "Couldn't save the new task: its id is taken. Try again." };
+      throw e;
     }
-    return { error: "Couldn't name the new task; try again." };
   }
 
   /** A new record, with its saved snapshot. */
-  private async create(make: (id: string) => Task, taint: boolean): Promise<TaskSaved> {
-    const r = await this.insert(make, taint);
+  private async create(make: (id: string) => Task, taint: boolean, id?: string): Promise<TaskSaved> {
+    const r = await this.insert(make, taint, id);
     if ("error" in r) return r;
     this.reload();
     return { saved: "task", id: r.id, rev: r.rev, ...(await this.snapshot(r.id)) };
@@ -139,10 +138,11 @@ export class TaskService {
     }
   }
 
-  /** A new open task after the last one, linked to the notes `about` (record ids). */
-  async addTask(fields: TaskPatch & { title: string }, checklist: string[] = [], taint = false, about: string[] = []): Promise<TaskSaved> {
+  /** A new open task after the last one, linked to the notes `about` (record ids). `id`: the record id the caller made for it
+   *  (a companion's outbox names a task before it is sent): a repeat of the same id is the same task, never a second one. */
+  async addTask(fields: TaskPatch & { title: string }, checklist: string[] = [], taint = false, about: string[] = [], id?: string): Promise<TaskSaved> {
     const order = nextOrder(await this.tasks());
-    const r = await this.create((id) => checklistEdit(newTask(id, { ...fields, order }), { add: checklist }), taint);
+    const r = await this.create((rec) => checklistEdit(newTask(rec, { ...fields, order }), { add: checklist }), taint, id);
     if ("error" in r || !about.length) return r;
     const why = await this.relink(r.id, about, []);
     return why ? { error: `Added the task (${r.id}), but it wasn't linked to its note: ${why}` } : r;

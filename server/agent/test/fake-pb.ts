@@ -148,7 +148,8 @@ export function fakePb() {
       }
       if (req.method === "POST") {
         if ([...map.values()].some((r) => r.path === body.path)) return err(400, { data: { path: { code: "validation_not_unique" } } });
-        const r: Rec = { ...body, id: `r${++n}`, rev: 1, updated: stamp(), ...(col === "notes" && !body.kind ? { kind: "note" } : {}) };
+        if (body.id && [...map.values()].some((r) => r.id === body.id)) return err(400, { data: { id: { code: "validation_not_unique" } } });
+        const r: Rec = { ...body, id: body.id ?? `r${++n}`, rev: 1, updated: stamp(), ...(col === "notes" && !body.kind ? { kind: "note" } : {}) };
         map.set(col === "notes" ? r.path : r.id, r);
         return Response.json(r);
       }

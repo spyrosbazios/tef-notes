@@ -1,7 +1,8 @@
 // The notes server client (src/pocketbase.ts) against a stubbed fetch: what each call sends, and how
 // PocketBase's answers become Conflict or null. No token: the private network is the gate.
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { Conflict, Refused, create, hasPreview, likeLit, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, search, serverUrl, tasks, update, uploaded, uploadTo } from "../src/pocketbase";
+import { HttpError } from "../src/http";
+import { Conflict, Gone, Refused, Unavailable, create, hasPreview, landed, lenses, likeLit, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, search, serverUrl, tasks, unanswered, update, uploaded, uploadTo } from "../src/pocketbase";
 import { newTask } from "../src/todo";
 
 const S = { url: "https://n:8097" };
@@ -131,5 +132,81 @@ describe("link previews", () => {
       ["path ~ \"notes/%\"", both(String.raw`"100\\%"`), both(String.raw`"a\\_b"`), both(String.raw`"c\\\\d"`), both(String.raw`"\"q\""`)].join(" && "),
     );
     expect(likeLit("plain")).toBe('"plain"');
+  });
+});
+
+describe("a create sent again", () => {
+  const text = "# A\n", path = "notes/a.md", row = { id: "r1", path, rev: 1, text, kind: "note" };
+  const taken = (field: string) => new Response(JSON.stringify({ data: { [field]: { code: "validation_not_unique" } } }), { status: 400 });
+
+  it("whose first answer was lost lands once: the repeat finds its own id taken and answers with the note there", async () => {
+    let posts = 0;
+    const ids = new Set<string>();
+    stubFetch(async (_url, init) => {
+      if (init?.method !== "POST") return new Response(JSON.stringify(row), { status: 200 });
+      ids.add(JSON.parse(init.body as string).id);
+      return ++posts === 1 ? new Response("{}", { status: 503 }) : taken("id");     // the first landed, its answer was lost
+    });
+    expect(await create(S, "r1", path, text)).toEqual({ rec: "r1", path, rev: 1, text, kind: "note" });
+    expect(posts).toBe(2);
+    expect([...ids]).toEqual(["r1"]);                                              // the same id, never a new one
+  });
+
+  it("is one POST when it worked", async () => {
+    const f = reply(200, row);
+    stubFetch(f);
+    await create(S, "r1", path, text);
+    expect(f.mock.calls.length).toBe(1);
+  });
+
+  it("an id held by a note of another path is a Conflict, not an answer", async () => {
+    stubFetch(async (_url, init) => (init?.method === "POST" ? taken("id") : new Response(JSON.stringify({ ...row, path: "notes/other.md" }), { status: 200 })));
+    await expect(create(S, "r1", path, text)).rejects.toBeInstanceOf(Conflict);
+  });
+
+  it("a path taken (nothing under the id) is a Conflict, and the id is still free for the next path", async () => {
+    stubFetch(async (_url, init) => (init?.method === "POST" ? taken("path") : new Response("{}", { status: 404 })));
+    await expect(create(S, "r1", path, text)).rejects.toBeInstanceOf(Conflict);
+  });
+
+  it("a server that refused (a 4xx) is not tried again", async () => {
+    const f = reply(403, { message: "no" });
+    stubFetch(f);
+    await expect(create(S, "r1", path, text)).rejects.toBeInstanceOf(Refused);
+    expect(f.mock.calls.length).toBe(1);
+  });
+
+  it("a task's create is read back the same way", async () => {
+    let posts = 0;
+    stubFetch(async (_url, init) => {
+      if (init?.method === "POST") return ++posts === 1 ? new Response("{}", { status: 502 }) : taken("id");
+      return new Response(JSON.stringify({ ...newTask("t1", { title: "T" }), rev: 1 }), { status: 200 });
+    });
+    expect((await tasks.create(S, newTask("t1", { title: "T" }))).id).toBe("t1");
+    expect(posts).toBe(2);
+  });
+
+  it("a lens and a tag are created under an id of their own, sent again the same way", async () => {
+    let posts = 0;
+    const ids = new Set<string>();
+    stubFetch(async (_url, init) => {
+      if (init?.method !== "POST") return new Response(JSON.stringify({ id: [...ids][0], name: "Work", tags: [] }), { status: 200 });
+      ids.add(JSON.parse(init.body as string).id);
+      return ++posts === 1 ? new Response("{}", { status: 503 }) : taken("id");
+    });
+    expect((await lenses.create(S, { name: "Work", tags: [], exclude: [], accent: null, theme: null })).rec).toBe([...ids][0]);
+    expect(ids.size).toBe(1);
+  });
+});
+
+describe("a write whose answer was lost", () => {
+  it("landed when the note is past the rev and holds the change; not when someone else's edit is all there is", () => {
+    expect(landed("a\n", "a\nb\n", "a\nb\n")).toBe(true);
+    expect(landed("a\n", "a\nb\n", "x\na\nb\n")).toBe(true);
+    expect(landed("a\n", "a\nb\n", "x\na\n")).toBe(false);
+  });
+  it("is unanswered when nothing replied or the server failed, never when it refused", () => {
+    for (const e of [new Error("socket closed"), new HttpError(503, "x"), new HttpError(429, "x"), new Unavailable("x")]) expect(unanswered(e)).toBe(true);
+    for (const e of [new Conflict("x"), new Gone("x"), new Refused("x"), new HttpError(400, "x"), new HttpError(404, "x")]) expect(unanswered(e)).toBe(false);
   });
 });

@@ -127,9 +127,18 @@ export const pbPorts = (server: pb.Server): Ports => ({
       if (j.items.length < 500) return keys;
     }
   },
+  /** The claim is a record under an id of this claim's own. A send whose answer was lost is sent again under that id and, finding
+   *  it taken, reads the record back: it is ours (the first landed: the claim is held), never "taken by another scan", which would
+   *  leave the reminder claimed and never sent. A taken key under another id is another scan's. */
   async claim(key) {
-    try { await pb.call(server, SENT, pb.json("POST", { key })); return true; } catch (e) {
-      if (e instanceof HttpError && e.status === 400) return false;   // the unique key is taken
+    const id = pb.recordId();
+    try {
+      await pb.createdUnder(() => pb.call(server, SENT, pb.json("POST", { id, key })), async () => {
+        try { return await pb.call(server, `${SENT}/${id}`); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; }
+      });
+      return true;
+    } catch (e) {
+      if (e instanceof pb.Conflict || (e instanceof HttpError && e.status === 400 && e.body?.data?.key?.code === "validation_not_unique")) return false;   // the unique key is taken
       throw e;
     }
   },

@@ -171,6 +171,12 @@ the agent writes it the same way). Links are outside it (above).
 
 - `server/pb_hooks/rev.pb.js` (logic in `lib/rev.js`) is a compare-and-swap: a write whose `rev` is not the record's
   current one is refused, and a successful write bumps it.
+- A write is never sent twice by the transport (`packages/core/src/http.ts`: only a GET or DELETE is retried), since a reply lost
+  after the server acted would make it act twice. What must survive a lost reply is idempotent by construction: every create
+  carries an id its client made (notes, tasks, links, lenses, tags, a push claim, a companion's task, a clip save: the clip
+  routes record each save under its `id` in `clip_saves` and answer a repeat as the first), and a create sent again that finds
+  its own id taken reads that record back (`createdUnder`); an edit that adds (an append) whose answer was lost is checked
+  against the note before it is made again (`landed`), never redone on top of itself.
 - A client that is refused re-reads and merges, then retries with the new `rev`. Notes use a line-level 3-way merge
   against the version the client last had (`packages/core/src/notes.ts`; it refuses on overlap). Tasks merge
   field by field (`mergeRecord` in `packages/core/src/todo.ts`): each side's changes are kept, a checklist is merged by

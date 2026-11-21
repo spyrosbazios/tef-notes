@@ -13,14 +13,32 @@ let serial = 0;
 const id = () => `hooks${String(++serial).padStart(10, "0")}`;
 const record = (collection: string, rec: string) => pb.call(s, `collections/${collection}/records/${rec}`);
 
-/** The clip route's save, as the extension sends it: a multipart `@jsonPayload`, no files. */
-async function clip(payload: Record<string, unknown>) {
+/** The clip route's save, as the extension sends it: a multipart `@jsonPayload` under a save id of its own, no files. */
+async function clipRaw(payload: Record<string, unknown>) {
   const form = new FormData();
-  form.append("@jsonPayload", JSON.stringify({ title: "Clipped page", selection: "Words from the page", ...payload }));
-  const res = await fetch(`${url}/api/tefnotes/clip`, { method: "POST", body: form });
+  form.append("@jsonPayload", JSON.stringify({ id: pb.recordId(), title: "Clipped page", selection: "Words from the page", ...payload }));
+  return fetch(`${url}/api/tefnotes/clip`, { method: "POST", body: form });
+}
+async function clip(payload: Record<string, unknown>) {
+  const res = await clipRaw(payload);
   expect(res.status).toBe(200);
   return res.json() as Promise<Record<string, any>>;
 }
+
+test("clip: a save sent again under its id is answered as the first was and writes nothing more", async () => {
+  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Target\n");
+  const t = await pb.tasks.create(s, newTask(id(), { title: "T" }));
+  for (const target of [{ kind: "new" }, { kind: "newtask" }, { kind: "note", path: n.path }, { kind: "task", id: t.id }]) {
+    const save = pb.recordId(), notesBefore = (await pb.list(s)).length, tasksBefore = (await pb.tasks.revs(s)).length;
+    const first = await (await clipRaw({ id: save, target })).json(), again = await (await clipRaw({ id: save, target })).json();
+    expect(again, JSON.stringify(target)).toEqual(first);
+    expect((await pb.list(s)).length).toBe(notesBefore + (target.kind === "new" ? 1 : 0));
+    expect((await pb.tasks.revs(s)).length).toBe(tasksBefore + (target.kind === "newtask" ? 1 : 0));
+  }
+  expect((await pb.read(s, n.path))!.rev).toBe(2);                 // appended once, not twice
+  expect((await record("tasks", t.id)).rev).toBe(2);
+  expect((await clipRaw({ target: { kind: "new" }, id: "Not A Record Id" })).status).toBe(400);
+});
 
 test("clip: a new note starts at rev 1, tainted, with its columns copied out of its text", async () => {
   const out = await clip({ target: { kind: "new" }, tags: ["clipped"] });

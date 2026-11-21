@@ -108,7 +108,7 @@ describe("save", () => {
     expect(req.init.method).toBe("POST");
     const form = req.init.body as FormData;
     expect(payload(form)).toEqual({
-      url: "https://example.com/a", title: "A", line: "a line", note: "mine", tags: ["garden"],
+      id: expect.stringMatching(/^[a-z0-9]{15}$/), url: "https://example.com/a", title: "A", line: "a line", note: "mine", tags: ["garden"],
       images: [{ src: "https://example.com/1.jpg", alt: "a cat" }], target: { kind: "note", path: "notes/a.md" },
     });
     const file = form.get("file") as File;
@@ -135,6 +135,17 @@ describe("save", () => {
     expect(payload(sent[0].init.body as FormData).summary).toBeUndefined();
     await save(page, undefined, { kind: "new" }, "", true, []);
     expect(payload(sent[1].init.body as FormData)).toMatchObject({ summary: true, text: "the page's words" });
+  });
+  it("keeps the save's id when the same save is pressed again after a failure, and makes a new one after it landed", async () => {
+    let fail = true;
+    serve(() => (fail ? new Response("{}", { status: 504 }) : ok(result)));
+    await expect(save(page, undefined, { kind: "new" }, "mine", false, [])).rejects.toThrow();     // the answer never came: it may have landed
+    fail = false;
+    await save(page, undefined, { kind: "new" }, "mine", false, []);                              // pressed again: the same save
+    await save(page, undefined, { kind: "new" }, "mine", false, []);                              // a new one, the last was answered
+    const ids = sent.map((r) => payload(r.init.body as FormData).id);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[1]);
   });
   it("names no content type itself, so the multipart boundary is the browser's", async () => {
     serve(() => ok(result));

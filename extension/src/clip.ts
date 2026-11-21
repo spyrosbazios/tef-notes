@@ -2,13 +2,14 @@
 // where JEV would file it, writes nothing), then save (POST {server}/api/tefnotes/clip: where the owner chose). The popup
 // is the only place a choice is made; the tags are asked for beside the suggestions (tagsFor); the context menu hands its page to it (background.ts).
 // The shapes are packages/core/src/clip.ts's, shared with the phone's Share screen. The picture's bytes: picture.ts.
-import { CLIP_TEXT, type ClipPage, type ClipResult, type ClipTags, saveBody, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
+import { CLIP_TEXT, type ClipPage, type ClipResult, type ClipTags, saveBodies, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
 import { serverError } from "@/core/http";
 import { likeLit } from "@/core/record-contracts";
 import { getServer, hasAccess } from "./settings";
 
 export type Page = ClipPage;
 
+const saves = saveBodies();
 const TIMEOUT_MS = 120_000; // the server's model calls decide how long a suggest or a save takes
 
 /** No server set, or Chrome has not granted it: the user's next step is the options page, not a retry. */
@@ -89,12 +90,15 @@ export const tagsFor = (page: Page, note: string) =>
 
 /** `target`: a suggested note or task, a new note or a new task. The page text is not sent again, unless `summary` (the
  *  box is ticked): the server writes the picture (`file`, the JPEG to store; an existing task keeps none), the link, the
- *  summary, the owner's note, `line` and the selection. `tags`: the owner's. */
-export function save(page: Page, line: string | undefined, target: Target, note: string, summary: boolean, tags: string[], file?: Blob) {
+ *  summary, the owner's note, `line` and the selection. `tags`: the owner's. The save carries an id: pressed again after a timeout
+ *  or a dropped answer, the same save keeps it and the server answers as it did the first time instead of filing the page twice. */
+export async function save(page: Page, line: string | undefined, target: Target, note: string, summary: boolean, tags: string[], file?: Blob) {
   const form = new FormData();
-  form.append("@jsonPayload", JSON.stringify(saveBody(page, line, target, note, summary, tags)));
+  form.append("@jsonPayload", JSON.stringify(saves.body(page, line, target, note, summary, tags)));
   if (file && sendsFiles(page, target)) form.append("file", file, "picture.jpg");
-  return json<ClipResult>(call("/api/tefnotes/clip", { method: "POST", body: form }));
+  const result = await json<ClipResult>(call("/api/tefnotes/clip", { method: "POST", body: form }));
+  saves.landed();
+  return result;
 }
 
 /** A picture the extension couldn't fetch itself, through the server (a public one only): its bytes. */

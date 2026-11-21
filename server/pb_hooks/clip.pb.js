@@ -8,7 +8,9 @@
 //     200 { suggestions: [{ kind: "note", path, title, p } | { kind: "task", id, title, p }] (best first, at most 4),
 //        pick: { kind: "new" } | { kind: "note", path } | { kind: "task", id }, line?: string }
 //     Asks JEV, writes nothing. `line` is the page's own passage JEV picked as what the page is: the save sends it back.
-//   POST /api/tefnotes/clip  multipart: `@jsonPayload` { url?, title, selection?, line?, note?, images?: [{ src, alt?, caption? }], pdfs?: [{ name }],
+//   POST /api/tefnotes/clip  multipart: `@jsonPayload` { id (15 of a-z0-9, made by the client once per save and kept for every
+//        send of it: the save is recorded under it, `clip_saves`, so a send repeated after a lost answer gets the first's answer
+//        and writes nothing), url?, title, selection?, line?, note?, images?: [{ src, alt?, caption? }], pdfs?: [{ name }],
 //        target: { kind: "new", title? } | { kind: "note", path } | { kind: "task", id } | { kind: "newtask", title? },
 //        summary?: true, text? (the page's innerText, read only with summary), tags?: [name] (the owner's picks: a new note or
 //        task carries them and the lens's tag, added here, an append adds the picks missing) } and, for a clip to a note, a new note or a new task, one `file`
@@ -144,6 +146,12 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
     return e.json(400, { error: "A clip to a note, a new note or a new task sends a `file` part per picture and PDF, in that order; a clip to an existing task sends none." });
   }
 
+  // A save sent again (the answer was lost, or the client's outbox sent it after it landed) is answered as the first was and
+  // does nothing more: the answer is kept under the save's id, in the transaction that did the save (clip_saves).
+  const replay = () => { try { return JSON.parse(e.app.findRecordById("clip_saves", clip.id).getString("result")); } catch (_) { return null; } };
+  const had = replay();
+  if (had) return e.json(200, had);
+
   // A new note or task carries the lens's tag, whichever client sent it: the clients send the owner's picks alone
   let prefs = null;
   try { prefs = JSON.parse(e.app.findFirstRecordByData("prefs", "key", "owner").getString("data") || "null"); } catch (_) { /* none saved yet: no lens */ }
@@ -257,6 +265,14 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
       return title;
     }
   };
+  /** The answer `out` kept under the save's id, in `tx`, the transaction that did the save: both or neither. Another send of
+   *  this save that got there first has the id: the save fails, and the answer it kept is the one returned (below). */
+  const remember = (tx, out) => {
+    const rec = new Record(tx.findCollectionByNameOrId("clip_saves"));
+    rec.set("id", clip.id);
+    rec.set("result", outcome ? { ...out, summary: outcome } : out);
+    tx.save(rec);
+  };
   const unattach = () => {
     for (const att of atts) {
       try { e.app.delete(att); } catch (err) { log("could not remove a file of a failed save", "note", att.getString("note"), "error", String(err).slice(0, 200)); }
@@ -278,7 +294,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
           const had = rows.names(r.getString("tags"));
           r.set("tags", [...had, ...without(clip.tags, had)]);
         }, { taint: true });
-        if (rec) out = { kind: "task", id, title: rec.getString("title"), action: "appended" };
+        if (rec) { out = { kind: "task", id, title: rec.getString("title"), action: "appended" }; remember(tx, out); }
       });
       if (full) return e.json(413, { error: "That task's notes are full." });
       if (!out) return gone();
@@ -297,7 +313,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
           r.set("text", next);
           title = n.title;
         }, { taint: true });
-        if (rec) out = { kind: "note", path: target, title, action: "appended" };
+        if (rec) { out = { kind: "note", path: target, title, action: "appended" }; remember(tx, out); }
       });
       if (!out) { unattach(); return e.json(404, { error: "That note no longer exists." }); }
     } else if (clip.target.kind === "newtask") {
@@ -326,15 +342,18 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
           tx.save(link);
         }
         out = made ? { kind: "task", id: task.id, title, action: "created", note: made.path } : { kind: "task", id: task.id, title, action: "created" };
+        remember(tx, out);
       });
     } else {
       const first = lib.titleOf(clip, clip.line, now), made = newNote(first), title = retitle(made, first);
-      e.app.runInTransaction((tx) => { saveNote(tx, made); });
       out = { kind: "note", path: made.path, title, action: "created" };
+      e.app.runInTransaction((tx) => { saveNote(tx, made); remember(tx, out); });
     }
     return e.json(200, outcome ? { ...out, summary: outcome } : out);
   } catch (err) {
     unattach();
+    const first = replay();
+    if (first) return e.json(200, first);   // another send of this save got there first: its answer, nothing twice
     log("failed", "url", clip.url, "error", String(err).slice(0, 300));
     return e.json(500, { error: "The clip could not be saved." });
   }
@@ -369,3 +388,9 @@ routerAdd("GET", "/api/tefnotes/clip/image", (e) => require(`${__hooks}/lib/http
     try { $os.remove(file); } catch (_) { /* never written */ }
   }
 }));
+
+// Saves kept a week for a re-send to find (pb_migrations/1795800000_clip_saves.js): then gone
+cronAdd("clip_saves_prune", "29 4 * * *", () => {
+  const gone = require(`${__hooks}/lib/clip.js`).pruneSaves($app);
+  if (gone) $app.logger().info("clip: pruned saves", "records", gone);
+});

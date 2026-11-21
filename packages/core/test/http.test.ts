@@ -27,3 +27,38 @@ describe("getJson's failure", () => {
     expect(await getJson("http://x/a", {}, 1).catch((x: unknown) => (x as Error).message)).toBe("HTTP 404");
   });
 });
+
+describe("getJson's retries", () => {
+  /** A fetch that fails the first `fails` times with `fail`, then answers 200; `sent` counts what reached it. */
+  function flaky(fails: number, fail: () => Response | Error) {
+    const sent: string[] = [];
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      sent.push(init?.method ?? "GET");
+      if (sent.length <= fails) { const f = fail(); if (f instanceof Error) throw f; return f; }
+      return Response.json({ ok: true });
+    }) as unknown as typeof fetch;
+    return sent;
+  }
+
+  it("sends a write once, whatever went wrong: a reply lost after the server acted must not act twice", async () => {
+    for (const method of ["POST", "PATCH", "PUT"]) {
+      for (const fail of [() => new Error("socket closed"), () => new Response("{}", { status: 503 }), () => new Response("{}", { status: 429 })]) {
+        const sent = flaky(5, fail);
+        await getJson("http://x/a", { method }, 4).catch(() => undefined);
+        expect(sent, method).toHaveLength(1);
+      }
+    }
+  });
+
+  it("tries a GET again after a network error", async () => {
+    const sent = flaky(1, () => new Error("socket closed"));
+    expect(await getJson("http://x/a", {}, 2)).toEqual({ ok: true });
+    expect(sent).toEqual(["GET", "GET"]);
+  });
+
+  it("tries a DELETE again after a 5xx: a repeat that finds the record gone is a 404, which callers read as done", async () => {
+    const sent = flaky(1, () => new Response("{}", { status: 502 }));
+    expect(await getJson("http://x/a", { method: "DELETE" }, 2)).toEqual({ ok: true });
+    expect(sent).toEqual(["DELETE", "DELETE"]);
+  });
+});
