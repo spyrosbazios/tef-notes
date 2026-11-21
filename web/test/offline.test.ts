@@ -31,6 +31,10 @@ describe("persistable", () => {
   test("the lists and details are kept", () => {
     for (const k of [["tags"], ["lenses"], ["photos", "n1"], ["photos", "all"], ["link-preview", "https://x.test"]]) expect(persistable(k)).toBe(true);
   });
+  test("whether the server has Talk is kept, the voice list a person searched is not", () => {
+    expect(persistable(["talk"])).toBe(true);
+    expect(persistable(["talk-voices", "anna"])).toBe(false);
+  });
   test("the notes, tasks and links are not: the local copy keeps them", () => {
     for (const k of [["notes"], ["tasks"], ["links"]]) expect(persistable(k)).toBe(false);
   });
@@ -40,7 +44,12 @@ describe("persistable", () => {
 });
 
 describe("throttled persister", () => {
-  const client = (n: number): PersistedClient => ({ timestamp: n, buster: "b", clientState: { mutations: [], queries: [] } });
+  type Dehydrated = PersistedClient["clientState"]["queries"][number];
+  /** A client whose one kept query last got data at `n`; `timestamp` is when the provider handed the client over. */
+  const client = (n: number, timestamp = n): PersistedClient => ({
+    timestamp, buster: "b",
+    clientState: { mutations: [], queries: [{ queryKey: ["tags"], queryHash: '["tags"]', state: { data: [], dataUpdatedAt: n, status: "success" } } as unknown as Dehydrated] },
+  });
   const kv = () => {
     const stored = new Map<string, PersistedClient>(), writes: number[] = [];
     return { stored, writes, get: async (k: string) => stored.get(k), set: async (k: string, v: PersistedClient) => { writes.push(v.timestamp); stored.set(k, v); }, del: async (k: string) => { stored.delete(k); } };
@@ -52,6 +61,30 @@ describe("throttled persister", () => {
     await Bun.sleep(60);
     expect(s.writes).toEqual([3]);
     expect((await p.restoreClient())?.timestamp).toBe(3);
+  });
+  test("a cache event that leaves what is kept as it was writes nothing", async () => {
+    const s = kv(), p = throttled(s, "k", 20);
+    p.persistClient(client(1, 1));
+    await p.flush();
+    p.persistClient(client(1, 2));      // e.g. the notes list projected after a save: the client is handed over again, unchanged
+    p.persistClient(client(1, 3));
+    await Bun.sleep(60);
+    expect(s.writes).toEqual([1]);
+    p.persistClient(client(2, 4));
+    await p.flush();
+    expect(s.writes).toEqual([1, 4]);
+  });
+  test("a write that failed is tried again by the next identical client", async () => {
+    let fail = true;
+    const writes: number[] = [];
+    const set = async (_k: string, v: PersistedClient) => { if (fail) throw new Error("full"); writes.push(v.timestamp); };
+    const p = throttled({ get: async () => undefined, set, del: async () => {} }, "k", 5);
+    p.persistClient(client(1, 1));
+    await p.flush();
+    fail = false;
+    p.persistClient(client(1, 2));
+    await p.flush();
+    expect(writes).toEqual([2]);
   });
   test("flush writes at once, and nothing is left for the timer", async () => {
     const s = kv(), p = throttled(s, "k", 20);

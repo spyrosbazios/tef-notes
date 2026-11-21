@@ -36,7 +36,7 @@ export function TalkVoicePicker() {
   const status = useTalkStatus().data;
   const [q, setQ] = useState(""), [typed, setTyped] = useState("");
   useEffect(() => { const id = setTimeout(() => setQ(typed.trim()), 300); return () => clearTimeout(id); }, [typed]);
-  const list = useQuery({ queryKey: ["talk", "voices", q], queryFn: () => talk.voices(q), staleTime: 10 * 60_000 });
+  const list = useQuery({ queryKey: ["talk-voices", q], queryFn: () => talk.voices(q), staleTime: 10 * 60_000 });
   const current = t.voice || status?.voice || "";
   const sample = useSample();
   const pick = (v: TalkVoice) => setPrefs({ talk: { voice: v.id } });

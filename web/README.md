@@ -1,6 +1,6 @@
 # TEF Notes web app
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-21 -->
 
 The laptop client for [TEF Notes](../README.md): browse and edit notes and tasks, view photos, PDFs and
 drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, TanStack Router and axios.
@@ -225,8 +225,10 @@ projections rather than coordinating each other's caches.
   says "Offline" once the server has been out of reach for a few seconds (a dropped stream on returning to the app doesn't flash
   it) and "N changes waiting" when the last sync failed to send them; changes only waiting their turn are not shown. Offline state is `src/lib/net.ts`: the browser says so, or a
   request or the realtime stream could not reach the server. Coming back, the realtime feed reconnects and a sync runs.
-- **Kept besides:** the query cache keeps tags, lenses, the photo lists and link previews (`persistable` in
-  `src/lib/persist.ts`; a new kind of query is not kept until added there), for up to 7 days. Attachment files, their thumbnails
+- **Kept besides:** the query cache keeps tags, lenses, the photo lists, link previews and whether the server has Talk
+  (`persistable` in `src/lib/persist.ts`; a new kind of query is not kept until added there), for up to 7 days
+  (`MAX_AGE`, which the query client's `gcTime` in `src/router.ts` follows, so no query overrides it). It is written only when
+  one of those changed, not on every note edit or sync. Attachment files, their thumbnails
   and links' saved pictures (`/api/files/attachments/` and `/api/files/link_previews/` on this origin, nothing else) seen once
   are kept by the service worker (`sw/sw.ts`, cache `attachment-files`, at most 400 files for 30 days); a picture never
   opened online is not there offline, and a PDF read in parts is not cached.

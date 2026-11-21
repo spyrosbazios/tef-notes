@@ -3,13 +3,20 @@
 declare const __APP_VERSION__: string;
 export const appVersion = (): string => __APP_VERSION__;
 
+/** Reload the page once a new service worker takes it over. Both ways of updating (this file's `forceUpdate` and the toast's
+ *  Reload) call it before asking the worker to skip waiting: the plugin's own reload only fires when a worker controlled the page
+ *  when it loaded, so a page opened before any worker was installed (a first visit) would otherwise never reload. */
+export function reloadOnTakeover(): void {
+  navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
+}
+
 export async function forceUpdate(): Promise<void> {
   const r = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
   if (r) {
     await r.update().catch(() => {});
     const next = r.waiting ?? (await installed(r));
     if (next) {
-      navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
+      reloadOnTakeover();
       next.postMessage({ type: "SKIP_WAITING" });
       return;
     }
