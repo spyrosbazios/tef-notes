@@ -15,6 +15,8 @@ version is one semver number for the whole repository, set by the git tag (see [
   say what doesn't belong from the notes you took it off; they are written at 3 such notes and again each time that
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
+- Searching for a word with a `%` or `_` in it (the CLI's `search`, the clipper's "any note") finds that character, not any
+  text: `100%` no longer matches everything that begins "100".
 
 ## 0.13.0 - 2026-11-19
 

@@ -17,6 +17,12 @@ export function conflictOf(status: number | undefined, body: any, what: string):
 /** A PocketBase filter literal, including backslash and quote escaping. */
 export const lit = (v: string) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
+/** A filter literal for `~` that matches `v` as plain text, wherever it sits. PocketBase wraps a `~` value in `%` and escapes
+ *  its `%`, `_` and `\` only when the value holds no unescaped `%`; with one it is a raw LIKE pattern, so a typed `100%` finds
+ *  "100" followed by anything, not a percent sign. Escaping them here keeps every case literal: a character already
+ *  escaped is left alone (github.com/pocketbase/pocketbase tools/search/filter.go `wrapLikeParams`). */
+export const likeLit = (v: string) => lit(v.replace(/[\\%_]/g, "\\$&"));
+
 /** Only client-owned columns: a PATCH preserves the server's tagging state and immutable kind. */
 export function noteColumns(path: string, text: string) {
   const n = parseNote(path, text);

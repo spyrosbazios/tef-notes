@@ -1,7 +1,7 @@
 // The notes server client (src/pocketbase.ts) against a stubbed fetch: what each call sends, and how
 // PocketBase's answers become Conflict or null. No token: the private network is the gate.
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { Conflict, create, hasPreview, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, serverUrl, tasks, update, uploaded, uploadTo } from "../src/pocketbase";
+import { Conflict, create, hasPreview, likeLit, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, search, serverUrl, tasks, update, uploaded, uploadTo } from "../src/pocketbase";
 import { newTask } from "../src/todo";
 
 const S = { url: "https://n:8097" };
@@ -118,5 +118,16 @@ describe("link previews", () => {
     expect(previewPictureUrl(S, p, "blur")).toBe(`${S.url}/api/files/link_previews/r1/x_ab.png?thumb=32x32f`);
     expect(previewPictureUrl(S, { ...p, picture: "" }, "sharp")).toBeUndefined();
     expect(photoThumbUrl(S, { rec: "a", file: "b c.jpg" }, "sharp")).toBe(`${S.url}/api/files/attachments/a/b%20c.jpg?thumb=640x640f`);
+  });
+
+  it("searches for every word as plain text: a typed % or _ is no wildcard (PocketBase takes a value with a bare % as a pattern)", async () => {
+    const f = reply(200, { items: [] });
+    stubFetch(f);
+    await search(S, String.raw`100% a_b c\d "q"`);
+    const both = (v: string) => `(title ~ ${v} || text ~ ${v})`;
+    expect(new URL(sent(f).url).searchParams.get("filter")).toBe(
+      ["path ~ \"notes/%\"", both(String.raw`"100\\%"`), both(String.raw`"a\\_b"`), both(String.raw`"c\\\\d"`), both(String.raw`"\"q\""`)].join(" && "),
+    );
+    expect(likeLit("plain")).toBe('"plain"');
   });
 });

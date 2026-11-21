@@ -2,12 +2,12 @@
 // where JEV would file it, writes nothing), then save (POST {server}/api/tefnotes/clip: where the owner chose). The popup
 // is the only place a choice is made; the tags are asked for beside the suggestions (tagsFor); the context menu hands its page to it (background.ts).
 // The shapes are packages/core/src/clip.ts's, shared with the phone's Share screen. The picture's bytes: picture.ts.
-import { type ClipPage, type ClipResult, type ClipTags, saveBody, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
+import { CLIP_TEXT, type ClipPage, type ClipResult, type ClipTags, saveBody, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
+import { likeLit } from "@/core/record-contracts";
 import { getServer, hasAccess } from "./settings";
 
 export type Page = ClipPage;
 
-const TEXT_CAP = 50000;
 const TIMEOUT_MS = 120_000; // the server's model calls decide how long a suggest or a save takes
 
 /** No server set, or Chrome has not granted it: the user's next step is the options page, not a retry. */
@@ -56,7 +56,7 @@ export async function readTab(tab: chrome.tabs.Tab, selection?: string, src?: st
   if (!tab.id || !tab.url || !/^https?:/.test(tab.url)) throw new Error("This page can't be saved.");
   // A page the browser won't script (the PDF viewer, the web store) still has a url and a title to file.
   const grabbed = await chrome.scripting
-    .executeScript({ target: { tabId: tab.id }, func: grab, args: [TEXT_CAP, src ?? null] })
+    .executeScript({ target: { tabId: tab.id }, func: grab, args: [CLIP_TEXT, src ?? null] })
     .then(([r]) => r?.result)
     .catch(() => undefined);
   return {
@@ -104,7 +104,7 @@ export const pictureViaServer = async (src: string) => (await call(`/api/tefnote
 /** Notes whose title or path holds `q`, newest first, for filing into a note the suggestions missed (never an archived
  *  one, as the suggest route). PocketBase's own records API: the server has no sign-in, and the rules allow reads. */
 export async function findNotes(q: string, signal?: AbortSignal): Promise<{ path: string; title: string }[]> {
-  const term = JSON.stringify(q.trim());
+  const term = likeLit(q.trim());
   const filter = `path ~ "notes/%" && archived != true && (title ~ ${term} || path ~ ${term})`;
   const params = new URLSearchParams({ filter, sort: "-updated", perPage: "8", fields: "path,title", skipTotal: "1" });
   const res = await call(`/api/collections/notes/records?${params}`, signal ? { signal } : {});

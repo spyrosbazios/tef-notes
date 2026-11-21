@@ -6,7 +6,7 @@ The web app's Share page (`web/src/components/share-page.tsx`) calls the same ro
 Root `AGENTS.md` has the server and the note format; this file only what is the extension's. How to build, install and
 release it is in `README.md`, not repeated here.
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-21 -->
 
 ## Contract
 
@@ -16,9 +16,9 @@ Two steps; the server side is `server/pb_hooks/clip.pb.js`, `src/clip.ts` the ex
 same way; never suggested, always offered last).
 
 1. `POST {server}/api/tefnotes/clip/suggest`, JSON `{url?, title, selection?, text?, note?, images?: [{src, alt?, caption?,
-   look?}], pdfs?: [{name}]}` (`url` is absent only for what the web app's Share page sends as text, photos or PDFs, which then carries a selection or files; `text` is `document.body.innerText`, capped at 50000 chars; `note` the user's words, at most 2000, context
+   look?}], pdfs?: [{name}]}` (`url` is absent only for what the web app's Share page sends as text, photos or PDFs, which then carries a selection or files; `text` is `document.body.innerText`, capped at 50000 chars, `CLIP_TEXT` in core; `note` the user's words, at most 2000, context
    for where it goes; `images` the pictures: the extension sends the one the menu was opened on, with its address, its alt text or title, its figure's
-   caption, and `look`, a base64 JPEG of it, long edge 768, padded to 280 a side, that JEV sees, on the first only; the web app's Share page sends one entry per shared photo
+   caption, and `look`, a base64 JPEG of it, long edge 768, a small one made up to 280 on its short side (`lookSize`), that JEV sees, on the first only; the web app's Share page sends one entry per shared photo
    (`src` "") and `pdfs` one per shared PDF; at most 10 files in all, `CLIP_FILES` in core) answers
    `200 {suggestions: [{kind: "note", path, title, p} | {kind: "task", id, title, p}], pick, line?}` and writes nothing.
    JEV chooses among the pinned and 60 newest notes and the 40 most recently touched open tasks (`TASKS` in

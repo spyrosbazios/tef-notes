@@ -12,8 +12,8 @@ import { getJson, HttpError } from "./http";
 import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
 import { noteKindOf, type NoteKind } from "./notes";
 import type { Link, LinkEnd } from "./record-links";
-import { conflictOf, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
-export { Conflict, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
+import { conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
+export { Conflict, likeLit, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
 import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "./record-protocol";
 export { linkFilter } from "./record-protocol";
 import { taskOf, type Task } from "./todo";
@@ -83,7 +83,7 @@ export async function index(s: Server): Promise<Card[]> {
 export async function search(s: Server, query: string, limit = 20): Promise<Remote[]> {
   const words = query.trim().split(/\s+/).filter(Boolean);
   if (!words.length) return [];
-  const filter = [`path ~ "notes/%"`, ...words.map((w) => `(title ~ ${lit(w)} || text ~ ${lit(w)})`)].join(" && ");
+  const filter = [`path ~ "notes/%"`, ...words.map((w) => `(title ~ ${likeLit(w)} || text ~ ${likeLit(w)})`)].join(" && ");
   const j = await call(s, `collections/notes/records?filter=${encodeURIComponent(filter)}&sort=-updated&perPage=${limit}&skipTotal=1`);
   return j.items.map(remote);
 }
