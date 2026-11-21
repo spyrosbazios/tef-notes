@@ -12,7 +12,7 @@ export type { SyncStatus, Settle } from "./sync-controller";
 import * as links from "@/services/links";
 import * as notes from "@/services/notes";
 import * as todo from "@/services/todo";
-import { flushLocal, local, ready } from "./local";
+import { flushLocal, local, ready, storeError } from "./local";
 import { getNet } from "./net";
 
 // ---- the server, as the engine asks of it
@@ -36,7 +36,7 @@ const transport: Transport = {
 export const LOCAL_QUERY = { networkMode: "always", staleTime: Infinity, retry: false } as const;
 
 // The browser's one controller; tests can construct independent controllers over memory stores.
-export const sync = createSync({ store: local, ready, transport, online: () => getNet().browser });
+export const sync = createSync({ store: local, ready, transport, online: () => getNet().browser, stored: storeError });
 export const { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle, resolveRefused } = sync;
 
 /** Mounted by the app's live-data hook; importing storage or a feature installs no lifecycle listeners. */

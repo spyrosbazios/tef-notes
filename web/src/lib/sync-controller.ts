@@ -6,8 +6,9 @@ import {
   type Refusal, type Store, type Transport,
 } from "@/core/sync";
 
-/** `refused`: changes the server refused, parked until the owner sends them again or lets them go (Settings lists them). */
-export type SyncStatus = { waiting: number; conflicts: string[]; refused: Refusal[]; syncing: boolean; error?: string };
+/** `refused`: changes the server refused, parked until the owner sends them again or lets them go (Settings lists them).
+ *  `unsaved`: why the copy couldn't be written to this device's storage, until a write goes through (lib/local.ts). */
+export type SyncStatus = { waiting: number; conflicts: string[]; refused: Refusal[]; syncing: boolean; error?: string; unsaved?: string };
 
 export type Settle = "mine" | "theirs" | "restore" | "dismiss";
 
@@ -15,8 +16,11 @@ type Cancel = () => void;
 type Later = (work: () => void, ms: number) => Cancel;
 const later: Later = (work, ms) => { const timer = setTimeout(work, ms); return () => clearTimeout(timer); };
 
-export function createSync({ store: local, ready, transport, online, schedule = later }: {
-  store: Store; ready: Promise<void>; transport: Transport; online: () => boolean; schedule?: Later;
+/** What the copy's storage says about its writes (lib/local.ts `storeError`); a copy kept in memory alone has none. */
+type Stored = { get: () => string | undefined; watch: (l: () => void) => () => void };
+
+export function createSync({ store: local, ready, transport, online, schedule = later, stored }: {
+  store: Store; ready: Promise<void>; transport: Transport; online: () => boolean; schedule?: Later; stored?: Stored;
 }) {
   let mounts = 0;
   // ---- what the app shows of it
@@ -33,12 +37,13 @@ export function createSync({ store: local, ready, transport, online, schedule = 
 
   const refusedKey = (r: Refusal[]) => r.map((x) => `${x.kind}:${x.key}:${x.title}:${x.reason}`).join("\n");
   function refresh(over: Partial<Pick<SyncStatus, "syncing" | "error">> = {}) {
-    const next: SyncStatus = { ...status, waiting: waiting(local), conflicts: conflicted(local), refused: refusals(local), ...over };
-    if (next.waiting === status.waiting && next.syncing === status.syncing && next.error === status.error
+    const next: SyncStatus = { ...status, waiting: waiting(local), conflicts: conflicted(local), refused: refusals(local), unsaved: stored?.get(), ...over };
+    if (next.waiting === status.waiting && next.syncing === status.syncing && next.error === status.error && next.unsaved === status.unsaved
       && next.conflicts.join("\n") === status.conflicts.join("\n") && refusedKey(next.refused) === refusedKey(status.refused)) return;
     status = next;
     watchers.forEach((l) => l());
   }
+  stored?.watch(() => refresh());
 
   /** Called after a sync changed the copy: the app redraws from it (hooks/live.ts `useLive` registers the redraw). */
   const redraws = new Set<() => void>();

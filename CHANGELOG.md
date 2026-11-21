@@ -33,6 +33,9 @@ version is one semver number for the whole repository, set by the git tag (see [
   can't be left behind if its name turns out to be taken.
 - Text kept after "Use the server's" is no longer lost if the note is then deleted on another device: it waits in
   Settings to be restored or dismissed.
+- The web app's offline copy is written to the device one batch at a time, each in one transaction and in order; a write
+  that fails (storage full) is kept to try again with the next and is shown ("Not saved on this device") instead of being
+  dropped silently.
 
 ## 0.13.0 - 2026-11-19
 
