@@ -1,5 +1,6 @@
 // One sync controller per local store. All mutable status, timers and subscriptions belong to this
 // instance; browser events and realtime are attached by the app, not by importing this module.
+import { applyChange, topicOf, type Change, type Topic } from "@/core/changes";
 import { isNotePath } from "@/core/notes";
 import {
   coalesced, conflicted, discardRefused, dismissLost, keepMine, refusals, restoreMine, retryRefused, syncRound, takeTheirs, waiting,
@@ -45,13 +46,23 @@ export function createSync({ store: local, ready, transport, online, schedule = 
   }
   stored?.watch(() => refresh());
 
-  /** Called after a sync changed the copy: the app redraws from it (hooks/live.ts `useLive` registers the redraw). */
-  const redraws = new Set<() => void>();
-  function onRedraw(f: () => void): () => void {
+  /** Called after the copy changed, by a sync (every list: `topics` undefined), a write (`apply`) or a settled conflict or
+   *  refusal (the lists it touched): the app redraws from it (hooks/live.ts `useLive` registers the redraw). */
+  const redraws = new Set<(topics?: readonly Topic[]) => void>();
+  function onRedraw(f: (topics?: readonly Topic[]) => void): () => void {
     redraws.add(f);
     return () => { redraws.delete(f); };
   }
-  const changed = () => { refresh(); redraws.forEach((f) => f()); };
+  const redraw = (topics?: readonly Topic[]) => redraws.forEach((f) => f(topics));
+  const changed = () => { refresh(); redraw(); };
+
+  /** Work a round waits for before it pulls: an open note's typing not yet saved goes into the copy first (lib/records.ts), so
+   *  the pull sees the note edited here and never drops it as deleted elsewhere. */
+  const befores = new Set<() => Promise<void>>();
+  function beforeRound(f: () => Promise<void>): () => void {
+    befores.add(f);
+    return () => { befores.delete(f); };
+  }
 
   /** A new note's path moved aside by a sync (`-2`: another device had the name): where it is now. */
   const moved = new Map<string, string>();
@@ -72,6 +83,7 @@ export function createSync({ store: local, ready, transport, online, schedule = 
 
   const round = coalesced(async () => {
     await ready;
+    await Promise.all([...befores].map((f) => f()));
     retryTimer?.();
     if (!online()) { changed(); return; }                      // no network at all: everything stays waiting
     const errs: string[] = [];
@@ -84,7 +96,7 @@ export function createSync({ store: local, ready, transport, online, schedule = 
       });
     } finally {
       refresh({ syncing: false, error: errs[0] });
-      redraws.forEach((f) => f());
+      redraw();
       failures = ok && !errs.length ? 0 : failures + 1;
       if (mounts && failures && waiting(local)) retryTimer = schedule(() => { void syncNow(); }, Math.min(RETRY_FIRST * 2 ** (failures - 1), RETRY_MOST));
     }
@@ -106,11 +118,22 @@ export function createSync({ store: local, ready, transport, online, schedule = 
   /** Whether a sync is out (the engine keeps a delete as a tombstone then: its first upload of the record may yet land). */
   const syncing = () => round.running();
 
-  /** An edit was made on the local copy: count it, and send it a moment after the last. */
-  function edited(): void {
-    refresh();
-    pushTimer?.();
-    if (mounts) pushTimer = schedule(() => { void syncNow(); }, PUSH_AFTER);
+  /** The one way a write reaches the copy: `changes` applied in order (core/changes.ts), counted, sent a moment after the last
+   *  (`PUSH_AFTER`), and the lists they touched redrawn. true when any changed something. Throws on one the copy refuses, those
+   *  before it applied. Changes are data so that a copy held elsewhere (another tab's) can take them in place of this one. */
+  function apply(changes: readonly Change[]): boolean {
+    const touched = new Set<Topic>();
+    try {
+      for (const c of changes) if (applyChange(local, c, syncing())) touched.add(topicOf(c));
+    } finally {
+      if (touched.size) {
+        refresh();
+        pushTimer?.();
+        if (mounts) pushTimer = schedule(() => { void syncNow(); }, PUSH_AFTER);
+        redraw([...touched]);
+      }
+    }
+    return touched.size > 0;
   }
 
   // ---- when
@@ -154,22 +177,26 @@ export function createSync({ store: local, ready, transport, online, schedule = 
 
   // ---- a conflict settled
 
-  /** false when there was nothing to settle (a second tap). The caller redraws. */
+  /** false when there was nothing to settle (a second tap). */
   function settle(path: string, how: Settle): boolean {
     const done = { mine: keepMine, theirs: takeTheirs, restore: restoreMine, dismiss: dismissLost }[how](local, path);
     if (!done) return false;
     refresh();
+    redraw(["notes"]);
     if (how === "mine" || how === "restore") void syncNow();
     return true;
   }
   /** A change the server refused, sent again as it is (`retry`) or let go (`discard`: back to the server's version, or away
-   *  when the server never had it). false when it was not refused (a second tap). The caller redraws. */
+   *  when the server never had it). false when it was not refused (a second tap). */
   function resolveRefused(r: Pick<Refusal, "kind" | "key">, how: "retry" | "discard"): boolean {
     const done = (how === "retry" ? retryRefused : discardRefused)(local, r.kind, r.key);
     if (!done) return false;
     refresh();
+    redraw([r.kind === "note" ? "notes" : r.kind === "task" ? "tasks" : "links"]);
     if (how === "retry") void syncNow();
     return true;
   }
-  return { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle, resolveRefused, start };
+  return { getStatus, watchStatus, onRedraw, beforeRound, movedTo, opened, syncNow, syncing, apply, heard, settle, resolveRefused, start };
 }
+
+export type SyncController = ReturnType<typeof createSync>;

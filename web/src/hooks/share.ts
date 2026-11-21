@@ -36,6 +36,6 @@ export async function saveSharedFiles(qc: QueryClient, s: Shared, files: File[])
   const rec = await createNote(qc, `Photos ${localDay()} ${two(d.getHours())}:${two(d.getMinutes())}`);
   const mine = [...s.images, ...s.pdfs].map((f) => Number(f.uri)).sort((a, b) => a - b).map((i) => files[i]);
   const { path, lines } = await addFiles(qc, rec.path, mine);
-  if (lines) await write(qc, { ...rec, path }, (text) => withLines(path, text, lines));
+  if (lines) await write(rec, (text, at) => withLines(at, text, lines));
   return path;
 }

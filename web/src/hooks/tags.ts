@@ -3,7 +3,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { useCallback, useEffect, useMemo } from "react";
 import { tagColor, tagGuesser, type TagDef, type TagFields } from "@/core/tags";
 import type { Color } from "@/core/notes";
-import { syncNow } from "@/lib/sync";
+import { syncNow } from "@/lib/records";
 import * as tags from "@/services/tags";
 import { LENSES } from "./lens";
 import { pullPrefs } from "./prefs";

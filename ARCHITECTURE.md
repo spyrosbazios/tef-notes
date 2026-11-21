@@ -82,7 +82,8 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   verdict with nothing to add (`tagged` alone) changes neither `rev` nor `updated`, nor reaches realtime.
 - `tainted` marks a note holding text the owner didn't write, set in the same write by whoever wrote it: the chat agent
   with web text in view, the CLI under `TEF_NOTES_AGENT=1`, the clip routes (a clip or a share is someone else's text,
-  `server/pb_hooks/lib/records.js`). Never cleared: `server/pb_hooks/tainted.pb.js` keeps it on every later save. A
+  `server/pb_hooks/lib/records.js`), the web app when a link's Summary is put in (the local copy holds the mark until the write
+  goes up, `packages/core/src/sync.ts`). Never cleared: `server/pb_hooks/tainted.pb.js` keeps it on every later save. A
   tainted note read back counts as reading the web, so that chat's next write asks first.
 - `kind` says what the note is: `note`, the only kind today; a select that grows as kinds are added
   (`server/pb_migrations/1793300000_note_kind.js`). It is set when the note is made and never changes (`notes.pb.js`: a
@@ -336,7 +337,8 @@ configure). It uses shadcn, TanStack Query and axios services (`web/src/services
 `Conflict`. The web sync controller (`web/src/lib/sync-controller.ts`) owns its mutable status and timers over an injected
 store and transport; a round that fails is tried again after 5 s, doubling to at most 5 minutes, and Settings lists the
 changes the server refused, to send again or let go. The root frame's `hooks/live.ts` owns realtime and browser lifecycle subscriptions; `lib/local-records.ts`
-owns the notes/tasks/links query projections, shared by feature edits and sync redraws. On a phone it is the installed PWA, in its own layout below `md`.
+owns the notes/tasks/links query projections, shared by feature edits and sync redraws; `lib/records.ts` is the one writer of
+the local copy (changes handed to the controller's `apply`) and owns an open note's unsaved typing (web/README.md, Offline). On a phone it is the installed PWA, in its own layout below `md`.
 
 Colours live in one place, `packages/core/src/theme.ts` (`THEMES`: sixteen themes, nine dark and seven light, each a palette,
 tints and note colours, and `ACCENTS`). The web app, the site and the extension get the

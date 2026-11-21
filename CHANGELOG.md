@@ -26,6 +26,10 @@ version is one semver number for the whole repository, set by the git tag (see [
   it ticks, `draw --replace` swaps the scene only once the new one is in place, `edit` keeps your text in a private file it
   names whenever it can't save, and `grep` says when it cut the list.
 - Android: files an interrupted save left in the outbox are cleaned up.
+- Web: typing into a note that was moved or deleted on another device is no longer lost: the note comes back with what you
+  typed, and a new note renamed to `-2` on its first sync keeps its page and your typing.
+- Web: a task's title, notes or checklist item that fails to save keeps what you typed instead of snapping back.
+- Web: a link's Summary put into a note marks the note as holding model text (`tainted`), as a clip's summary does.
 - A clip saved as a new note or task under a lens gets the lens's tag whichever way it was saved: the clipper used to
   leave it off, the share page to drop your picked tags. The server adds it now; every client sends just your picks.
 - Auto-tagging: a note the tagging service keeps refusing no longer holds up the rest; it is retried less and less

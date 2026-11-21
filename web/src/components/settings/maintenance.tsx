@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useOnline } from "@/hooks/online";
 import { useSyncStatus } from "@/hooks/sync";
 import { clearOffline, keptFiles } from "@/lib/offline";
-import { syncNow } from "@/lib/sync";
+import { syncNow } from "@/hooks/sync";
 import { useTasks } from "@/hooks/todo";
 import { useNotes } from "@/hooks/notes";
 import { message } from "@/services/api";

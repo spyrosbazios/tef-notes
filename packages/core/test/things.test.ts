@@ -1,10 +1,44 @@
 import { describe, expect, it } from "bun:test";
-import { progress, reminderPlan, remindAt, REPEATS } from "../src/things";
-import { EVERY, newTask, type Task } from "../src/todo";
+import { listOf, listOfDay, LOGBOOK, progress, reminderPlan, remindAt, REPEATS, sectionOf, sectionsOf } from "../src/things";
+import { EVERY, newTask, views, type Task } from "../src/todo";
 
 const T = "2026-10-31";
 let n = 0;
 const task = (title: string, p: Partial<Task> = {}) => newTask(`t${String(++n).padStart(14, "0")}`, { title, ...p });
+
+describe("the lists laid out", () => {
+  const titles = (l: { key: string; rows: Task[] }[]) => l.map((s) => [s.key, s.rows.map((t) => t.title)]);
+
+  it("Today lists its own before This Evening, Upcoming by day, the Logbook only the latest", () => {
+    const ts = [task("eve", { when: T, evening: true, order: 0 }), task("now", { when: T, order: 1 }), task("later", { when: "2026-11-02" }),
+      ...Array.from({ length: LOGBOOK + 5 }, (_, i) => task(`done ${i}`, { done: "2026-10-01" }))];
+    const v = views(ts, T);
+    expect(listOf(v, "today").map((t) => t.title)).toEqual(["now", "eve"]);
+    expect(titles(sectionsOf(v, "today", [], T))).toEqual([["today", ["now"]], ["evening", ["eve"]]]);
+    expect(titles(sectionsOf(v, "upcoming", [], T))).toEqual([["2026-11-02", ["later"]]]);
+    expect(listOf(v, "logbook")).toHaveLength(LOGBOOK);
+    expect(sectionOf("inbox", ts[0]!)).toBe("");
+  });
+
+  it("a task just ticked lingers where it was, by order; one the list never showed doesn't", () => {
+    const a = task("a", { when: T, order: 0 }), b = task("b", { when: T, order: 1 }), c = task("c", { when: T, order: 2 });
+    const done = { ...b, done: T }, v = views([a, done, c], T);
+    expect(titles(sectionsOf(v, "today", [b], T))).toEqual([["today", ["a", "b", "c"]]]);
+    expect(titles(sectionsOf(v, "today", [task("elsewhere", { when: "2026-12-01" })], T))).toEqual([["today", ["a", "c"]]]);
+  });
+
+  it("a task just unticked lingers in the Logbook by the day it was done", () => {
+    const x = task("x", { done: "2026-10-30" }), y = task("y", { done: "2026-10-28" }), back = task("back", { done: "2026-10-29" });
+    expect(titles(sectionsOf(views([x, y], T), "logbook", [back], T))).toEqual([["2026-10-30", ["x"]], ["2026-10-28", ["y"]], ["2026-10-29", ["back"]]]);
+  });
+
+  it("a day is Today's once it has come, Upcoming's before, as views lists its tasks", () => {
+    for (const day of ["2026-10-01", T, "2026-11-01"]) {
+      const v = views([task("x", { when: day })], T);
+      expect(listOf(v, listOfDay(day, T))).toHaveLength(1);
+    }
+  });
+});
 
 describe("repeats", () => {
   it("are on offer as the server stores them", () => {

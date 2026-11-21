@@ -11,6 +11,8 @@ import { retagTask, taskOf, type Task } from "@/core/todo";
 type Rev<T> = T & { rev: number };
 const server = { tasks: new Map<string, Rev<Task>>(), notes: new Map<string, { rec: string; path: string; text: string; rev: number }>(), links: new Map<string, Link>(), down: false };
 const sent: Record<string, unknown>[] = [];
+/** The marks note writes went up with (`tainted`). */
+const marks: string[] = [];
 let lists = 0;
 const net = async <T>(f: () => T): Promise<T> => { if (server.down) throw new Unavailable("network"); return f(); };
 
@@ -24,13 +26,15 @@ mock.module("@/services/notes", () => ({
   list:() => net(() => { lists++; return [...server.notes.values()].map((r) => ({ rec: r.rec, path: r.path, rev: r.rev, kind: "note" })); }),
   get: (rec: string) => net(() => { const r = server.notes.get(rec); return r ? noteRec(r) : null; }),
   read: (path: string) => net(() => { const r = [...server.notes.values()].find((x) => x.path === path); return r ? noteRec(r) : null; }),
-  create: (rec: string, path: string, text: string) => net(() => {
+  create: (rec: string, path: string, text: string, mark: object = {}) => net(() => {
+    marks.push(`create ${JSON.stringify(mark)}`);
     if (server.notes.has(rec) || [...server.notes.values()].some((x) => x.path === path)) throw new Conflict(path);
     const r = { rec, path, text, rev: 1 };
     server.notes.set(r.rec, r);
     return noteRec(r);
   }),
-  update: (e: { rec: string; rev: number }, text: string) => net(() => {
+  update: (e: { rec: string; rev: number }, text: string, mark: object = {}) => net(() => {
+    marks.push(`update ${JSON.stringify(mark)}`);
     const r = server.notes.get(e.rec);
     if (!r) return null;
     if (r.rev !== e.rev) throw new Conflict("rev");
@@ -75,16 +79,17 @@ const { local } = await import("@/lib/local");
 const { note } = await import("@/lib/net");
 const { getStatus, heard, onRedraw, sync, syncNow } = await import("@/lib/sync");
 const { projectLocal } = await import("@/lib/local-records");
+const { noteDrafts, noteIdNow } = await import("@/lib/records");
 
 let qc: QueryClient, stop: (() => void) | undefined;
 beforeEach(async () => {
   for (const n of local.notes.all()) local.notes.delete(n.path);
   for (const t of local.tasks.all()) local.tasks.delete(t.id);
   for (const l of local.links.all()) local.links.delete(l.link.id);
-  server.tasks.clear(); server.notes.clear(); server.links.clear(); server.down = false; sent.length = 0;
+  server.tasks.clear(); server.notes.clear(); server.links.clear(); server.down = false; sent.length = 0; marks.length = 0;
   qc = new QueryClient();
   stop?.();
-  const redraw = onRedraw(() => projectLocal(qc));
+  const redraw = onRedraw((topics) => projectLocal(qc, topics));
   const background = sync.start();
   stop = () => { background(); redraw(); };
   await syncNow();
@@ -116,7 +121,7 @@ describe("writes go to the copy first", () => {
     const r = await createNote(qc, "Plan");
     await syncNow();
     server.down = true;
-    const after = await write(qc, r, (text) => `${text}more\n`);
+    const after = await write(r, (text) => `${text}more\n`);
     expect(seen().find((n) => n.path === r.path)?.text).toBe(after.text);
     expect(getStatus().waiting).toBe(1);
     server.down = false;
@@ -129,7 +134,7 @@ describe("writes go to the copy first", () => {
     const r = await createNote(qc, "Gone soon");
     await syncNow();
     server.down = true;
-    await deleteNote(qc, r);
+    await deleteNote(r);
     expect(seen()).toEqual([]);
     server.down = false;
     await syncNow();
@@ -142,7 +147,7 @@ describe("writes go to the copy first", () => {
     await syncNow();
     const rec = [...server.notes.keys()][0]!, theirs = server.notes.get(rec)!;
     server.notes.set(rec, { ...theirs, text: theirs.text.replace("l5", "l5 theirs"), rev: theirs.rev + 1 });
-    await write(qc, r, (text) => text.replace("l1", "l1 mine"));
+    await write(r, (text) => text.replace("l1", "l1 mine"));
     await syncNow();
     const text = [...server.notes.values()][0]!.text;
     expect(text).toContain("l1 mine");
@@ -155,7 +160,7 @@ describe("writes go to the copy first", () => {
     await syncNow();
     const rec = [...server.notes.keys()][0]!, theirs = server.notes.get(rec)!;
     server.notes.set(rec, { ...theirs, text: theirs.text.replace("one", "theirs"), rev: theirs.rev + 1 });
-    await write(qc, r, (text) => text.replace("one", "mine"));
+    await write(r, (text) => text.replace("one", "mine"));
     await syncNow();
     expect(getStatus().conflicts).toEqual([r.path]);
     expect([...server.notes.values()][0]!.text).toContain("theirs");
@@ -203,7 +208,7 @@ describe("writes go to the copy first", () => {
 
   test("flags are a write like any other", async () => {
     const r = await createNote(qc, "Pin me");
-    await setFlags(qc, r, { pinned: true });
+    await setFlags(r, { pinned: true });
     expect(seen().find((n) => n.path === r.path)?.text).toContain("pinned: true");
   });
 });
@@ -213,7 +218,7 @@ describe("tasks", () => {
     const t = await addTask(qc, { title: "a" });
     await syncNow();
     sent.length = 0;
-    await editTask(qc, t.id, { due: "2026-11-10" });
+    await editTask(t.id, { due: "2026-11-10" });
     expect(cached(t.id)).toMatchObject({ due: "2026-11-10", rev: 1 });      // shown at once, as the server last had it
     await syncNow();
     expect(sent).toHaveLength(1);
@@ -224,7 +229,7 @@ describe("tasks", () => {
   test("an edit that changes nothing leaves nothing waiting", async () => {
     const t = await addTask(qc, { title: "a" });
     await syncNow();
-    await editTask(qc, t.id, { title: "a" });
+    await editTask(t.id, { title: "a" });
     expect(getStatus().waiting).toBe(0);
   });
 
@@ -232,7 +237,7 @@ describe("tasks", () => {
     const t = await addTask(qc, { title: "a" });
     await syncNow();
     server.tasks.set(t.id, { ...server.tasks.get(t.id)!, notes: "from the phone", rev: 2 });          // another device wrote
-    await editTask(qc, t.id, { due: "2026-11-10" });
+    await editTask(t.id, { due: "2026-11-10" });
     await syncNow();
     expect(server.tasks.get(t.id)).toMatchObject({ due: "2026-11-10", notes: "from the phone", rev: 3 });
     expect(cached(t.id)?.notes).toBe("from the phone");
@@ -243,7 +248,7 @@ describe("tasks", () => {
     await syncNow();
     const theirs = addItem(taskOf(server.tasks.get(t.id)), "theirs");
     server.tasks.set(t.id, { ...server.tasks.get(t.id)!, checklist: theirs.checklist, rev: 2 });
-    await changeTask(qc, t.id, (cur) => addItem(cur, "mine"));
+    await changeTask(t.id, (cur) => addItem(cur, "mine"));
     await syncNow();
     expect((server.tasks.get(t.id)!.checklist as { text: string }[]).map((i) => i.text)).toEqual(["theirs", "mine"]);
   });
@@ -252,7 +257,7 @@ describe("tasks", () => {
     const t = await addTask(qc, { title: "a", tags: ["home"] });
     await syncNow();
     server.tasks.set(t.id, { ...server.tasks.get(t.id)!, tags: ["home", "errand"], rev: 2 });
-    await changeTask(qc, t.id, (cur) => retagTask(cur, ["Urgent"]));
+    await changeTask(t.id, (cur) => retagTask(cur, ["Urgent"]));
     await syncNow();
     expect(server.tasks.get(t.id)?.rev).toBe(3);
     expect([...server.tasks.get(t.id)!.tags].sort()).toEqual(["Urgent", "errand", "home"]);       // a set: either side's addition is kept
@@ -260,14 +265,14 @@ describe("tasks", () => {
 
   test("a tag is taken off ignoring case, and one it already has is not added twice", async () => {
     const t = await addTask(qc, { title: "a", tags: ["Home", "work"] });
-    await changeTask(qc, t.id, (cur) => retagTask(cur, ["WORK"], ["home"]));
+    await changeTask(t.id, (cur) => retagTask(cur, ["WORK"], ["home"]));
     expect(cached(t.id)?.tags).toEqual(["work"]);
   });
 
   test("a value the server would refuse stops the edit before it is written", async () => {
     const t = await addTask(qc, { title: "a" });
     await syncNow();
-    await expect(editTask(qc, t.id, { when: "soon" })).rejects.toThrow();
+    await expect(editTask(t.id, { when: "soon" })).rejects.toThrow();
     expect(getStatus().waiting).toBe(0);
   });
 
@@ -276,16 +281,16 @@ describe("tasks", () => {
     await syncNow();
     server.tasks.delete(t.id);
     await syncNow();
-    await expect(editTask(qc, t.id, { notes: "x" })).rejects.toThrow(/deleted/);
+    await expect(editTask(t.id, { notes: "x" })).rejects.toThrow(/deleted/);
   });
 
   test("a task deleted here, offline, goes with its links", async () => {
     const t = await addTask(qc, { title: "a" });
     await syncNow();
-    const l = await addLink(qc, { type: "task", id: t.id }, { type: "note", id: "n1" }, "about");
+    const l = await addLink({ type: "task", id: t.id }, { type: "note", id: "n1" }, "about");
     expect(qc.getQueryData<Link[]>(LINKS)?.map((x) => x.id)).toEqual([l.id]);
     server.down = true;
-    await removeTask(qc, cached(t.id) as never);
+    await removeTask(cached(t.id) as never);
     expect(cached(t.id)).toBeUndefined();
     expect(qc.getQueryData<Link[]>(LINKS)).toEqual([]);
   });
@@ -294,17 +299,17 @@ describe("tasks", () => {
 describe("ticking", () => {
   test("a task is done today", async () => {
     const t = await addTask(qc, { title: "a" });
-    await tickTask(qc, t.id, true);
+    await tickTask(t.id, true);
     await syncNow();
     expect(server.tasks.get(t.id)?.done).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    await tickTask(qc, t.id, false);
+    await tickTask(t.id, false);
     await syncNow();
     expect(server.tasks.get(t.id)?.done).toBe("");
   });
 
   test("a repeating task is done without `every`, and its next round is a new record", async () => {
     const t = await addTask(qc, { title: "Water plants", when: "2026-10-01", every: "1w" });
-    await tickTask(qc, t.id, true);
+    await tickTask(t.id, true);
     await syncNow();
     const all = [...server.tasks.values()];
     expect(all.length).toBe(2);
@@ -317,9 +322,9 @@ describe("ticking", () => {
   test("the next round is about the same notes: its links made again from it, under new ids", async () => {
     const t = await addTask(qc, { title: "Pay rent", when: "2026-10-01", every: "1m" });
     await syncNow();
-    const l1 = await addLink(qc, { type: "task", id: t.id }, { type: "note", id: "n1" }, "about");
+    const l1 = await addLink({ type: "task", id: t.id }, { type: "note", id: "n1" }, "about");
     await syncNow();
-    await tickTask(qc, t.id, true);
+    await tickTask(t.id, true);
     await syncNow();
     const next = [...server.tasks.values()].find((r) => r.id !== t.id)!;
     const carried = [...server.links.values()].filter((l) => l.from.id === next.id);
@@ -332,10 +337,77 @@ describe("ticking", () => {
   test("ticking a task that doesn't repeat makes no links", async () => {
     const t = await addTask(qc, { title: "Once" });
     await syncNow();
-    await addLink(qc, { type: "task", id: t.id }, { type: "note", id: "n1" }, "about");
-    await tickTask(qc, t.id, true);
+    await addLink({ type: "task", id: t.id }, { type: "note", id: "n1" }, "about");
+    await tickTask(t.id, true);
     await syncNow();
     expect(server.links.size).toBe(1);
+  });
+});
+
+describe("an open note's typing", () => {
+  const bodyOf = (text: string, path: string) => parseNote(path, text).body;
+
+  test("typed into a note deleted on another device, it puts the note back with the text instead of being lost", async () => {
+    const r = await createNote(qc, "Doomed", "start");
+    await syncNow();
+    const d = noteDrafts(r);
+    d.body.type("start, and what I was typing");                   // not yet saved: the 800 ms haven't passed
+    server.notes.delete(r.rec);                                     // deleted on the phone meanwhile
+    await syncNow();                                                // the sync puts the typing in the copy before it pulls
+    const back = server.notes.get(r.rec)!;
+    expect(bodyOf(back.text, back.path)).toBe("start, and what I was typing");
+    expect(seen().map((n) => n.path)).toEqual([r.path]);
+    expect(d.body.pending()).toBe(false);
+  });
+
+  test("typed after the sync dropped the note, the text puts it back under its record id", async () => {
+    const r = await createNote(qc, "Doomed", "start");
+    await syncNow();
+    const d = noteDrafts(r);
+    server.notes.delete(r.rec);
+    await syncNow();
+    expect(seen()).toEqual([]);
+    d.body.type("typed as the delete came in");
+    await d.body.flush();
+    await syncNow();
+    expect(bodyOf(server.notes.get(r.rec)!.text, r.path)).toBe("typed as the delete came in");
+  });
+
+  test("a note moved aside to -2 on its first push keeps its draft, and its page finds it under its new id", async () => {
+    server.down = true;
+    const r = await createNote(qc, "Shared");
+    const d = noteDrafts(r);
+    d.body.type("plans");
+    server.notes.set("theirs", { rec: "theirs", path: r.path, text: "another device's", rev: 1 });
+    server.down = false;
+    await syncNow();
+    const moved = server.notes.get(r.rec)!, id = r.path.slice(6, -3);
+    expect(moved.path).toMatch(/-shared-2\.md$/);
+    expect(bodyOf(moved.text, moved.path)).toBe("plans");
+    expect(noteIdNow(id)).toBe(moved.path.slice(6, -3));
+    d.body.type("more");
+    await d.body.flush();
+    await syncNow();
+    expect(bodyOf(server.notes.get(r.rec)!.text, moved.path)).toBe("more");
+    expect(server.notes.get("theirs")!.text).toBe("another device's");
+  });
+
+  test("a link's summary put in goes up with the tainted mark, and the note's later saves carry none of their own", async () => {
+    const r = await createNote(qc, "Links", "https://example.com");
+    await syncNow();
+    const d = noteDrafts(r);
+    d.body.type("https://example.com\n\n> **Summary**\n> a model's words");
+    d.body.taint();
+    await d.body.flush();
+    expect(local.notes.get(r.path)?.tainted).toBe(true);
+    await syncNow();
+    d.body.type("mine again");                                    // the next typed is marked too: the insert may reach the draft after it says so
+    await d.body.flush();
+    await syncNow();
+    d.body.type("and again");
+    await d.body.flush();
+    await syncNow();
+    expect(marks).toEqual(["create {}", 'update {"tainted":true}', 'update {"tainted":true}', "update {}"]);
   });
 });
 

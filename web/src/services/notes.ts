@@ -4,7 +4,7 @@
 // of it by the core's noteColumns, the same ones the phone and the CLI send. `kind` (core/notes.ts
 // NoteKind) is the server's own: read, never sent; set when a note is made, never changed.
 import { MEMORY, noteKindOf, parseNote, type Note, type NoteKind } from "@/core/notes";
-import type { Entry } from "@/core/record-contracts";
+import type { Entry, Mark } from "@/core/record-contracts";
 import { noteCollection } from "@/core/record-protocol";
 import { recordTransport } from "./records";
 
@@ -20,8 +20,9 @@ const notes = noteCollection(recordTransport, rec, {
   fields: "id,path,rev,kind,text,updated", filter: 'path ~ "notes/%"',
 });
 export const { list, get, read, remove } = notes;
-export const create = (rec: string, path: string, text: string): Promise<Rec> => notes.create(rec, path, text);
-export const update = (e: Entry, text: string): Promise<Rec | null> => notes.update(e, text);
+/** `mark`: the text holds someone else's (`tainted`, server/pb_hooks/tainted.pb.js keeps it from then on). */
+export const create = (rec: string, path: string, text: string, mark: Mark = {}): Promise<Rec> => notes.create(rec, path, text, mark);
+export const update = (e: Entry, text: string, mark: Mark = {}): Promise<Rec | null> => notes.update(e, text, mark);
 
 /** The in-app agent's memory file; null before the agent first wrote it. */
 export const memory = () => read(MEMORY);

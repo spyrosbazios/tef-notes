@@ -3,7 +3,6 @@
 // written at the task's rev (hooks/todo.ts), redone on the newer record when it moved; the notes are links (hooks/links.ts),
 // outside the rev. The card is drawn beside its list (task-screen.tsx) or in a drawer over the screen (task-drawer.tsx), where
 // below `md` its pickers (components/pick.tsx) are sheets over it.
-import { useQueryClient } from "@tanstack/react-query";
 import { Bell, Calendar, Flag, MapPin, Moon, NotebookText, Plus, Repeat, Tag, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { dayLabel, whenLabel } from "@/core/dates";
@@ -50,19 +49,18 @@ function LinkedNote({ n, onOpen, onRemove }: { n: NoteRec; onOpen: () => void; o
 /** The notes the task is about: links of their own (core/record-links.ts), as many as it likes, added from a picker and
  *  removed one by one. Neither the task's nor the note's rev moves. */
 function LinkedNotes({ task }: { task: TaskRec }) {
-  const qc = useQueryClient();
   const sorted = useSorted(), scoped = useLensSorted(), links = useLinks().data;
   const { openNote } = useNav();
   const [open, setOpen] = useState(false), [q, setQ] = useState("");
   const { linked, unseen } = useMemo(() => notesFor(links ?? [], task.id, sorted), [links, task.id, sorted]);
   const taken = useMemo(() => linkedNoteIds(links ?? [], task.id), [links, task.id]);
   const hits = useMemo(() => scoped.filter((n) => !taken.has(n.rec)).filter(matches(q)).slice(0, 30), [scoped, taken, q]);
-  const add = (n: NoteRec) => { setOpen(false); setQ(""); report(addLink(qc, { type: "task", id: task.id }, { type: "note", id: n.rec }, "about")); };
+  const add = (n: NoteRec) => { setOpen(false); setQ(""); report(addLink({ type: "task", id: task.id }, { type: "note", id: n.rec }, "about")); };
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1 py-1">
       {linked.map(({ link, n }) => (
         <LinkedNote key={link.id} n={n} onOpen={() => openNote(n.note.id)}
-          onRemove={() => report(removeLink(qc, link.id))} />
+          onRemove={() => report(removeLink(link.id))} />
       ))}
       {unseen ? <span className="text-sm text-faint">{unseen === 1 ? "A note you can't see yet" : `${unseen} notes you can't see yet`}</span> : null}
       <Pick title="Link a note" width="w-72 p-0" open={open} onOpenChange={setOpen}
@@ -84,8 +82,7 @@ function LinkedNotes({ task }: { task: TaskRec }) {
 /** The task's tags: one more tag, or one fewer, is written at the task's rev and
  *  redone on the newer record when it moved (so a tag the auto-tagger or another device added meanwhile stays). */
 function TaskTags({ task }: { task: TaskRec }) {
-  const qc = useQueryClient();
-  const retag = (add: string[], remove: string[] = []) => report(changeTask(qc, task.id, (t) => retagTask(t, add, remove)));
+  const retag = (add: string[], remove: string[] = []) => report(changeTask(task.id, (t) => retagTask(t, add, remove)));
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1 py-1">
       <TagEditor tags={task.tags} onAdd={(t) => retag([t])} onRemove={(t) => retag([], [t])} />
@@ -113,13 +110,12 @@ function TaskNotes({ task, onSave }: { task: TaskRec; onSave: (notes: string) =>
 }
 
 function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?: React.ReactNode; onGone: () => void }) {
-  const qc = useQueryClient();
   const today = useToday();
   const lingering = useLingering();
   const [confirm, setConfirm] = useState(false);
   const checked = lingering.get(task.id)?.checked ?? !!task.done;
   const when = whenLabel(task, today);
-  const patch = (p: Parameters<typeof editTask>[2]) => report(editTask(qc, task.id, p));
+  const patch = (p: Parameters<typeof editTask>[1]) => report(editTask(task.id, p));
 
   return (
     <article className="flex h-full min-h-0 flex-col" aria-label={task.title}>
@@ -132,14 +128,14 @@ function TaskDetail({ task, leading, onGone }: { task: TaskRec; leading?: React.
       <div data-scroll-restoration-id={taskScroll(task.id)} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-xl space-y-4 px-4 pt-2 pb-24 md:space-y-5 md:px-10 md:pt-8">
           <div className="flex items-start gap-3">
-            <TickBox size="lg" checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(qc, task); }} className="mt-1.5 shrink-0" />
-            <DraftTextarea value={task.title} rows={1} aria-label="Title" placeholder="Title" onSave={(title) => editTask(qc, task.id, { title: title.replace(/\s*\n\s*/g, " ") })}
+            <TickBox size="lg" checked={checked} aria-label={checked ? "Mark not done" : "Mark done"} onClick={() => { void toggleTask(task); }} className="mt-1.5 shrink-0" />
+            <DraftTextarea value={task.title} rows={1} aria-label="Title" placeholder="Title" onSave={(title) => editTask(task.id, { title: title.replace(/\s*\n\s*/g, " ") })}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
               className={cn("min-h-0 resize-none border-transparent bg-transparent px-2 py-1 text-2xl leading-tight font-extrabold tracking-tight shadow-none hover:border-input md:text-2xl dark:bg-transparent", checked && "text-faint line-through decoration-faint")} />
           </div>
           {task.done ? <p className="-mt-3 pl-11 text-xs text-dim">Done {dayLabel(task.done, today)}</p> : null}
 
-          <TaskNotes key={task.id} task={task} onSave={(notes) => editTask(qc, task.id, { notes })} />
+          <TaskNotes key={task.id} task={task} onSave={(notes) => editTask(task.id, { notes })} />
 
           <Checklist task={task} />
 

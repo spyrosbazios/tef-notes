@@ -1,29 +1,13 @@
-// The links (core/record-links.ts) as TanStack Query state, over the local copy (lib/local.ts): one list of every link (a personal
-// notebook's are few), read from the copy. A link is only made or deleted, no rev and no merge: a made one goes up when its
-// task has (an add is idempotent), a deleted one is a tombstone until the server has dropped it (packages/core/src/sync.ts).
-import { queryOptions, useQuery, type QueryClient } from "@tanstack/react-query";
-import { recordId } from "@/core/pocketbase";
-import { type Link, type LinkEnd, type LinkRole } from "@/core/record-links";
-import { addLink as makeLink, removeLink as dropLink, visibleLinks } from "@/core/sync";
-import { local } from "@/lib/local";
-import { LINKS, localEdited } from "@/lib/local-records";
-import { LOCAL_QUERY, opened, syncing } from "@/lib/sync";
+// The links (core/record-links.ts) as TanStack Query state, over the local copy: one list of every link (a personal notebook's
+// are few), read from the copy. A link is only made or deleted, no rev and no merge: a made one goes up when its task has (an
+// add is idempotent), a deleted one is a tombstone until the server has dropped it (packages/core/src/sync.ts). Writes:
+// lib/records.ts.
+import { queryOptions, useQuery } from "@tanstack/react-query";
+import { LINKS, LOCAL_QUERY, opened, readLinks } from "@/lib/records";
 
-export { LINKS } from "@/lib/local-records";
+export { LINKS } from "@/lib/records";
+export { addLink, removeLink } from "@/lib/records";
 
-export const linksQuery = queryOptions({ queryKey: LINKS, queryFn: async () => { await opened(); return visibleLinks(local); }, ...LOCAL_QUERY });
+export const linksQuery = queryOptions({ queryKey: LINKS, queryFn: async () => { await opened(); return readLinks(); }, ...LOCAL_QUERY });
 
 export const useLinks = () => useQuery(linksQuery);
-
-/** `from` linked to `to` as `role`, under a new id (the link already there, when this relation is); the sync sends it. */
-export async function addLink(qc: QueryClient, from: LinkEnd, to: LinkEnd, role: LinkRole): Promise<Link> {
-  const id = makeLink(local, recordId(), from, to, role);
-  localEdited(qc, "links");
-  return local.links.get(id)!.link;
-}
-
-/** A link gone (already gone is done). */
-export async function removeLink(qc: QueryClient, id: string): Promise<void> {
-  dropLink(local, id, syncing());
-  localEdited(qc, "links");
-}

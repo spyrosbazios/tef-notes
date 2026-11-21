@@ -2,13 +2,15 @@
 // Delete: the link itself out of the note (an ordinary, undoable edit).
 // Summary: the server writes a summary of the page
 // (server/pb_hooks/summary.pb.js) and it goes in as the block right under the link's paragraph, the place a clip with
-// "Add a summary" puts it. A link already followed by one gets no button. The insert is an ordinary edit (`onChange`).
+// "Add a summary" puts it. A link already followed by one gets no button. The insert is an ordinary edit (`onChange`), and once
+// it is in, `inserted` says so: the words are a model's, and the note's save carries the `tainted` mark (hooks/draft.ts).
 import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
 import { parse, schema } from "./markdown";
 
-/** The summary block of the page at `url`, as markdown (a blockquote under a bold "Summary"). Rejects with the reason. */
-export type Summarize = (url: string) => Promise<string>;
+/** The summary block of the page at `url`, as markdown (a blockquote under a bold "Summary"), and what to call once it is in the
+ *  note (a model wrote it: the write is marked `tainted`). Rejects with the reason. */
+export type Summarize = (url: string) => Promise<{ block: string; inserted: () => void }>;
 
 /** The position just after the top-level block holding `pos` (`pos` itself when it is between blocks). */
 const blockEnd = (doc: Node, pos: number) => {
@@ -105,7 +107,7 @@ export function summaryButton(cls: string, href: string, view: EditorView, getPo
     btn.disabled = true;
     btn.dataset.busy = "";
     btn.textContent = "Summarising…";
-    summarize(href).then((block) => {
+    summarize(href).then(({ block, inserted }) => {
       // The button never stays busy: the redraw that drops it can lag the insert, or not come at all (link moved, gone).
       delete btn.dataset.busy;
       btn.textContent = "Summary added";
@@ -113,6 +115,7 @@ export function summaryButton(cls: string, href: string, view: EditorView, getPo
       if (view.isDestroyed || pos === undefined || summarised(view.state.doc, pos)) return;
       const at = blockEnd(view.state.doc, pos);
       view.dispatch(view.state.tr.insert(at, parse(block).content).scrollIntoView());
+      inserted();
     }, (err: unknown) => {
       btn.disabled = false;
       delete btn.dataset.busy;

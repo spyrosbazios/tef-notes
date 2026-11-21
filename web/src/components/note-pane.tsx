@@ -66,14 +66,14 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const addFiles = useAddFiles(n.path);
   const note = n.note;
 
-  const fresh = () => qc.getQueryData<NoteRec[]>(NOTES)?.find((x) => x.path === n.path) ?? n;
+  const fresh = () => qc.getQueryData<NoteRec[]>(NOTES)?.find((x) => x.rec === n.rec) ?? n;
   const flag = async (f: FlagEdit) => {
-    try { await d.flush(); await setFlags(qc, fresh(), f); } catch (e) { toast.error(message(e)); }
+    try { await d.flush(); await setFlags(n, f); } catch (e) { toast.error(message(e)); }
   };
 
   /** A tag put on or taken off: written like any edit, at the note's rev. */
   const retag = async (add: string[], remove: string[] = []) => {
-    try { await d.flush(); await write(qc, fresh(), (text) => applyTags(n.path, text, add, remove)); } catch (e) { toast.error(message(e)); }
+    try { await d.flush(); await write(n, (text, path) => applyTags(path, text, add, remove)); } catch (e) { toast.error(message(e)); }
   };
 
   /** Lines of markdown (files already uploaded) into the body at the cursor: one to a paragraph in the editor. */
@@ -107,7 +107,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const { runs, running, runAction, ran } = useNoteRunActions(n, d.flush, fresh);
 
   const remove = async () => {
-    try { await deleteNote(qc, fresh()); toast(`Deleted “${note.title}”`); onGone(); } catch (e) { toast.error(message(e)); }
+    try { await deleteNote(n); toast(`Deleted “${note.title}”`); onGone(); } catch (e) { toast.error(message(e)); }
   };
 
   // A note just made, opened: the title selected, to type over (once: the pane is keyed by the note)
@@ -182,7 +182,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           <LinkedTasks n={n} className="mb-6" />
           {raw ? source : (
             <>
-            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => { void openDrawing(note.id, name); }} onEditor={setEd} />
+            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onTainted={d.taint} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => { void openDrawing(note.id, name); }} onEditor={setEd} />
             {ed ? <SelectionBar editor={ed} /> : null}
             </>
           )}

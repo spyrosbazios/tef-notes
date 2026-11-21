@@ -16,13 +16,14 @@ import { hostOf } from "@/core/links";
 import { fold, noteIdOf } from "@/core/notes";
 import { Conflict, previewPictureUrl } from "@/core/pocketbase";
 import { ACCENTS, accentColor, THEMES } from "@/core/theme";
+import { listOfDay } from "@/core/things";
 import type { DayWidget, LensWidget, LinkWidget, NotesWidget, QuoteWidget, ReviewWidget, TasksWidget, WeekWidget, Widget } from "@/core/widgets";
 import { useAppearance } from "@/hooks/appearance";
 import { setActiveLens, useCreateLens, useLenses } from "@/hooks/lens";
 import { useNotes } from "@/hooks/notes";
 import { useNow } from "@/hooks/now";
 import { useToday } from "@/hooks/todo";
-import { noteLink, useNav, type TaskView } from "@/lib/nav";
+import { noteLink, useNav } from "@/lib/nav";
 import { message } from "@/services/api";
 import { cn } from "@/lib/utils";
 import { Cards, LiveNote, LiveTask, Shell } from "./cards";
@@ -81,9 +82,6 @@ function DayView({ w }: { w: DayWidget }) {
 
 // ---- week
 
-/** The task list a day belongs to: what has come or is overdue is Today's, a later day Upcoming's. */
-const listOf = (day: string, today: string): TaskView => (day <= today ? "today" : "upcoming");
-
 function WeekView({ w }: { w: WeekWidget }) {
   const today = useToday(), { goView, showTask } = useNav();
   const last = w.days.at(-1)?.date ?? addDays(w.start, 6);
@@ -93,7 +91,7 @@ function WeekView({ w }: { w: WeekWidget }) {
       <div className="@container">
         <div className="grid grid-cols-1 gap-1.5 @md:grid-cols-7">
           {w.days.map((d) => {
-            const list = listOf(d.date, today), now = d.date === today;
+            const list = listOfDay(d.date, today), now = d.date === today;
             return (
               <div key={d.date} className={cn("flex min-w-0 flex-col gap-1.5 rounded-xl border bg-card p-2", now ? "border-brand" : "border-line")}>
                 <button type="button" onClick={() => goView({ kind: list })} aria-label={`${dayLabel(d.date, today)}: ${d.open} open, go to ${list}`}

@@ -1,7 +1,8 @@
 // What the task screens do with core/todo.ts's records, pure: the calendar's days, the repeats and reminder times on
-// offer, the checklist's count, the reminders due. `now` is a Date.
+// offer, the lists laid out in sections, the checklist's count, the reminders due. `now` is a Date.
 
-import type { Task } from "./todo";
+import type { TaskList } from "./assistant";
+import { views, type Task, type Views } from "./todo";
 
 // ---- days, repeats, reminder times
 
@@ -21,6 +22,49 @@ export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as con
 
 /** The reminder times a task can have: on its `when` day. */
 export const REMIND_TIMES = ["08:00", "09:00", "12:00", "15:00", "18:00", "20:00"];
+
+// ---- the lists, as a screen lays them out
+
+/** The Logbook shows this many of the latest, as the phone's does. */
+export const LOGBOOK = 100;
+
+/** What a list shows, in the order its rows sit in. */
+export function listOf(v: Views, kind: TaskList): Task[] {
+  switch (kind) {
+    case "today": return [...v.today, ...v.evening];
+    case "upcoming": return v.upcoming.flatMap((g) => g.tasks);
+    case "logbook": return v.logbook.slice(0, LOGBOOK);
+    case "inbox": return v.inbox;
+  }
+}
+
+/** The list a day's tasks are in: a day come or gone (overdue) is Today's, a later one Upcoming's (the rule of `views`). */
+export const listOfDay = (day: string, today: string): "today" | "upcoming" => (day <= today ? "today" : "upcoming");
+
+/** Which section of its list a task sits in: Today's two (`today`, `evening`), Upcoming's days, the Logbook's days done; the
+ *  Inbox is one (`""`). */
+export const sectionOf = (kind: TaskList, t: Task): string =>
+  kind === "today" ? (t.evening ? "evening" : "today") : kind === "upcoming" ? t.when : kind === "logbook" ? t.done : "";
+
+export type Section = { key: string; rows: Task[] };
+
+/** A list in its sections, Today's before This Evening, with each of `lingering` (a task just ticked or unticked, as it was) that
+ *  the list would have shown and no longer does slipped back in where it was: in its section, by `order` (the Logbook by the day
+ *  done, the latest first). */
+export function sectionsOf(v: Views, kind: TaskList, lingering: Iterable<Task>, today: string): Section[] {
+  const base = listOf(v, kind), m = new Map<string, Task[]>();
+  for (const t of base) { const k = sectionOf(kind, t); m.set(k, [...(m.get(k) ?? []), t]); }
+  const have = new Set(base.map((t) => t.id));
+  for (const t of lingering) {
+    if (have.has(t.id) || !listOf(views([t], today), kind).length) continue;
+    const k = sectionOf(kind, t), rows = [...(m.get(k) ?? [])];
+    const at = kind === "logbook" ? rows.findIndex((r) => r.done < t.done) : rows.findIndex((r) => r.order > t.order);
+    rows.splice(at < 0 ? rows.length : at, 0, t);
+    m.set(k, rows);
+  }
+  const out = [...m].map(([key, rows]) => ({ key, rows }));
+  return kind === "today" ? out.sort((a, b) => (a.key === "today" ? -1 : b.key === "today" ? 1 : 0)) : out;
+}
 
 // ---- reading a task
 

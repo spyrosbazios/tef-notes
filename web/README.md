@@ -208,8 +208,16 @@ is `packages/core/src/sync.ts` (the logic, tested over a fake server in
 that controller with browser storage and services. `src/hooks/live.ts`, mounted by the root frame, owns the realtime feed and
 starts/stops browser lifecycle listeners; importing a feature does not attach them. The controller owns its timers,
 status and subscriptions, and stopping its last lifecycle owner prevents late requests from scheduling another retry.
-`src/lib/local-records.ts` owns the query projections and their refresh after edits and sync; feature hooks use those
-projections rather than coordinating each other's caches.
+`src/lib/local-records.ts` owns the query projections, redrawn by the controller after a write or a sync; feature hooks use those
+projections rather than coordinating each other's caches. `src/lib/records.ts` is the one module that writes the copy: every write
+is a change (`packages/core/src/changes.ts`, data) handed to the controller's `apply`, and hooks expose those writes; components
+reach records only through hooks, and hooks only through `records.ts` (`scripts/check-boundaries.ts`).
+
+- **Typing:** a text box saves as you type through one draft primitive (`src/lib/drafts.ts`): it goes into the copy a moment
+  after the last key, and a save that fails keeps what was typed. An open note's body and title drafts belong to `records.ts`, by
+  the note's record id: a sync puts what is pending into the copy before it pulls, so typing into a note deleted on another device
+  puts it back with the text, and a note that moved aside to `-2` keeps its draft and its page's address follows it. A link's
+  Summary put into a note is saved with the `tainted` mark (model text), as the server's clip writes are.
 
 - **Edits:** a note row holds its text, the `rev` it was last in step with and `base`, the text as of that `rev`; a task row its
   record and `base`; a link its `pushed` time. An edit marks the row unsent and goes up 1.5 s after the last one, when the page

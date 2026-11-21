@@ -15,7 +15,7 @@ import { TASKS } from "@/hooks/todo";
 import { setDock } from "@/hooks/dock";
 import type { UiHost } from "@/lib/assistant";
 import { useNav } from "@/lib/nav";
-import { syncNow } from "@/lib/sync";
+import { syncNow } from "@/lib/records";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
 

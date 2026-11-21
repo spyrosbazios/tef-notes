@@ -109,6 +109,8 @@ export function useNav() {
     view, open: note, task,
     /** A note, over the screen it was found from. */
     openNote: (id: string) => navigate(noteLink(id, inShell ? view : null)),
+    /** The open note found under another id (it moved aside to `-2` on its first push): the address replaced, no step added. */
+    followNote: (id: string) => navigate({ ...noteLink(id, inShell ? view : null), replace: true }),
     /** The way back from a note: where the app came from, else the screen under it (a note opened by its address). */
     leaveNote: () => {
       if (canGoBack) router.history.back();

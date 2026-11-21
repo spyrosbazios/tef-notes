@@ -19,9 +19,11 @@
 // and one made while a push is out stays unsent after it).
 // A failure is one of the transport's typed outcomes (record-contracts): `Unavailable` is tried again later, `Refused` parks
 // the row (`refused`, its reason): it is not sent again until it is edited or the owner asks (`retryRefused`, `discardRefused`).
-import { Conflict, Gone, Refused, Unavailable, type Entry, type Listed, type Remote, type Versioned } from "./record-contracts";
+// A note written with text the owner didn't write (a model's summary) carries the `tainted` mark (`Mark`) on the row until a
+// push has sent it; the server never takes the mark off (server/pb_hooks/tainted.pb.js), so it is sent once.
+import { Conflict, Gone, Refused, Unavailable, type Entry, type Listed, type Mark, type Remote, type Versioned } from "./record-contracts";
 import { isNotePath, newNotePath, parseNote, reconcile, type NoteKind } from "./notes";
-import { linksForNextRound, newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "./record-links";
+import { newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "./record-links";
 import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";
 
 // ---- rows
@@ -31,13 +33,13 @@ import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";
  *  both sides' edits are diffed against. `conflict_*`: the server's
  *  version while unsent edits overlap it. `lost`: the unsent text `takeTheirs` replaced, until restored or dismissed.
  *  `deleted`: a tombstone until the delete is pushed. `refused`: why the server refused its change, which then waits for
- *  the owner (every row kind has it). */
+ *  the owner (every row kind has it). `tainted`: the unsent text holds someone else's (a model's), to go up with the mark. */
 export type NoteRow = {
   path: string; text: string; kind: NoteKind;
   updated: number; pushed: number | null;
   rec: string; rev: number | null; base: string | null;
   conflict_text: string | null; conflict_rev: number | null; lost: string | null;
-  deleted: boolean; refused?: string;
+  deleted: boolean; refused?: string; tainted?: true;
 };
 
 /** A task as the client holds it: `data` now, `base` as of `rev` (null until first pushed or pulled). */
@@ -63,8 +65,8 @@ export type Transport = {
   notes: {
     list: () => Promise<Listed[]>;
     get: (rec: string) => Promise<Fetched | null>;
-    create: (rec: string, path: string, text: string) => Promise<Remote>;
-    update: (e: Entry, text: string) => Promise<Remote | null>;
+    create: (rec: string, path: string, text: string, mark: Mark) => Promise<Remote>;
+    update: (e: Entry, text: string, mark: Mark) => Promise<Remote | null>;
     remove: (e: Pick<Entry, "rec" | "rev">) => Promise<void>;
   };
   tasks: {
@@ -160,17 +162,17 @@ export const freshNote = (rec: string, path: string, text: string, updated: numb
 });
 
 /** A note made here, under its own record id (`recordId`), at a path this copy doesn't hold: unsent until the next push. */
-export function addNote(s: Store, rec: string, path: string, text: string): void {
+export function addNote(s: Store, rec: string, path: string, text: string, mark: Mark = {}): void {
   if (s.notes.get(path)) throw new Error(`${path} is taken`);
-  s.notes.put(freshNote(rec, path, text, tick()));
+  s.notes.put({ ...freshNote(rec, path, text, tick()), ...(mark.tainted ? { tainted: true as const } : {}) });
 }
 
-/** `text` written to the note at `path`: unsent until the next push. false when it was the text already, or there is no such
- *  note (a new one is `addNote`'s). */
-export function writeNote(s: Store, path: string, text: string): boolean {
+/** `text` written to the note at `path`: unsent until the next push, with `mark` (a row once tainted stays so until sent).
+ *  false when it was the text already, or there is no such note (a new one is `addNote`'s). */
+export function writeNote(s: Store, path: string, text: string, mark: Mark = {}): boolean {
   const n = s.notes.get(path);
   if (!n || (!n.deleted && n.text === text)) return false;
-  s.notes.put({ ...n, text, updated: tick(n), deleted: false, refused: undefined });
+  s.notes.put({ ...n, text, updated: tick(n), deleted: false, refused: undefined, ...(mark.tainted ? { tainted: true as const } : {}) });
   return true;
 }
 
@@ -283,17 +285,20 @@ async function sendNote(c: Run, path: string, retry = true, taken = new Set<stri
   const n = store.notes.get(path);
   if (!n || n.deleted || !unsent(n) || n.conflict_rev != null || n.refused != null) return;
   const at = n.updated;                                            // edits made mid-request stay unsent
+  const mark: Mark = n.tainted ? { tainted: true } : {};
   const done = async (r: Remote) => {
     const now = store.notes.get(path);
     // Deleted while it went up: a tombstone gets the record for drop to delete, next in this push; a row gone altogether is
     // taken down here, or the next pull would bring the note back
     if (!now) return api.notes.remove(r);
-    if (now.deleted) return void store.notes.put({ ...now, rec: r.rec, rev: r.rev });
-    store.notes.put({ ...now, rec: r.rec, rev: r.rev, base: n.text, pushed: at });
+    // The mark went up with it: the server keeps it from now on (one written mid-request is the server's already too)
+    const sent = mark.tainted ? { tainted: undefined } : {};
+    if (now.deleted) return void store.notes.put({ ...now, rec: r.rec, rev: r.rev, ...sent });
+    store.notes.put({ ...now, rec: r.rec, rev: r.rev, base: n.text, pushed: at, ...sent });
   };
   try {
     // Gone from the server since (deleted elsewhere) while edited here: the edit puts it back, under the same record id
-    const r = (n.rev != null ? await api.notes.update({ rec: n.rec, path, rev: n.rev }, n.text) : null) ?? await api.notes.create(n.rec, path, n.text);
+    const r = (n.rev != null ? await api.notes.update({ rec: n.rec, path, rev: n.rev }, n.text, mark) : null) ?? await api.notes.create(n.rec, path, n.text, mark);
     return await done(r);
   } catch (e) {
     if (!(e instanceof Conflict)) throw e;
@@ -449,8 +454,8 @@ const endsHere = (s: Store, l: Link) => [l.from, l.to].every((e) => e.type !== "
 /** The links to show: not deleted, and naming no task that is gone here. Oldest first. */
 export const visibleLinks = (s: Store): Link[] => s.links.all().filter((r) => !r.deleted && endsHere(s, r.link)).map((r) => r.link);
 
-/** Every link not deleted here, its task there or not. */
-const liveLinks = (s: Store): Link[] => s.links.all().filter((r) => !r.deleted).map((r) => r.link);
+/** Every link not deleted here, its task there or not: what a repeating task's next round is linked from (changes.ts). */
+export const liveLinks = (s: Store): Link[] => s.links.all().filter((r) => !r.deleted).map((r) => r.link);
 
 /** `from` linked to `to` as `role` (newLink throws on one it refuses; `id` names it); the id of the link, the one already
  *  held when this relation is. */
@@ -470,10 +475,6 @@ export function removeLink(s: Store, id: string, syncing: boolean): void {
   else s.links.delete(id);
 }
 
-/** A repeating task ticked (core/todo.ts complete): its next round gets the links of the one done, each under a new id. */
-export function carryLinks(s: Store, taskId: string, nextId: string, newId: () => string): void {
-  for (const link of linksForNextRound(liveLinks(s), taskId, nextId, newId)) s.links.put({ link, pushed: null, deleted: false });
-}
 
 // ---- links: pull and push
 
@@ -596,7 +597,7 @@ export function discardRefused(s: Store, kind: Refusal["kind"], key: string): bo
     const n = s.notes.get(key);
     if (n?.refused == null) return false;
     if (n.rev == null || n.base == null) s.notes.delete(key);
-    else { const t = tick(n); s.notes.put({ ...n, text: n.base, updated: t, pushed: t, deleted: false, refused: undefined }); }
+    else { const t = tick(n); s.notes.put({ ...n, text: n.base, updated: t, pushed: t, deleted: false, refused: undefined, tainted: undefined }); }
   } else if (kind === "task") {
     const r = s.tasks.get(key);
     if (r?.refused == null) return false;

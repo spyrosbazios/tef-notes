@@ -3,7 +3,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-export type Boundary = { name: string; roots: string[]; forbidden: (module: string) => boolean };
+/** `direct`: only what a root imports itself is checked, not what it reaches through others (a layer that must go through the
+ *  next one, which may then load what the first may not). */
+export type Boundary = { name: string; roots: string[]; forbidden: (module: string) => boolean; direct?: boolean };
 
 /** Follow re-exports and dynamic imports too; report the path that crosses a boundary. */
 export function violations(rules: Boundary[], imports: (module: string) => string[]): string[] {
@@ -12,7 +14,7 @@ export function violations(rules: Boundary[], imports: (module: string) => strin
     const seen = new Set<string>();
     const visit = (module: string, chain: string[]) => {
       if (rule.forbidden(module)) { errors.push(`${rule.name}: ${[...chain, module].join(" -> ")}`); return; }
-      if (seen.has(module)) return;
+      if (seen.has(module) || (rule.direct && chain.length)) return;
       seen.add(module);
       for (const dependency of imports(module)) visit(dependency, [...chain, module]);
     };
@@ -26,7 +28,12 @@ const agent = "server/agent/src/";
 const core = "packages/core/src/";
 const adapters = new Set(["notes", "tools", "tagTools", "webTools", "todoTools", "widgetTools", "fileTools", "placeTools", "noteActionTools", "drawings", "assistant", "agent"].map((name) => `${agent}${name}.ts`));
 const sdk = (name: string) => name === "external:ai" || name.startsWith("external:@ai-sdk/");
-const pure = ["notes", "todo", "sync", "prefs", "prefs-sync", "record-contracts", "record-protocol", "chat-history"];
+/** Every source file under `dir` (relative to the repo root), its subdirectories' too. */
+const filesUnder = (dir: string): string[] =>
+  readdirSync(resolve(root, dir), { recursive: true, encoding: "utf8" }).filter((name) => /\.tsx?$/.test(name)).map((name) => `${dir}${name}`);
+/** What only the records module (web/src/lib/records.ts) loads: the local copy, the sync and its edit helpers. */
+const copy = new Set(["web/src/lib/local.ts", "web/src/lib/sync.ts", "web/src/lib/local-records.ts", "web/src/lib/sync-controller.ts", `${core}sync.ts`, `${core}changes.ts`]);
+const pure = ["notes", "todo", "sync", "changes", "prefs", "prefs-sync", "record-contracts", "record-protocol", "chat-history"];
 
 function rules(): Boundary[] {
   return [
@@ -54,6 +61,18 @@ function rules(): Boundary[] {
       name: "Sync controller receives storage and transport; it must not load UI or services",
       roots: ["web/src/lib/sync-controller.ts"],
       forbidden: (name) => /^web\/src\/(hooks|services|components)\//.test(name) || name.startsWith("external:"),
+    },
+    {
+      name: "Hooks read and write records through lib/records.ts, never the copy or the sync themselves",
+      roots: filesUnder("web/src/hooks/"),
+      forbidden: (name) => copy.has(name),
+      direct: true,
+    },
+    {
+      name: "Components reach records through hooks, never the records module, the copy or the sync",
+      roots: filesUnder("web/src/components/"),
+      forbidden: (name) => copy.has(name) || name === "web/src/lib/records.ts",
+      direct: true,
     },
     ...["notes", "todo", "links"].map((feature): Boundary => ({
       name: `${feature} hooks must not coordinate another record feature's projections`,
