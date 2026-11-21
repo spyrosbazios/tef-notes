@@ -1,11 +1,12 @@
 // A note's photos, PDFs and drawings as URLs for the preview, and new ones added from a file pick, a paste or a drop (or drawn).
 import { queryOptions, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
-import { rewriteImagePaths } from "@/core/notes";
+import { noteIdOf, rewriteImagePaths } from "@/core/notes";
 import { drawingName, drawingPreview, fileMarkdown, MAX_PDF, PDF, pdfName, photoMarkdown, photoName } from "@/core/photos";
 import { Conflict } from "@/core/pocketbase";
 import { downscale } from "@/lib/picture";
 import * as photos from "@/services/photos";
+import { landed } from "./notes";
 
 export const PHOTOS = ["photos"] as const;
 const listKey = (note: string) => [...PHOTOS, note] as const;
@@ -58,10 +59,13 @@ async function putUnder(noteId: string, taken: Set<string>, next: () => string, 
 const refreshed = (qc: QueryClient, noteId: string) =>
   Promise.all([qc.invalidateQueries({ queryKey: listKey(noteId) }), qc.invalidateQueries({ queryKey: ALL_PHOTOS })]);
 
-/** Uploads the images and PDFs among `files` to the note; resolves to the body lines that show them. */
-export async function addFiles(qc: QueryClient, noteId: string, files: File[]): Promise<string> {
+/** Uploads the images and PDFs among `files` to the note at `path`, once it is on the server (`landed`: a note made here goes
+ *  up first, so its files are filed under the id it keeps); resolves to the note's path there and the body lines that show
+ *  them. */
+export async function addFiles(qc: QueryClient, path: string, files: File[]): Promise<{ path: string; lines: string }> {
   const mine = files.filter(attachable);
-  if (!mine.length) return "";
+  if (!mine.length) return { path, lines: "" };
+  const at = await landed(path), noteId = noteIdOf(at);
   const taken = new Set((await photos.list(noteId)).map((p) => p.name)), lines: string[] = [];
   for (const f of mine) {
     if (f.type === PDF) {
@@ -74,13 +78,13 @@ export async function addFiles(qc: QueryClient, noteId: string, files: File[]): 
     }
   }
   await refreshed(qc, noteId);
-  return lines.join("\n");
+  return { path: at, lines: lines.join("\n") };
 }
 
-/** The same for a note on the page: the hook binds the query client and the note. */
-export function useAddFiles(noteId: string) {
+/** The same for a note on the page: the hook binds the query client and the note's path. */
+export function useAddFiles(path: string) {
   const qc = useQueryClient();
-  return (files: File[]) => addFiles(qc, noteId, files);
+  return (files: File[]) => addFiles(qc, path, files);
 }
 
 /** A drawing is two attachments: its Excalidraw scene (`<name>.excalidraw`, JSON) and a PNG of it (`<name>.png`) the chip and

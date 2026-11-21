@@ -21,7 +21,7 @@ export function noteOf(row: NoteRow): NoteRec {
   const sig = `${row.updated}|${row.rev}|${row.rec}|${row.kind}`, hit = parsed.get(row.path);
   if (hit?.sig === sig) return hit.rec;
   const rec: NoteRec = {
-    rec: row.rec ?? "", path: row.path, rev: row.rev ?? 0, kind: row.kind, text: row.text, updated: new Date(row.updated).toISOString(),
+    rec: row.rec, path: row.path, rev: row.rev ?? 0, kind: row.kind, text: row.text, updated: new Date(row.updated).toISOString(),
     note: parseNote(row.path, row.text),
   };
   parsed.set(row.path, { sig, rec });

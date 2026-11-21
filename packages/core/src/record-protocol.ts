@@ -83,8 +83,10 @@ export function noteCollection<T>(s: RecordTransport, of: (r: any) => T, options
       const j = await call(s, `${records}?${fields}filter=${encodeURIComponent(`path = ${lit(path)}`)}&perPage=1&skipTotal=1`, { timeout });
       return j.items.length ? of(j.items[0]) : null;
     },
-    create: async (path: string, text: string, mark: Mark = {}): Promise<T> =>
-      of(await call(s, `${records}${options.fields ? `?fields=${options.fields}` : ""}`, json("POST", { ...noteColumns(path, text), ...mark }))),
+    /** A new note under the client's own record id (`recordId`). Conflict: a record has that id (this create landed before:
+     *  read it back by `rec`) or that path (another note's). */
+    create: async (rec: string, path: string, text: string, mark: Mark = {}): Promise<T> =>
+      of(await call(s, `${records}${options.fields ? `?fields=${options.fields}` : ""}`, json("POST", { id: rec, ...noteColumns(path, text), ...mark }))),
     update: (e: Entry, text: string, mark: Mark = {}) => orGone(async () =>
       of(await call(s, at(e.rec), json("PATCH", { ...noteColumns(e.path, text), rev: e.rev, ...mark })))),
     async remove(e: Pick<Entry, "rec" | "rev">): Promise<void> {

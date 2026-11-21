@@ -120,7 +120,7 @@ export function createSync({ store: local, ready, transport, online, schedule = 
     if (topic === "notes") {
       if (typeof r.path !== "string" || !isNotePath(r.path)) return;
       const n = local.notes.get(r.path);
-      isNews = gone ? !!n && !n.deleted : !n || n.rev !== r.rev;
+      isNews = gone ? !!n && !n.deleted && n.rec === r.id : !n || n.rec !== r.id || n.rev !== r.rev;
     } else if (topic === "tasks") {
       const t = local.tasks.get(r.id);
       isNews = gone ? !!t && !t.deleted : !t || t.rev !== r.rev;

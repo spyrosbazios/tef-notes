@@ -7,7 +7,7 @@ import { Conflict, Unavailable, type Remote, type Versioned } from "../src/pocke
 import { outcomeOf } from "../src/record-protocol";
 import { sameLink, type Link } from "../src/record-links";
 import {
-  addLink, carryLinks, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
+  addLink, addNote, carryLinks, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
   restoreMine, retryRefused, saveTask, syncRound, takeTheirs, tick, visibleLinks, waiting, writeNote,
   type LinkRow, type NoteRow, type Run, type Store, type TaskRow, type Transport,
 } from "../src/sync";
@@ -37,10 +37,9 @@ function fakeServer() {
     notes: {
       list: () => net("notes.list", () => [...notes.values()].map((r) => ({ rec: r.rec, path: r.path, rev: r.rev, kind: "note" as const }))),
       get: (rec) => net("notes.get", () => { const r = notes.get(rec); return r ? remote(r) : null; }),
-      read: (path) => net("notes.read", () => { const r = byPath(path); return r ? remote(r) : null; }),
-      create: (path, text) => net("notes.create", () => {
-        if (byPath(path)) throw new Conflict(path);
-        const r = { rec: `rec${++n}`, path, text, rev: 1 };
+      create: (rec, path, text) => net("notes.create", () => {
+        if (notes.has(rec) || byPath(path)) throw new Conflict(path);
+        const r = { rec, path, text, rev: 1 };
         notes.set(r.rec, r);
         return remote(r);
       }),
@@ -218,14 +217,14 @@ describe("notes", () => {
 
   test("a note made here is created, and keeps the text typed while it went up", async () => {
     const server = fakeServer(), s = store();
-    writeNote(s, P, note("A", "one"));
+    addNote(s, "mine1", P, note("A", "one"));
     const create = server.api.notes.create;
-    server.api.notes.create = async (path, text) => { const r = await create(path, text); writeNote(s, P, note("A", "one\nmore")); return r; };   // typed while the create is out
+    server.api.notes.create = async (rec, path, text) => { const r = await create(rec, path, text); writeNote(s, P, note("A", "one\nmore")); return r; };   // typed while the create is out
     await run(s, server).go();
     expect(s.notes.get(P)!.text).toBe(note("A", "one\nmore"));
     expect(waiting(s)).toBe(1);                              // the second edit is still unsent
     await run(s, server).go();
-    expect(server.notes.get("rec1")!.text).toBe(note("A", "one\nmore"));
+    expect(server.notes.get("mine1")!.text).toBe(note("A", "one\nmore"));
     expect(waiting(s)).toBe(0);
   });
 
@@ -286,7 +285,7 @@ describe("notes", () => {
   test("a new note whose path the server took moves aside to -2", async () => {
     const server = fakeServer(), s = store();
     server.put("notes/20261101-untitled.md", note("Untitled", "theirs"));
-    writeNote(s, "notes/20261101-untitled.md", note("Untitled", "mine"));
+    addNote(s, "mine1", "notes/20261101-untitled.md", note("Untitled", "mine"));
     const moves: [string, string][] = [];
     const r = run(s, server, { moved: (a, b) => moves.push([a, b]) });
     await r.go();
@@ -297,21 +296,71 @@ describe("notes", () => {
     expect([...server.notes.values()].map((x) => x.path).sort()).toEqual(["notes/20261101-untitled-2.md", "notes/20261101-untitled.md"]);
   });
 
-  test("a create that landed once before is not a second note", async () => {
+  test("a create whose reply was lost, then edited, is read back by its record id: one note, never a second", async () => {
     const server = fakeServer(), s = store();
-    server.put(P, note("A", "same"));
-    writeNote(s, P, note("A", "same"));
+    addNote(s, "mine1", P, note("A", "one"));
+    const create = server.api.notes.create;
+    server.api.notes.create = async (rec, path, text) => { await create(rec, path, text); throw new Unavailable("reply lost"); };
     await run(s, server).go();
-    expect([...server.notes.keys()]).toEqual(["rec1"]);
-    expect(s.notes.get(P)).toMatchObject({ rec: "rec1", rev: 1 });
+    expect(server.notes.get("mine1")).toMatchObject({ path: P, rev: 1 });
+    expect(waiting(s)).toBe(1);
+    writeNote(s, P, note("A", "one\ntwo"));                     // edited before the next round
+    server.api.notes.create = create;
+    await run(s, server).go();
+    expect([...server.notes.values()].map((r) => [r.rec, r.path, r.text, r.rev])).toEqual([["mine1", P, note("A", "one\ntwo"), 2]]);
+    expect(s.notes.get(P)).toMatchObject({ rec: "mine1", rev: 2, conflict_rev: null });
     expect(waiting(s)).toBe(0);
+  });
+
+  test("a note deleted and made again at the same path elsewhere is fetched again, not kept as the old one", async () => {
+    const server = fakeServer(), s = store();
+    const old = server.put(P, note("A", "old"));
+    await run(s, server).go();
+    server.notes.delete(old.rec);
+    const now = server.put(P, note("A", "new"));                // a new record, at rev 1 like the old one was
+    expect(now.rev).toBe(old.rev);
+    await run(s, server).go();
+    expect(s.notes.get(P)).toMatchObject({ rec: now.rec, rev: 1, text: note("A", "new"), base: note("A", "new") });
+    expect(waiting(s)).toBe(0);
+  });
+
+  test("an edit to a note deleted and made again elsewhere moves aside, never merged into the new note", async () => {
+    const server = fakeServer(), s = store();
+    const old = server.put(P, note("A", "old"));
+    await run(s, server).go();
+    server.notes.delete(old.rec);
+    const now = server.put(P, note("A", "new"));
+    writeNote(s, P, note("A", "old, edited here"));
+    await run(s, server).go();
+    expect(server.notes.get(now.rec)!.text).toBe(note("A", "new"));
+    const moved = [...server.notes.values()].find((r) => r.rec !== now.rec)!;
+    expect([moved.path, moved.text]).toEqual(["notes/20261101-a-2.md", note("A", "old, edited here")]);
+    await run(s, server).go();
+    expect(s.notes.get(P)).toMatchObject({ rec: now.rec, text: note("A", "new") });
+  });
+
+  test("text kept after taking theirs outlives the server deleting the note, and restoring puts it back", async () => {
+    const server = fakeServer(), s = store();
+    const r = server.put(P, note("A", "one"));
+    await run(s, server).go();
+    writeNote(s, P, note("A", "mine"));
+    server.put(P, note("A", "theirs"));
+    await run(s, server).go();
+    takeTheirs(s, P);
+    server.notes.delete(r.rec);
+    await run(s, server).go();
+    expect(s.notes.get(P)).toMatchObject({ lost: note("A", "mine") });
+    expect(conflicted(s)).toEqual([P]);
+    restoreMine(s, P);
+    await run(s, server).go();
+    expect([...server.notes.values()].map((x) => [x.path, x.text])).toEqual([[P, note("A", "mine")]]);
   });
 
   test("a delete is a tombstone, sent with its rev; a note the server never had is gone at once", async () => {
     const server = fakeServer(), s = store();
     server.put(P, note("A", "one"));
     await run(s, server).go();
-    writeNote(s, "notes/20261101-b.md", note("B"));
+    addNote(s, "mine1", "notes/20261101-b.md", note("B"));
     expect(removeNote(s, "notes/20261101-b.md", false)).toBe(true);
     expect(s.notes.get("notes/20261101-b.md")).toBeUndefined();
     expect(removeNote(s, P, false)).toBe(true);
@@ -355,7 +404,7 @@ describe("notes", () => {
 
   test("an unreachable server ends the round after the pull and leaves every edit unsent", async () => {
     const server = fakeServer(), s = store();
-    writeNote(s, P, note("A", "one"));
+    addNote(s, "mine1", P, note("A", "one"));
     saveTask(s, newTask("t1", { title: "x" }));
     server.take(true);
     const r = run(s, server);
@@ -367,7 +416,7 @@ describe("notes", () => {
 
   test("an edit while a sync is out outlives it", () => {
     const s = store();
-    s.notes.put({ ...freshNote(P, note("A"), 1), rec: "r", rev: 1, base: note("A"), pushed: 1 });
+    s.notes.put({ ...freshNote("r", P, note("A"), 1), rev: 1, base: note("A"), pushed: 1 });
     writeNote(s, P, note("A", "x"));
     expect(s.notes.get(P)!.updated).toBeGreaterThan(s.notes.get(P)!.pushed!);
     expect(tick({ updated: Date.now() + 1000 })).toBeGreaterThan(Date.now() + 1000);
@@ -489,7 +538,7 @@ describe("refused", () => {
     server.api.notes.update = async () => { throw refusal; };
     server.api.notes.create = async () => { throw refusal; };
     writeNote(s, P, note("A", "too long"));
-    writeNote(s, "notes/20261101-b.md", note("B"));
+    addNote(s, "mine2", "notes/20261101-b.md", note("B"));
     await run(s, server).go();
     expect(refusals(s).map((x) => [x.kind, x.key, x.title])).toEqual([["note", P, "A"], ["note", "notes/20261101-b.md", "B"]]);
     discardRefused(s, "note", P);
@@ -517,6 +566,17 @@ describe("links", () => {
     await run(s, server).go();
     expect(server.links.size).toBe(0);
     expect(s.links.get(id)).toBeUndefined();
+  });
+
+  test("a link to a note made here waits for the note to go up", async () => {
+    const server = fakeServer(), s = store();
+    server.putTask(newTask("task1", { title: "x" }));
+    addNote(s, "mine1", P, note("A"));
+    const id = addLink(s, ids(), { type: "task", id: "task1" }, { type: "note", id: "mine1" }, "about");
+    server.api.notes.create = async () => { throw new Unavailable("down"); };
+    await run(s, server).go();
+    expect(s.links.get(id)).toMatchObject({ pushed: null });
+    expect(server.links.size).toBe(0);
   });
 
   test("a link whose task is not up yet waits a round, not forever", async () => {
@@ -597,7 +657,7 @@ describe("waiting", () => {
   test("counts unsent and deleted rows, not those in step", () => {
     const s = store();
     expect(waiting(s)).toBe(0);
-    s.notes.put({ ...freshNote(P, "x", 1), rev: 1, rec: "r", pushed: 1 });
+    s.notes.put({ ...freshNote("r", P, "x", 1), rev: 1, pushed: 1 });
     expect(waiting(s)).toBe(0);
     patch(s.notes, P, { updated: 5 });
     expect(waiting(s)).toBe(1);

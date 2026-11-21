@@ -26,6 +26,13 @@ version is one semver number for the whole repository, set by the git tag (see [
   seconds, then less and less often, up to every 5 minutes.
 - A note, task or link made or deleted on another device while a sync was listing a large notebook could be dropped from
   this one until the next sync: listings now page by record id.
+- A new note whose upload landed but whose reply was lost is no longer duplicated as `-2` when edited, and a note deleted
+  and made again at the same path on another device is fetched again instead of this device keeping (and later merging)
+  the old one's text: notes carry their own record id from the moment they are made, as tasks do.
+- Photos shared into a new note, or added to a note just made, are filed only once the note is on the server, so they
+  can't be left behind if its name turns out to be taken.
+- Text kept after "Use the server's" is no longer lost if the note is then deleted on another device: it waits in
+  Settings to be restored or dismissed.
 
 ## 0.13.0 - 2026-11-19
 

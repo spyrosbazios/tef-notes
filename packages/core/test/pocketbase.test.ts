@@ -1,7 +1,7 @@
 // The notes server client (src/pocketbase.ts) against a stubbed fetch: what each call sends, and how
 // PocketBase's answers become Conflict or null. No token: the private network is the gate.
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { Conflict, create, hasPreview, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, serverUrl, tasks, update, uploaded, uploadTo } from "../src/pocketbase";
+import { Conflict, Refused, create, hasPreview, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, serverUrl, tasks, update, uploaded, uploadTo } from "../src/pocketbase";
 import { newTask } from "../src/todo";
 
 const S = { url: "https://n:8097" };
@@ -23,12 +23,12 @@ describe("pocketbase", () => {
     const f = reply(200, { id: "r1", path: "notes/a.md", rev: 1, text: "x", kind: "note" });
     stubFetch(f);
     const text = "---\ntitle: Garage\ncreated: 2026-10-05\npinned: true\ncolor: yellow\ntags: [home]\n---\n1234\n";
-    expect(await create(S, "notes/a.md", text)).toEqual({ rec: "r1", path: "notes/a.md", rev: 1, text: "x", kind: "note" });
+    expect(await create(S, "r1", "notes/a.md", text)).toEqual({ rec: "r1", path: "notes/a.md", rev: 1, text: "x", kind: "note" });
     const { url, init, body } = sent(f);
     expect(url).toBe("https://n:8097/api/collections/notes/records");
     expect(init.method).toBe("POST");
     expect(init.headers).toEqual({ "Content-Type": "application/json" });
-    expect(body).toEqual({ path: "notes/a.md", text, title: "Garage", day: "2026-10-05", pinned: true, archived: false, color: "yellow", tags: ["home"] });
+    expect(body).toEqual({ id: "r1", path: "notes/a.md", text, title: "Garage", day: "2026-10-05", pinned: true, archived: false, color: "yellow", tags: ["home"] });
   });
 
   it("an update names the rev it was based on; a stale one is a Conflict, a gone record null", async () => {
@@ -43,11 +43,13 @@ describe("pocketbase", () => {
     expect(await update(S, { rec: "r1", path: "notes/a.md", rev: 2 }, "y")).toBeNull();
   });
 
-  it("a create at a taken path is a Conflict", async () => {
-    stubFetch(reply(400, { data: { path: { code: "validation_not_unique", message: "Value must be unique." } } }));
-    await expect(create(S, "notes/a.md", "x")).rejects.toBeInstanceOf(Conflict);
+  it("a create at a taken path or record id is a Conflict; another refusal is Refused", async () => {
+    for (const field of ["path", "id"]) {
+      stubFetch(reply(400, { data: { [field]: { code: "validation_not_unique", message: "Value must be unique." } } }));
+      await expect(create(S, "r1", "notes/a.md", "x")).rejects.toBeInstanceOf(Conflict);
+    }
     stubFetch(reply(400, { data: { text: { code: "validation_max_text_constraint" } } }));
-    await expect(create(S, "notes/a.md", "x")).rejects.not.toBeInstanceOf(Conflict);
+    await expect(create(S, "r1", "notes/a.md", "x")).rejects.toBeInstanceOf(Refused);
   });
 
   it("deletes with ?rev=, already gone being done", async () => {

@@ -12,6 +12,7 @@
 // Where IndexedDB is unavailable or full (a private window) the app runs on memory alone: edits still sync while the page is
 // open, and unsent ones are lost with it. The same trade the query cache's persister makes (lib/persist.ts).
 import { clear, createStore, delMany, entries, setMany } from "idb-keyval";
+import { recordId } from "@/core/pocketbase";
 import type { LinkRow, NoteRow, Store, Table, TaskRow } from "@/core/sync";
 
 const KEYS = { notes: "n:", tasks: "t:", links: "l:" } as const;
@@ -68,7 +69,13 @@ export const local: Store = all.store;
 /** Resolves once what an earlier visit stored is in `local`. Anything reading or syncing it waits for this. */
 export const ready: Promise<void> = !hasIdb ? Promise.resolve() : entries(kv).then((rows) => {
   for (const [k, row] of rows as [string, unknown][]) {
-    if (k.startsWith(KEYS.notes)) all.loaders.notes.load(k.slice(2), row as NoteRow);
+    // One-shot migration (2026-11-21), to delete once every browser has opened this version: a note made here before notes
+    // carried a client record id was stored with `rec` null; it gets one now, written back so it keeps it
+    if (k.startsWith(KEYS.notes) && (row as NoteRow).rec == null) {
+      const given: NoteRow = { ...(row as NoteRow), rec: recordId() };
+      all.loaders.notes.load(k.slice(2), given);
+      if (local.notes.get(k.slice(2)) === given) local.notes.put(given);
+    } else if (k.startsWith(KEYS.notes)) all.loaders.notes.load(k.slice(2), row as NoteRow);
     else if (k.startsWith(KEYS.tasks)) all.loaders.tasks.load(k.slice(2), row as TaskRow);
     else if (k.startsWith(KEYS.links)) all.loaders.links.load(k.slice(2), row as LinkRow);
   }

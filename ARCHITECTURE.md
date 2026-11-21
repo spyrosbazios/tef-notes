@@ -35,7 +35,9 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
 ## Note file format
 
 A note is one markdown file, stored whole in the record's `text`. Its record is keyed by `path`
-(`notes/YYYYMMDD-<slug>.md`; the filename is the note's stable id, and a note's path never changes). The record
+(`notes/YYYYMMDD-<slug>.md`; the filename is the note's stable id, and a note's path never changes). A client names a new
+note's record itself (`recordId`), as it does a task's: a create whose reply was lost is found again by that id, and a note
+deleted and made again at the same path is another record, never mistaken for the old one. The record
 `agent/memory.md` is not a note: it is the chat agent's memory of you (who you are, how you keep notes), rewritten by
 the agent without asking, under 6000 characters.
 

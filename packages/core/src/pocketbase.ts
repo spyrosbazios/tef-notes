@@ -88,7 +88,8 @@ export async function search(s: Server, query: string, limit = 20): Promise<Remo
   return j.items.map(remote);
 }
 
-export const create = (s: Server, path: string, text: string, mark: Mark = {}): Promise<Remote> => notes(s).create(path, text, mark);
+/** A new note under the caller's own record id (`recordId`); Conflict when a record has that id or that path already. */
+export const create = (s: Server, rec: string, path: string, text: string, mark: Mark = {}): Promise<Remote> => notes(s).create(rec, path, text, mark);
 export const update = (s: Server, e: Entry, text: string, mark: Mark = {}): Promise<Remote | null> => notes(s).update(e, text, mark);
 export const remove = (s: Server, e: Pick<Entry, "rec" | "rev">): Promise<void> => notes(s).remove(e);
 

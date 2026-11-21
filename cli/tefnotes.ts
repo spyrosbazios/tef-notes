@@ -324,7 +324,7 @@ async function main(argv: string[]) {
       for (;;) {
         const path = newNotePath(title, Date.now(), taken);
         try {
-          await pb.create(s, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""), MARK);
+          await pb.create(s, pb.recordId(), path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""), MARK);
           return console.log(idOf(path));
         } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;

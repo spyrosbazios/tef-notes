@@ -23,7 +23,6 @@ const transport: Transport = {
   notes: {
     list: notes.list,
     get: async (rec) => { const r = await notes.get(rec); return r && at(r); },
-    read: async (path) => { const r = await notes.read(path); return r && at(r); },
     create: notes.create,
     update: notes.update,
     remove: notes.remove,

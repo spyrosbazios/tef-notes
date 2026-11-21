@@ -4,11 +4,13 @@
 // The server is the source of truth; a client holds a copy plus unsent edits. Every write is made on the copy first
 // (the `edit` helpers below), marks the row unsent, and a push sends it later, naming the `rev` it was based on (the write
 // contract, ARCHITECTURE.md): a stale one is refused and settled here, never retried blind.
-//   - Notes: pull = one listing of every `path, rev, kind`, then a fetch of those whose rev differs; a record gone from
-//     the server and not edited here is dropped. Push = an update per unsent row at its rev, a create for a new one, a
-//     delete at its rev for a tombstone. A stale rev (Conflict) is a 3-way line merge against `base` (`reconcile`):
-//     disjoint edits merge and go up once more, overlap is a `conflict` the user settles (`keepMine`, `takeTheirs`).
-//     A new note whose path the server has already moves aside to `-2`.
+//   - Notes: pull = one listing of every `rec, path, rev, kind`, then a fetch of those whose record or rev differs (a note
+//     deleted and made again at the same path elsewhere is another record); a record gone from the server and not edited
+//     here is dropped. Push = an update per unsent row at its rev, a create under the row's own record id (`recordId`, made
+//     with the note) for a new one, a delete at its rev for a tombstone. A stale rev (Conflict) is a 3-way line merge against
+//     `base` (`reconcile`): disjoint edits merge and go up once more, overlap is a `conflict` the user settles (`keepMine`,
+//     `takeTheirs`). A create refused as a Conflict is read back by its record id: there, it landed before (its reply was
+//     lost); not there, another note holds the path, and this one moves aside to `-2`.
 //   - Tasks: the same over records. A stale rev merges field by field against `base` (`mergeRecord`), the local edit
 //     winning a field both changed, so there is never a conflict to settle.
 //   - Links: a set of ids, no rev. Pulled after the tasks; an add is idempotent (the server's copy comes back, perhaps
@@ -24,15 +26,16 @@ import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";
 
 // ---- rows
 
-/** A note as the client holds it. `rec`/`rev`: the server's record and version the text was last in step with (null until
- *  first pushed); `base`: that version's text, what both sides' edits are diffed against. `conflict_*`: the server's
+/** A note as the client holds it. `rec`: its record id, made here for a note made here (`recordId`) and sent with its create;
+ *  `rev`: the server's version the text was last in step with (null until first pushed); `base`: that version's text, what
+ *  both sides' edits are diffed against. `conflict_*`: the server's
  *  version while unsent edits overlap it. `lost`: the unsent text `takeTheirs` replaced, until restored or dismissed.
  *  `deleted`: a tombstone until the delete is pushed. `refused`: why the server refused its change, which then waits for
  *  the owner (every row kind has it). */
 export type NoteRow = {
   path: string; text: string; kind: NoteKind;
   updated: number; pushed: number | null;
-  rec: string | null; rev: number | null; base: string | null;
+  rec: string; rev: number | null; base: string | null;
   conflict_text: string | null; conflict_rev: number | null; lost: string | null;
   deleted: boolean; refused?: string;
 };
@@ -60,8 +63,7 @@ export type Transport = {
   notes: {
     list: () => Promise<Listed[]>;
     get: (rec: string) => Promise<Fetched | null>;
-    read: (path: string) => Promise<Fetched | null>;
-    create: (path: string, text: string) => Promise<Remote>;
+    create: (rec: string, path: string, text: string) => Promise<Remote>;
     update: (e: Entry, text: string) => Promise<Remote | null>;
     remove: (e: Pick<Entry, "rec" | "rev">) => Promise<void>;
   };
@@ -108,9 +110,6 @@ export const unsent = (n: NoteRow) => n.updated !== n.pushed;
 /** Whether a task has edits not sent. */
 export const taskUnsent = (r: TaskRow) => r.updated !== r.pushed;
 
-/** The notes the engine syncs. */
-export type Want = (path: string) => boolean;
-
 // ---- one sync at a time
 
 /** A function that runs `run` one at a time. A call while it runs asks for one more run after it and gets that rerun's promise
@@ -141,12 +140,9 @@ export type Run = {
   changed?: () => void;
   /** A new note moved aside to `to` because `from` was taken: an open editor should follow it. */
   moved?: (from: string, to: string) => void;
-  /** The notes this run syncs; notes only by default (`isNotePath`). */
-  want?: Want;
 };
 
 const unreachable = (e: unknown) => e instanceof Unavailable;
-const wants = (c: Run, path: string) => (c.want ?? isNotePath)(path);
 
 /** Local midnight of the note's `created`, so a first pull lists notes by age, not all at "now". */
 function createdAt(path: string, text: string) {
@@ -157,19 +153,24 @@ function createdAt(path: string, text: string) {
 
 // ---- notes: local edits
 
-/** A new row for a note made here. */
-export const freshNote = (path: string, text: string, updated: number): NoteRow => ({
-  path, text, kind: "note", updated, pushed: null, rec: null, rev: null, base: null,
+/** A new row for a note under the record id `rec`, not yet on the server. */
+export const freshNote = (rec: string, path: string, text: string, updated: number): NoteRow => ({
+  path, text, kind: "note", updated, pushed: null, rec, rev: null, base: null,
   conflict_text: null, conflict_rev: null, lost: null, deleted: false,
 });
 
-/** `text` written to the note at `path` (a new row when there is none): unsent until the next push. false when it was the text
- *  already. */
+/** A note made here, under its own record id (`recordId`), at a path this copy doesn't hold: unsent until the next push. */
+export function addNote(s: Store, rec: string, path: string, text: string): void {
+  if (s.notes.get(path)) throw new Error(`${path} is taken`);
+  s.notes.put(freshNote(rec, path, text, tick()));
+}
+
+/** `text` written to the note at `path`: unsent until the next push. false when it was the text already, or there is no such
+ *  note (a new one is `addNote`'s). */
 export function writeNote(s: Store, path: string, text: string): boolean {
   const n = s.notes.get(path);
-  if (n && !n.deleted && n.text === text) return false;
-  if (n) s.notes.put({ ...n, text, updated: tick(n), deleted: false, refused: undefined });
-  else s.notes.put(freshNote(path, text, tick()));
+  if (!n || (!n.deleted && n.text === text)) return false;
+  s.notes.put({ ...n, text, updated: tick(n), deleted: false, refused: undefined });
   return true;
 }
 
@@ -178,7 +179,7 @@ export function writeNote(s: Store, path: string, text: string): boolean {
 export function removeNote(s: Store, path: string, syncing: boolean): boolean {
   const n = s.notes.get(path);
   if (!n || n.deleted) return false;
-  if (n.rec || syncing) s.notes.put({ ...n, deleted: true, conflict_text: null, conflict_rev: null, refused: undefined });
+  if (n.rev != null || syncing) s.notes.put({ ...n, deleted: true, conflict_text: null, conflict_rev: null, refused: undefined });
   else s.notes.delete(path);
   return true;
 }
@@ -218,14 +219,15 @@ export function dismissLost(s: Store, path: string): boolean {
 
 // ---- notes: pull
 
-/** The server's text into the row, unless typed into or deleted while the read was out (push sorts those out). true when
- *  the text changed. */
+/** The server's text into the row, unless typed into or deleted while the read was out (push sorts those out). Another record
+ *  at the row's path (deleted and made again elsewhere) replaces the row's record and base with its own. true when the text
+ *  changed. */
 function takeNote(s: Store, r: Fetched): boolean {
   const { path, text, rec, rev, kind, at } = r, n = s.notes.get(path);
   if (n && (unsent(n) || n.deleted || n.conflict_rev != null)) return false;
   if (n && n.text === text) { s.notes.put({ ...n, rec, rev, base: text, kind }); return false; }
   if (n) { const t = Math.max(at ?? Date.now(), n.updated + 1); s.notes.put({ ...n, text, rec, rev, base: text, kind, updated: t, pushed: t }); }
-  else { const t = at ?? createdAt(path, text); s.notes.put({ ...freshNote(path, text, t), rec, rev, base: text, kind, pushed: t }); }
+  else { const t = at ?? createdAt(path, text); s.notes.put({ ...freshNote(rec, path, text, t), rev, base: text, kind, pushed: t }); }
   return true;
 }
 
@@ -235,9 +237,12 @@ async function pullNotes(c: Run): Promise<boolean> {
   const failed = (what: string, e: unknown) => { if (unreachable(e)) down = true; c.fail(what, e); };
   let entries: Listed[];
   try { entries = await c.api.notes.list(); } catch (e) { failed("notes", e); return !down; }
-  const remote = new Map(entries.filter((e) => wants(c, e.path)).map((e) => [e.path, e]));
-  const local = new Map(c.store.notes.all().filter((r) => wants(c, r.path)).map((r) => [r.path, r]));
-  const stale = [...remote.values()].filter((e) => { const l = local.get(e.path); return !l || !(l.rev === e.rev || unsent(l) || l.deleted || l.conflict_rev != null); });
+  const remote = new Map(entries.filter((e) => isNotePath(e.path)).map((e) => [e.path, e]));
+  const local = new Map(c.store.notes.all().filter((r) => isNotePath(r.path)).map((r) => [r.path, r]));
+  const stale = [...remote.values()].filter((e) => {
+    const l = local.get(e.path);
+    return !l || !((l.rec === e.rec && l.rev === e.rev) || unsent(l) || l.deleted || l.conflict_rev != null);
+  });
   await pool(stale, 6, async (e) => {
     if (down) return;                                              // each would wait out its own timeout
     try {
@@ -245,11 +250,12 @@ async function pullNotes(c: Run): Promise<boolean> {
       if (rem) takeNote(c.store, rem);
     } catch (err) { failed(e.path, err); }
   });
-  // Gone from the server: removed here too, unless edited here since (push puts it back). A tombstone's delete is done.
+  // Gone from the server: removed here too, unless edited here since (push puts it back) or holding text `takeTheirs`
+  // replaced, which waits for the owner (`restoreMine` puts it back up). A tombstone's delete is done.
   for (const path of local.keys()) {
     if (remote.has(path)) continue;
     const n = c.store.notes.get(path);
-    if (n && (n.deleted || !unsent(n))) c.store.notes.delete(path);
+    if (n && (n.deleted || (!unsent(n) && n.lost == null))) c.store.notes.delete(path);
   }
   // A kind never moves, but a copy pulled before it was kept has the rev and lacks it
   for (const r of c.store.notes.all()) { const e = remote.get(r.path); if (e && r.kind !== e.kind) c.store.notes.put({ ...r, kind: e.kind }); }
@@ -259,8 +265,9 @@ async function pullNotes(c: Run): Promise<boolean> {
 // ---- notes: push
 
 /** A note made here whose path the server has already (another device made one by that name before this one pulled) moved to a
- *  free path: text and flags go along, the old row goes. `taken`: paths the server was found to hold. Returns the new path.
- *  The note's photos are not moved: the web never has one on a note not yet pushed (an upload needs the server). */
+ *  free path: text, flags and record id go along, the old row goes. `taken`: paths the server was found to hold. Returns the
+ *  new path. Nothing is filed under the old path's id: a note's attachments go on only once it is on the server (the web's
+ *  `landed`), and a path the server holds never changes. */
 function moveAside(c: Run, path: string, n: NoteRow, taken: Set<string>): string {
   taken.add(path);
   const to = newNotePath(parseNote(path, n.text).title, createdAt(path, n.text), new Set([...c.store.notes.all().map((r) => r.path), ...taken]));
@@ -274,7 +281,7 @@ function moveAside(c: Run, path: string, n: NoteRow, taken: Set<string>): string
 async function sendNote(c: Run, path: string, retry = true, taken = new Set<string>()): Promise<void> {
   const { api, store } = c;
   const n = store.notes.get(path);
-  if (!n || n.deleted || !unsent(n) || n.conflict_rev != null) return;
+  if (!n || n.deleted || !unsent(n) || n.conflict_rev != null || n.refused != null) return;
   const at = n.updated;                                            // edits made mid-request stay unsent
   const done = async (r: Remote) => {
     const now = store.notes.get(path);
@@ -285,20 +292,22 @@ async function sendNote(c: Run, path: string, retry = true, taken = new Set<stri
     store.notes.put({ ...now, rec: r.rec, rev: r.rev, base: n.text, pushed: at });
   };
   try {
-    // Gone from the server since (deleted elsewhere) while edited here: the edit puts it back
-    const r = (n.rec && n.rev != null ? await api.notes.update({ rec: n.rec, path, rev: n.rev }, n.text) : null) ?? await api.notes.create(path, n.text);
+    // Gone from the server since (deleted elsewhere) while edited here: the edit puts it back, under the same record id
+    const r = (n.rev != null ? await api.notes.update({ rec: n.rec, path, rev: n.rev }, n.text) : null) ?? await api.notes.create(n.rec, path, n.text);
     return await done(r);
   } catch (e) {
     if (!(e instanceof Conflict)) throw e;
   }
-  const rem = await api.notes.read(path);
-  if (!rem) return done(await api.notes.create(path, n.text));    // deleted between the refusal and the read
+  // A stale rev, or a create refused for its record id or its path: the record says which
+  const rem = await api.notes.get(n.rec);
   const cur = store.notes.get(path);
   if (!cur || cur.deleted) return;
-  // Never pushed, and the server has the path: someone else's note, not this one's past to merge with. The same text is this
-  // upload, landed once before the page closed; anything else, this note moves aside and goes up there
-  if (cur.rec == null && isNotePath(path) && rem.text !== cur.text) return sendNote(c, moveAside(c, path, cur, taken), retry, taken);
-  const m = reconcile(cur.base ?? undefined, cur.text, rem.text);
+  // Not on the server: the path is another record's (another device made a note by that name), and this one moves aside
+  if (!rem) return sendNote(c, moveAside(c, path, cur, taken), retry, taken);
+  // On the server and never in step here: this create landed before, its reply lost. What landed is an earlier text of this
+  // note, so every difference is the local edit
+  const base = cur.rev == null ? rem.text : cur.base;
+  const m = reconcile(base ?? undefined, cur.text, rem.text);
   if (m == null) {
     store.notes.put({ ...cur, rec: rem.rec, conflict_text: rem.text, conflict_rev: rem.rev });
     return;
@@ -312,7 +321,7 @@ async function sendNote(c: Run, path: string, retry = true, taken = new Set<stri
 async function dropNote(c: Run, t: NoteRow): Promise<void> {
   const { api, store } = c;
   const gone = () => { if (store.notes.get(t.path)?.deleted) store.notes.delete(t.path); };   // unless written to again meanwhile
-  if (!t.rec || t.rev == null) return gone();
+  if (t.rev == null) return gone();
   try {
     await api.notes.remove({ rec: t.rec, rev: t.rev });
     return gone();
@@ -327,7 +336,7 @@ async function dropNote(c: Run, t: NoteRow): Promise<void> {
 }
 
 async function pushNotes(c: Run) {
-  const mine = () => c.store.notes.all().filter((n) => wants(c, n.path) && n.refused == null);
+  const mine = () => c.store.notes.all().filter((n) => isNotePath(n.path) && n.refused == null);
   const failed = (path: string) => (e: unknown) => (e instanceof Refused ? void patch(c.store.notes, path, { refused: e.message }) : c.fail(path, e));
   for (const n of mine()) if (!n.deleted && unsent(n) && n.conflict_rev == null) await sendNote(c, n.path).catch(failed(n.path));
   for (const n of mine()) if (n.deleted) await dropNote(c, n).catch(failed(n.path));
@@ -491,10 +500,15 @@ async function pullLinks(c: Run): Promise<"ok" | "failed" | "down"> {
   return "ok";
 }
 
-/** A task end's record: "here" on the server, "pending" made here and not up yet, "gone" not held. */
-function taskEnd(s: Store, id: string): "here" | "pending" | "gone" {
-  const r = s.tasks.get(id);
-  return !r || r.deleted ? "gone" : r.rev == null ? "pending" : "here";
+/** A link end's record: "here" on the server, "pending" made here and not up yet, "gone" deleted here or, for a task, not
+ *  held. A note not held here is the server's to judge (`Gone` if it has none). */
+function endOf(s: Store, e: LinkEnd): "here" | "pending" | "gone" {
+  if (e.type === "task") {
+    const r = s.tasks.get(e.id);
+    return !r || r.deleted ? "gone" : r.rev == null ? "pending" : "here";
+  }
+  const n = s.notes.all().find((x) => x.rec === e.id);
+  return !n ? "here" : n.deleted ? "gone" : n.rev == null ? "pending" : "here";
 }
 
 async function pushLinks(c: Run) {
@@ -509,9 +523,9 @@ async function pushLinks(c: Run) {
         continue;
       }
       if (r.pushed != null) continue;
-      const ends = [l.from, l.to].filter((e) => e.type === "task").map((e) => taskEnd(store, e.id));
-      if (ends.includes("gone")) { store.links.delete(id); continue; }   // its task deleted here: the server's cascade sees to its copy
-      if (ends.includes("pending")) continue;                          // its task didn't go up this round: next time
+      const ends = [l.from, l.to].map((e) => endOf(store, e));
+      if (ends.includes("gone")) { store.links.delete(id); continue; }   // an end deleted here: the server's cascade sees to its copy
+      if (ends.includes("pending")) continue;                          // an end didn't go up this round: next time
       const got = await api.links.add(l), now = store.links.get(id);
       if (!now) { await api.links.remove(got.id); continue; }
       if (got.id !== id) store.links.delete(id);                       // the server had this relation under its own id

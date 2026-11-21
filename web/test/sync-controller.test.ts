@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Refused, Unavailable } from "@/core/record-contracts";
-import { saveTask, writeNote, type Transport } from "@/core/sync";
+import { addNote, saveTask, writeNote, type Transport } from "@/core/sync";
 import { newTask } from "@/core/todo";
 import { tables } from "@/lib/local";
 import { createSync } from "@/lib/sync-controller";
@@ -12,7 +12,7 @@ function fixture() {
   let lists = 0, online = true;
   const unused = async (): Promise<never> => { throw new Error("Unexpected write"); };
   const transport: Transport = {
-    notes: { list: async () => { lists++; return []; }, get: unused, read: unused, create: unused, update: unused, remove: unused },
+    notes: { list: async () => { lists++; return []; }, get: unused, create: unused, update: unused, remove: unused },
     tasks: { revs: async () => [], get: unused, getMany: async () => [], create: unused, update: unused, remove: unused },
     links: { ids: async () => [], byIds: unused, add: unused, remove: unused },
   };
@@ -34,7 +34,7 @@ test("controllers isolate stores, status and redraw subscriptions; route loaders
   expect(b.lists()).toBe(1);
   expect(draws).toBe(0);
   a.offline();
-  writeNote(a.store, "notes/a.md", "offline edit");
+  addNote(a.store, "a1", "notes/a.md", "offline edit");
   a.sync.edited();
   expect(a.sync.getStatus().waiting).toBe(1);
   expect(b.sync.getStatus().waiting).toBe(0);
@@ -68,7 +68,7 @@ test("the last lifecycle owner cancels pending work, cleanup is idempotent and r
 
 test("a failed request finishing after stop cannot rearm the retry timer", async () => {
   const f = fixture();
-  writeNote(f.store, "notes/a.md", "waiting");
+  addNote(f.store, "a1", "notes/a.md", "waiting");
   let reject!: (reason: Error) => void, entered!: () => void;
   const started = new Promise<void>((resolve) => { entered = resolve; });
   f.transport.notes.list = () => { entered(); return new Promise((_, fail) => { reject = fail; }); };
@@ -90,7 +90,7 @@ test("a failed request finishing after stop cannot rearm the retry timer", async
 
 test("retries back off exponentially to a cap and start over after a round that went through", async () => {
   const f = fixture();
-  writeNote(f.store, "notes/a.md", "waiting");
+  addNote(f.store, "a1", "notes/a.md", "waiting");
   let fail = true;
   const list = f.transport.notes.list;
   f.transport.notes.list = async () => { if (fail) throw new Unavailable("offline"); return list(); };
@@ -103,7 +103,7 @@ test("retries back off exponentially to a cap and start over after a round that 
   }
   expect(waits).toEqual([5_000, 10_000, 20_000, 40_000, 80_000, 160_000, 300_000, 300_000]);
   fail = false;
-  f.transport.notes.create = async (path, text) => ({ rec: "r1", path, text, rev: 1, kind: "note" });
+  f.transport.notes.create = async (rec, path, text) => ({ rec, path, text, rev: 1, kind: "note" });
   await f.sync.syncNow();
   expect(f.queued.size).toBe(0);
   fail = true;

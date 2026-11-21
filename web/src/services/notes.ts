@@ -20,7 +20,7 @@ const notes = noteCollection(recordTransport, rec, {
   fields: "id,path,rev,kind,text,updated", filter: 'path ~ "notes/%"',
 });
 export const { list, get, read, remove } = notes;
-export const create = (path: string, text: string): Promise<Rec> => notes.create(path, text);
+export const create = (rec: string, path: string, text: string): Promise<Rec> => notes.create(rec, path, text);
 export const update = (e: Entry, text: string): Promise<Rec | null> => notes.update(e, text);
 
 /** The in-app agent's memory file; null before the agent first wrote it. */
