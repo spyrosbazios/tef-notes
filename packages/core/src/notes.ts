@@ -494,6 +494,11 @@ export function merge3(base: string, mine: string, theirs: string): string | nul
   return [...out, ...o.slice(at)].join("\n");
 }
 
+/** The note as it was before an edit (`before`) put back over what is there now (`current`), when `after` is what the edit
+ *  wrote: the inverse of the edit, merged into everything written since. null where the owner's later writing touches
+ *  the same lines: the edit can no longer be undone without losing theirs. */
+export const undoEdit = (before: string, after: string, current: string): string | null => merge3(after, before, current);
+
 /** The editor's draft when the stored body moved on under it (a pull, a merge on push, an agent append): both
  *  edits against `start`, the body it began from. Overlap keeps the draft as typed, `clash` set to say so. */
 export function mergeDraft(start: string, draft: string, theirs: string): { text: string; clash: boolean } {

@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from "bun:test";
 import {
   appendToNote, appended, attachmentOf, isNotePath, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
-  pastedNote, picturesOf, mosaicCells, slugify, snippetOf, withBody, withFlags,
+  pastedNote, picturesOf, mosaicCells, slugify, snippetOf, undoEdit, withBody, withFlags,
 } from "../src/notes";
 import { localDay } from "../src/time";
 
@@ -268,6 +268,24 @@ describe("merge", () => {
     const want = mine.slice();
     want[10] = "head edit";
     expect(merge3(base.join("\n"), mine.join("\n"), theirs.join("\n"))).toBe(want.join("\n"));
+  });
+});
+
+describe("undoEdit", () => {
+  const before = "# t\n\nbuy milk\n\nsome notes\n";
+  const after = "# t\n\n- buy milk\n\nsome notes\n";
+
+  it("puts the note back as it was when nothing was written since", () => {
+    expect(undoEdit(before, after, after)).toBe(before);
+  });
+
+  it("keeps what was written elsewhere after the run", () => {
+    expect(undoEdit(before, after, after + "\nlater\n")).toBe(before + "\nlater\n");
+    expect(undoEdit(before, after, "# t2\n\n- buy milk\n\nsome notes\n")).toBe("# t2\n\nbuy milk\n\nsome notes\n");
+  });
+
+  it("refuses where the owner wrote over what the run wrote", () => {
+    expect(undoEdit(before, after, "# t\n\n- buy oat milk\n\nsome notes\n")).toBeNull();
   });
 });
 
