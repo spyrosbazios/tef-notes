@@ -6,8 +6,6 @@
 //
 // Writes this covers: notes, tasks and links. What it does not (attachment uploads, chats, clips, lenses, tags, push
 // subscriptions) has no local copy to wait in and fails at once while offline: services/api.ts says which and how.
-import { AxiosError } from "axios";
-import { Conflict } from "@/core/pocketbase";
 import type { Transport } from "@/core/sync";
 import { createSync } from "./sync-controller";
 export type { SyncStatus, Settle } from "./sync-controller";
@@ -32,7 +30,6 @@ const transport: Transport = {
   },
   tasks: { revs: todo.tasks.revs, get: todo.tasks.get, getMany: todo.tasks.getMany, create: todo.tasks.create, update: todo.tasks.update, remove: todo.tasks.remove },
   links: { ids: links.ids, byIds: links.byIds, add: links.add, remove: links.remove },
-  status: (e) => (e instanceof AxiosError ? e.response?.status : e instanceof Conflict ? 409 : undefined),
 };
 
 /** What a query over the local copy needs: it never touches the network, so it runs offline too (TanStack's default would pause
@@ -41,7 +38,7 @@ export const LOCAL_QUERY = { networkMode: "always", staleTime: Infinity, retry: 
 
 // The browser's one controller; tests can construct independent controllers over memory stores.
 export const sync = createSync({ store: local, ready, transport, online: () => getNet().browser });
-export const { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle } = sync;
+export const { getStatus, watchStatus, onRedraw, movedTo, opened, syncNow, syncing, edited, heard, settle, resolveRefused } = sync;
 
 /** Mounted by the app's live-data hook; importing storage or a feature installs no lifecycle listeners. */
 export function startSync(): () => void {

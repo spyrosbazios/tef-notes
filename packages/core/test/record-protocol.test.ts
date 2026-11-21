@@ -1,17 +1,17 @@
 import { expect, test } from "bun:test";
-import { Conflict, conflictOf } from "../src/record-contracts";
-import { links, noteCollection, revCollection, type RecordTransport, type RecordRequest } from "../src/record-protocol";
+import { Conflict, Gone, Refused, Unavailable, conflictOf } from "../src/record-contracts";
+import { links, noteCollection, outcomeOf, revCollection, type RecordTransport, type RecordRequest } from "../src/record-protocol";
 import { linkRecord, type Link } from "../src/record-links";
 
 function transport(reply: (path: string, request: RecordRequest) => any) {
   const calls: { path: string; request: RecordRequest }[] = [];
   const io: RecordTransport = {
     async request(path, request = {}) { calls.push({ path, request }); return reply(path, request); },
-    status: (e) => e instanceof Failure ? e.status : undefined,
+    answer: (e) => e instanceof Failure ? { status: e.status, body: e.body } : undefined,
   };
   return { io, calls };
 }
-class Failure extends Error { constructor(public status: number) { super(); } }
+class Failure extends Error { constructor(public status: number, public body: unknown = {}) { super(); } }
 
 test("note policy keeps filters, fields, quoting and read timeout, writes keep rev and marks", async () => {
   const { io, calls } = transport((path) => path.includes("filter=") ? { items: [] } : { id: "a" });
@@ -39,7 +39,7 @@ test("task pagination terminates on an empty page and batches ids in forties", a
   expect(calls).toHaveLength(5);
 });
 
-test("gone is null or done, conflicts and other native errors retain identity", async () => {
+test("gone is null or done; every other failure is its typed outcome, a Conflict kept as it is", async () => {
   let failure: Error = new Failure(404);
   const { io } = transport(() => { throw failure; });
   const tasks = revCollection("tasks", (r) => ({ id: r.id }));
@@ -49,15 +49,30 @@ test("gone is null or done, conflicts and other native errors retain identity", 
   await tasks.remove(io, "a", 4);
   await notes.remove({ rec: "a", rev: 4 });
   await links.remove(io, "a");
-  for (const e of [new Conflict("stale"), new Failure(403), new Error("offline")]) {
+  const conflict = new Conflict("stale");
+  failure = conflict;
+  await expect(tasks.update(io, "a", 4, {})).rejects.toBe(conflict);
+  for (const [e, type] of [[new Failure(403), Refused], [new Failure(503), Unavailable], [new Error("offline"), Unavailable]] as const) {
     failure = e;
-    await expect(tasks.update(io, "a", 4, {})).rejects.toBe(e);
-    await expect(notes.get("a")).rejects.toBe(e);
+    await expect(tasks.update(io, "a", 4, {})).rejects.toBeInstanceOf(type);
+    await expect(notes.get("a")).rejects.toBeInstanceOf(type);
   }
 });
 
+test("PocketBase's answers as outcomes: a relation to a deleted record is Gone, a validation Refused with its reason", () => {
+  const missing = { message: "Failed to create record.", data: { toNote: { code: "validation_missing_rel_records", message: "Failed to find all relation records with the provided ids." } } };
+  expect(outcomeOf(400, missing, "links")).toBeInstanceOf(Gone);
+  expect(outcomeOf(404, {}, "x")).toBeInstanceOf(Gone);
+  const refused = outcomeOf(400, { message: "Failed to create record.", data: { title: { code: "validation_required", message: "Cannot be blank." } } }, "x");
+  expect(refused).toBeInstanceOf(Refused);
+  expect(refused.message).toBe("Failed to create record. (title: Cannot be blank.)");
+  expect(outcomeOf(403, { message: "Only superusers can perform this action." }, "x").message).toBe("Only superusers can perform this action.");
+  for (const status of [408, 429, 500, 502]) expect(outcomeOf(status, {}, "x")).toBeInstanceOf(Unavailable);
+  expect(outcomeOf(409, {}, "x")).toBeInstanceOf(Conflict);
+});
+
 const link: Link = { id: "a", from: { type: "task", id: "t" }, to: { type: "note", id: "n" }, role: "about" };
-test("link replay recovers server id, excludes malformed records and preserves unrelated refusals", async () => {
+test("link replay recovers server id, excludes malformed records and keeps an unrelated refusal", async () => {
   const failure = new Failure(400);
   let existing = true;
   const { io, calls } = transport((_path, request) => {
@@ -67,7 +82,7 @@ test("link replay recovers server id, excludes malformed records and preserves u
   expect(await links.add(io, link)).toEqual({ ...link, id: "server" });
   expect(decodeURIComponent(calls[1].path)).toContain('fromTask = "t"');
   existing = false;
-  await expect(links.add(io, link)).rejects.toBe(failure);
+  await expect(links.add(io, link)).rejects.toBeInstanceOf(Refused);
 });
 
 test("only stale revisions and known unique fields are conflicts", () => {

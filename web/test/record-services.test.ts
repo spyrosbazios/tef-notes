@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { Conflict } from "@/core/pocketbase";
+import { Conflict, Refused, Unavailable } from "@/core/pocketbase";
 import { linkRecord, type Link } from "@/core/record-links";
 import { newTask } from "@/core/todo";
 import { api, Offline } from "@/services/api";
@@ -41,7 +41,7 @@ test("web note projection and read timeout survive the adapter, synced writes by
   expect(calls).toHaveLength(4);
 });
 
-test("axios conflicts retain messages; other HTTP errors retain type, 404 becomes null", async () => {
+test("axios conflicts retain messages; 404 becomes null; other answers are typed outcomes", async () => {
   let status = 409;
   stub(() => ({ status, data: { message: "Changed since that version." } }));
   await expect(tasks.update("t", 4, { title: "x" })).rejects.toBeInstanceOf(Conflict);
@@ -51,7 +51,9 @@ test("axios conflicts retain messages; other HTTP errors retain type, 404 become
   expect(await tasks.get("t")).toBeNull();
   await links.remove("gone");
   status = 403;
-  await expect(tasks.get("t")).rejects.toBeInstanceOf(AxiosError);
+  await expect(tasks.get("t")).rejects.toBeInstanceOf(Refused);
+  status = 503;
+  await expect(tasks.get("t")).rejects.toBeInstanceOf(Unavailable);
   expect(getNet().reached).toBe(true);
 });
 
@@ -66,8 +68,8 @@ test("web links recover duplicate ends with the server id through axios", async 
   expect(calls).toHaveLength(2);
 });
 
-test("network errors still update connectivity and remain AxiosErrors", async () => {
+test("network errors still update connectivity and are Unavailable", async () => {
   api.defaults.adapter = async (c) => { throw new AxiosError("network", AxiosError.ERR_NETWORK, c); };
-  await expect(notes.read("notes/a.md")).rejects.toBeInstanceOf(AxiosError);
+  await expect(notes.read("notes/a.md")).rejects.toBeInstanceOf(Unavailable);
   expect(getNet().reached).toBe(false);
 });

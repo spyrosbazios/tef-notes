@@ -3,7 +3,7 @@
 // nothing moves when it comes or goes. Reads still work from the local copy (lib/local.ts) and edits are kept in it, to go up when
 // the server is back.
 import { blur, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { CloudUpload, WifiOff } from "lucide-react";
+import { CloudAlert, CloudUpload, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Swap } from "@/components/swap";
@@ -27,22 +27,24 @@ function useHeld(on: boolean, ms: number): boolean {
   return on && held;
 }
 
-/** Offline that has lasted, or changes the last sync failed to send. Changes only waiting their turn (an edit goes up a moment after
- *  the last, lib/sync.ts) are not news, nor is a conflict, which Settings lists. A count changing swaps in place. */
+/** Offline that has lasted, changes the last sync failed to send, or changes the server refused (Settings lists them, to send
+ *  again or let go). Changes only waiting their turn (an edit goes up a moment after the last, lib/sync.ts) are not news, nor is
+ *  a conflict, which Settings lists. A count changing swaps in place. */
 export function SyncNotice() {
-  const online = useOnline(), { waiting, error } = useSyncStatus();
+  const online = useOnline(), { waiting, error, refused } = useSyncStatus();
   const appear = useTempoTransition(transition.disclosure);
-  const offline = useHeld(!online, GRACE), stuck = online && waiting > 0 && !!error;
+  const offline = useHeld(!online, GRACE), stuck = online && waiting > 0 && !!error, refusedOnly = online && !stuck && refused.length > 0;
   const count = <Swap id={waiting}>{changes(waiting)}</Swap>;
+  const refusals = <Swap id={`r${refused.length}`}>{`${refused.length} ${refused.length === 1 ? "change" : "changes"} refused · see Settings`}</Swap>;
   return (
     <AnimatePresence>
-      {offline || stuck ? (
+      {offline || stuck || refusedOnly ? (
         <motion.div key="notice" role="status" transition={appear}
           className="pointer-events-none absolute inset-x-0 top-2 z-40 flex justify-center px-3"
           initial={{ opacity: 0, filter: blur.disclosure }} animate={{ opacity: 1, filter: "blur(0px)" }} exit={{ opacity: 0, filter: blur.disclosure }}>
           <div className="flex items-center gap-1.5 rounded-full border border-line bg-raised px-3 py-1 text-xs text-dim shadow-sm">
-            {offline ? <WifiOff className="size-3.5" /> : <CloudUpload className="size-3.5" />}
-            {offline ? <>Offline{waiting ? <> · {count}</> : ""}</> : count}
+            {offline ? <WifiOff className="size-3.5" /> : refusedOnly ? <CloudAlert className="size-3.5" /> : <CloudUpload className="size-3.5" />}
+            {offline ? <>Offline{waiting ? <> · {count}</> : ""}</> : refusedOnly ? refusals : count}
           </div>
         </motion.div>
       ) : null}

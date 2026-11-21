@@ -74,6 +74,7 @@ test("noteColumns survive HTTP create/update; path and kind are immutable", asyn
   for (const patch of [{ path: "notes/moved.md" }, { kind: "capture" }]) {
     expect((await raw(record("notes", n.rec), "PATCH", { rev: n.rev, ...patch })).status).toBe(400);
   }
+  await expect(pb.update(s, { ...n, path: "notes/moved.md" }, text)).rejects.toBeInstanceOf(pb.Refused);
   expect(await pb.get(s, n.rec)).toEqual(n);
   const cleared = "# Plain\nNo frontmatter.\n";
   await pb.update(s, n, cleared);
@@ -104,6 +105,12 @@ test("links: idempotent replay, unique ends/role, shape checks and cascades on e
   expect((await pb.tasks.get(s, t.id))?.rev).toBe(1);
   await pb.remove(s, n);
   expect(await pb.links.of(s, l.from)).toEqual([]);
+  // A link to a note deleted meanwhile: what PocketBase answers, and the protocol's typed outcome for it (the sync drops it)
+  const dangling = newLink(id(), l.from, { type: "note", id: n.rec }, "about");
+  const refused = await raw("collections/links/records", "POST", linkRecord(dangling));
+  expect(refused.status).toBe(400);
+  expect((await refused.json()).data.toNote.code).toBe("validation_missing_rel_records");
+  await expect(pb.links.add(s, dangling)).rejects.toBeInstanceOf(pb.Gone);
   expect((await pb.tasks.get(s, t.id))?.rev).toBe(1);
   const n2 = await note();
   const l2 = await pb.links.add(s, { ...l, id: id(), to: { type: "note", id: n2.rec } });

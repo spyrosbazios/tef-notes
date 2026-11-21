@@ -12,10 +12,12 @@
 //   - Tasks: the same over records. A stale rev merges field by field against `base` (`mergeRecord`), the local edit
 //     winning a field both changed, so there is never a conflict to settle.
 //   - Links: a set of ids, no rev. Pulled after the tasks; an add is idempotent (the server's copy comes back, perhaps
-//     under its own id, which the row takes), a remove is a tombstone, a 404 (an end gone from the server) drops the link.
+//     under its own id, which the row takes), a remove is a tombstone, `Gone` (an end gone from the server) drops the link.
 // "Unsent" is `updated !== pushed` (both ms, `tick`ed so an edit in the same millisecond as a push still reads as unsent,
 // and one made while a push is out stays unsent after it).
-import { Conflict, type Entry, type Listed, type Remote, type Versioned } from "./record-contracts";
+// A failure is one of the transport's typed outcomes (record-contracts): `Unavailable` is tried again later, `Refused` parks
+// the row (`refused`, its reason): it is not sent again until it is edited or the owner asks (`retryRefused`, `discardRefused`).
+import { Conflict, Gone, Refused, Unavailable, type Entry, type Listed, type Remote, type Versioned } from "./record-contracts";
 import { isNotePath, newNotePath, parseNote, reconcile, type NoteKind } from "./notes";
 import { linksForNextRound, newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "./record-links";
 import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";
@@ -25,20 +27,21 @@ import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";
 /** A note as the client holds it. `rec`/`rev`: the server's record and version the text was last in step with (null until
  *  first pushed); `base`: that version's text, what both sides' edits are diffed against. `conflict_*`: the server's
  *  version while unsent edits overlap it. `lost`: the unsent text `takeTheirs` replaced, until restored or dismissed.
- *  `deleted`: a tombstone until the delete is pushed. */
+ *  `deleted`: a tombstone until the delete is pushed. `refused`: why the server refused its change, which then waits for
+ *  the owner (every row kind has it). */
 export type NoteRow = {
   path: string; text: string; kind: NoteKind;
   updated: number; pushed: number | null;
   rec: string | null; rev: number | null; base: string | null;
   conflict_text: string | null; conflict_rev: number | null; lost: string | null;
-  deleted: boolean;
+  deleted: boolean; refused?: string;
 };
 
 /** A task as the client holds it: `data` now, `base` as of `rev` (null until first pushed or pulled). */
-export type TaskRow = { id: string; data: Task; base: Task | null; rev: number | null; updated: number; pushed: number | null; deleted: boolean };
+export type TaskRow = { id: string; data: Task; base: Task | null; rev: number | null; updated: number; pushed: number | null; deleted: boolean; refused?: string };
 
 /** A link as the client holds it. `pushed`: when the server last had it (ms), null for one made here and not up yet. */
-export type LinkRow = { link: Link; pushed: number | null; deleted: boolean };
+export type LinkRow = { link: Link; pushed: number | null; deleted: boolean; refused?: string };
 
 /** One kind of row, by key. The engine reads and writes rows whole; `patch` below is the partial write. */
 export type Table<R> = { get: (key: string) => R | undefined; all: () => R[]; put: (row: R) => void; delete: (key: string) => void };
@@ -51,7 +54,8 @@ export type Store = { notes: Table<NoteRow>; tasks: Table<TaskRow>; links: Table
 export type Fetched = Remote & { at?: number };
 
 /** What the engine asks of the server, the core's `pocketbase.ts` calls with the server bound (the web wraps its axios services
- *  the same way). Every call rejects with `Conflict` for a stale rev or a taken name; `status` says what an error was. */
+ *  the same way). Every call rejects with a typed outcome of record-contracts (record-protocol maps PocketBase's answers to
+ *  them): `Conflict` for a stale rev or a taken name, `Gone`, `Refused`, `Unavailable`. */
 export type Transport = {
   notes: {
     list: () => Promise<Listed[]>;
@@ -75,8 +79,6 @@ export type Transport = {
     add: (l: Link) => Promise<Link>;
     remove: (id: string) => Promise<void>;
   };
-  /** The HTTP status an error carries; undefined when nothing answered (a timeout, a refused or dropped connection). */
-  status: (e: unknown) => number | undefined;
 };
 
 // ---- small things
@@ -143,7 +145,7 @@ export type Run = {
   want?: Want;
 };
 
-const unreachable = (c: Run, e: unknown) => !(e instanceof Conflict) && c.api.status(e) === undefined;
+const unreachable = (e: unknown) => e instanceof Unavailable;
 const wants = (c: Run, path: string) => (c.want ?? isNotePath)(path);
 
 /** Local midnight of the note's `created`, so a first pull lists notes by age, not all at "now". */
@@ -166,7 +168,7 @@ export const freshNote = (path: string, text: string, updated: number): NoteRow 
 export function writeNote(s: Store, path: string, text: string): boolean {
   const n = s.notes.get(path);
   if (n && !n.deleted && n.text === text) return false;
-  if (n) s.notes.put({ ...n, text, updated: tick(n), deleted: false });
+  if (n) s.notes.put({ ...n, text, updated: tick(n), deleted: false, refused: undefined });
   else s.notes.put(freshNote(path, text, tick()));
   return true;
 }
@@ -176,7 +178,7 @@ export function writeNote(s: Store, path: string, text: string): boolean {
 export function removeNote(s: Store, path: string, syncing: boolean): boolean {
   const n = s.notes.get(path);
   if (!n || n.deleted) return false;
-  if (n.rec || syncing) s.notes.put({ ...n, deleted: true, conflict_text: null, conflict_rev: null });
+  if (n.rec || syncing) s.notes.put({ ...n, deleted: true, conflict_text: null, conflict_rev: null, refused: undefined });
   else s.notes.delete(path);
   return true;
 }
@@ -230,7 +232,7 @@ function takeNote(s: Store, r: Fetched): boolean {
 /** false when the server couldn't be reached: nothing else is worth trying this round. */
 async function pullNotes(c: Run): Promise<boolean> {
   let down = false;
-  const failed = (what: string, e: unknown) => { if (unreachable(c, e)) down = true; c.fail(what, e); };
+  const failed = (what: string, e: unknown) => { if (unreachable(e)) down = true; c.fail(what, e); };
   let entries: Listed[];
   try { entries = await c.api.notes.list(); } catch (e) { failed("notes", e); return !down; }
   const remote = new Map(entries.filter((e) => wants(c, e.path)).map((e) => [e.path, e]));
@@ -325,9 +327,10 @@ async function dropNote(c: Run, t: NoteRow): Promise<void> {
 }
 
 async function pushNotes(c: Run) {
-  const mine = () => c.store.notes.all().filter((n) => wants(c, n.path));
-  for (const n of mine()) if (!n.deleted && unsent(n) && n.conflict_rev == null) await sendNote(c, n.path).catch((e) => c.fail(n.path, e));
-  for (const n of mine()) if (n.deleted) await dropNote(c, n).catch((e) => c.fail(n.path, e));
+  const mine = () => c.store.notes.all().filter((n) => wants(c, n.path) && n.refused == null);
+  const failed = (path: string) => (e: unknown) => (e instanceof Refused ? void patch(c.store.notes, path, { refused: e.message }) : c.fail(path, e));
+  for (const n of mine()) if (!n.deleted && unsent(n) && n.conflict_rev == null) await sendNote(c, n.path).catch(failed(n.path));
+  for (const n of mine()) if (n.deleted) await dropNote(c, n).catch(failed(n.path));
 }
 
 // ---- tasks: local edits
@@ -336,7 +339,7 @@ async function pushNotes(c: Run) {
 export function saveTask(s: Store, data: Task): void {
   const r = s.tasks.get(data.id);
   if (r && !r.deleted && same(r.data, data)) return;
-  if (r) s.tasks.put({ ...r, data, updated: tick(r), deleted: false });
+  if (r) s.tasks.put({ ...r, data, updated: tick(r), deleted: false, refused: undefined });
   else s.tasks.put({ id: data.id, data, base: null, rev: null, updated: tick(), pushed: null, deleted: false });
 }
 
@@ -344,7 +347,7 @@ export function saveTask(s: Store, data: Task): void {
 export function removeTask(s: Store, id: string, syncing: boolean): void {
   const r = s.tasks.get(id);
   if (!r || r.deleted) return;
-  if (r.rev != null || syncing) s.tasks.put({ ...r, deleted: true });
+  if (r.rev != null || syncing) s.tasks.put({ ...r, deleted: true, refused: undefined });
   else s.tasks.delete(id);
 }
 
@@ -361,10 +364,10 @@ function takeTask(s: Store, r: Versioned<Task>) {
 async function pullTasks(c: Run): Promise<boolean> {
   const { api, store } = c;
   let entries: { id: string; rev: number }[];
-  try { entries = await api.tasks.revs(); } catch (e) { c.fail("tasks", e); return !unreachable(c, e); }
+  try { entries = await api.tasks.revs(); } catch (e) { c.fail("tasks", e); return !unreachable(e); }
   const remote = new Set(entries.map((e) => e.id)), local = new Map(store.tasks.all().map((r) => [r.id, r]));
   const stale = entries.filter((e) => { const l = local.get(e.id); return !l || (l.rev !== e.rev && !taskUnsent(l) && !l.deleted); }).map((e) => e.id);
-  try { for (const r of await api.tasks.getMany(stale)) takeTask(store, r); } catch (e) { c.fail("tasks", e); if (unreachable(c, e)) return false; }
+  try { for (const r of await api.tasks.getMany(stale)) takeTask(store, r); } catch (e) { c.fail("tasks", e); if (unreachable(e)) return false; }
   // Gone from the server: gone here too, unless edited here since (the push puts it back). A tombstone's delete is done.
   for (const l of local.values()) if (l.rev != null && !remote.has(l.id) && (l.deleted || !taskUnsent(l))) store.tasks.delete(l.id);
   return true;
@@ -420,11 +423,14 @@ async function dropTask(c: Run, t: TaskRow): Promise<void> {
   store.tasks.put({ id: t.id, data, base: data, rev, updated: u, pushed: u, deleted: false });
 }
 
+const taskFailed = (c: Run, id: string) => (e: unknown) =>
+  (e instanceof Refused ? void patch(c.store.tasks, id, { refused: e.message }) : c.fail(`tasks/${id}`, e));
+
 const pushTasks = (c: Run) =>
-  pool(c.store.tasks.all().filter((r) => !r.deleted && taskUnsent(r)), 4, (r) => sendTask(c, r.id).catch((e) => c.fail(`tasks/${r.id}`, e)));
+  pool(c.store.tasks.all().filter((r) => !r.deleted && taskUnsent(r) && r.refused == null), 4, (r) => sendTask(c, r.id).catch(taskFailed(c, r.id)));
 
 const dropTasks = (c: Run) =>
-  pool(c.store.tasks.all().filter((r) => r.deleted), 4, (t) => dropTask(c, t).catch((e) => c.fail(`tasks/${t.id}`, e)));
+  pool(c.store.tasks.all().filter((r) => r.deleted && r.refused == null), 4, (t) => dropTask(c, t).catch(taskFailed(c, t.id)));
 
 // ---- links: local edits
 
@@ -451,7 +457,7 @@ export function addLink(s: Store, id: string, from: LinkEnd, to: LinkEnd, role: 
 export function removeLink(s: Store, id: string, syncing: boolean): void {
   const r = s.links.get(id);
   if (!r || r.deleted) return;
-  if (r.pushed != null || syncing) s.links.put({ ...r, deleted: true });
+  if (r.pushed != null || syncing) s.links.put({ ...r, deleted: true, refused: undefined });
   else s.links.delete(id);
 }
 
@@ -470,14 +476,14 @@ const LINK_BATCH = 40;
 async function pullLinks(c: Run): Promise<"ok" | "failed" | "down"> {
   const { api, store } = c;
   let ids: string[];
-  try { ids = await api.links.ids(); } catch (e) { c.fail("links", e); return unreachable(c, e) ? "down" : "failed"; }
+  try { ids = await api.links.ids(); } catch (e) { c.fail("links", e); return unreachable(e) ? "down" : "failed"; }
   const remote = new Set(ids), rows = new Map(store.links.all().map((r) => [r.link.id, r]));
   const missing = ids.filter((id) => !rows.has(id));
   try {
     for (let i = 0; i < missing.length; i += LINK_BATCH) {
       for (const link of await api.links.byIds(missing.slice(i, i + LINK_BATCH))) if (!store.links.get(link.id)) store.links.put({ link, pushed: Date.now(), deleted: false });
     }
-  } catch (e) { c.fail("links", e); return unreachable(c, e) ? "down" : "failed"; }
+  } catch (e) { c.fail("links", e); return unreachable(e) ? "down" : "failed"; }
   for (const r of rows.values()) {
     if (remote.has(r.link.id)) { if (r.pushed == null) store.links.put({ ...r, pushed: Date.now() }); }   // an add that landed before the page closed
     else if (r.pushed != null) store.links.delete(r.link.id);       // gone from the server; a tombstone's delete is done
@@ -495,6 +501,7 @@ async function pushLinks(c: Run) {
   const { api, store } = c;
   for (const r of store.links.all()) {
     const l = r.link, id = l.id;
+    if (r.refused != null) continue;
     try {
       if (r.deleted) {
         await api.links.remove(id);
@@ -510,7 +517,8 @@ async function pushLinks(c: Run) {
       if (got.id !== id) store.links.delete(id);                       // the server had this relation under its own id
       store.links.put({ link: got, pushed: Date.now(), deleted: now.deleted });
     } catch (e) {
-      if (!(e instanceof Conflict) && c.api.status(e) === 404 && !r.deleted) store.links.delete(id);   // an end is gone from the server
+      if (e instanceof Gone && !r.deleted) store.links.delete(id);       // an end is gone from the server (deleted elsewhere)
+      else if (e instanceof Refused) patch(store.links, id, { refused: e.message });
       else c.fail(`links/${id}`, e);
     }
   }
@@ -537,11 +545,56 @@ export async function syncRound(c: Run): Promise<boolean> {
 
 // ---- what the client shows of it
 
-/** Rows with changes not sent: unsent or deleted notes, tasks and links. */
+/** Rows with changes not sent and still to be tried: unsent or deleted notes, tasks and links, not those the server refused. */
 export function waiting(s: Store): number {
-  return s.notes.all().filter((n) => unsent(n) || n.deleted).length
-    + s.tasks.all().filter((t) => taskUnsent(t) || t.deleted).length
-    + s.links.all().filter((l) => l.pushed == null || l.deleted).length;
+  return s.notes.all().filter((n) => (unsent(n) || n.deleted) && n.refused == null).length
+    + s.tasks.all().filter((t) => (taskUnsent(t) || t.deleted) && t.refused == null).length
+    + s.links.all().filter((l) => (l.pushed == null || l.deleted) && l.refused == null).length;
+}
+
+/** A change the server refused: which row (`key`: a note's path, a task's or a link's id), what it was, and why. */
+export type Refusal = { kind: "note" | "task" | "link"; key: string; title: string; deleted: boolean; reason: string };
+
+/** Every change the server refused, waiting on the owner: send it again (`retryRefused`) or let it go (`discardRefused`). */
+export function refusals(s: Store): Refusal[] {
+  return [
+    ...s.notes.all().flatMap((n) => n.refused == null ? [] : [{ kind: "note" as const, key: n.path, title: parseNote(n.path, n.text).title, deleted: n.deleted, reason: n.refused }]),
+    ...s.tasks.all().flatMap((t) => t.refused == null ? [] : [{ kind: "task" as const, key: t.id, title: t.data.title, deleted: t.deleted, reason: t.refused }]),
+    ...s.links.all().flatMap((l) => l.refused == null ? [] : [{ kind: "link" as const, key: l.link.id, title: "A link", deleted: l.deleted, reason: l.refused }]),
+  ];
+}
+
+/** A refused change tried again on the next push, as it is. false when nothing was refused. */
+export function retryRefused(s: Store, kind: Refusal["kind"], key: string): boolean {
+  const clear = <R extends { refused?: string }>(t: Table<R>) => {
+    const r = t.get(key);
+    if (r?.refused == null) return false;
+    t.put({ ...r, refused: undefined });
+    return true;
+  };
+  return kind === "note" ? clear(s.notes) : kind === "task" ? clear(s.tasks) : clear(s.links);
+}
+
+/** A refused change let go: the row goes back to the server's version (a delete is undone), or away when the server never
+ *  had it. false when nothing was refused. */
+export function discardRefused(s: Store, kind: Refusal["kind"], key: string): boolean {
+  if (kind === "note") {
+    const n = s.notes.get(key);
+    if (n?.refused == null) return false;
+    if (n.rev == null || n.base == null) s.notes.delete(key);
+    else { const t = tick(n); s.notes.put({ ...n, text: n.base, updated: t, pushed: t, deleted: false, refused: undefined }); }
+  } else if (kind === "task") {
+    const r = s.tasks.get(key);
+    if (r?.refused == null) return false;
+    if (r.rev == null || r.base == null) s.tasks.delete(key);
+    else { const t = tick(r); s.tasks.put({ ...r, data: r.base, updated: t, pushed: t, deleted: false, refused: undefined }); }
+  } else {
+    const l = s.links.get(key);
+    if (l?.refused == null) return false;
+    if (l.pushed == null) s.links.delete(key);
+    else s.links.put({ ...l, deleted: false, refused: undefined });
+  }
+  return true;
 }
 
 /** The paths of notes whose edits overlap the server's, waiting on a side being picked or on replaced text being restored. */

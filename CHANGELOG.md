@@ -20,6 +20,10 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 - Waiting for a sync while one is already out now waits for a fresh round: the assistant opening a note it just made, a
   note action's Undo and the Share page no longer see the notebook as it was before the write.
+- A change the server refuses (a link to a note deleted on another device, a note or task it won't take) is no longer
+  retried every 30 seconds forever. A link to something deleted is dropped; anything else the server refused is listed in
+  Settings > Server & sync, to try again or let go, and the sync notice says so. A sync that fails is retried after 5
+  seconds, then less and less often, up to every 5 minutes.
 
 ## 0.13.0 - 2026-11-19
 

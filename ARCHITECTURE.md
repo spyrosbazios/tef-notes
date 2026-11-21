@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-20 -->
+<!-- reviewed: 2026-11-21 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -22,10 +22,12 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
   from the agent with the `fish` key (`server/README.md`, "Voice input" and "Talk").
 - `packages/core/`: dependency-free TypeScript shared by the web app, CLI, extension and agent, imported as
   `@/core/*`. It holds the note format, the merge, the PocketBase client, task logic, agent card shapes and the theme
-  palettes. `record-contracts.ts` holds transport-free record types, conflict errors and derived note columns;
-  `record-protocol.ts` holds note/task/link requests over an injected transport. The fetch client (`pocketbase.ts`)
-  and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports the contracts,
-  not the HTTP client. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
+  palettes. `record-contracts.ts` holds transport-free record types, the typed failures (`Conflict`, `Gone`, `Refused`,
+  `Unavailable`) and derived note columns; `record-protocol.ts` holds note/task/link requests over an injected transport and
+  maps PocketBase's answers to those failures (`outcomeOf`: a relation to a deleted record is `Gone`). The fetch client
+  (`pocketbase.ts`) and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports
+  the contracts, not the HTTP client, and switches on those types, never on status codes: a `Refused` change is parked
+  (`refused`) and shown to the owner instead of being retried. The server's hooks are plain JS and cannot import it, so `server/pb_hooks/lib/notes.js` is a small copy of
   the note format that a test (`server/test/notes.test.js`) checks against `packages/core/src/notes.ts`.
 - Clients own merging. The server stays thin: schema, rules, the `rev` contract and a few jobs.
 - There is no sign-in; see [SECURITY.md](SECURITY.md).
@@ -298,7 +300,8 @@ writes text of its own, and only with your confirmation.
 `web/` is built by the server image into `pb_public`, so the web app and the API share an origin (no CORS, one URL to
 configure). It uses shadcn, TanStack Query and axios services (`web/src/services/`), with errors mapped to the core's
 `Conflict`. The web sync controller (`web/src/lib/sync-controller.ts`) owns its mutable status and timers over an injected
-store and transport. The root frame's `hooks/live.ts` owns realtime and browser lifecycle subscriptions; `lib/local-records.ts`
+store and transport; a round that fails is tried again after 5 s, doubling to at most 5 minutes, and Settings lists the
+changes the server refused, to send again or let go. The root frame's `hooks/live.ts` owns realtime and browser lifecycle subscriptions; `lib/local-records.ts`
 owns the notes/tasks/links query projections, shared by feature edits and sync redraws. On a phone it is the installed PWA, in its own layout below `md`.
 
 Colours live in one place, `packages/core/src/theme.ts` (`THEMES`: sixteen themes, nine dark and seven light, each a palette,

@@ -13,7 +13,7 @@ import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
 import { noteKindOf, type NoteKind } from "./notes";
 import type { Link, LinkEnd } from "./record-links";
 import { conflictOf, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
-export { Conflict, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
+export { Conflict, Gone, Refused, Unavailable, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
 import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "./record-protocol";
 export { linkFilter } from "./record-protocol";
 import { taskOf, type Task } from "./todo";
@@ -59,7 +59,7 @@ export async function call(s: Server, path: string, init: RequestInit = {}): Pro
 
 const transport = (s: Server): RecordTransport => ({
   request: (path, request = {}) => call(s, path, request.body === undefined ? { method: request.method } : json(request.method ?? "POST", request.body)),
-  status: (e) => e instanceof HttpError ? e.status : undefined,
+  answer: (e) => e instanceof HttpError ? { status: e.status, body: e.body } : undefined,
 });
 const remote = (r: any): Remote => ({ rec: r.id, path: r.path, rev: r.rev, text: r.text, kind: noteKindOf(r.kind) });
 const notes = (s: Server) => noteCollection(transport(s), remote, { sort: "path" });

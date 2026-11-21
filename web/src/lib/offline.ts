@@ -20,9 +20,10 @@ export async function keptFiles(): Promise<number> {
 
 /** Forget the offline copy: the local copy, the stored query cache and the kept files. The page then reloads, so nothing still in
  *  memory writes it back; what the server has comes down again on the next visit online. What was never sent would be lost with
- *  it, so nothing is forgotten while any change waits. */
+ *  it, so nothing is forgotten while any change waits or sits refused. */
 export async function clearOffline(): Promise<void> {
-  if (getStatus().waiting) throw new Error("Changes made here haven't reached the server yet.");
+  const { waiting, refused } = getStatus();
+  if (waiting || refused.length) throw new Error("Changes made here haven't reached the server yet.");
   persister.disable();   // the cache changing during the awaits below, and the flush as the page hides, would write it back
   await clearLocal();
   await persister.removeClient();
