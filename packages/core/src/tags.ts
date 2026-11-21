@@ -8,17 +8,23 @@ import { fold, parseNote, withFlags, type Color } from "./notes";
 import { call, json, type Server } from "./pocketbase";
 import type { Task } from "./todo";
 
-export type TagDef = { rec: string; name: string; color?: Color; description: string };
-/** What a form edits: everything but the record id. */
-export type TagFields = Omit<TagDef, "rec">;
+/** `describedBy`: who wrote the description (the server's column): only "owner" is the owner's own words; the auto-tagger's ("auto")
+ *  and the chat agent's ("agent") are text a model wrote, which a reader that acts on it must not trust. Unset: none written. */
+export type TagDef = { rec: string; name: string; color?: Color; description: string; describedBy?: string };
+/** What a form edits: everything but the record id, and the mark the server sets. */
+export type TagFields = Omit<TagDef, "rec" | "describedBy">;
+/** The writer of a description change that isn't the owner's, sent as `describedBy` (the server would otherwise stamp "owner"). */
+export type TagMark = "agent";
 
 // ---- definitions
 
 /** A `tags` record as a TagDef; the web app's transport maps its own responses through this. */
-export const tagDef = (r: any): TagDef => ({ rec: r.id, name: r.name, color: r.color || undefined, description: r.description ?? "" });
+export const tagDef = (r: any): TagDef => ({ rec: r.id, name: r.name, color: r.color || undefined, description: r.description ?? "", describedBy: r.describedBy || undefined });
 
-/** A TagDef's columns, as the server stores them: no colour is the empty select. */
-export const tagColumns = (t: TagFields) => ({ name: t.name.trim(), color: t.color ?? "", description: t.description.trim() });
+/** A TagDef's columns, as the server stores them: no colour is the empty select. `mark`: who wrote the description when it isn't
+ *  the owner; sent only with a description, so a definition changed without one keeps the mark of what it has. */
+export const tagColumns = (t: TagFields, mark?: TagMark) =>
+  ({ name: t.name.trim(), color: t.color ?? "", description: t.description.trim(), ...(mark && t.description.trim() ? { describedBy: mark } : {}) });
 
 /** Every definition, by name. */
 export async function listTags(s: Server): Promise<TagDef[]> {
@@ -27,12 +33,12 @@ export async function listTags(s: Server): Promise<TagDef[]> {
 }
 
 /** A new definition. Conflict: a tag by that name (ignoring case) exists. */
-export const createTag = async (s: Server, t: TagFields): Promise<TagDef> =>
-  tagDef(await call(s, "collections/tags/records", json("POST", tagColumns(t))));
+export const createTag = async (s: Server, t: TagFields, mark?: TagMark): Promise<TagDef> =>
+  tagDef(await call(s, "collections/tags/records", json("POST", tagColumns(t, mark))));
 
 /** Conflict: the new name is taken. */
-export const updateTag = async (s: Server, rec: string, t: TagFields): Promise<TagDef> =>
-  tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t))));
+export const updateTag = async (s: Server, rec: string, t: TagFields, mark?: TagMark): Promise<TagDef> =>
+  tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t, mark))));
 
 /** What a rename did (server/pb_hooks/tags.pb.js): the name the items carry now, how many records changed, and whether
  *  `to` was a tag already, which the renamed one merged into. */

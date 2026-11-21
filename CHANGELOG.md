@@ -18,6 +18,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- A tag description the server or the assistant wrote is treated like text from the web: when the assistant reads one it
+  asks before writing, and a description the assistant writes is marked as its own. Only what you wrote is trusted.
 - The agent no longer answers another website's browser: its routes need a JSON body (raw bytes for dictation) and an
   `Origin` that is your server's own, and a confirm card's answer only runs a write the agent itself asked about (cards are
   signed; one waiting while the agent updates has to be asked again).

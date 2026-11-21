@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-20 -->
+<!-- reviewed: 2026-11-21 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -203,7 +203,9 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
   next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`. The owner can turn
   the asking off in Settings (prefs `agent.webGuard`, `src/agent.ts` `guarded`): their rules then hold as set, while the
-  `tainted` mark and the withdrawal of memory, `save_note_action` and the selection tools stay.
+  `tainted` mark and the withdrawal of memory, `save_note_action` and the selection tools stay. A tag's description counts
+  as read from the web unless `describedBy` says the owner wrote it (the auto-tagger's and the agent's were written by a
+  model): `list_tags` marks those `unverified` and reading one taints the turn (policy `result: "marked"`).
 - Note actions (`packages/core/src/note-actions.ts`): a button on a note runs a prompt the owner saved, as a chat of its own
   whose requests carry `action` (which action, on which note). The agent reads the action from the preferences and narrows
   the turn to it (`src/note-action.ts`): only the tools its result needs (rewrite this note, add a task, or read and

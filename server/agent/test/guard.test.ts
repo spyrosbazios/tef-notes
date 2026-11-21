@@ -141,6 +141,11 @@ describe("historyFromWeb", () => {
     expect(taint(part("go_view", "output-available", { output: { ok: true } }))).toBe(false);
     expect(taint(part("go_view", "output-error", { errorText: "The app didn't do it." }))).toBe(false);
   });
+  it("taints on a tag listing that carried a model's description, not on one that carried only the owner's", () => {
+    const listing = (tags: object[]) => part("list_tags", "output-available", { output: { tags } });
+    expect(taint(listing([{ name: "a", means: "m", unverified: true }]))).toBe(true);
+    expect(taint(listing([{ name: "a", means: "m" }, { name: "b" }]))).toBe(false);
+  });
   it("agrees with the turn's own check on an error result", () => {
     const err: ModelMessage[] = [{ role: "tool", content: [{ type: "tool-result", toolCallId: "c", toolName: "read_page", output: { type: "error-text", value: "boom" } }] }];
     expect(fromWeb(err)).toBe(true);

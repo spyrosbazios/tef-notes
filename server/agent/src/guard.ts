@@ -56,8 +56,13 @@ export async function repair<M extends UIMessage>(ms: M[], tools: ToolSet): Prom
  *  the paths of notes and ids of tasks written in a chat that had (their `tainted` column); one read back
  *  here is web text too, a chat later. */
 export const fromWeb = (ms: ModelMessage[], tainted: ReadonlySet<string>, policyFor: PolicyLookup) =>
-  ms.some((m) => m.role === "tool" && m.content.some((p) => p.type === "tool-result" && (policyFor(p.toolName)?.result === "untrusted"
-    || (policyFor(p.toolName)?.result === "records" && tainted.size > 0 && names(p.output, tainted)))));
+  ms.some((m) => m.role === "tool" && m.content.some((p) => {
+    if (p.type !== "tool-result") return false;
+    const policy = policyFor(p.toolName);
+    return policy?.result === "untrusted"
+      || (policy?.result === "records" && tainted.size > 0 && names(p.output, tainted))
+      || (policy?.result === "marked" && !!policy.taints?.(p.output.type === "json" ? p.output.value : undefined));
+  }));
 
 /** Whether a tool result names one of these paths or ids: as a JSON string value, so one quoted inside a note's text doesn't count. */
 function names(output: unknown, paths: ReadonlySet<string>) {
@@ -80,6 +85,7 @@ export function historyFromWeb(ms: UIMessage[], tainted: ReadonlySet<string>, po
     if (!isToolUIPart(p) || (p.state !== "output-available" && p.state !== "output-error")) return false;
     const policy = policyFor(getToolName(p));
     // A removed tool with an opaque result has no trustworthy provenance classification.
-    return !policy || policy.result === "untrusted" || (policy.result === "records" && p.state === "output-available" && names(p.output, tainted));
+    return !policy || policy.result === "untrusted"
+      || (p.state === "output-available" && ((policy.result === "records" && names(p.output, tainted)) || (policy.result === "marked" && !!policy.taints?.(p.output))));
   }));
 }

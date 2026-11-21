@@ -2,7 +2,9 @@
 // server/pb_hooks/clip.pb.js): one short model call on the default model. A PDF is titled from its first pages' text (what
 // OCR read of a scan, waited for a little); a photo or screenshot by the model looking at it. The PDF comes first, as the
 // clip route's own fallback puts a PDF's name over the day's "Photos". Any failure, no key, or a model that takes no images
-// answers `{ title: null }`, and the route keeps the title it had: titling never fails a save.
+// answers `{ title: null }`, and the route keeps the title it had: titling never fails a save. This route writes nothing:
+// the title is a model's reading of someone else's file, set on the note by the clip route (`retitle`), whose write marks
+// the note `tainted` like the rest of that clip's.
 import { generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { isPdf } from "@/core/photos";
