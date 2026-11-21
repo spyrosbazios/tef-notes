@@ -274,3 +274,22 @@ describe("htmlOf", () => {
     expect(() => htmlOf(U, net({ [U]: reply(302, { location: "http://10.0.0.1/" }) }))).toThrow(Blocked);
   });
 });
+
+describe("prune", () => {
+  test("deletes each old record through the app, so its picture files go with it, page by page", () => {
+    const now = 1_000_000_000_000, old = now - lib.KEEP_TTL - 1;
+    let rows = [...Array.from({ length: 250 }, (_, i) => ({ id: `o${i}`, fetched: old })), { id: "fresh", fetched: now }];
+    const deleted = [], asked = [];
+    const app = {
+      findRecordsByFilter: (coll, filter, sort, limit, offset, params) => {
+        asked.push({ coll, filter, limit, params });
+        return rows.filter((r) => r.fetched < params.t).slice(0, limit);
+      },
+      delete: (r) => { deleted.push(r.id); rows = rows.filter((x) => x !== r); },
+    };
+    expect(lib.prune(app, now)).toBe(250);
+    expect(deleted).toHaveLength(250);
+    expect(rows.map((r) => r.id)).toEqual(["fresh"]);
+    expect(asked[0]).toEqual({ coll: "link_previews", filter: "fetched < {:t}", limit: 200, params: { t: now - lib.KEEP_TTL } });
+  });
+});

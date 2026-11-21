@@ -75,8 +75,8 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
   return e.json(200, { url, ...out, picture: rec ? pictureOf(rec) : "" });
 });
 
-// Previews nobody asked for in a quarter: gone
+// Previews nobody asked for in a quarter: gone, with their kept pictures (lib/link-preview.js prune)
 cronAdd("link_previews_prune", "17 4 * * *", () => {
-  const lib = require(`${__hooks}/lib/link-preview.js`);
-  $app.db().newQuery("DELETE FROM link_previews WHERE fetched < {:t}").bind({ t: Date.now() - lib.KEEP_TTL }).execute();
+  const gone = require(`${__hooks}/lib/link-preview.js`).prune($app);
+  if (gone) $app.logger().info("link-preview: pruned", "records", gone);
 });

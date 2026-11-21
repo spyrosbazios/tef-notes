@@ -384,4 +384,19 @@ function htmlOf(raw, io) {
   return { url: page.url, html: page.body };
 }
 
-module.exports = { FOUND_TTL, PAGE_BYTES, htmlOf, EMPTY_TTL, KEEP_TTL, IMAGE_BYTES, Blocked, isPublicIp, parseUrl, resolveUrl, fetchPage, parsePage, pageText, textOf, previewOf, curl, curlFile, getent };
+// ---- the cache
+
+const PRUNE_PAGE = 200;                      // records deleted per query by prune
+
+/** Deletes every `link_previews` record nobody refreshed in KEEP_TTL, each through `app.delete`, so its kept `picture`
+ *  and that picture's thumbs leave storage with it (a raw DELETE leaves the files behind). Returns how many went. */
+function prune(app, now = Date.now()) {
+  let gone = 0;
+  for (;;) {
+    const old = app.findRecordsByFilter("link_previews", "fetched < {:t}", "", PRUNE_PAGE, 0, { t: now - KEEP_TTL });
+    for (const r of old) { app.delete(r); gone++; }
+    if (old.length < PRUNE_PAGE) return gone;
+  }
+}
+
+module.exports = { prune, FOUND_TTL, PAGE_BYTES, htmlOf, EMPTY_TTL, KEEP_TTL, IMAGE_BYTES, Blocked, isPublicIp, parseUrl, resolveUrl, fetchPage, parsePage, pageText, textOf, previewOf, curl, curlFile, getent };
