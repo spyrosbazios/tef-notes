@@ -7,6 +7,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- Auto-tagging: a note the tagging service keeps refusing no longer holds up the rest; it is retried less and less
+  often, and set aside after a few tries until you edit it.
 - Saving a clip answers in time even when the page, the writing model and the agent are all slow: their calls share
   one deadline, so the clipper and the share page no longer give up on a save that then lands anyway. A link shared
   without its title now finds the title the server already has for it.
