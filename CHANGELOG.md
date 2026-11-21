@@ -7,6 +7,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- The hourly tag-description job no longer writes over a description you (or an agent) saved while it was writing, nor
+  undoes a rename made meanwhile.
 - `tefnotes` run with `TEF_NOTES_AGENT=1` marks every write that carries content: `import` and `draw --replace` no longer
   leave a note unmarked, and a tag description it writes is recorded as an agent's, not the owner's.
 - Voice input: leaving the screen while the microphone was still opening no longer leaves it recording (and streaming to

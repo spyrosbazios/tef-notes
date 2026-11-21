@@ -2,10 +2,11 @@
 // Renaming a tag (below), and tag descriptions written from the notes that carry the tag, for the tag editors (phone, web, CLI): the logic is
 // lib/tags.js, the server's model (lib/llm.js, its one writing model). The route writes nothing: the client shows the text
 // and saves it with the tag the normal way (the `tags` collection's `description`, the hint the auto-tagger's JEV gets).
-// The hourly job below does save one, only for a tag whose description the owner didn't write (`describedBy`): drawn from
-// the notes the owner filed under it by hand, first at 3 of them, then each time they double (lib/tags.js due). A
-// description saved through the API is the owner's, unless the request marks it an agent's (the request hooks below),
-// and the job never writes over the owner's. The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
+// The hourly job below does save one, only for a tag with no description or one the job wrote itself (`describedBy`,
+// lib/tags.js replaceable): drawn from the notes the owner filed under it by hand, first at 3 of them, then each time they
+// double (lib/tags.js due). A description saved through the API is the owner's, unless the request marks it an agent's
+// (the request hooks below), and the job never writes over either: it re-reads the tag in the transaction that saves it
+// and drops its answer when the tag was renamed or described by someone meanwhile (lib/tags.js saveDescription). The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
 // used for the notes asked about from then on and sends no note back to be asked again; the owner's own edit does.
 //
 // POST /api/tefnotes/tags/describe JSON { tag: "<name>" } | { all: true }
@@ -141,18 +142,20 @@ cronAdd("tag-describe", "17 * * * *", () => {
     if (!name || !lib.due(n, rec.getInt("described"), rec.getString("describedBy"))) continue;
     const r = lib.describe($app, ds, key, have, name, log);
     if (!r.description) continue;                                 // failed: the next hour tries again
-    rec.set("description", r.description);
-    rec.set("described", n);
-    rec.set("describedBy", "auto");
-    try { $app.save(rec); log("described", "tag", name, "notes", n); } catch (err) { log("saving the description failed", "tag", name, "error", String(err).slice(0, 200)); }
+    // The model took a while: the tag is read again where it is written, and left alone if it moved meanwhile
+    let saved = false;
+    try {
+      $app.runInTransaction((tx) => { saved = lib.saveDescription(tx, rec.id, name, r.description, n); });
+      log(saved ? "described" : "renamed or described meanwhile: left as it is", "tag", name, "notes", n);
+    } catch (err) { log("saving the description failed", "tag", name, "error", String(err).slice(0, 200)); }
   }
 });
 
 // Who wrote a description that arrives through the API, decided here and nowhere else: "agent" when the request says
 // so (an outside agent: the CLI under TEF_NOTES_AGENT=1), else the owner's (the tag editors). A client can only lower
 // the trust: "owner" and "auto" are never taken from a request, and a write that leaves the description as it was
-// leaves `describedBy` too. Only the owner's is trusted: the hourly job above never writes over it, and the
-// auto-tagger's definitions hash holds it (lib/autotag.js). The job's own save is no request, so it fires neither hook.
+// leaves `describedBy` too. Only the owner's is trusted: the auto-tagger's definitions hash holds it (lib/autotag.js).
+// The hourly job above writes over neither the owner's nor an agent's. The job's own save is no request, so it fires neither hook.
 onRecordCreateRequest((e) => {
   const by = e.requestInfo().body["describedBy"] === "agent" ? "agent" : "owner";
   e.record.set("describedBy", e.record.getString("description").trim() ? by : "");

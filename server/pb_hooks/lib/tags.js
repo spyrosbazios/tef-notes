@@ -7,7 +7,7 @@
 // spread over its history, and the notes the owner took it off. Never from the auto-tagger's own tags: a description
 // drawn from them describes the tagger's mistakes, which then spread (the loop this replaced). Asked for (the route), it
 // is returned and the client saves it, falling back to any note that carries the tag. The hourly job (tags.pb.js) writes
-// one itself only where the owner wrote none (`describedBy`, 1795200000_tag_described_by.js): first at MIN hand-tagged
+// one itself only where there is none or its own (`describedBy`, 1795200000_tag_described_by.js; `replaceable`): first at MIN hand-tagged
 // notes, then each time their count doubles, at least EVERY more (`described`, 1793900000_tag_described.js).
 
 const { parse, fold } = require("./notes.js");
@@ -70,12 +70,32 @@ const rejected = (rows, name, n = MAX_REJECTED) => {
 /** How many of `rows` the owner filed under `name` by hand (case and tonos ignored). */
 const count = (rows, name) => { const k = fold(name); return rows.filter((r) => byHand(r, k)).length; };
 
+/** Whether the hourly job may write over a description by `by` ("owner" | "agent" | "auto" | ""): none yet, or its own.
+ *  Never the owner's, and never an agent's: that one was saved on purpose by someone (the CLI under TEF_NOTES_AGENT=1),
+ *  and writing over it each hour would undo that write unseen. Neither is more trusted for it: an agent's and the job's
+ *  are both left out of the auto-tagger's definitions hash. */
+const replaceable = (by) => by === "" || by === "auto";
+
 /** Whether the hourly job writes `name`'s description now, with `n` hand-tagged notes, last written at `described` of
- *  them, by `by` ("owner" | "auto" | ""): never over the owner's, first at MIN, then when they double, EVERY more at least. */
+ *  them, by `by`: only a replaceable one, first at MIN, then when they double, EVERY more at least. */
 function due(n, described, by) {
-  if (by === "owner" || n < MIN) return false;
+  if (!replaceable(by) || n < MIN) return false;
   if (!described) return true;
   return n >= Math.max(described + EVERY, 2 * described);
+}
+
+/** The hourly job's save of `description` (drawn at `n` hand-tagged notes) on the tag record `id`, re-read inside `tx`
+ *  (findRecordById, save): written only while the tag is still called `name` and its description is still replaceable,
+ *  since the model's answer took a while and the owner may have renamed or described it meanwhile. Whether it was written. */
+function saveDescription(tx, id, name, description, n) {
+  let rec;
+  try { rec = tx.findRecordById("tags", id); } catch (_) { return false; }
+  if (rec.getString("name").trim() !== name || !replaceable(rec.getString("describedBy"))) return false;
+  rec.set("description", description);
+  rec.set("described", n);
+  rec.set("describedBy", "auto");
+  tx.save(rec);
+  return true;
 }
 
 /** A note as the model reads it: its title and the opening of its body (pictures dropped, blank runs squeezed). */
@@ -184,4 +204,4 @@ function mergeDefs(defs, from, to) {
   return { keep: { ...dst, color: dst.color || (src && src.color) || "", description: theirs ? src.description : dst.description || "", describedBy: theirs ? src.describedBy || "" : dst.describedBy || "" }, drop: src, merged: true };
 }
 
-module.exports = { renameInput, renamed, mergeDefs, rows, describe, EVERY, MIN, MAX_REJECTED, count, due, rejected, byHand, MAX_NOTES, BODY_CHARS, MAX_CHARS, Bad, input, tagsOf, pick, sample, request, descriptionOf };
+module.exports = { replaceable, saveDescription, renameInput, renamed, mergeDefs, rows, describe, EVERY, MIN, MAX_REJECTED, count, due, rejected, byHand, MAX_NOTES, BODY_CHARS, MAX_CHARS, Bad, input, tagsOf, pick, sample, request, descriptionOf };
