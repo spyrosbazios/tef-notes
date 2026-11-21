@@ -1,6 +1,7 @@
 // Holds the assistant above the routes. The `Chat` is made here and lives as long as the page, so navigating never
 // unmounts it, closing the dock keeps the thread and the stream going, and a card or a tool call is answered whether or not
-// the panel is on screen. What it adds to the plain chat of the AI SDK:
+// the panel is on screen. A request carries only the chat's newest message (the owner's, or the reply they answered): the
+// server holds the history and saves it. What it adds to the plain chat of the AI SDK:
 //  - `context` in every request: where the owner is and what is open, read when the request goes out (so a step resumed by
 //    an answered card sees the screen as it is then), from the URL's nav, the query cache and the selected text;
 //  - the UI tools (core/assistant.ts): a call to open a note, a task or a view is done in the app through the nav
@@ -95,7 +96,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           }, words ? words.markdown() : selected.current, activeLensOf(qc), !!words, openDrawingNow(qc.getQueryData<NoteRec[]>(NOTES)));
           offered = uiToolsFor(context);
           const action = scope?.();
-          return { body: { id, messages, ...settingsNow(qc), context, ...(action ? { action } : {}) } };
+          // Only the newest message goes: the server holds the chat's history (server/agent/src/history.ts)
+          return { body: { id, message: messages.at(-1), ...settingsNow(qc), context, ...(action ? { action } : {}) } };
         },
       }),
       sendAutomaticallyWhen: resumes,

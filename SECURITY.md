@@ -40,8 +40,10 @@ on every device would add friction without keeping out anyone the network does n
   `Origin` other than the server's own host, or `Sec-Fetch-Site: cross-site`, is refused (`server/agent/src/request-guard.ts`).
   A client that is not a browser sends no `Origin` and is let through. Talk's WebSocket, which has no preflight at all, gets
   the same `Origin` check. A proxy in front must pass `Host` or `X-Forwarded-Host` through. A confirm card's answer runs its
-  write only if this agent issued the card: each card is signed with a secret kept in the agent's data volume, so a request
-  body cannot approve a call the model never made. A page that reaches the agent under a name it controls (DNS
+  write only if this agent issued the card: the agent holds each chat's history itself (a request carries only the newest
+  message, `server/agent/src/history.ts`), takes an answer only for a card the saved reply is waiting on, by its id, and runs
+  the call as it was issued; each card is also signed with a secret kept in the agent's data volume. So a request body cannot
+  approve a call the model never made, change one it did, or edit what the chat read (its taint). A page that reaches the agent under a name it controls (DNS
   rebinding) is not stopped by any of this: the network is the gate.
 - Scanned PDFs are read on your server: Tesseract runs inside the agent, and the text it read stays in the agent's
   data volume until the PDF is deleted. The only traffic is the one-time download of each language's data file from

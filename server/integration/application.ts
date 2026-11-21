@@ -4,25 +4,45 @@ import * as pb from "../../packages/core/src/pocketbase";
 import { NoteService } from "../agent/src/application/notes";
 import { TaskService, taskEdit } from "../agent/src/application/todo";
 import { addTaskRoute, tickRoute } from "../agent/src/companion";
-import { exists, saver } from "../agent/src/chats";
+import { load, saver } from "../agent/src/chats";
+import { fileBytes, storeFiles } from "../agent/src/chat-files";
 import { readChatHistory } from "../../packages/core/src/chat-history";
 
 const url = process.env.TEF_CONTRACT_URL;
 if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run integration/run.ts --application");
 const server = { url };
 
-test("chat saver writes versioned history over HTTP; the format guard refuses unreadable records", async () => {
+test("chat saver writes versioned history over HTTP at the rev it read; the format guard refuses unreadable records", async () => {
   const created = await pb.call(server, "collections/chats/records", pb.json("POST", { title: "Old chat", messages: [] }));
-  expect(await exists(server, created.id)).toBe(true);
+  expect(created.rev).toBe(1);
+  const read = await load(server, created.id);
+  expect(read).toEqual({ rev: 1, messages: [] });
   const messages = [{ id: "user-question", role: "user" as const, parts: [{ type: "text" as const, text: "A saved conversation" }] }];
-  await saver(server, created.id, "test-model")(messages);
+  const save = saver(server, created.id, read!.rev, "test-model");
+  await save(messages);
+  await save([...messages, { id: "reply", role: "assistant" as const, parts: [{ type: "text" as const, text: "Saved twice" }] }]);
   const path = `collections/chats/records/${created.id}`;
   const saved = await pb.call(server, path);
-  expect(saved).toMatchObject({ historyVersion: 1, title: "A saved conversation", model: "test-model" });
-  expect(readChatHistory(saved)).toEqual(messages);
-  await pb.call(server, path, pb.json("PATCH", { historyVersion: 2 }));
-  await expect(exists(server, created.id)).rejects.toThrow("Unsupported chat history version");
-  expect(await pb.call(server, path)).toMatchObject({ historyVersion: 2, messages });
+  expect(saved).toMatchObject({ rev: 3, historyVersion: 1, title: "A saved conversation", model: "test-model" });
+  expect(readChatHistory(saved)).toHaveLength(2);
+  // another writer at the rev this saver last saw is refused: the chat's saves never undo each other
+  await expect(saver(server, created.id, 2, "x")(messages)).rejects.toThrow("This chat wasn't saved");
+  expect(await load(server, created.id)).toMatchObject({ rev: 3 });
+  await pb.call(server, path, pb.json("PATCH", { historyVersion: 2, rev: 3 }));
+  await expect(load(server, created.id)).rejects.toThrow("Unsupported chat history version");
+});
+
+test("a chat's attached file is stored on its own record, served back, and deleted with the chat", async () => {
+  const created = await pb.call(server, "collections/chats/records", pb.json("POST", { title: "Files", messages: [] }));
+  const bytes = new Uint8Array(8 * 1024 * 1024 - 4096).fill(0x20);
+  bytes.set(new TextEncoder().encode("%PDF-1.4\n"));
+  const url = `data:application/pdf;base64,${Buffer.from(bytes).toString("base64")}`;
+  const m = await storeFiles(server, created.id, { id: "u", role: "user", parts: [{ type: "file", mediaType: "application/pdf", filename: "big.pdf", url }] });
+  const stored = (m.parts[0] as { url: string }).url;
+  expect(stored).toMatch(/^\/api\/files\/chat_files\//);
+  expect((await fileBytes(server, stored)).length).toBe(bytes.length);
+  await pb.call(server, `collections/chats/records/${created.id}`, { method: "DELETE" });
+  await expect(fileBytes(server, stored)).rejects.toThrow("HTTP 404");
 });
 
 test("application writes expose domain results and recurrence carries links over real PocketBase", async () => {

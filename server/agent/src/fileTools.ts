@@ -1,6 +1,6 @@
 // attach_file: a photo or PDF the owner attached in the chat filed into a note, as the app's own upload would: an
 // `attachments` record under the note's id and a line in its body pointing at it. The bytes come from the chat's file part
-// (its data URL); the model only names the file. Someone else's content: the write is always marked tainted.
+// (its stored chat file, or an older chat's data URL: chat-files.ts); the model only names the file. Someone else's content: the write is always marked tainted.
 import { tool } from "ai";
 import { z } from "zod";
 import type { Attached } from "@/core/assistant";
@@ -9,6 +9,7 @@ import { fileMarkdown, PDF, pdfName, photoMarkdown, photoName } from "@/core/pho
 import * as pb from "@/core/pocketbase";
 import { localDay } from "@/core/time";
 import { definedTags, type NoteService } from "./application/notes";
+import { fileBytes } from "./chat-files";
 import { checkWrite, noteSaved, TAGS } from "./notes";
 import { toolModule } from "./tool-policy";
 
@@ -20,13 +21,6 @@ export const ATTACH = z.object({
   tags: TAGS.optional().describe("A new note's tags"),
 });
 export type AttachInput = z.infer<typeof ATTACH>;
-
-/** The file's bytes from its data URL. */
-export function bytesOf(url: string): Uint8Array | null {
-  const m = /^data:[^;,]*(;base64)?,(.*)$/s.exec(url);
-  if (!m) return null;
-  return m[1] ? Uint8Array.from(Buffer.from(m[2], "base64")) : new TextEncoder().encode(decodeURIComponent(m[2]));
-}
 
 /** Why the call can't go ahead, or null: checked before the owner is asked, so a bad one goes back to the agent. */
 export async function attachProblem(notes: NoteService, files: readonly Attached[], i: AttachInput): Promise<string | null> {
@@ -44,8 +38,9 @@ export const fileModule = toolModule(({ notes, files }) => ({
     execute: async (i) => {
       const bad = await attachProblem(notes, files, i);
       if (bad) return { error: bad };
-      const f = files.find((x) => x.name === i.file)!, bytes = bytesOf(f.url);
-      if (!bytes) return { error: `${f.name} couldn't be read.` };
+      const f = files.find((x) => x.name === i.file)!;
+      let bytes: Uint8Array;
+      try { bytes = await fileBytes(notes.server, f.url); } catch (e) { return { error: `${f.name} couldn't be read: ${(e as Error).message}` }; }
       const t = i.tags && await definedTags(notes, i.tags);
       if (t && "error" in t) return t;
       const text = i.text?.trim() ?? "";

@@ -64,7 +64,9 @@ argument, so they do not import the tool registry. Tests cover completeness and 
 and writes use version 1. Unsupported future versions and malformed records fail explicitly before a chat runs.
 Tool inputs and outputs are opaque historical data. `guard.ts` repairs only the execution copy for today's tool schemas;
 the stream and `chats.ts` saver keep the original parts, including during continuation and periodic saves. Taint is
-classified before repair so an obsolete read cannot remove the approval requirement.
+classified before repair so an obsolete read cannot remove the approval requirement. The history is the agent's own: it
+is read from the record, never taken from a request (`history.ts` says what a client's newest message may add), and every
+save of a chat goes through one queue under the record's `rev`. Attached files are `chat_files` records (`chat-files.ts`).
 
 ## Widgets
 

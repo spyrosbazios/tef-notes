@@ -1,6 +1,7 @@
 // The agent runs on the server (the sidecar at /agent, same origin): which models it offers, and the chats it keeps.
-// A chat is a PocketBase record: the client makes it empty before the first send and names it in the request, the
-// server writes the messages and the title back as it goes (so a chat opens the same on every device).
+// A chat is a PocketBase record: the client makes it empty before the first send and names it in the request; the
+// server holds its history from then on (a request carries only the newest message) and writes the messages and the title
+// back as it goes, so a chat opens the same on every device. An attached file comes back as a stored chat file's address.
 import type { UIMessage } from "ai";
 import { readChatHistory, serializeChatHistory } from "@/core/chat-history";
 import type { AgentModels } from "@/core/agent";
