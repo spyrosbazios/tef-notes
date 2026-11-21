@@ -20,7 +20,7 @@ describe("drawingPicture", () => {
   it("draws a PNG the size of the live shapes plus padding", async () => {
     const png = await drawingPicture(scene);
     if (!(png instanceof Uint8Array)) throw new Error(png.error);
-    expect([...png.slice(1, 4)].map((c) => String.fromCharCode(c)).join("")).toBe("PNG");
+    expect(Array.from(png.subarray(1, 4), (c) => String.fromCharCode(c)).join("")).toBe("PNG");
     expect(size(png)).toEqual([560 + 32, 165 + 32]);           // the deleted one far off doesn't widen it
   });
 

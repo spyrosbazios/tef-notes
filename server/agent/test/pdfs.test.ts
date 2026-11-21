@@ -96,7 +96,7 @@ describe("pdfs", () => {
     expect((await get(`note=a/b&name=lease.pdf`)).status).toBe(400);
     expect((await get(`note=${id}&name=lease.pdf&size=huge`)).status).toBe(400);
     const blur = new Uint8Array(await (await get(`note=${id}&name=lease.pdf&size=blur`)).arrayBuffer());
-    expect([...blur.slice(0, 2)]).toEqual([0xff, 0xd8]);
+    expect(Array.from(blur.subarray(0, 2))).toEqual([0xff, 0xd8]);
     expect(blur.length).toBeLessThan(new Uint8Array(await (await get(`note=${id}&name=lease.pdf`)).arrayBuffer()).length);
   });
 

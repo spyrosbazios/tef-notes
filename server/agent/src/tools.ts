@@ -40,9 +40,9 @@ export const RECENT = 60;                   // the prompt's index: every pinned 
 
 /** What the note tools write: notes only — memory has update_memory. One level, any letters (the laptop names
  *  files `Λίστα.md` too), no `/`, `\\`, control character or `..`: nothing the server would refuse. */
-export const NOTE_RE = /^notes\/(?!.*\.\.)[^/\\\0-\x1f]+\.md$/;
+export const NOTE_RE = /^notes\/(?!.*\.\.)[^/\\\p{Cc}]+\.md$/u;
 /** What read_note opens: a note, or the agent's memory. */
-export const READ_RE = new RegExp(`${NOTE_RE.source}|^agent\\/memory\\.md$`);
+export const READ_RE = new RegExp(`${NOTE_RE.source}|^agent\\/memory\\.md$`, "u");
 
 /** What read_image keeps in the chat: which picture, never its bytes (toModelOutput fetches them). */
 type Seen = { error: string } | { path: string; name: string; rec: string; file: string };

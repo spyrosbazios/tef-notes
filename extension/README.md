@@ -1,6 +1,6 @@
 # TEF Notes Clipper
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-21 -->
 
 A Chrome (Manifest V3) extension that saves the page you are on, a selection, a link or a picture to your
 [TEF Notes](../README.md) notes. The server suggests which of your notes and open tasks it fits; you pick one (or a new
@@ -50,6 +50,7 @@ update itself.
 | `bun run build` | Builds into `dist/` (popup, options page, service worker, manifest, icons) |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run lint` | oxlint |
+| `bun test` | The pure logic: address handling, the two calls to the server, the tab's page, the context-menu handoff (`test/`, over a fake `chrome`) |
 | `bun run pack <key> <out>` | Packs `dist/` into a signed CRX plus `update.xml` in `<out>`; needs `TEF_NOTES_URL` and a key (prints usage without arguments) |
 | `bun run id [key]` | Prints the extension ID the signing key gives (default `../server/crx-key.pem`) |
 

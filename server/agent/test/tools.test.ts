@@ -655,7 +655,7 @@ describe("approvals", () => {
   });
 
   it("a tainted note a task is about, read through list_tasks, counts as reading the web", async () => {
-    const w = pb.put("notes/w.md", file("w"), { tainted: true });
+    pb.put("notes/w.md", file("w"), { tainted: true });
     const t = newTask("ab12".padEnd(15, "0"), { title: "t" });
     pb.tasks.set(t.id, { ...t, rev: 1 });
     const listed: ModelMessage = { role: "tool", content: [{ type: "tool-result", toolCallId: "l", toolName: "list_tasks", output: { type: "json", value: { tasks: [{ linked: ["notes/w.md"] }] } } }] };

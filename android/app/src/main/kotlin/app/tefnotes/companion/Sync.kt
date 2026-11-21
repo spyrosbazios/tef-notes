@@ -29,19 +29,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result = running.withLock {
         val context = applicationContext
         val api = Store.server(context)?.let(::Api) ?: return Result.success()
-        // A send and the note that it was sent go together: stopped between the two (the system ends the work, the last
-        // widget is removed), the next run would send it again, and a repeating task ticked twice rolls over twice.
-        val sent = withContext(NonCancellable) {
-            try {
-                for (id in Store.ticks(context)) {
-                    // A refusal for good (the task is gone) meets the wish as far as it can be met.
-                    try { api.tick(id) } catch (e: Refused) { if (e.again) throw e }
-                    Store.dropTick(context, id)
-                }
-                Outbox.send(context, api)
-                true
-            } catch (_: Unreachable) { false } catch (_: Refused) { false } catch (_: IOException) { false }
-        }
+        val sent = Sync.sendWaiting(context, api)
         try { Store.keep(context, api.hello()) } catch (_: Unreachable) { } catch (_: Refused) { }
         Widgets.refresh(context, api)
         when {
@@ -59,6 +47,22 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 }
 
 object Sync {
+    /** Sends what waits, the widget's ticks and then the outbox: true when all of it went, false when something can't go
+     *  now (what is left stays, for the run that tries again). A send and the note that it was sent go together: stopped
+     *  between the two (the system ends the work, the last widget is removed), the next run would send it again, and a
+     *  repeating task ticked twice rolls over twice. */
+    suspend fun sendWaiting(context: Context, api: Api): Boolean = withContext(NonCancellable) {
+        try {
+            for (id in Store.ticks(context)) {
+                // A refusal for good (the task is gone) meets the wish as far as it can be met.
+                try { api.tick(id) } catch (e: Refused) { if (e.again) throw e }
+                Store.dropTick(context, id)
+            }
+            Outbox.send(context, api)
+            true
+        } catch (_: Unreachable) { false } catch (_: Refused) { false } catch (_: IOException) { false }
+    }
+
     private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
     /** Soon, after a run already asked for. */

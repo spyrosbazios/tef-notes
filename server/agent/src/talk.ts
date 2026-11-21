@@ -335,7 +335,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     voice = undefined;
     generation++;                                  // a socket still opening belongs to the reply that just ended
     speak.drop(); held = []; confirmed = true;
-    for (const k of [...waits.keys()]) answer(k, CANCELLED);
+    for (const k of waits.keys()) answer(k, CANCELLED);
     markSpeaking(false);
     endsAt = 0;
     if (!ended) out.json({ type: "interrupted" });
@@ -409,7 +409,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     ended = true;
     clearInterval(timer); clearInterval(beat);
     abort?.abort();
-    for (const k of [...waits.keys()]) answer(k, CANCELLED);
+    for (const k of waits.keys()) answer(k, CANCELLED);
     ear?.done();
     ear?.close();
     ear = undefined;

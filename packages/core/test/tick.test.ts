@@ -11,7 +11,7 @@ function fake() {
   };
   const advance = (ms: number) => {
     now += ms;
-    for (const [h, t] of [...due]) if (t.at <= now) { due.delete(h); t.f(); }
+    for (const [h, t] of due) if (t.at <= now) { due.delete(h); t.f(); }
   };
   return { clock, advance };
 }

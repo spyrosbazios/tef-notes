@@ -3,7 +3,7 @@
 Kotlin, Jetpack Compose for its three small screens, Glance for the widgets, WorkManager for the one background job. What
 it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this file only what is the companion's.
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-21 -->
 
 ## Where facts live
 
@@ -47,8 +47,10 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
   activity finishes only once it is off the screen (`SheetControl.close()`, never `finish()` straight).
 - Testing on the owner's phone over adb: install and read logs only. Key events and `am start` land on whatever they
   have open (a Back press closed a browser tab, 2026-11-14).
-- The unit tests cover `Contract.kt` only. The widgets, the sheets and the sync are checked by hand on a phone: there
-  is no emulator on the build host and no instrumented test.
+- The unit tests cover `Contract.kt`, `Outbox.kt` and what a run sends (`Sync.sendWaiting`, the part of the worker that needs no
+  WorkManager): on the JVM, against a real server on the loopback and a `Context` of temp files and in-memory preferences
+  (`Fakes.kt`). The widgets, the sheets and WorkManager's scheduling are checked by hand on a phone: there is no emulator on
+  the build host and no instrumented test.
 - Android's `JSONObject.optString` answers the text "null" for a JSON null; the JVM test library answers "". Only
   `Hello.tag` is ever null, and `helloOf` asks `isNull` first. A new nullable field needs the same.
 - `compileSdk` is 37 because Compose 1.12 requires it. `targetSdk` stays at 36: targeting 37 makes reaching a server on

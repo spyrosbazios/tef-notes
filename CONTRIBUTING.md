@@ -49,7 +49,7 @@ Clone the whole repository: every module imports `packages/core`.
 
 Each module's README has its setup and commands:
 
-- `packages/core`: `cd packages/core && bun test && bun run typecheck`
+- `packages/core`: `cd packages/core && bun run lint && bun test && bun run typecheck`
 - `server` (hooks and the agent): [server/README.md](server/README.md); `cd server && bun test`
 - `web`: [web/README.md](web/README.md)
 - `cli`: [cli/README.md](cli/README.md)

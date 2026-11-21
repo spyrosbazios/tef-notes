@@ -76,7 +76,7 @@ export class NoteService {
     });
     add(words, "words");
     add(near, "meaning");
-    return [...fused.values()].sort((a, b) => b.score - a.score).slice(0, limit).map(({ score: _, ...h }) => h);
+    return [...fused.values()].sort((a, b) => b.score - a.score).slice(0, limit).map((h): Hit => ({ path: h.path, title: h.title, snippet: h.snippet, match: h.match }));
   }
 
   /** Notes holding every word of `query` in their title or text, accents, tonos and case ignored (the phone's search

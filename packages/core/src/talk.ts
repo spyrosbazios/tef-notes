@@ -148,7 +148,7 @@ export function talkStatusOf(raw: unknown): TalkStatus | null {
   return o && model ? { model, voice: typeof o.voice === "string" ? o.voice : "", speed: speedOf(o.speed) } : null;
 }
 
-const url = (v: unknown) => (typeof v === "string" && /^https:\/\//.test(v) && v.length <= 2000 ? v : undefined);
+const url = (v: unknown) => (typeof v === "string" && v.startsWith("https://") && v.length <= 2000 ? v : undefined);
 
 /** `GET /agent/talk/voices`' body: the voices that name an id and a title, the rest dropped. */
 export function talkVoicesOf(raw: unknown): TalkVoice[] {

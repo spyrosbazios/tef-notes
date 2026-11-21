@@ -1,6 +1,6 @@
 # @tefnotes/core
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-21 -->
 
 The code every TEF Notes client shares: the web app, the CLI, the extension and the chat agent. Dependency-free
 TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md).
@@ -43,6 +43,7 @@ Consumers import it as `@/core/*`:
 ```sh
 cd packages/core
 bun install
+bun run lint
 bun test
 bun run typecheck
 ```
