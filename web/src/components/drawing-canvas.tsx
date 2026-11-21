@@ -8,7 +8,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { FONT_SIZES, shapesOf } from "@/core/drawing";
-import { setLive, liveNow, type Live } from "@/hooks/drawing";
+import { liveNow, markUnsaved, setLive, type Live } from "@/hooks/drawing";
 import { edited } from "@/lib/drawing-edit";
 
 /** The long edge the PNG preview is capped at, as photos are (core/photos.ts MAX); the picture an edit answers with (the agent
@@ -23,11 +23,11 @@ export type DrawingHandle = {
 };
 
 type Props = {
-  initial: string | null;
-  /** The opening this canvas is (hooks/drawing.ts `Opened`): the note's id, the file (null while new). */
+  /** The saved scene it opens on (core/drawing.ts `readScene`); null for a new drawing. */
+  initial: Record<string, unknown> | null;
+  /** The opening this canvas is (hooks/drawing.ts `Opened`): the note's id, the file (null while new). Whether it holds changes
+   *  not saved yet goes to the drawing's store under it, each time that flips. */
   opening: { seq: number; noteId: string; name: string | null };
-  /** Whether the drawing holds changes not saved yet, each time that flips. */
-  onUnsaved: (unsaved: boolean) => void;
   ref: React.Ref<DrawingHandle>;
 };
 
@@ -48,19 +48,20 @@ const dataUrl = (b: Blob) => new Promise<string | null>((done) => {
   r.readAsDataURL(b);
 });
 
-export default function DrawingCanvas({ initial, opening, onUnsaved, ref }: Props) {
+export default function DrawingCanvas({ initial, opening, ref }: Props) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
-  const data = useMemo(() => (initial ? restore(JSON.parse(initial), null, null) : null), [initial]);
+  // Checked for shape by readScene; Excalidraw's restore mends what is missing inside it
+  const data = useMemo(() => (initial ? restore(initial as Parameters<typeof restore>[0], null, null) : null), [initial]);
+  const { seq, noteId, name } = opening;
   // The scene version last saved (or opened): changes since are unsaved
-  const savedAt = useRef<number | null>(null), unsaved = useRef(false);
-  const notify = useRef(onUnsaved);
-  useEffect(() => { notify.current = onUnsaved; });
+  const savedAt = useRef<number | null>(null);
   const track = (elements: readonly ExcalidrawElement[]) => {
     const v = getSceneVersion(elements);
     savedAt.current ??= v;
-    const now = v !== savedAt.current;
-    if (now !== unsaved.current) { unsaved.current = now; notify.current(now); }
+    markUnsaved(seq, v !== savedAt.current);
   };
+  // What this canvas held goes with it (closed, or failed to draw): nothing of it is left to save or to ask about
+  useEffect(() => () => markUnsaved(seq, false), [seq]);
 
   useImperativeHandle(ref, () => ({
     async snapshot() {
@@ -78,7 +79,6 @@ export default function DrawingCanvas({ initial, opening, onUnsaved, ref }: Prop
   }), [api]);
 
   // The assistant's hands on this canvas, for as long as it is up
-  const { seq, noteId, name } = opening;
   useEffect(() => {
     if (!api) return;
     const live: Live = {
@@ -89,7 +89,6 @@ export default function DrawingCanvas({ initial, opening, onUnsaved, ref }: Prop
         const box = new Map(elements.map((e) => [e.id, e.type === "text" && e.containerId ? e.containerId : e.id]));
         return { shapes: shapesOf(elements), selected: [...new Set(Object.keys(chosen).filter((id) => chosen[id]).map((id) => box.get(id) ?? id))] };
       },
-      unsaved: () => unsaved.current,
       async apply(edit) {
         // Labels are measured as they are built: in Excalidraw's hand, not in whatever stood in while it loaded
         await document.fonts.load(`${FONT_SIZES.m}px Excalifont`).catch(() => []);

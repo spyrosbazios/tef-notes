@@ -29,7 +29,7 @@ import { TalkPill } from "@/components/talk/pill";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { dockNow, setDock, useDock } from "@/hooks/dock";
-import { closeDrawing, openedNow } from "@/hooks/drawing";
+import { drawingNow, requestDrawingClose } from "@/hooks/drawing";
 import { useKeyboard } from "@/hooks/keyboard";
 import { useRail, toggleRail } from "@/hooks/rail";
 import { useNewNote } from "@/hooks/new-note";
@@ -80,8 +80,9 @@ export function Shell() {
   const keyboard = useKeyboard();
   const [palette, setPalette] = useState(false), [menu, setMenu] = useState(false), [adding, setAdding] = useState<Start | null>(null);
 
-  // A drawing is open over its note's page: the note left (closed, another opened), the drawing goes too
-  useEffect(() => { if (openedNow() && openedNow()?.noteId !== note) closeDrawing(); }, [note]);
+  // A drawing is open over its note's page: the note left (closed, another opened), the drawing goes too. The layer's guard
+  // (hooks/drawing.ts `useDrawingGuard`) already asked about unsaved strokes before the address changed; this closes what is left
+  useEffect(() => { if (drawingNow().opened && drawingNow().opened?.noteId !== note) void requestDrawingClose(); }, [note]);
 
   // Opened to ask the assistant (`?ask=1`, a companion's widget): the word leaves the address first, so the phone's Ask
   // step is pushed over the plain screen and a step back doesn't open it again

@@ -96,6 +96,17 @@ export function shapesOf(elements: unknown): Shape[] {
   return out;
 }
 
+/** A drawing's saved file read back for the editor: its scene, or why it is none (not JSON, or not Excalidraw's). Unlike
+ *  `sceneProblem`, an empty scene is one: a drawing whose strokes were all erased still opens. Never throws: a file damaged
+ *  on disk must not take the note's page down with it. */
+export function readScene(text: string): { scene: Record<string, unknown> } | { error: string } {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { return { error: "the file is not JSON" }; }
+  const o = obj(raw);
+  if (!o || o.type !== "excalidraw" || !Array.isArray(o.elements)) return { error: "the file is not an Excalidraw scene" };
+  return { scene: o };
+}
+
 /** Why `scene` isn't an Excalidraw file the app can keep (an `.excalidraw` file's JSON: `type: "excalidraw"`, an `elements`
  *  array holding at least one live element with an id and a type), or null when it is. What `tefnotes draw` checks before it
  *  uploads one and the server's picture route before it draws one. */

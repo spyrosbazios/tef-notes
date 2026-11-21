@@ -28,7 +28,7 @@ function useSaved(noteId: string, name: string | undefined): string | undefined 
 /** Opens a note's drawing in the editor: the note, then the drawing over it. */
 function useOpen() {
   const { openNote } = useNav();
-  return (noteId: string, name: string | null) => { openNote(noteId); openDrawing(noteId, name); };
+  return (noteId: string, name: string | null) => { openNote(noteId); void openDrawing(noteId, name); };
 }
 
 function Picture({ src, alt }: { src: string | undefined; alt: string }) {

@@ -22,6 +22,9 @@ version is one semver number for the whole repository, set by the git tag (see [
   Try again, instead of blanking the whole app; a link left half typed (`[x](https://)`) no longer gets a Reader button
   that crashed the app.
 - A note shown in two of the assistant's answers no longer makes the first tile vanish.
+- A drawing with unsaved strokes is no longer closed without asking when you leave its note (Back, ⌘K, the assistant opening
+  another note) or reload the page; holding ⌘S, or ⌘S while the assistant saves, no longer makes the drawing twice. A
+  damaged drawing file says it can't be opened instead of crashing the note.
 
 ## 0.13.0 - 2026-11-19
 

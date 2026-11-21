@@ -169,7 +169,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
         <input ref={file} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
         <NoteHeaderActions pinned={!!note.pinned} archived={!!note.archived} color={note.color} raw={raw} saveVerb={out.verb} running={running ? runs.run?.action.id ?? null : null}
-          onFile={() => file.current?.click()} onDraw={() => openDrawing(note.id, null)} onPin={() => { void flag({ pinned: !note.pinned }); }}
+          onFile={() => file.current?.click()} onDraw={() => { void openDrawing(note.id, null); }} onPin={() => { void flag({ pinned: !note.pinned }); }}
           onAsk={() => { void sendOut("ask"); }} onRaw={setRaw} onSave={() => { void sendOut("save"); }} onColor={(color) => { void flag({ color }); }}
           onCopyLink={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}
           onArchive={() => { void flag(archivePatch([note])).then(() => toast(note.archived ? "Brought back from the archive" : "Archived")); }}
@@ -203,7 +203,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
           <LinkedTasks n={n} className="mb-6" />
           {raw ? source : (
             <>
-            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => openDrawing(note.id, name)} onEditor={setEd} />
+            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => { void openDrawing(note.id, name); }} onEditor={setEd} />
             {ed ? <SelectionBar editor={ed} /> : null}
             </>
           )}
