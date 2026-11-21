@@ -73,12 +73,13 @@ export const clip = (text: string, n: number) => (text.length > n ? { text: text
 export const capList = <T,>(xs: T[], n: number, end = false) =>
   xs.length <= n ? { list: xs } : { list: end ? xs.slice(-n) : xs.slice(0, n), left_out: xs.length - n };
 
-/** Read provenance from the intact UI history, before obsolete tool inputs are repaired away. */
+/** Read provenance from the intact UI history, before obsolete tool inputs are repaired away. A result and an error both count
+ *  (an untrusted tool's error text can carry the page's words, as `fromWeb` has it); a call with neither yet read nothing. */
 export function historyFromWeb(ms: UIMessage[], tainted: ReadonlySet<string>, policyFor: PolicyLookup) {
   return ms.some((m) => m.parts.some((p) => {
-    if (!isToolUIPart(p) || p.state !== "output-available") return false;
+    if (!isToolUIPart(p) || (p.state !== "output-available" && p.state !== "output-error")) return false;
     const policy = policyFor(getToolName(p));
     // A removed tool with an opaque result has no trustworthy provenance classification.
-    return !policy || policy.result === "untrusted" || (policy.result === "records" && names(p.output, tainted));
+    return !policy || policy.result === "untrusted" || (policy.result === "records" && p.state === "output-available" && names(p.output, tainted));
   }));
 }
