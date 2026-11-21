@@ -19,7 +19,7 @@ env:
 
 jobs:
   boundaries:
-    name: Architecture - import boundaries
+    name: Architecture - import boundaries, migration names
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -29,6 +29,8 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun scripts/check-boundaries.ts
       - run: bun test scripts/check-boundaries.test.ts
+      - run: bun scripts/check-migrations.ts
+      - run: bun test scripts/check-migrations.test.ts
 
   core:
     name: Core - tests, typecheck

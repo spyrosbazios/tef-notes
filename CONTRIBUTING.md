@@ -1,6 +1,6 @@
 # Contributing
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-21 -->
 
 Thanks for looking. Read [ARCHITECTURE.md](ARCHITECTURE.md) first; it explains the note format and the write contract
 that most changes have to respect. Security reports go through [SECURITY.md](SECURITY.md), not issues.
@@ -36,8 +36,8 @@ Clone the whole repository: every module imports `packages/core`.
 - **Package managers are fixed per module**: bun everywhere (`packages/core`, `server/agent`, `web`, `cli`, `extension`, and `android`'s build script; the app itself is Gradle's). Do not add a second lockfile to a module.
 - **`web/src/components/ui/` is shadcn's output.** Add components with `bunx --bun shadcn@latest add <name>`; never
   hand-edit them.
-- **Migrations are append-only.** A schema change is a new file in `server/pb_migrations/`; never edit one that has
-  applied. Hooks and migrations are baked into the image and reach a server only with `docker compose up -d --build`.
+- **Migrations are append-only.** A schema change is a new file in `server/pb_migrations/`, with a timestamp of its own
+  (`scripts/check-migrations.ts`, in CI); never edit one that has applied. Hooks and migrations are baked into the image and reach a server only with `docker compose up -d --build`.
 - **Every write carries `rev`.** Never write a note or task without the `rev` it was based on, and on a refusal
   re-read and merge rather than retrying with the newer `rev`. The server hook enforces it; clients must respect it.
 - **No secrets in the tree.** Provider keys live in `server/keys/` and `server/.env`, signing keys are `*.pem`; all are
