@@ -38,7 +38,8 @@
 //
 // Writes bypass the request hooks (rev.pb.js), so the rev contract is lib/records.js's: an append re-reads the note (or
 // the task, whose `notes` it adds to) inside the transaction that writes it, bumps its rev and copies a note's columns
-// out of its text; a new note or task starts at rev 1 (a new task after every other in `order`). Each file is an
+// out of its text; a new note or task starts at rev 1 (a new task after every other in `order`). Every write is marked
+// `tainted` (tainted.pb.js): a clip is someone else's text, and the owner's note is the model's write-up. Each file is an
 // `attachments` record under the note's id (its collection checks the type and size), saved first and deleted again if
 // the note's write fails: never one without the other.
 // A handler runs in its own VM and sees nothing of this file's top level: each requires what it uses.
@@ -218,7 +219,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     const made = { path, title, text: () => notes.serialize({ title: made.title, created: notes.localDay(now), tags: without(clip.tags, []) }, body) };
     return made;
   };
-  const saveNote = (tx, made) => records.create(tx, "notes", (r) => { r.set("path", made.path); r.set("text", made.text()); });
+  const saveNote = (tx, made) => records.create(tx, "notes", (r) => { r.set("path", made.path); r.set("text", made.text()); }, { taint: true });
   /** A clip of files alone: once they are stored under `made`, the agent's title for them (a PDF's first pages, a photo
    *  looked at), on the unsaved note too; else `title`, the clip's own. Titling never fails the save. */
   const AGENT = env("TEF_NOTES_AGENT") || "http://agent:8098";
@@ -260,7 +261,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
           let had = [];
           try { const v = JSON.parse(r.getString("tags") || "[]"); if (Array.isArray(v)) had = v.filter((t) => typeof t === "string"); } catch (_) { /* none */ }
           r.set("tags", [...had, ...without(clip.tags, had)]);
-        });
+        }, { taint: true });
         if (rec) out = { kind: "task", id, title: rec.getString("title"), action: "appended" };
       });
       if (full) return e.json(413, { error: "That task's notes are full." });
@@ -279,7 +280,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
           if (added.length) next = notes.withTags(target, next, [...n.tags, ...added]);
           r.set("text", next);
           title = n.title;
-        });
+        }, { taint: true });
         if (rec) out = { kind: "note", path: target, title, action: "appended" };
       });
       if (!out) { unattach(); return e.json(404, { error: "That note no longer exists." }); }
@@ -300,7 +301,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
           t.set("checklist", []);
           t.set("tags", without(clip.tags, []));
           t.set("order", next.n);
-        });
+        }, { taint: true });
         if (saved) {
           const link = new Record(tx.findCollectionByNameOrId("links"));
           link.set("fromTask", task.id);

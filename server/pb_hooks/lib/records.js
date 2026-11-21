@@ -4,7 +4,7 @@
 //
 // `tainted` (pb_migrations/1792600000_chats.js, 1793000002_todo_tainted.js): a record holding text the owner didn't
 // write (a clipped page, a share from another app, what a model wrote) is marked, so a chat that reads it back treats
-// it like web text and asks before it writes.
+// it like web text and asks before it writes. Once set it stays (tainted.pb.js).
 //
 // Plain CommonJS over the transaction PocketBase hands a hook (`tx`: findRecordById, findCollectionByNameOrId, save),
 // so bun can test it with a fake (server/test/records.test.js).

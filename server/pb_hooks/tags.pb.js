@@ -4,8 +4,8 @@
 // and saves it with the tag the normal way (the `tags` collection's `description`, the hint the auto-tagger's JEV gets).
 // The hourly job below does save one, only for a tag whose description the owner didn't write (`describedBy`): drawn from
 // the notes the owner filed under it by hand, first at 3 of them, then each time they double (lib/tags.js due). A
-// description saved through the API (a client, the agent's tools) is the owner's: the request hooks below mark it, and
-// the job never writes over it. The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
+// description saved through the API is the owner's, unless the request marks it an agent's (the request hooks below),
+// and the job never writes over the owner's. The job's descriptions are not in the auto-tagger's definitions hash, so a new one is
 // used for the notes asked about from then on and sends no note back to be asked again; the owner's own edit does.
 //
 // POST /api/tefnotes/tags/describe JSON { tag: "<name>" } | { all: true }
@@ -148,15 +148,20 @@ cronAdd("tag-describe", "17 * * * *", () => {
   }
 });
 
-// A description that arrives through the API is the owner's (the tag editors, the agent's tag tools): the hourly job
-// above never writes over it, and the auto-tagger's definitions hash holds it. The job's own save is no request, so it
-// fires neither hook.
+// Who wrote a description that arrives through the API, decided here and nowhere else: "agent" when the request says
+// so (an outside agent: the CLI under TEF_NOTES_AGENT=1), else the owner's (the tag editors). A client can only lower
+// the trust: "owner" and "auto" are never taken from a request, and a write that leaves the description as it was
+// leaves `describedBy` too. Only the owner's is trusted: the hourly job above never writes over it, and the
+// auto-tagger's definitions hash holds it (lib/autotag.js). The job's own save is no request, so it fires neither hook.
 onRecordCreateRequest((e) => {
-  e.record.set("describedBy", e.record.getString("description").trim() ? "owner" : "");
+  const by = e.requestInfo().body["describedBy"] === "agent" ? "agent" : "owner";
+  e.record.set("describedBy", e.record.getString("description").trim() ? by : "");
   e.next();
 }, "tags");
 
 onRecordUpdateRequest((e) => {
-  if (e.record.getString("description") !== e.record.original().getString("description")) e.record.set("describedBy", "owner");
+  const was = e.record.original();
+  if (e.record.getString("description") === was.getString("description")) e.record.set("describedBy", was.getString("describedBy"));
+  else e.record.set("describedBy", e.requestInfo().body["describedBy"] === "agent" ? "agent" : "owner");
   e.next();
 }, "tags");

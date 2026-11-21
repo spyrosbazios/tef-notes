@@ -74,8 +74,10 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   `"<rev>:<hash of the tag definitions>:<hash of the title and text>"`, the state the note was last evaluated at: a new
   `rev` with the same title and text (a tag taken off, a pin) is re-stamped, never asked about again. The server's tag additions are ordinary `rev` bumps (the 3-way merge absorbs them); a
   verdict with nothing to add (`tagged` alone) changes neither `rev` nor `updated`, nor reaches realtime.
-- `tainted` belongs to the chat agent: set in the same write when it writes a note with web text in view, never cleared,
-  never sent by a client. A tainted note read back counts as reading the web, so that chat's next write asks first.
+- `tainted` marks a note holding text the owner didn't write, set in the same write by whoever wrote it: the chat agent
+  with web text in view, the CLI under `TEF_NOTES_AGENT=1`, the clip routes (a clip or a share is someone else's text,
+  `server/pb_hooks/lib/records.js`). Never cleared: `server/pb_hooks/tainted.pb.js` keeps it on every later save. A
+  tainted note read back counts as reading the web, so that chat's next write asks first.
 - `kind` says what the note is: `note`, the only kind today; a select that grows as kinds are added
   (`server/pb_migrations/1793300000_note_kind.js`). It is set when the note is made and never changes (`notes.pb.js`: a
   create without one is a `note`). It is the only test of what a note is: nothing reads a kind out of a path. Clients get it
@@ -102,8 +104,8 @@ Things-style to-dos, records of their own (`tasks`; schema in
   with `when`. `remind` is `HH:MM` on the `when` day. `every` is `Nd Nw Nm Ny` fixed (next from
   the scheduled day, skipping to after today), `+Nd` and so on from the day it was done, or `mon,thu` weekdays. A
   month's last day stays the last day (Jan 31, Feb 28, Mar 31).
-- `tainted` is the chat agent's, as on notes: set in the same write when it writes a task with web text in
-  view, never cleared, never sent by a client (`taskOf` drops it, so a client's PATCH leaves it).
+- `tainted`, as on notes: set by the chat agent with web text in view, the CLI under `TEF_NOTES_AGENT=1`, and the clip
+  routes' new task or append; never cleared (`taskOf` drops it from a read, and `tainted.pb.js` keeps it on every save).
 - A client names a new record itself (`recordId`, 15 characters of `[a-z0-9]`), so a record made
   offline already has its id. A create whose id is taken is a `Conflict` (the same upload landed before).
 - Deleting a note deletes its attachments
@@ -286,8 +288,9 @@ follows redirects unseen, or loosen the check.
 **Tag descriptions** (`tags.pb.js`, `lib/tags.js`). `{tag}` or `{all: true}`; the model writes a description (up to 400
 characters, the auto-tagger's hint) from up to 12 notes you filed under the tag by hand, spread over its history (any that
 carry it when there are none), and the titles of notes you took it off. Clients save it with the tag. An hourly job
-(`tags.pb.js`) writes one itself only for a tag whose description you didn't write (`tags.describedBy`; one saved through
-the API is yours): first at 3 hand-tagged notes, then each time they double (`tags.described`). It never draws on the
+(`tags.pb.js`) writes one itself only for a tag whose description you didn't write (`tags.describedBy`: `owner`, `auto`
+the job's, or `agent`, one a request marked an outside agent's, as the CLI does under `TEF_NOTES_AGENT=1`; the server
+decides it on every save, a request can't claim `owner` or `auto`, and only `owner` is trusted): first at 3 hand-tagged notes, then each time they double (`tags.described`). It never draws on the
 auto-tagger's own tags: a description drawn from them described its mistakes, and spread them.
 
 **Where AI is allowed to write.** JEV only decides (tags, suggestions). The writing model (the server's provider) only tidies your own note on a clip,
