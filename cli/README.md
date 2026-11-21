@@ -1,6 +1,6 @@
 # TEF Notes CLI
 
-<!-- reviewed: 2026-11-10 -->
+<!-- reviewed: 2026-11-21 -->
 
 TEF Notes from a terminal: notes and tasks, for you and for coding agents. It is the same client the web app uses (`packages/core/src/pocketbase.ts`), so every write is a compare-and-swap on the record's `rev`: nothing here
 overwrites an edit it has not seen. The note format and the write contract are in
@@ -77,8 +77,13 @@ each is safe to repeat: a link already there stays, and one already gone is done
 ## Coding agents
 
 Agents drive the CLI through the [`tefnotes` skill](../skills/tefnotes/SKILL.md). They run it with `TEF_NOTES_AGENT=1`:
-every note and task they write is then marked `tainted`, so the in-app assistant treats it like web text and asks
-before writing once it has read it. Links and tag definitions carry no mark.
+every note and task they write (`new`, `append`, `put`, `edit`, `draw`, `import`, `add`, `set`, `done`) is then marked
+`tainted`, so the in-app assistant treats it like web text and asks before writing once it has read it; `draw --replace`
+marks the note before it swaps the scene. A tag description they write (`tag --about`, `tags --describe --write`) is sent
+`describedBy: "agent"`, so the server and the auto-tagger don't take it for yours. Deletions, links, attachments and tag
+renames carry no mark of their own. Every writing command goes through [`writes.ts`](writes.ts), which applies the mark;
+`tefnotes.ts` never calls core's note, task or tag writers directly, and `test/marks.test.ts` checks both that and what each
+command sends.
 
 ## Concurrency: the rev rules
 
@@ -92,7 +97,7 @@ before writing once it has read it. Links and tag definitions carry no mark.
 ## Development
 
 ```sh
-cd cli && bun run typecheck
+cd cli && bun run typecheck && bun test
 ```
 
 ## Security

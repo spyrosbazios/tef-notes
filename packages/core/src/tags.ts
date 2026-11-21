@@ -5,7 +5,7 @@
 // Platform-neutral, like pocketbase.ts: fetch only, so the phone, the web app and the CLI share it.
 import { getJson, HttpError } from "./http";
 import { fold, parseNote, withFlags, type Color } from "./notes";
-import { call, json, type Server } from "./pocketbase";
+import { call, json, type Mark, type Server } from "./pocketbase";
 import type { Task } from "./todo";
 
 export type TagDef = { rec: string; name: string; color?: Color; description: string };
@@ -17,8 +17,11 @@ export type TagFields = Omit<TagDef, "rec">;
 /** A `tags` record as a TagDef; the web app's transport maps its own responses through this. */
 export const tagDef = (r: any): TagDef => ({ rec: r.id, name: r.name, color: r.color || undefined, description: r.description ?? "" });
 
-/** A TagDef's columns, as the server stores them: no colour is the empty select. */
-export const tagColumns = (t: TagFields) => ({ name: t.name.trim(), color: t.color ?? "", description: t.description.trim() });
+/** A TagDef's columns, as the server stores them: no colour is the empty select. A `mark` (an outside agent's write, as
+ *  on a note) sends `describedBy: "agent"` beside the description, so the server keeps who wrote it instead of stamping
+ *  the owner's. Send it only with a description that is being written. */
+export const tagColumns = (t: TagFields, mark: Mark = {}) =>
+  ({ name: t.name.trim(), color: t.color ?? "", description: t.description.trim(), ...(mark.tainted && { describedBy: "agent" as const }) });
 
 /** Every definition, by name. */
 export async function listTags(s: Server): Promise<TagDef[]> {
@@ -27,12 +30,12 @@ export async function listTags(s: Server): Promise<TagDef[]> {
 }
 
 /** A new definition. Conflict: a tag by that name (ignoring case) exists. */
-export const createTag = async (s: Server, t: TagFields): Promise<TagDef> =>
-  tagDef(await call(s, "collections/tags/records", json("POST", tagColumns(t))));
+export const createTag = async (s: Server, t: TagFields, mark: Mark = {}): Promise<TagDef> =>
+  tagDef(await call(s, "collections/tags/records", json("POST", tagColumns(t, mark))));
 
 /** Conflict: the new name is taken. */
-export const updateTag = async (s: Server, rec: string, t: TagFields): Promise<TagDef> =>
-  tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t))));
+export const updateTag = async (s: Server, rec: string, t: TagFields, mark: Mark = {}): Promise<TagDef> =>
+  tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t, mark))));
 
 /** What a rename did (server/pb_hooks/tags.pb.js): the name the items carry now, how many records changed, and whether
  *  `to` was a tag already, which the renamed one merged into. */
