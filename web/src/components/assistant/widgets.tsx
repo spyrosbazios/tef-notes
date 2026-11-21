@@ -2,7 +2,7 @@
 // Display only: a widget writes nothing, a tick on a task row is the card's own, and saving a lens is the owner's button.
 // Task and note rows are the chat's cards (cards.tsx), drawn live from the app's own records.
 import { CalendarDays, Check, Clock, ExternalLink, FileText, Focus, LayoutGrid, ListTodo, Plus, TriangleAlert } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Masonry } from "@/components/masonry";
 import { DeleteDialog, TagsDialog } from "@/components/note-actions";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addDays, dayLabel, dayParts } from "@/core/dates";
 import { lensProblem, LENS_NAME_MAX } from "@/core/lens";
+import { hostOf } from "@/core/links";
 import { fold, noteIdOf } from "@/core/notes";
 import { Conflict, previewPictureUrl } from "@/core/pocketbase";
 import { ACCENTS, accentColor, THEMES } from "@/core/theme";
@@ -196,8 +197,7 @@ function QuoteView({ w }: { w: QuoteWidget }) {
 function LinkView({ w }: { w: LinkWidget }) {
   const p = w.preview, [broken, setBroken] = useState(false);
   const src = previewPictureUrl({ url: location.origin }, p, "sharp") ?? (/^https?:\/\//i.test(p.image) ? p.image : "");
-  let host = p.url;
-  try { host = new URL(p.url).hostname.replace(/^www\./, ""); } catch { /* shown as given */ }
+  const host = hostOf(p.url) ?? p.url;
   return (
     <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${p.title || host}`}
       className="block overflow-hidden rounded-2xl border border-line bg-card transition-colors hover:bg-raised focus-visible:border-brand focus-visible:outline-none">
@@ -297,6 +297,8 @@ function TasksView({ w }: { w: TasksWidget }) {
  *  marked gone). A tile's tag narrows Home to it; its menu tags or deletes, as on Home. */
 function NotesView({ w }: { w: NotesWidget }) {
   const { data } = useNotes(), { openNote, filterTag } = useNav(), now = useNow(30_000);
+  // Its tiles' ids are this gallery's own: a note shown in two of a chat's answers is two tiles, not one shared layout
+  const gallery = useId();
   const [dialog, setDialog] = useState<"tags" | "delete" | null>(null), [target, setTarget] = useState<string[]>([]);
   const ask = (kind: "tags" | "delete", path: string) => { setTarget([path]); setDialog(kind); };
   const recs = new Map(data?.map((n) => [n.path, n]));
@@ -306,7 +308,7 @@ function NotesView({ w }: { w: NotesWidget }) {
       <Heading icon={<LayoutGrid className="size-4" />} title={w.title || "Notes"} detail={`${n} ${n === 1 ? "note" : "notes"}`} />
       <Masonry>
         {w.notes.map((c) => {
-          const r = recs.get(c.path), id = `chat:${c.path}`;
+          const r = recs.get(c.path), id = `chat:${gallery}:${c.path}`;
           return r ? (
             <Tile key={id} id={id} n={r} link={noteLink(r.note.id, null)} now={now} menuPaths={[r.path]} onPick={() => openNote(r.note.id)}
               onTag={filterTag} onTags={() => ask("tags", r.path)} onDelete={() => ask("delete", r.path)} />

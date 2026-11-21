@@ -29,4 +29,8 @@ describe("readableLink", () => {
     expect(["https://a.com/x", "http://a.com/x", "mailto:a@b.co", "20261001-foo.md", "../attachments/20261001-a/doc.pdf", "ftp://a.com/x"].map(readableLink))
       .toEqual([true, true, false, false, false, false]);
   });
+  test("a link left half typed has no host: no button, and so no Reader to throw on it", () => {
+    expect(["https://", "http://"].map(readableLink)).toEqual([false, false]);
+    expect(runs("see [x](https://) here")).toEqual([]);
+  });
 });

@@ -6,6 +6,7 @@ import { transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Minus, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +24,7 @@ export function PdfViewer({ url, name, onClose }: { url: string | null; name: st
       <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined} className="flex h-[92dvh] w-[min(56rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
         <DialogTitle className="truncate border-b border-line py-3 pr-12 pl-4 text-sm font-semibold">{name}</DialogTitle>
         <DialogDescription className="sr-only">The PDF, page by page</DialogDescription>
-        {url ? <Pages url={url} /> : null}
+        {url ? <Boundary what="The PDF" resetKey={url}><Pages url={url} /></Boundary> : null}
       </DialogContent>
     </Dialog>
   );

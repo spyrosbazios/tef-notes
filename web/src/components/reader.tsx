@@ -6,12 +6,14 @@ import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Boundary } from "@/components/boundary";
 import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useNarrow } from "@/hooks/media";
 import { Skeleton } from "@/components/ui/skeleton";
+import { hostOf } from "@/core/links";
 import { readingMinutes } from "@/core/reader";
 import { message } from "@/services/api";
 import * as reader from "@/services/reader";
@@ -24,7 +26,7 @@ export function Reader({ url, onClose, onNote }: { url: string | null; onClose: 
   return (
     <Dialog open={url !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent aria-describedby={undefined} data-side={narrow ? "bottom" : undefined} className="flex h-[92dvh] w-[min(46rem,96vw)] max-w-none flex-col gap-0 p-0 sm:max-w-none">
-        {url ? <Body url={url} onNote={onNote} /> : null}
+        {url ? <Boundary what="The article" resetKey={url}><Body url={url} onNote={onNote} /></Boundary> : null}
       </DialogContent>
     </Dialog>
   );
@@ -53,7 +55,7 @@ function Body({ url, onNote }: { url: string; onNote?: (id: string) => void }) {
   const q = useQuery({ queryKey: ["reader", url], queryFn: () => reader.read(url), staleTime: HOUR, gcTime: HOUR, retry: false });
   const a = q.data;
   const follow = useTempoTransition(spring.progress);
-  const host = new URL(url).hostname.replace(/^www\./, "");
+  const host = hostOf(url) ?? url;
   const meta = a ? [a.site || host, a.author, a.published, `${readingMinutes(a.words)} min read`].filter(Boolean).join(" · ") : host;
   return (
     <ScrollProgressProvider transition={follow}>

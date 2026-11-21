@@ -1,5 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { decode, linkify, noteLinkPath, titleFromHtml, youtubeVideo } from "../src/links";
+import { decode, hostOf, linkify, noteLinkPath, titleFromHtml, youtubeVideo } from "../src/links";
+
+describe("hostOf", () => {
+  it("the site, www. dropped", () => {
+    expect(hostOf("https://www.example.com/a?b")).toBe("example.com");
+    expect(hostOf("http://a.b.org")).toBe("a.b.org");
+  });
+  it("null for a link that is no absolute URL, never a throw", () => {
+    expect(["https://", "https//x.com", "notes/a.md", "../attachments/x/a.pdf", ""].map(hostOf)).toEqual([null, null, null, null, null]);
+  });
+});
 
 describe("titleFromHtml", () => {
   it("prefers og:title, whichever order the attributes come in", () => {

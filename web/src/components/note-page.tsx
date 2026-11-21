@@ -2,6 +2,7 @@
 // list, so the editor has the room (note-pane.tsx is the editor and its tools). It lies over the screen it was opened from (App.tsx
 // `NoteLayer`), which stays mounted under it.
 import { ChevronLeft } from "lucide-react";
+import { Boundary } from "@/components/boundary";
 import { NotePane } from "@/components/note-pane";
 import { Button } from "@/components/ui/button";
 import { useNote, useNotes } from "@/hooks/notes";
@@ -23,5 +24,6 @@ export function NotePage({ id }: { id: string }) {
       </div>
     );
   }
-  return <NotePane key={n.path} n={n} leading={back} onNote={openNote} onGone={leaveNote} />;
+  // A throw in the note is the note's alone: the screen under it and the dock beside it stay
+  return <Boundary what="The note" resetKey={id}><NotePane key={n.path} n={n} leading={back} onNote={openNote} onGone={leaveNote} /></Boundary>;
 }

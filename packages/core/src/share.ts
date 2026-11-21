@@ -4,7 +4,7 @@
 import type { ClipPage, Target } from "./clip";
 import { askedAbout } from "./handoff";
 import { inheritTags, type Lens } from "./lens";
-import { firstUrl, linkify } from "./links";
+import { firstUrl, hostOf, linkify } from "./links";
 import { isPdf, PDF } from "./photos";
 import { localDay } from "./time";
 
@@ -52,7 +52,7 @@ export function clipOf(s: Shared, pageTitle: string | null): ClipPage {
   };
 }
 
-const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+const host = (u: string) => hostOf(u) ?? u;
 const firstLine = (t: string) => t.split("\n").map((l) => l.trim()).find(Boolean) ?? "";
 
 /** A title is at most this long; a longer one is cut with an ellipsis. */

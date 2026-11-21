@@ -13,7 +13,7 @@ import type { EditorState, Transaction } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import type { LinkPreview } from "@/core/pocketbase";
-import { youtubeEmbed, youtubeVideo } from "@/core/links";
+import { hostOf, youtubeEmbed, youtubeVideo } from "@/core/links";
 import { isPdfLink } from "./files";
 import { copyButton, deleteButton, readButton, summarised, summaryButton, type Summarize } from "./link-tools";
 
@@ -132,8 +132,7 @@ function card(url: string, p: LinkPreview | null, open: (url: string) => void, t
   root.tabIndex = 0;
   root.setAttribute("role", "link");
   root.title = url;
-  let host = url;
-  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* a bare URL that is not one: shown as typed */ }
+  const host = hostOf(url) ?? url;   // a bare URL that is not one: shown as typed
   const thumb = el("div", "pm-card-thumb");
   const mark = () => { if (!thumb.firstChild) thumb.dataset.empty = ""; };
   const src = p && safe(p.image) ? p.image : p && safe(p.icon) ? p.icon : "";

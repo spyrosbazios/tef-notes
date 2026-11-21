@@ -16,6 +16,13 @@ version is one semver number for the whole repository, set by the git tag (see [
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
 
+### Fixed
+
+- A part of the web app that fails to draw (a note, the assistant, Reader, a PDF, a drawing) says so in its own place with
+  Try again, instead of blanking the whole app; a link left half typed (`[x](https://)`) no longer gets a Reader button
+  that crashed the app.
+- A note shown in two of the assistant's answers no longer makes the first tile vanish.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added

@@ -9,7 +9,7 @@
 import { ReducedMotionConfig, scale, spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { Archive, ArrowDownUp, Check, LayoutGrid, Pin, Plus, Sparkles, Tags } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { between, toggled } from "@/core/bulk";
 import { groupNotes } from "@/core/note-groups";
 import { NOTE_SORT_LABEL, NOTE_SORTS, sortNotes, type NoteSort } from "@/core/note-sort";
@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLongPress } from "@/hooks/long-press";
+import { useMoved } from "@/hooks/masonry";
 import { useNarrow, useTouch } from "@/hooks/media";
 import { useLensSorted, useNotes } from "@/hooks/notes";
 import { useNoteView } from "@/hooks/note-view";
@@ -41,24 +42,6 @@ import { isNotesView, noteLink, useIntent, useNav, type AppLink } from "@/lib/na
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
-
-/** The tiles on screen by id. A tile that changes column is a second element with the id while the first one leaves (Masonry's
- *  columns each have their own presence): the shared layout carries it across, so the newcomer does not fade in and the one it
- *  replaces is hidden at once, instead of two tiles fading over each other. */
-const onScreen = new Map<string, Set<HTMLElement>>();
-function useMoved(id: string, shared: boolean, el: RefObject<HTMLElement | null>): boolean {
-  const [moved] = useState(() => shared && onScreen.has(id));
-  useLayoutEffect(() => {
-    const node = el.current;
-    if (!shared || !node) return;
-    const others = onScreen.get(id) ?? new Set<HTMLElement>();
-    for (const o of others) o.style.visibility = "hidden";
-    others.add(node);
-    onScreen.set(id, others);
-    return () => { others.delete(node); if (!others.size) onScreen.delete(id); };
-  }, [id, shared, el]);
-  return moved;
-}
 
 /** The keys held down on a click or key press: what decides between opening a note and selecting it. */
 type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean };

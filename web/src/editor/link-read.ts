@@ -4,15 +4,17 @@
 // the markdown, the cursor and a copy are untouched by it.
 import type { Mark, Node } from "prosemirror-model";
 import { Plugin } from "prosemirror-state";
+import { hostOf } from "@/core/links";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import { cardUrl } from "./link-cards";
 import { schema } from "./markdown";
 import { deleteButton, readButton, summarised, summaryButton, type Summarize } from "./link-tools";
 
-/** Whether `href` is a page the reader can fetch: an http(s) address. A note link and an attached file are relative
- *  (`notes/…`, `../attachments/…`), so the scheme alone tells a page from them. */
-export const readableLink = (href: string) => /^https?:\/\//i.test(href);
+/** Whether `href` is a page the reader can fetch: an http(s) address with a host. A note link and an attached file are relative
+ *  (`notes/…`, `../attachments/…`), so the scheme tells a page from them; a link the owner left half typed (`[x](https://)`) has
+ *  no host, and gets no button. */
+export const readableLink = (href: string) => /^https?:\/\//i.test(href) && hostOf(href) !== null;
 
 /** One run of text under the same readable link, with the position just after it (where the button goes). */
 export type ReadableRun = { href: string; from: number; end: number };
