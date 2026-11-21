@@ -2,8 +2,11 @@
 // until the sync (Sync.kt) can send it. A clip waits as its whole save request, so it is sent as it would have been: its
 // payload in the entry, its files (pictures' JPEGs, PDFs) copied beside it, named after it.
 // One the server refuses for good stays, marked with why, until the owner discards it in Settings: nothing the owner
-// saved is dropped silently. A send whose answer was lost is sent again, so a clip can land twice; the other way round
-// would lose it.
+// saved is dropped silently. A send whose answer was lost is sent again, so every entry carries an id of its own (a clip in
+// its payload, a task beside its title), made before the first send was tried and kept with the entry: the server records
+// what it did under that id and answers the second send as the first, so nothing lands twice and nothing is lost.
+// A crash leaves loose ends (a draft `.json.part` that was never renamed, files copied for an entry that was never written):
+// `sweep` removes them.
 package app.tefnotes.companion
 
 import android.content.Context
@@ -54,11 +57,14 @@ object Outbox {
 
     private fun read(file: File): JSONObject? = try { JSONObject(file.readText()) } catch (_: JSONException) { null } catch (_: IOException) { null }
 
+    /** A clip waits as the request it would have been: `payload` carries the save's `id` (saveBody), the one the first,
+     *  direct send used. */
     fun addClip(context: Context, payload: JSONObject, parts: List<Part>, what: String) =
         add(context, JSONObject().put("kind", "clip").put("what", what).put("payload", payload), parts)
 
-    fun addTask(context: Context, title: String, list: String) =
-        add(context, JSONObject().put("kind", "task").put("what", title).put("title", title).put("list", list))
+    /** A task waits under the `id` its direct send used (newId), so the server makes it once if that send had landed. */
+    fun addTask(context: Context, id: String, title: String, list: String) =
+        add(context, JSONObject().put("kind", "task").put("what", title).put("id", id).put("title", title).put("list", list))
 
     fun list(context: Context): List<Waiting> = entries(context).map { f ->
         read(f)?.let { Waiting(f, it.optString("what"), it.optString("refused").ifEmpty { null }) } ?: Waiting(f, "Something saved", UNREADABLE)
@@ -71,17 +77,45 @@ object Outbox {
         file.delete()
     }
 
+    /** Removes what a crash left: a draft entry (`*.json.part`) and files copied for an entry that was never written.
+     *  Only what is older than `GRACE_MS`: an entry being written right now has both for a moment. */
+    fun sweep(context: Context, now: Long = System.currentTimeMillis()) {
+        val all = dir(context).listFiles() ?: return
+        val stale = { f: File -> now - f.lastModified() > GRACE_MS }
+        val written = all.filter { it.extension == "json" }.map { it.nameWithoutExtension }.toSet()
+        for (f in all) {
+            val orphan = when {
+                f.name.endsWith(".json.part") -> true
+                f.extension == "json" -> false
+                else -> PART_NAME.matchEntire(f.name)?.groupValues?.get(1)?.let { it !in written } ?: false
+            }
+            if (orphan && stale(f)) f.delete()
+        }
+    }
+
+    /** The id an entry is sent under: the one it was made with; one with none (an entry the app wrote before entries
+     *  carried one) is given one now, and kept in the entry before the first send is tried, so every later send has it. */
+    private fun withId(file: File, entry: JSONObject, payload: JSONObject?): String {
+        val holder = payload ?: entry
+        holder.optString("id").takeIf { it.isNotEmpty() }?.let { return it }
+        val id = newId()
+        holder.put("id", id)
+        write(file, entry)
+        return id
+    }
+
     /** Sends what waits, oldest first. Throws Unreachable (or a Refused worth trying again) at the first one that can't go
      *  now, leaving it and the rest; one refused for good is marked and passed over. */
     suspend fun send(context: Context, api: Api) {
+        sweep(context)
         for (file in entries(context)) {
             val entry = read(file) ?: continue          // shown in Settings as unreadable, for the owner to discard
             if (entry.has("refused")) continue
             val payload = entry.optJSONObject("payload")
             try {
                 when {
-                    entry.optString("kind") == "task" -> api.addTask(entry.optString("title"), entry.optString("list"))
-                    payload != null -> api.save(payload, partsOf(file, entry) ?: throw Refused(400, "a file of it is gone"))
+                    entry.optString("kind") == "task" -> api.addTask(withId(file, entry, null), entry.optString("title"), entry.optString("list"))
+                    payload != null -> { withId(file, entry, payload); api.save(payload, partsOf(file, entry) ?: throw Refused(400, "a file of it is gone")) }
                     else -> throw Refused(400, UNREADABLE)
                 }
                 gone(file)
@@ -93,4 +127,7 @@ object Outbox {
     }
 
     private const val UNREADABLE = "it can't be read back"
+    /** A copied file's name: `<entry's stem>-<n>.<ext>`. */
+    private val PART_NAME = Regex("^(.+)-\\d+\\.(?:jpg|pdf)$")
+    private const val GRACE_MS = 60_000L
 }

@@ -37,13 +37,15 @@ export async function notesRoute(server: pb.Server): Promise<Response> {
   return Response.json(notesFeed(notes, lenses, lens, prefs));
 }
 
-/** A new open task, after the last one: planned for today when added from Today, tagged as the lens on tags what is made. */
+/** A new open task, after the last one: planned for today when added from Today, tagged as the lens on tags what is made. It
+ *  is made under the companion's own id: one sent again (its answer was lost, or the outbox sent it after it landed) finds that
+ *  id taken and answers with the task that is there, never a second. */
 export async function addTaskRoute(req: Request, server: pb.Server): Promise<Response> {
   const task = newTaskOf(await req.json().catch(() => null));
-  if (!task) return refuse(400, "A task needs a title.");
+  if (!task) return refuse(400, "A task needs a title and an id of its own.");
   const { lens } = await owner(server);
-  const r = await new TaskService(server).addTask({ title: task.title, when: task.list === "today" ? localDay() : "", tags: inheritTags(lens) });
-  return "error" in r ? refuse(502, r.error) : Response.json({ id: r.id });
+  const r = await new TaskService(server).addTask({ title: task.title, when: task.list === "today" ? localDay() : "", tags: inheritTags(lens) }, [], false, [], task.id);
+  return "error" in r ? refuse(409, r.error) : Response.json({ id: r.id });
 }
 
 /** A tick. One already ticked (on another screen, since the widget drew it) stays as it is: the wish is met. */

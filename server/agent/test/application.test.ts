@@ -23,6 +23,56 @@ it("note append retries against fresh text, marks taint, and invalidates the req
   expect(await notes.all()).not.toBe(initial);
 });
 
+/** `fetch` for `run`, but a PATCH to a note is done by the server and then answered 503: a reply lost on the way; `after` runs
+ *  between the two (an edit made by someone else in the meantime). */
+async function losingReplies<T>(run: () => Promise<T>, after?: () => void): Promise<{ result: T; patches: number }> {
+  const real = globalThis.fetch;
+  let patches = 0;
+  globalThis.fetch = (async (input: any, init?: RequestInit) => {
+    const r = await real(input, init);
+    if (init?.method === "PATCH" && String(input).includes("/collections/notes/")) { patches++; after?.(); return Response.json({}, { status: 503 }); }
+    return r;
+  }) as typeof fetch;
+  try { return { result: await run(), patches }; } finally { globalThis.fetch = real; }
+}
+
+it("an append whose answer was lost is not made again on top of itself", async () => {
+  pb.put(path, file("one\n"));
+  const notes = new NoteService(server);
+  const { result, patches } = await losingReplies(() => notes.change(path, (text) => text + "- two\n", { taint: true }));
+  expect(patches).toBe(1);                                                    // sent once, never re-sent by the transport or by change
+  expect(result).toEqual({ saved: path, rev: 2, text: file("one\n- two\n") });
+  expect(pb.notes.get(path)!.text).toBe(file("one\n- two\n"));
+});
+
+it("an append whose answer was lost, with the note edited since, is still found to have landed", async () => {
+  pb.put(path, file("one\n"));
+  const notes = new NoteService(server);
+  const { result } = await losingReplies(
+    () => notes.change(path, (text) => text + "- two\n", { taint: false }),
+    () => { const rec = pb.notes.get(path)!; rec.text += "later\n"; rec.rev++; },
+  );
+  expect(result).toEqual({ saved: path, rev: 3, text: file("one\n- two\nlater\n") });
+  expect(pb.notes.get(path)!.text).toBe(file("one\n- two\nlater\n"));
+});
+
+it("a new note whose answer was lost is sent again under its own id: one note", async () => {
+  const notes = new NoteService(server);
+  const real = globalThis.fetch;
+  let posts = 0;
+  globalThis.fetch = (async (input: any, init?: RequestInit) => {
+    const r = await real(input, init);
+    if (init?.method === "POST" && String(input).includes("/collections/notes/records") && ++posts === 1) return Response.json({}, { status: 503 });
+    return r;
+  }) as typeof fetch;
+  try {
+    const r = await notes.create("Idea", () => file("body\n"), false);
+    expect("saved" in r).toBe(true);
+  } finally { globalThis.fetch = real; }
+  expect(posts).toBe(2);
+  expect(pb.notes.size).toBe(1);
+});
+
 it("whole-note edits merge disjoint changes and refuse overlap without writing", async () => {
   pb.put(path, file("one\ntwo\nthree\n"));
   const notes = new NoteService(server), read = { rev: 1, text: file("one\ntwo\nthree\n") };

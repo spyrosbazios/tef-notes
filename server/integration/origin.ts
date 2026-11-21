@@ -64,6 +64,6 @@ test("the web app, an older browser on this host, the extension and non-browsers
     expect((await pb.read(s, path))?.path).toBe(path);
   }
   const clip = new FormData();
-  clip.append("@jsonPayload", JSON.stringify({ title: "From the extension", selection: "Words", target: { kind: "new" } }));
+  clip.append("@jsonPayload", JSON.stringify({ id: "extclip00000001", title: "From the extension", selection: "Words", target: { kind: "new" } }));
   expect((await fetch(`${url}/api/tefnotes/clip`, { method: "POST", body: clip, headers: EXTENSION })).status).toBe(200);
 });

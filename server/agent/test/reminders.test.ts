@@ -1,7 +1,7 @@
 // Which tasks ring now, and one scan over fake ports: sent once, to every subscription, not before the time, not long after it.
 import { describe, expect, it } from "bun:test";
 import { newTask, type Task } from "@/core/todo";
-import { dueKey, dueReminders, payloadFor, scan, type Candidate, type Ports } from "../src/reminders";
+import { dueKey, dueReminders, payloadFor, pbPorts, scan, type Candidate, type Ports } from "../src/reminders";
 import type { Outcome, Sub, Vapid } from "../src/push";
 
 const at = (h: number, m = 0) => new Date(2026, 10, 8, h, m).getTime();
@@ -140,5 +140,46 @@ describe("scan", () => {
       expect(await scan(r.p, at(9, 1))).toEqual([dueKey(t)]);
       expect(r.claimed.has(dueKey(t))).toBe(true);
     }
+  });
+});
+
+describe("the claim over PocketBase", () => {
+  /** A push_sent collection with a unique key and id; `lose`: the first POST is kept and then answered 503, as a reply lost on the way is. */
+  function sentCollection(lose: boolean) {
+    const rows = new Map<string, { id: string; key: string }>();
+    let posts = 0;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        const id = new URL(req.url).pathname.split("/")[5];
+        if (req.method === "GET") return rows.has(id) ? Response.json(rows.get(id)) : Response.json({}, { status: 404 });
+        const body = await req.json() as { id: string; key: string };
+        posts++;
+        const data: Record<string, { code: string }> = {};
+        if (rows.has(body.id)) data.id = { code: "validation_not_unique" };
+        if ([...rows.values()].some((r) => r.key === body.key)) data.key = { code: "validation_not_unique" };
+        if (Object.keys(data).length) return Response.json({ data }, { status: 400 });
+        rows.set(body.id, { id: body.id, key: body.key });
+        return lose && posts === 1 ? Response.json({}, { status: 503 }) : Response.json(rows.get(body.id));
+      },
+    });
+    return { rows, posts: () => posts, ports: pbPorts({ url: `http://127.0.0.1:${server.port}` }), stop: () => server.stop(true) };
+  }
+
+  it("a claim whose answer was lost is held, not read as taken: the reminder is sent", async () => {
+    const c = sentCollection(true);
+    try {
+      expect(await c.ports.claim("t1@2026-11-08T08:00")).toBe(true);
+      expect(c.rows.size).toBe(1);
+      expect(c.posts()).toBe(2);       // sent again under its own id
+    } finally { c.stop(); }
+  });
+  it("a key another scan holds is taken", async () => {
+    const c = sentCollection(false);
+    try {
+      expect(await c.ports.claim("t1@2026-11-08T08:00")).toBe(true);
+      expect(await c.ports.claim("t1@2026-11-08T08:00")).toBe(false);
+      expect(c.rows.size).toBe(1);
+    } finally { c.stop(); }
   });
 });

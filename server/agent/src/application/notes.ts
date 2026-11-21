@@ -94,12 +94,16 @@ export class NoteService {
     return hits.map((h) => ({ path: h.n.path, snippet: h.snippet }));
   }
 
-  /** A new note at a free path. Conflict on a path taken meanwhile: the next free one. */
+  /** A new note at a free path, under a record id made once: a path taken meanwhile moves the note aside to the next free one
+   *  (the id is unused until a create lands), and a create whose answer was lost is sent again under the same id, so it lands once. */
   async create(title: string, text: (path: string) => string, taint: boolean): Promise<NoteSaved> {
+    const rec = pb.recordId();
     for (let i = 0; i < TRIES; i++) {
       const path = newNotePath(title, Date.now(), new Set((await this.all()).keys())), body = text(path);
       try {
-        const r = await pb.call(this.server, "collections/notes/records", pb.json("POST", { ...pb.noteColumns(path, body), ...(taint ? { tainted: true } : {}) }));
+        const r = await pb.createdUnder(
+          () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: rec, ...pb.noteColumns(path, body), ...(taint ? { tainted: true } : {}) })),
+          () => pb.get(this.server, rec));
         this.rows = undefined;
         return { saved: r.path, rev: r.rev, text: body };
       } catch (e) {
@@ -136,13 +140,16 @@ export class NoteService {
   async change(path: string, edit: (text: string) => string, o: { taint?: boolean; base?: { rev: number; text: string | null }; create?: boolean } = {}): Promise<NoteSaved> {
     const { base } = o;
     let baseText = base ? (base.rev === 0 ? "" : base.text) : null, mine: string | undefined;
+    const made = pb.recordId();                          // a missing file is created under this one id, however many tries it takes
     for (let i = 0; i < TRIES; i++) {
       const cur = await this.read(path);
       if (!cur) {
         if (!o.create) return { error: `No note ${path}: it was deleted meanwhile.` };
         const first = edit("");
         try {
-          const r = await pb.call(this.server, "collections/notes/records", pb.json("POST", { ...pb.noteColumns(path, first), ...(o.taint ? { tainted: true } : {}) }));
+          const r = await pb.createdUnder(
+            () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: made, ...pb.noteColumns(path, first), ...(o.taint ? { tainted: true } : {}) })),
+            () => pb.get(this.server, made));
           this.rows = undefined;
           return { saved: path, rev: r.rev, text: first };
         } catch (e) {
@@ -169,7 +176,12 @@ export class NoteService {
         return { saved: path, rev: r.rev, text: next };
       } catch (e) {
         if (e instanceof HttpError && e.status === 404) return { error: `No note ${path}: it was deleted meanwhile.` };
-        if (!(e instanceof pb.Conflict)) throw e;
+        if (e instanceof pb.Conflict) continue;
+        if (!pb.unanswered(e)) throw e;
+        // No answer: the write may have landed. Redoing an edit that adds on the text it already is in would add it twice.
+        const now = await this.read(path);
+        if (!now) return { error: `No note ${path}: it was deleted meanwhile.` };
+        if (now.rev !== cur.rev && pb.landed(cur.text, next, now.text)) { this.rows = undefined; return { saved: path, rev: now.rev, text: now.text }; }
       }
     }
     return { error: `${path} keeps changing under this edit; try again in a moment.` };

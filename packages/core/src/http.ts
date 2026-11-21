@@ -1,4 +1,8 @@
-// fetch with a timeout and backoff on 429 / 5xx — the urllib retry loops in pnl.py and pnl_evm.py.
+// fetch with a timeout, and backoff on a network error, 429 or 5xx for a request that is safe to send twice: a GET, or a
+// DELETE (a repeat that finds the record gone is a 404, which every caller reads as done). A POST, PATCH or PUT is sent once:
+// a reply lost after the server acted would have it act twice (a second create, an append added twice, a claim read as taken).
+// A caller that must survive a lost reply sends a write under an id of its own and sends it again itself, where it can read what
+// a clash on that id means (pocketbase.ts `createdUnder`, `landed`).
 
 export class HttpError extends Error {
   /** `body`: the error's JSON, when it sent some — PocketBase's names the field a validation failed on. */
@@ -22,7 +26,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** A read gets 15 s a try, a write 45 s: on a dead network a listing gives up in seconds, not after a write's patience. */
 const patience = (init: RequestInit) => (!init.method || init.method === "GET" ? 15_000 : 45_000);
 
-export async function getJson(url: string, init: RequestInit = {}, tries = 4, timeoutMs = patience(init)): Promise<any> {
+/** Whether sending `init` twice is the same as once. */
+const repeatable = (init: RequestInit) => !init.method || init.method === "GET" || init.method === "DELETE";
+
+export async function getJson(url: string, init: RequestInit = {}, triesAllowed = 4, timeoutMs = patience(init)): Promise<any> {
+  const tries = repeatable(init) ? triesAllowed : 1;
   for (let i = 0; ; i++) {
     const ctl = new AbortController(), stop = () => ctl.abort();
     const timer = setTimeout(stop, timeoutMs);

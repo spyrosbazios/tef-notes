@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** The contract this build draws (companion.ts COMPANION_CONTRACT). */
-const val CONTRACT = 3
+const val CONTRACT = 4
 const val APP = "tefnotes"
 
 // ---- the look
@@ -279,9 +279,15 @@ fun percent(p: Double) = "${Math.round(p * 100)}%"
 fun suggestBody(page: ClipPage, note: String, look: String?): JSONObject =
     page.json(look).apply { if (note.isNotBlank()) put("note", note.trim()) }
 
-/** The save request's `@jsonPayload`. `tags`: the owner's, carried by what the save makes. */
-fun saveBody(page: ClipPage, line: String?, target: Target, note: String, summary: Boolean, tags: List<String>): JSONObject =
-    page.json().put("target", target.json()).apply {
+/** A new id for something sent to the server that must land once however often it is sent: 15 of a-z0-9, as a record id is
+ *  (clip.ts `clipId`; the server takes exactly these). Made once, before the first send, and kept with what waits. */
+fun newId(random: java.util.Random = java.security.SecureRandom()): String =
+    String(CharArray(15) { "abcdefghijklmnopqrstuvwxyz0123456789"[random.nextInt(36)] })
+
+/** The save request's `@jsonPayload`. `id`: this save's own (newId), the same for every send of it, so a send the server
+ *  already did is answered, not done again. `tags`: the owner's, carried by what the save makes. */
+fun saveBody(id: String, page: ClipPage, line: String?, target: Target, note: String, summary: Boolean, tags: List<String>): JSONObject =
+    page.json().put("id", id).put("target", target.json()).apply {
         if (line != null) put("line", line)
         if (note.isNotBlank()) put("note", note.trim())
         if (tags.isNotEmpty()) put("tags", JSONArray(tags))

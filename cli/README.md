@@ -89,9 +89,17 @@ command sends.
 
 - `cat` prints the note's `rev` on stderr. `put` and `rm` take it back and refuse if the note moved since. That
   refusal is the point: read the note again and redo the change; never retry with the newer `rev` without looking.
-- `append` re-reads and retries, since adding at the end cannot clash. `edit` merges an edit made meanwhile the way
-  the web app does, and refuses on overlap, leaving your text in a temp file.
-- `grep` is the server's case-insensitive `LIKE`; Greek accents (tonos) must match.
+- `append` re-reads and retries, since adding at the end cannot clash; if a write's answer never came it reads the note
+  again first and, when the text is already there, does not add it twice. `edit` merges an edit made meanwhile the way
+  the web app does, and refuses on overlap. It works on a file in a folder of its own (owner-only), removed once the text
+  is saved; any refusal, a second one after the merge included, keeps it and prints its path.
+- Creates (`new`, `add`) carry an id made once: a create whose answer was lost is sent again under it and lands once, and
+  a path taken meanwhile moves a new note aside under the same id. `done` on a repeating task makes the next round (its id is
+  made from the task's) before it ticks, so running it again after a failure loses no round. `draw --replace` uploads the new
+  scene under the next free name, moves the note's link to it, and only then removes the old files. `put` refuses an empty
+  text.
+- `grep` is the server's case-insensitive `LIKE`; Greek accents (tonos) must match. It lists the first 20 matches and
+  says when there are more.
 - Notes are yours: append or edit what you mean to, and do not reorganise unasked, least of all from an agent.
 
 ## Development

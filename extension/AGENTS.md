@@ -27,8 +27,8 @@ same way; never suggested, always offered last).
    above every other option. `line`: the page's own passage JEV chose as what the page is. Without a key or when JEV fails: no suggestions,
    `pick` is new. A picture TypeSafe refuses (its image input is opt-in and early) is asked about again by its words.
    Typing a note asks again (after a 0.9 s pause, or on leaving the box).
-2. `POST {server}/api/tefnotes/clip`, multipart: `@jsonPayload` = `{url?, title, selection?, line?, note?, images?: [{src,
-   alt?, caption?}], pdfs?: [{name}], target, summary?: true, text?}` (`target` as above, `line` passed back from step 1; `summary` only
+2. `POST {server}/api/tefnotes/clip`, multipart: `@jsonPayload` = `{id, url?, title, selection?, line?, note?, images?: [{src,
+   alt?, caption?}], pdfs?: [{name}], target, summary?: true, text?}` (`target` as above, `id` 15 of a-z0-9 the client makes for this save and keeps for every send of it (core `clipId`, `saveBodies`: a save pressed again after a failure keeps it): the server records the save under it and answers a repeat as the first, so a clip lands once; `line` passed back from step 1; `summary` only
    when the user ticked "Add a summary", and `text` the page's text then, the same 50000 chars as in step 1) and, with `images` or `pdfs` and a note, a new
    note or a new task as target, one `file` part per file in order: each picture's JPEG to store (long edge 1600, quality 0.82, `packages/core/src/photos.ts`),
    then each PDF as it is (at most `MAX_PDF`); an existing task takes none: `sendsFiles` in core. Answers `200 {kind: "note", path, title, action: "created" | "appended", summary?}` or `{kind: "task", id, title,

@@ -26,13 +26,13 @@ class ContractTest {
 
     @Test
     fun helloIsOnlyATefNotesServers() {
-        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":3,"look":$look,"summary":true}"""))!!
-        assertEquals(Hello(3, JSONObject(look).toString(), true), h)
+        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":4,"look":$look,"summary":true}"""))!!
+        assertEquals(Hello(4, JSONObject(look).toString(), true), h)
         assertNull(helloOf(JSONObject("""{"app":"other","look":$look}""")))
         assertNull(helloOf(JSONObject("""{"message":"Not found"}""")))
     }
 
-    private val feed = """{"contract":3,"list":"today","title":"Today · Work","url":"/today","more":2,"look":$look,"sections":[
+    private val feed = """{"contract":4,"list":"today","title":"Today · Work","url":"/today","more":2,"look":$look,"sections":[
         {"label":"","tasks":[{"id":"a","title":"A","detail":"09:30","late":false,"url":"/today?t=a"},{"id":"b","title":"B","detail":"Due Nov 12","late":true,"url":"/today?t=b"}]},
         {"label":"This Evening","tasks":[{"id":"c","title":"C","detail":"","late":false,"url":"/today?t=c"}]}]}"""
 
@@ -59,7 +59,7 @@ class ContractTest {
 
     @Test
     fun aFeedOfAnotherContractOrNoFeedIsNotDrawn() {
-        assertNull(tasksFeedOf(feed.replace("\"contract\":3", "\"contract\":4")))
+        assertNull(tasksFeedOf(feed.replace("\"contract\":4", "\"contract\":5")))
         assertNull(tasksFeedOf("<html>"))
         assertNull(tasksFeedOf(null))
         assertNull(notesFeedOf("{}"))
@@ -67,9 +67,9 @@ class ContractTest {
 
     @Test
     fun aFeedOfAnotherContractIsNamedSoAWidgetDoesNotSayLoadingForever() {
-        val newer = feed.replace("\"contract\":3", "\"contract\":4")
-        val older = feed.replace("\"contract\":3", "\"contract\":2")
-        assertEquals(mismatchMessage(4), feedMismatch(newer))
+        val newer = feed.replace("\"contract\":4", "\"contract\":5")
+        val older = feed.replace("\"contract\":4", "\"contract\":2")
+        assertEquals(mismatchMessage(5), feedMismatch(newer))
         assertEquals(mismatchMessage(2), feedMismatch(older))
         assertEquals("That server and this app are of different versions: update the app.", mismatchMessage(CONTRACT + 1))
         assertEquals("That server and this app are of different versions: update the server.", mismatchMessage(CONTRACT - 1))
@@ -87,7 +87,7 @@ class ContractTest {
 
     @Test
     fun aNotesFeed() {
-        val f = notesFeedOf("""{"contract":3,"title":"Notes","url":"/notes","more":0,"look":$look,"notes":[
+        val f = notesFeedOf("""{"contract":4,"title":"Notes","url":"/notes","more":0,"look":$look,"notes":[
             {"id":"a","title":"A","peek":"words","pinned":true,"url":"/note/a","color":{"bg":"#172331","fg":"#d2e2f3","line":"#6a92bd"}},
             {"id":"b","title":"B","peek":"","pinned":false,"url":"/note/b"}]}""")!!
         assertEquals(FeedNote("a", "A", "words", true, "/note/a", 0xFF172331.toInt(), 0xFFD2E2F3.toInt()), f.notes[0])
@@ -102,13 +102,20 @@ class ContractTest {
             suggestBody(page, " mine ", "QUJD").toString(),
         )
         assertEquals(
-            JSONObject("""{"url":"https://example.com","title":"Example","selection":"a quote","images":[{"src":""},{"src":""}],"pdfs":[{"name":"a.pdf"}],"target":{"kind":"new"},"line":"the line","tags":["work"],"summary":true}""").toString(),
-            saveBody(page, "the line", Target.New, "", true, listOf("work")).toString(),
+            JSONObject("""{"url":"https://example.com","title":"Example","selection":"a quote","images":[{"src":""},{"src":""}],"pdfs":[{"name":"a.pdf"}],"id":"abcdefghij01234","target":{"kind":"new"},"line":"the line","tags":["work"],"summary":true}""").toString(),
+            saveBody("abcdefghij01234", page, "the line", Target.New, "", true, listOf("work")).toString(),
         )
         assertEquals(true, sendsFiles(page, Target.NewTask))
         assertEquals(false, sendsFiles(page, Target.Task("t")))
         assertEquals(false, sendsFiles(page.copy(pictures = 0, pdfs = emptyList()), Target.New))
         assertEquals(true, sendsFiles(page.copy(pictures = 0), Target.New))
+    }
+
+    @Test
+    fun anIdIsARecordIdsShapeAndANewOneEveryTime() {
+        val ids = List(50) { newId() }.toSet()
+        assertEquals(50, ids.size)
+        for (id in ids) assertTrue(id, Regex("^[a-z0-9]{15}$").matches(id))
     }
 
     @Test

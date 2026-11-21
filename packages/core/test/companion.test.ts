@@ -24,7 +24,7 @@ describe("the look", () => {
     expect(ownerLook({ theme: "nord", accent: "rose" }, work)).toMatchObject({ scheme: "light", bg: THEMES.light.C.bg, brand: ACCENTS.teal.light });
   });
   it("hello names the app, the contract and the summary box as left", () => {
-    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 3, look: DEFAULT_LOOK, summary: true });
+    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 4, look: DEFAULT_LOOK, summary: true });
   });
 });
 
@@ -37,7 +37,7 @@ describe("a task list", () => {
       task("d", { when: "2026-11-20" }),
       task("e", { when: TODAY, done: TODAY }),
     ], "today");
-    expect(f).toMatchObject({ contract: 3, list: "today", title: "Today", url: "/today", more: 0 });
+    expect(f).toMatchObject({ contract: 4, list: "today", title: "Today", url: "/today", more: 0 });
     expect(f.sections).toEqual([
       { label: "", tasks: [
         { id: "a", title: "Task a", detail: "09:30", late: false, url: "/today?t=a" },
@@ -74,13 +74,16 @@ describe("a task list", () => {
 });
 
 describe("a new task", () => {
-  it("takes a title on one line and the list it was added from", () => {
-    expect(newTaskOf({ title: "  Buy\n milk ", list: "today" })).toEqual({ title: "Buy milk", list: "today" });
-    expect(newTaskOf({ title: "x", list: "upcoming" })).toEqual({ title: "x", list: "inbox" });
+  const id = "abcdefghij01234";
+  it("takes a title on one line, the list it was added from and the id the companion made", () => {
+    expect(newTaskOf({ id, title: "  Buy\n milk ", list: "today" })).toEqual({ id, title: "Buy milk", list: "today" });
+    expect(newTaskOf({ id, title: "x", list: "upcoming" })).toEqual({ id, title: "x", list: "inbox" });
   });
-  it("is nothing without a title", () => {
-    expect(newTaskOf({ title: "  " })).toBeNull();
+  it("is nothing without a title, or without an id of a record id's shape: a repeat must be the same task", () => {
+    expect(newTaskOf({ id, title: "  " })).toBeNull();
     expect(newTaskOf(null)).toBeNull();
+    expect(newTaskOf({ title: "Buy milk" })).toBeNull();
+    for (const bad of ["short", "ABCDEFGHIJ01234", "abcdefghij012345", 7, null]) expect(newTaskOf({ id: bad, title: "Buy milk" })).toBeNull();
   });
 });
 

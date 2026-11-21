@@ -11,9 +11,9 @@ import { SEARCH_PATH, searchHitsOf, type SearchHit } from "./find";
 import { CHAT_FIELDS, chatOf, type StoredChat } from "./chat-history";
 import { getJson, HttpError } from "./http";
 import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
-import { noteKindOf, type NoteKind } from "./notes";
+import { noteKindOf, reconcile, type NoteKind } from "./notes";
 import type { Link, LinkEnd } from "./record-links";
-import { conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
+import { Conflict, Gone, Refused, Unavailable, conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
 export { Conflict, Gone, Refused, Unavailable, likeLit, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
 import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "./record-protocol";
 export { linkFilter } from "./record-protocol";
@@ -58,6 +58,39 @@ export async function call(s: Server, path: string, init: RequestInit = {}): Pro
   }
 }
 
+/** Whether `e` leaves open that the write it came from landed: nothing answered (the network, a timeout) or the server failed
+ *  (5xx, a 408 or 429 too: the reply is no word on what was done). The server's own refusals (Conflict, Gone, Refused, a 4xx)
+ *  are answers: the write did not happen. */
+export const unanswered = (e: unknown): boolean =>
+  e instanceof Unavailable || (!(e instanceof Conflict || e instanceof Gone || e instanceof Refused)
+    && (!(e instanceof HttpError) || e.status >= 500 || e.status === 408 || e.status === 429));
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A create under an id the caller made (`recordId`), sent again when no answer came back. getJson sends a write once, since
+ *  a second send after a landed one acts twice; under its own id a create can be repeated: the server holds that id once. `make`
+ *  sends it; `there` reads the record by that id (null: none). A Conflict means the id is taken, which after our own earlier
+ *  try is that try having landed: the record `there` finds is the answer, and no new id is ever made. A Conflict with nothing
+ *  under the id is another record's (a path, a name): it goes back to the caller as it was. */
+export async function createdUnder<T>(make: () => Promise<T>, there: () => Promise<T | null>, { tries = 3, wait = 500 } = {}): Promise<T> {
+  for (let i = 0; ; i++) {
+    try { return await make(); } catch (e) {
+      if (e instanceof Conflict) {
+        const had = await there();
+        if (had) return had;
+        throw e;
+      }
+      if (!unanswered(e) || i >= tries - 1) throw e;
+      await pause(wait * 2 ** i);
+    }
+  }
+}
+
+/** Whether a write of `mine` over the text `base`, whose answer was lost and which the note has moved on from (a newer rev),
+ *  landed: the note now (`now`) is `mine`, or already holds `mine`'s change (folding it in changes nothing). Called only once the
+ *  rev has moved: at the rev the write was based on, the write did not land. */
+export const landed = (base: string, mine: string, now: string): boolean => now === mine || reconcile(base, mine, now) === now;
+
 /** The record protocols (core/record-protocol.ts) over `s`: the agent's and the CLI's fetch. */
 export const transport = (s: Server): RecordTransport => ({
   request: (path, request = {}) => call(s, path, request.body === undefined ? { method: request.method } : json(request.method ?? "POST", request.body)),
@@ -90,8 +123,12 @@ export async function search(s: Server, query: string, limit = 20): Promise<Remo
   return j.items.map(remote);
 }
 
-/** A new note under the caller's own record id (`recordId`); Conflict when a record has that id or that path already. */
-export const create = (s: Server, rec: string, path: string, text: string, mark: Mark = {}): Promise<Remote> => notes(s).create(rec, path, text, mark);
+/** A new note under the caller's own record id (`recordId`), sent again when no answer came back (createdUnder): a repeat that
+ *  finds the id taken by a note of this path is the first send having landed, and that note is the answer. Conflict when a record
+ *  has that path already, or that id with another path. */
+export const create = (s: Server, rec: string, path: string, text: string, mark: Mark = {}): Promise<Remote> => createdUnder(
+  () => notes(s).create(rec, path, text, mark),
+  async () => { const had = await get(s, rec); return had && had.path === path ? had : null; });
 export const update = (s: Server, e: Entry, text: string, mark: Mark = {}): Promise<Remote | null> => notes(s).update(e, text, mark);
 export const remove = (s: Server, e: Pick<Entry, "rec" | "rev">): Promise<void> => notes(s).remove(e);
 
@@ -101,7 +138,9 @@ export const tasks = {
   list: (s: Server, o: { filter?: string; sort?: string } = {}) => taskProtocol.list(transport(s), o),
   get: (s: Server, id: string) => taskProtocol.get(transport(s), id),
   getMany: (s: Server, ids: string[]) => taskProtocol.getMany(transport(s), ids),
-  create: (s: Server, r: Task, mark: Mark = {}) => taskProtocol.create(transport(s), r, mark),
+  /** A new task under its own id, sent again when no answer came back: a repeat that finds the id taken is the first send having
+   *  landed, and the record there is the answer. */
+  create: (s: Server, r: Task, mark: Mark = {}) => createdUnder(() => taskProtocol.create(transport(s), r, mark), () => taskProtocol.get(transport(s), r.id)),
   update: (s: Server, id: string, rev: number, fields: Partial<Omit<Task, "id">>, mark: Mark = {}) => taskProtocol.update(transport(s), id, rev, fields, mark),
   remove: (s: Server, id: string, rev: number) => taskProtocol.remove(transport(s), id, rev),
 };
@@ -125,8 +164,11 @@ export const lenses = {
     const j = await call(s, `collections/lenses/records?perPage=${PAGE}&skipTotal=1&sort=created,id`);
     return j.items.map(lensOf);
   },
-  /** A new lens. */
-  create: async (s: Server, l: LensFields): Promise<Lens> => lensOf(await call(s, "collections/lenses/records", json("POST", lensColumns(l)))),
+  /** A new lens, under an id of its own (`id`, made here when not given): sent again when no answer came, never twice. Conflict: a
+   *  lens by that name (ignoring case) exists. */
+  create: (s: Server, l: LensFields, id = recordId()): Promise<Lens> => createdUnder(
+    async () => lensOf(await call(s, "collections/lenses/records", json("POST", { id, ...lensColumns(l) }))),
+    async () => { try { return lensOf(await call(s, `collections/lenses/records/${id}`)); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; } }),
   /** `rec` rewritten. HttpError 404 when it has gone. */
   update: async (s: Server, rec: string, l: LensFields): Promise<Lens> =>
     lensOf(await call(s, `collections/lenses/records/${rec}`, json("PATCH", lensColumns(l)))),

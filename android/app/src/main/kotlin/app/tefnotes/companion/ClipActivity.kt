@@ -265,7 +265,7 @@ class ClipActivity : ComponentActivity() {
         refused = null
         saving = target
         val sent = picked                               // the owner's picks: the server adds the lens's tag to what it makes
-        val payload = saveBody(page, suggestions.line, target, note, summary, sent)
+        val payload = saveBody(newId(), page, suggestions.line, target, note, summary, sent)   // its id goes with every send, the outbox's too
         val files = if (sendsFiles(page, target)) parts.orEmpty() else emptyList()
         lifecycleScope.launch {
             try {

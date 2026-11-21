@@ -18,6 +18,14 @@ version is one semver number for the whole repository, set by the git tag (see [
   second message while a reply is still running is refused instead of running a second reply, and no request can
   approve a card the agent never showed or rewrite what the chat already read.
 
+- Nothing is made twice when a reply is lost on the way: writes are no longer re-sent by the transport, and every create
+  (notes, tasks, lenses, tags, reminder claims, the Android companion's tasks and clips, the clipper's and share page's
+  saves) carries an id of its own that the server answers a repeat of as the first. The companion contract is now 4: the
+  Android app needs the matching build.
+- The command line no longer loses data: `put` refuses empty input, `done` on a repeating task makes the next round before
+  it ticks, `draw --replace` swaps the scene only once the new one is in place, `edit` keeps your text in a private file it
+  names whenever it can't save, and `grep` says when it cut the list.
+- Android: files an interrupted save left in the outbox are cleaned up.
 - A clip saved as a new note or task under a lens gets the lens's tag whichever way it was saved: the clipper used to
   leave it off, the share page to drop your picked tags. The server adds it now; every client sends just your picks.
 - Auto-tagging: a note the tagging service keeps refusing no longer holds up the rest; it is retried less and less

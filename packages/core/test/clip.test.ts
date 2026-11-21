@@ -1,6 +1,6 @@
 // The clip routes' shapes shared with the extension (src/clip.ts), a share as a clip, the picture JEV looks at.
 import { describe, expect, it } from "bun:test";
-import { choices, describe as said, NEW, NEW_TASK, saveBody, sendsFiles, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
+import { choices, clipId, describe as said, NEW, NEW_TASK, saveBodies, saveBody, sendsFiles, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
 import { LOOK_MAX, LOOK_MIN, lookSize } from "../src/photos";
 import { clipOf, type Shared } from "../src/share";
 
@@ -62,8 +62,8 @@ describe("the requests", () => {
   it("suggest carries the note and the first picture's look; save the target, and the files only for a note", () => {
     expect(suggestBody(page, "mine", "AAAA")).toEqual({ ...page, note: "mine", images: [{ src: "", alt: "x", look: "AAAA" }, { src: "" }] });
     expect(suggestBody({ url: U, title: "t" }, "", undefined)).toEqual({ url: U, title: "t", note: undefined, images: undefined });
-    expect(saveBody(page, "line", { kind: "task", id: ID }, "", false)).toEqual({ url: U, title: "Page", selection: undefined, line: "line", target: { kind: "task", id: ID }, note: undefined, images: page.images, pdfs: page.pdfs, tags: undefined });
-    expect(saveBody(page, undefined, NEW, "", false, ["work"])).toMatchObject({ tags: ["work"] });
+    expect(saveBody(page, "line", { kind: "task", id: ID }, "", false, [], "saveidsaveidsav")).toEqual({ id: "saveidsaveidsav", url: U, title: "Page", selection: undefined, line: "line", target: { kind: "task", id: ID }, note: undefined, images: page.images, pdfs: page.pdfs, tags: undefined });
+    expect(saveBody(page, undefined, NEW, "", false, ["work"], "saveidsaveidsav")).toMatchObject({ tags: ["work"] });
     expect(sendsFiles(page, NEW)).toBe(true);
     expect(sendsFiles(page, { kind: "note", path: "notes/a.md" })).toBe(true);
     expect(sendsFiles(page, { kind: "task", id: ID })).toBe(false);
@@ -74,11 +74,26 @@ describe("the requests", () => {
   });
   it("a summary asked for sends the flag and the page's text, which is otherwise not sent again", () => {
     const withText = { ...page, text: "The page's text." };
-    expect(saveBody(withText, undefined, NEW, "", false)).not.toHaveProperty("text");
-    expect(saveBody(withText, undefined, NEW, "", false)).not.toHaveProperty("summary");
-    expect(saveBody(withText, undefined, NEW, "", true)).toMatchObject({ summary: true, text: "The page's text." });
+    expect(saveBody(withText, undefined, NEW, "", false, [], "saveidsaveidsav")).not.toHaveProperty("text");
+    expect(saveBody(withText, undefined, NEW, "", false, [], "saveidsaveidsav")).not.toHaveProperty("summary");
+    expect(saveBody(withText, undefined, NEW, "", true, [], "saveidsaveidsav")).toMatchObject({ summary: true, text: "The page's text." });
     // no page text (a share of a link): the flag alone (the server fetches the page)
-    expect(JSON.parse(JSON.stringify(saveBody({ url: U, title: "Page" }, undefined, NEW, "", true)))).toEqual({ url: U, title: "Page", target: { kind: "new" }, summary: true });
+    expect(JSON.parse(JSON.stringify(saveBody({ url: U, title: "Page" }, undefined, NEW, "", true, [], "saveidsaveidsav")))).toEqual({ id: "saveidsaveidsav", url: U, title: "Page", target: { kind: "new" }, summary: true });
+  });
+  it("a save's id is a record id's shape, and a new one every time", () => {
+    const ids = new Set(Array.from({ length: 50 }, clipId));
+    expect(ids.size).toBe(50);
+    for (const id of ids) expect(id).toMatch(/^[a-z0-9]{15}$/);
+  });
+  it("the same save sent again keeps its id, any other save and one already landed get a new one", () => {
+    const saves = saveBodies(), args: Parameters<ReturnType<typeof saveBodies>["body"]> = [page, undefined, NEW, "note", false, ["a"]];
+    const first = saves.body(...args).id;
+    expect(saves.body(...args).id).toBe(first);                                       // pressed again after a failure
+    expect(saves.body(page, undefined, NEW, "note", false, ["b"]).id).not.toBe(first); // another save
+    const second = saves.body(...args).id;
+    expect(second).not.toBe(first);
+    saves.landed();
+    expect(saves.body(...args).id).not.toBe(second);                                  // the same words once it was answered: a new save
   });
   it("the notice when a summary was asked for and not written", () => {
     const r = (summary?: ClipResult["summary"]): ClipResult => ({ kind: "note", path: "notes/a.md", title: "A", action: "created", summary });

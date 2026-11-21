@@ -98,13 +98,13 @@ describe("lenses calls", () => {
     const f = fake((url, init) => (init?.method === "DELETE" ? {} : url.includes("?") ? { items: [{ id: "a", name: "Work", tags: ["work"] }] } : { id: "a", name: "Work", tags: ["work"] }));
     try {
       expect(await lenses.list(s)).toEqual([{ rec: "a", name: "Work", tags: ["work"], exclude: [], accent: null, theme: null }]);
-      expect((await lenses.create(s, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null })).rec).toBe("a");
+      expect((await lenses.create(s, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null }, "abcdefghij01234")).rec).toBe("a");
       await lenses.update(s, "a", { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null });
       await lenses.remove(s, "a");
       expect(f.calls.map((c) => `${c.init?.method ?? "GET"} ${c.url.replace("http://pb/api/", "").split("?")[0]}`)).toEqual([
         "GET collections/lenses/records", "POST collections/lenses/records", "PATCH collections/lenses/records/a", "DELETE collections/lenses/records/a",
       ]);
-      expect(JSON.parse(String(f.calls[1].init!.body))).toEqual({ name: "Work", tags: ["work"], exclude: [], accent: "", theme: "" });
+      expect(JSON.parse(String(f.calls[1].init!.body))).toEqual({ id: "abcdefghij01234", name: "Work", tags: ["work"], exclude: [], accent: "", theme: "" });
     } finally { f.restore(); }
   });
 });

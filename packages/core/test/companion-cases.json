@@ -709,7 +709,7 @@
 
   ],
 
-  "contract": 3,
+  "contract": 4,
 
   "taskLists": [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]],
 
@@ -735,7 +735,7 @@
       ],
       "tick": "c",
       "feed": {
-        "contract": 3,
+        "contract": 4,
         "list": "today",
         "title": "Today",
         "url": "/today",
@@ -757,7 +757,7 @@
         "ask": "/?ask=1"
       },
       "after": {
-        "contract": 3,
+        "contract": 4,
         "list": "today",
         "title": "Today",
         "url": "/today",
@@ -784,7 +784,7 @@
       ],
       "tick": "a",
       "feed": {
-        "contract": 3,
+        "contract": 4,
         "list": "today",
         "title": "Today",
         "url": "/today",
@@ -806,7 +806,7 @@
         "ask": "/?ask=1"
       },
       "after": {
-        "contract": 3,
+        "contract": 4,
         "list": "today",
         "title": "Today",
         "url": "/today",
@@ -831,7 +831,7 @@
       ],
       "tick": "zzz",
       "feed": {
-        "contract": 3,
+        "contract": 4,
         "list": "today",
         "title": "Today",
         "url": "/today",
@@ -853,7 +853,7 @@
         "ask": "/?ask=1"
       },
       "after": {
-        "contract": 3,
+        "contract": 4,
         "list": "today",
         "title": "Today",
         "url": "/today",

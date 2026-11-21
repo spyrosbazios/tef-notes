@@ -75,16 +75,17 @@ class TaskActivity : ComponentActivity() {
     private fun add() {
         if (title.isBlank() || busy) return
         busy = true
+        val id = newId()                                // the task's own, for every send of it: the outbox keeps it if this one is lost
         lifecycleScope.launch {
             val said = try {
-                Api(Store.server(this@TaskActivity)!!).addTask(title.trim(), list)
+                Api(Store.server(this@TaskActivity)!!).addTask(id, title.trim(), list)
                 "Added to ${listLabel(list)}"
             } catch (e: Refused) {
                 // A no for good: the sheet stays as it is, so nothing typed is lost.
                 if (!e.again) return@launch no(e)
-                later()
+                later(id)
             } catch (_: Unreachable) {
-                later()
+                later(id)
             }
             Sync.now(this@TaskActivity)
             window.decorView.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -93,8 +94,8 @@ class TaskActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun later(): String {
-        withContext(Dispatchers.IO) { Outbox.addTask(this@TaskActivity, title.trim(), list) }
+    private suspend fun later(id: String): String {
+        withContext(Dispatchers.IO) { Outbox.addTask(this@TaskActivity, id, title.trim(), list) }
         return "Saved. It is added when the server is reachable"
     }
 

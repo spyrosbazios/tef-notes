@@ -155,15 +155,23 @@ function target(v) {
   throw new Bad("target must be a note's path, a task's id, new or newtask.");
 }
 
-/** The save request's JSON, or Bad: the page, the line suggest picked (or none), the owner's note, the files' words
- *  (their bytes are the request's file parts, the route's to read; an existing task takes none), the owner's choice of
+/** A save's `id`, made by the client for that one save (core clip.ts `clipId`): 15 of a-z0-9, as a record id is. The save is
+ *  kept under it (`clip_saves`), so the same save sent again, after an answer that was lost, is answered and not done twice. */
+function clipId(v) {
+  if (typeof v !== "string" || !/^[a-z0-9]{15}$/.test(v)) throw new Bad("id must be 15 lowercase letters and digits, made once for this save.");
+  return v;
+}
+
+/** The save request's JSON, or Bad: the save's `id`, the page, the line suggest picked (or none), the owner's note, the files'
+ *  words (their bytes are the request's file parts, the route's to read; an existing task takes none), the owner's choice of
  *  where: `target`, and whether they ticked "Add a summary": `summary`, with the page's `text` then (read only then). */
 function saveInput(body) {
-  const p = page(body, "target, url (or a selection, images or pdfs), title, and optionally line, note");
+  const p = page(body, "id, target, url (or a selection, images or pdfs), title, and optionally line, note");
+  const id = clipId(body.id);
   if (body.summary != null && typeof body.summary !== "boolean") throw new Bad("summary must be true or false.");
   const summary = body.summary === true;
   return {
-    ...p, line: field(body, "line", 2 * LINE, false).replace(/\s+/g, " "), note: field(body, "note", NOTE, false), ...filesOf(body, false), target: target(body.target),
+    id, ...p, line: field(body, "line", 2 * LINE, false).replace(/\s+/g, " "), note: field(body, "note", NOTE, false), ...filesOf(body, false), target: target(body.target),
     summary, text: summary ? field(body, "text", PAGE_CHARS, true) : "", tags: tagsOf(body.tags),
   };
 }
@@ -504,4 +512,17 @@ function summarise(clip, io) {
   }
 }
 
-module.exports = { lensTag, savedTags, DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, TASKS, input, saveInput, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, taskNotes, taskRow, taskLine, taskIndex, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
+const SAVES_KEPT = 7 * 86400000;   // a kept save (`clip_saves`): a re-send comes in minutes, an outbox's within the day
+
+/** Deletes the `clip_saves` records older than SAVES_KEPT; returns how many went. */
+function pruneSaves(app, now = Date.now()) {
+  const before = new Date(now - SAVES_KEPT).toISOString().replace("T", " ");
+  let gone = 0;
+  for (;;) {
+    const old = app.findRecordsByFilter("clip_saves", "created < {:t}", "", 200, 0, { t: before });
+    for (const r of old) { app.delete(r); gone++; }
+    if (old.length < 200) return gone;
+  }
+}
+
+module.exports = { pruneSaves, SAVES_KEPT, clipId, lensTag, savedTags, DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, TASKS, input, saveInput, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, taskNotes, taskRow, taskLine, taskIndex, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
