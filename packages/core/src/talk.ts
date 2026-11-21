@@ -5,8 +5,9 @@
 // each turn. The app sends the microphone and plays the voice; it hears nothing of the speech itself.
 //   GET /agent/talk/voices?q= -> TalkVoice[]: the owner's own Fish voices, then public ones (matching `q` when given)
 //   GET /agent/talk  -> TalkStatus; 404 while the server has no Fish Audio key (Talk is off: the app hides it)
-//   WS  /agent/talk  -> one conversation, for as long as the socket is open. Refused unless the upgrade's Origin is the
-//                       server's own: no preflight guards a WebSocket the way it guards the JSON routes.
+//   WS  /agent/talk  -> one conversation, for as long as the socket is open (and TALK_LIMITS allow). Refused when the
+//                       upgrade comes from another website (an Origin that isn't the server's own, the check every /agent
+//                       route makes): a browser opens a WebSocket to any address with no preflight, so that is its one lock.
 // Text frames are JSON: a TalkClientEvent up, a TalkServerEvent down. Binary frames are audio, raw 16-bit little-endian
 // mono PCM: the microphone up at TALK_RATE.mic (in pieces of 20 to 40 ms, the ear's own pace: a smaller message is read
 // sooner), the voice down at TALK_RATE.voice. The app's first frame is `start`, and nothing is read before it; the
@@ -23,6 +24,11 @@ import { contextOf, type AssistantContext } from "./assistant";
 /** Samples per second of each direction's audio: Fish's realtime ear takes 16 kHz as it is, and its voice writes 24 kHz
  *  PCM (the rate the app's player is opened at, `talk-voice.ts`). */
 export const TALK_RATE = { mic: 16_000, voice: 24_000 } as const;
+
+/** How long a conversation may stay open, because the ear (Fish's realtime transcription) is billed by the second for as long
+ *  as it is: the agent ends it, with an `error` saying why, after `idleMs` in which the owner neither took a turn nor tapped
+ *  anything while nothing was being said or thought, and after `maxMs` in all. Starting again is one tap. */
+export const TALK_LIMITS = { idleMs: 5 * 60_000, maxMs: 60 * 60_000 } as const;
 
 /** Samples of microphone in each frame the app sends: 40 ms, the ear's own upper pace. */
 export const MIC_FRAME = (TALK_RATE.mic * 40) / 1000;

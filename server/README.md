@@ -156,9 +156,12 @@ model provider:
   It hears the assistant's own lines too, so a follow-up is understood in context. Billed per session second.
 - **The voice** (`wss://api.fish.audio/v1/tts/live`, S2.1 Pro) speaks the reply as it is written, a sentence at a time.
   Billed per character; the free model costs nothing (Settings → Voice picks it).
-- **The turn** is the chat's own agent over the chat's own tools: a write still asks with a card (Settings → Agent), the
-  web-taint rules still apply, and the UI tools (open a note, go to a view) are done by the app. The conversation is saved
-  as a chat, so it reopens in the text assistant.
+- **The turn** is the chat's own agent over the chat's own tools: a write still asks with a card (Settings → Agent, read
+  every turn), the web-taint rules still apply (a chat that read the web stays tainted in Talk), and the UI tools (open a
+  note, go to a view) are done by the app. Speaking over the reply stops it. The conversation is saved as a chat, so it
+  reopens in the text assistant.
+- **The caps**: the ear is billed for as long as it is open, so the agent ends a conversation after 5 minutes with nothing
+  from you and after an hour in all (`TALK_LIMITS` in the contract); starting again is one tap.
 
 Nothing is re-billed per turn, which is what makes this affordable: a ten-minute conversation is a few cents of voice and
 the model tokens any chat would cost. Off without the Fish key; turning it off is the same as voice input.

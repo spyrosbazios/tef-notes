@@ -5,7 +5,7 @@ import type { ModelMessage } from "ai";
 import { DEFAULT_ACTIONS, type Actions } from "@/core/actions";
 import { cardsOf } from "@/core/agent";
 import { parseNote } from "@/core/notes";
-import { approvals, guarded } from "../src/agent";
+import { approvals, guarded } from "../src/turn";
 import { Notes } from "../src/notes";
 import { newTask, type Task } from "@/core/todo";
 import { localDay } from "@/core/time";

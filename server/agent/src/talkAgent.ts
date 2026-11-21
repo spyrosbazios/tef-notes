@@ -1,108 +1,103 @@
-// How Talk's turns are thought up: the chat's own instructions, context and tools, and the chat's model, one step at a
-// time. A step is run with nobody to execute its tools (talkTools.ts `unrun`), so talk.ts runs each call itself — with the
-// confirm card, the taint rules and the app's own tools — and hands the result back for the next step. Nothing here touches
-// the speech: the text is the voice's, and what is said of it is talk.ts's business.
-import { streamText, stepCountIs, type ModelMessage, type ToolSet } from "ai";
-import { EFFORT, type Effort } from "@/core/agent";
-import type { Actions } from "@/core/actions";
+// One turn of Talk, the agent's side: the chat's own turn (turn.ts runTurn, `spoken`), so the instructions, tools, the
+// owner's rules, the confirm cards, the taint checks and the model's timeout are the chat's, read for every turn. What
+// Talk adds is where the turn's answers come from: the chat's client resends the conversation with a card's answer or the
+// app's output, and here the turn waits for them over the socket (talk.ts) and runs the next round itself. Nothing here
+// touches the speech: the reply's words go to `words`, and what is said of them is talk.ts's business.
+import { getToolName, isToolUIPart, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
+import { isUiTool } from "@/core/assistant";
+import type { Effort } from "@/core/agent";
 import type { AssistantContext } from "@/core/assistant";
 import type { Server } from "@/core/pocketbase";
-import { approvals, context, guarded } from "./agent";
-import { key } from "./keys";
-import { model as pickModel } from "./models";
-import { PLACES, SYSTEM, TALK, WEB } from "./systemPrompt";
-import { policyFor, tools } from "./tools";
-import { allowed } from "./tool-policy";
-import { offered, unrun } from "./talkTools";
-import { Notes } from "./notes";
-import { Todo } from "./todo";
-import { readWeb } from "./tools";
+import type { model as pickModel } from "./models";
+import { runTurn, type AgentMessage } from "./turn";
 
-/** What a write's policy answers (tool-policy.ts): a card, nothing, or a refusal with the owner's reason. */
-export type Status = "not-applicable" | "user-approval" | { type: "denied"; reason: string };
+/** Rounds of one spoken turn: each after the app answered what the last one asked (a card, an app's tool). A model that
+ *  keeps asking the app for things ends the turn here, as the chat's client would stop resending. */
+export const MAX_ROUNDS = 8;
 
-/** A tool the step asked for. */
-export type Spoken = { id: string; name: string; input: unknown };
+/** What the reply is waiting on: the owner's tap on a card (`approval`), or the app doing one of its own tools (`output`). */
+export type Asked = { kind: "approval"; id: string } | { kind: "output"; toolCallId: string };
+/** Its answer, as the app sent it. */
+export type Answer = { approved: boolean; reason?: string } | { output: unknown };
 
-/** One step: the reply as it is written, and the calls it asked for (none: it answered). */
-export type Turn = { text: AsyncIterable<string>; calls: PromiseLike<Spoken[]> };
-
-export type TalkAgent = {
-  /** The instructions the conversation began with: a snapshot, as a conversation's context is (a spoken conversation has no
-   *  room to re-read them, and a stable prefix is what the prompt cache is paid on). */
-  instruction: string;
-  /** The tools the model may ask for, with nobody to run them (the SDK never runs a call itself). */
-  tools: ToolSet;
-  /** The same tools, to run: talk.ts runs each call, past the card and the taint rules. */
-  exec: ToolSet;
-  /** Steps a turn may take before it must answer. */
-  steps: number;
-  /** One step of `history`. */
-  turn(history: ModelMessage[], signal: AbortSignal): Turn;
-  /** Whether this conversation has read someone else's text: its writes ask, and some tools are withdrawn. */
-  foreign: boolean;
-  /** Whether it has by now, as the history stands. */
-  untrusted(history: ModelMessage[]): Promise<boolean>;
-  /** The chat's own pre-write check (agent.ts `approvals`): "user-approval" when the write needs the owner's tap, or a
-   *  `denied` status when the owner never allows it. */
-  ask(name: string, input: unknown, history: ModelMessage[]): Promise<Status>;
-  /** Whether a tool is withdrawn once the conversation has read someone else's text (tool-policy.ts). */
-  refuses(name: string): boolean;
-};
-
-export type Plan = {
+export type TalkTurn = {
   server: Server;
-  /** The chat model (models.ts): the owner's pick, else the server's. */
+  pick?: typeof pickModel;
   model: string;
   effort: Effort;
-  /** The owner's rules for the agent's writes (core/actions.ts): what asks, what just goes, what is never allowed. */
-  rules: Actions;
-  /** Whether a "Just do it" write still asks once the conversation has read someone else's text (prefs `agent.webGuard`). */
-  webGuard: boolean;
   page: AssistantContext | undefined;
-  /** Whether this conversation has read someone else's text: its writes ask, always. */
-  foreign: boolean;
+  signal: AbortSignal;
+  /** Whether this turn is still the conversation's: false once the owner spoke over it or the conversation ended. Checked
+   *  after every wait, so a turn that lost it changes nothing, says nothing and runs nothing more. */
+  live: () => boolean;
+  /** The conversation as it stands. */
+  messages: () => AgentMessage[];
+  /** A message as it now reads: the owner's, or the reply as it grows. */
+  show: (m: AgentMessage) => void;
+  /** The reply's words, as they are written. */
+  words: (delta: string) => void;
+  /** The reply stopped to wait for the app: what it has written so far is to be said now. */
+  pause: () => void;
+  /** The app's answer to `asked`; null when the turn ended before it came. */
+  answer: (asked: Asked) => Promise<Answer | null>;
 };
 
-/** The conversation's agent, ready before the socket is answered: the context is a snapshot of the start (talk.ts). */
-export async function talkAgent(p: Plan): Promise<TalkAgent> {
-  const notes = new Notes(p.server), todo = new Todo(p.server), ctx = await context(notes, p.page);
-  const untrusted = p.foreign || ctx.foreign ? async () => true : readWeb(notes, todo);
-  const web = !!(await key("exa"));
-  // A tool whose action the owner rules out is never offered: the model cannot call what it cannot see
-  const all = Object.fromEntries(Object.entries(offered(tools(notes, todo, untrusted), web, p.page)).filter(([n]) => allowed(policyFor(n), p.rules)));
-  const { model: m, providerOptions } = await pickModel(p.model);
-  const { steps, reasoning } = EFFORT[p.effort];
-  const check = approvals(notes, todo, p.rules, guarded(p.webGuard, untrusted)) as Record<string, ((i: unknown, o: { messages: ModelMessage[] }) => Promise<Status>) | undefined>;
-  // Talk's own rules ride after the chat's, so nothing the chat says about drawing, lists or markdown has to be unlearned
-  const instruction = `${SYSTEM}\n${PLACES}${web ? `\n${WEB}` : ""}\n${TALK}\n\n${ctx.text}`;
-  return {
-    instruction,
-    tools: unrun(all),
-    exec: all,
-    steps,
-    foreign: p.foreign || ctx.foreign,
-    untrusted,
-    ask: (name, input, history) => check[name]?.(input, { messages: history }) ?? Promise.resolve("not-applicable"),
-    refuses: (name) => !!policyFor(name)?.unavailableWhenTainted,
-    turn: (history, signal) => {
-      const r = streamText({
-        model: m,
-        system: instruction,
-        messages: history,
-        tools: unrun(all),
-        stopWhen: stepCountIs(1),      // one step at a time: talk.ts runs the calls, then asks again
-        reasoning,
-        providerOptions,
-        abortSignal: signal,
-        // A socket has no error boundary to hand a failure to: talk.ts hears it from the stream
-        onError: () => {},
-      });
-      return {
-        text: r.textStream,
-        calls: r.toolCalls.then((cs) => cs.flatMap((c) => (c.toolName && c.toolCallId ? [{ id: c.toolCallId, name: c.toolName, input: c.input }] : []))),
-      };
-    },
-  };
+/** What a reply waits on once its round ended: its cards, and the app's own tools it called. */
+export function waitingOn(m: AgentMessage): Asked[] {
+  return m.parts.flatMap((p): Asked[] => {
+    if (!isToolUIPart(p)) return [];
+    if (p.state === "approval-requested") return [{ kind: "approval", id: p.approval.id }];
+    return p.state === "input-available" && isUiTool(getToolName(p)) ? [{ kind: "output", toolCallId: p.toolCallId }] : [];
+  });
 }
 
+/** The reply with the app's answers in it, as the chat's client puts them there (addToolApprovalResponse, addToolOutput): a
+ *  card's answer keeps the server's signature (approval-secret.ts), so the next round runs the write only if it issued it. */
+export function answered<M extends UIMessage>(m: M, asked: readonly Asked[], answers: readonly Answer[]): M {
+  return {
+    ...m,
+    parts: m.parts.map((p) => {
+      if (!isToolUIPart(p)) return p;
+      const i = asked.findIndex((a) => (a.kind === "approval" ? p.state === "approval-requested" && p.approval.id === a.id : p.state === "input-available" && p.toolCallId === a.toolCallId));
+      const a = answers[i];
+      if (i < 0 || !a) return p;
+      if ("output" in a) return { ...p, state: "output-available", output: a.output };
+      return p.state !== "approval-requested" ? p : { ...p, state: "approval-responded", approval: { ...p.approval, approved: a.approved, ...(a.reason && { reason: a.reason }) } };
+    }),
+  } as M;
+}
+
+/** Runs one spoken turn to its end: round after round while the reply waits on the app. Throws what the model's stream
+ *  failed with (a timeout among them); a turn that lost the conversation just stops. */
+export async function talkTurn(t: TalkTurn): Promise<void> {
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const run = await runTurn({ server: t.server, pick: t.pick, model: t.model, effort: t.effort, page: t.page, history: t.messages(), spoken: true, abortSignal: t.signal });
+    if (!t.live()) return;
+    if ("error" in run) throw new Error(run.error);
+    const last = t.messages().at(-1), continued = last?.role === "assistant";
+    let failed: string | undefined;
+    // The words go to the voice as the model writes them, ahead of the message they build
+    const words = new TransformStream<UIMessageChunk, UIMessageChunk>({
+      transform(c, out) {
+        if (c.type === "text-delta" && t.live()) t.words(c.delta);
+        // An abort nobody asked for is the model's timeout (turn.ts MODEL_TIMEOUT)
+        if (c.type === "abort" && !t.signal.aborted) failed = "The model stopped answering.";
+        out.enqueue(c);
+      },
+    });
+    for await (const m of readUIMessageStream<AgentMessage>({ message: continued ? last : undefined, stream: run.stream.pipeThrough(words), onError: (e) => { failed = e instanceof Error ? e.message : String(e); } })) {
+      if (!t.live()) return;
+      t.show(m);
+    }
+    if (!t.live()) return;
+    if (failed) throw new Error(failed);
+    const reply = t.messages().at(-1);
+    const asked = reply?.role === "assistant" ? waitingOn(reply) : [];
+    if (!reply || !asked.length) return;
+    t.pause();
+    const answers = await Promise.all(asked.map(t.answer));
+    if (!t.live()) return;
+    if (answers.some((a) => a === null)) return;
+    t.show(answered(reply, asked, answers as Answer[]));
+  }
+}

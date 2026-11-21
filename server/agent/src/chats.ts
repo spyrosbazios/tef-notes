@@ -13,13 +13,17 @@ export function titleOf(ms: UIMessage[]) {
   return text.trim() ? chatTitle(text.trim()).slice(0, 200) : "";
 }
 
-/** Whether the record exists and its history is readable. Never let an older agent replace a future format. */
-export async function exists(s: pb.Server, id: string) {
-  try { const record = await pb.call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=id,messages,historyVersion`); readChatHistory(record); return true; } catch (e) {
-    if (e instanceof HttpError && e.status === 404) return false;
+/** The chat's history; null when there is no such record. Throws on one it can't read: never let an older agent replace a
+ *  future format. */
+export async function history(s: pb.Server, id: string): Promise<UIMessage[] | null> {
+  try { return readChatHistory(await pb.call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=id,messages,historyVersion`)) as UIMessage[]; } catch (e) {
+    if (e instanceof HttpError && e.status === 404) return null;
     throw e;
   }
 }
+
+/** Whether the record exists and its history is readable. */
+export const exists = async (s: pb.Server, id: string) => (await history(s, id)) !== null;
 
 /** Saves of one chat, one at a time and in order: a slow mid-stream save never lands after the final one. */
 export function saver(s: pb.Server, id: string, model: string) {

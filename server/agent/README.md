@@ -25,7 +25,7 @@ to it. See the security model in [../README.md](../README.md).
 A client that stays with the owner through the app (the web's docked panel) sends `context` with every
 message: what is on screen, as `AssistantContext` (`packages/core/src/assistant.ts` is the contract; `contextOf` reads it, and
 a context that can't be read is ignored: the chat is a plain one). The server renders it as a `<screen>` block, last in the
-`<context>` of the newest user message (`src/assistant.ts`, `src/agent.ts`), so the instructions stay one fixed prefix for the
+`<context>` of the newest user message (`src/assistant.ts`, `src/turn.ts`), so the instructions stay one fixed prefix for the
 prompt cache. It is the owner's text, quoted and bounded, never instructions, and not web taint.
 
 With a context the agent also has the UI tools `open_note`, `open_task`, `go_view` and `ask_choice`: declared without an
@@ -49,7 +49,7 @@ keeps these services independent of assistant modules and card builders.
 
 Each tool-definition module also declares a typed policy table: approval mode and validator, whether its result
 contains external text or record references, whether taint withdraws it, and whether it requires Exa. Adding a tool
-requires a policy entry (`Policies<T>` in `src/tool-policy.ts`). `src/tools.ts` assembles the tables; `src/agent.ts`
+requires a policy entry (`Policies<T>` in `src/tool-policy.ts`). `src/tools.ts` assembles the tables; `src/turn.ts`
 derives approval callbacks and availability from them. The pure guard and loop utilities receive policy lookup as an
 argument, so they do not import the tool registry. Tests cover completeness and the existing approval/taint behavior.
 
