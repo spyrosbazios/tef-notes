@@ -67,7 +67,7 @@ Run the checks of every module you touched, and of `packages/core` if you change
 Format, then lint, type-check, test and build, in that order.
 
 Commit messages: short and descriptive, no required format. Keep unrelated changes in separate commits.
-Pull requests are squash-merged once CI (`.github/workflows/ci.yml`) is green; there is no commit linter and no git hook.
+Pull requests are squash-merged once CI (`.github/workflows/ci.yml`) is green; there is no commit linter and no git hook. Its `images` job builds the server and agent images without pushing, so a failure that only happens inside an image (its Bun is Alpine's) shows before a deploy.
 
 ## Licence and CLA
 

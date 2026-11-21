@@ -229,6 +229,36 @@ jobs:
       - run: bun test
       - run: bun run build
 
+  # What docker.yml publishes on a tag, built here without pushing: a build that only fails inside an image (its Bun is
+  # Alpine's musl, not this runner's glibc) must not first show itself at a deploy. The `server` target is the published
+  # image and has no signing stage, so no CRX key is needed. amd64 only: the web build runs on the builder's own platform
+  # and the agent has no native step of its own; the multi-arch build stays docker.yml's.
+  images:
+    name: Images - server and agent build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: server
+            dockerfile: server/Dockerfile
+            target: server
+          - name: agent
+            dockerfile: server/agent/Dockerfile
+            target: ""
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          push: false
+          cache-from: type=gha,scope=ci-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.name }}
+
   android:
     name: Android companion - typecheck, tests, lint, build
     runs-on: ubuntu-latest
