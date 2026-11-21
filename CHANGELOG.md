@@ -7,6 +7,7 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- Clipper: changing the server's address gives up Chrome's access to the old one.
 - Every server route answers a failure the same way, so the web app, the clipper and `tefnotes` all show the server's
   own words (a link the server won't fetch, a rename that failed) instead of a bare status.
 - The hourly tag-description job no longer writes over a description you (or an agent) saved while it was writing, nor

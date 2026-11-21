@@ -35,6 +35,10 @@ export function installChrome(): FakeChrome {
           return fake.accepts;
         },
         contains: async (want: Origins) => want.origins.every((o) => fake.granted.has(o)),
+        remove: async (gone: Origins) => {
+          for (const o of gone.origins) fake.granted.delete(o);
+          return true;
+        },
       },
       scripting: {
         executeScript: async (job: { target: { tabId: number }; args: unknown[] }) => {

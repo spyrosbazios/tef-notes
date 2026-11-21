@@ -32,6 +32,19 @@ describe("the server's address", () => {
     expect(await hasAccess("https://notes.example.net")).toBe(true);
     expect(await hasAccess("https://other.example.net")).toBe(false);
   });
+  it("gives up the old address's access when it changes, and keeps it when the new one is declined", async () => {
+    expect(await setServer("https://old.example.net")).toBe(true);
+    expect(await setServer("https://old.example.net")).toBe(true);
+    expect(await hasAccess("https://old.example.net")).toBe(true);
+    fake.accepts = false;
+    expect(await setServer("https://new.example.net")).toBe(false);
+    expect(await hasAccess("https://old.example.net")).toBe(true);
+    fake.accepts = true;
+    expect(await setServer("https://new.example.net")).toBe(true);
+    expect(await getServer()).toBe("https://new.example.net");
+    expect(await hasAccess("https://new.example.net")).toBe(true);
+    expect(await hasAccess("https://old.example.net")).toBe(false);
+  });
   it("is not kept when the owner declines the permission", async () => {
     fake.accepts = false;
     expect(await setServer("https://notes.example.net")).toBe(false);
