@@ -3,6 +3,7 @@
 import { expect, test } from "bun:test";
 import * as pb from "../../packages/core/src/pocketbase";
 import { newTask } from "../../packages/core/src/todo";
+import { serverError } from "../../packages/core/src/http";
 
 const url = process.env.TEF_CONTRACT_URL;
 if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun --no-env-file server/integration/run.ts");
@@ -54,6 +55,22 @@ test("clip: an append to a task bumps rev; a new task starts at rev 1", async ()
   expect(await record("tasks", made.id)).toMatchObject({ rev: 1, tags: ["x"], title: "Clipped task", tainted: true });
 });
 
+test("clip: under the owner's lens, a new note or task takes its tag on the server; an append takes the picks alone", async () => {
+  const lens = await pb.call(s, "collections/lenses/records", pb.json("POST", { name: "Work", tags: [" #Work ", "clients"] }));
+  const prefs = await pb.call(s, "collections/prefs/records", pb.json("POST", { key: "owner", data: { lens: lens.id } }));
+  try {
+    const note = await clip({ target: { kind: "new" }, tags: ["ideas"] });
+    expect((await record("notes", (await pb.read(s, note.path))!.rec)).tags).toEqual(["ideas", "Work"]);
+    const task = await clip({ target: { kind: "newtask", title: "Under the lens" }, tags: ["work"] });
+    expect((await record("tasks", task.id)).tags).toEqual(["work"]);             // picked already, ignoring case
+    const n = await pb.create(s, `notes/${id()}.md`, '---\ntitle: "Mine"\ntags: [a]\n---\nFirst\n');
+    await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
+    expect((await record("notes", n.rec)).tags).toEqual(["a", "b"]);
+  } finally {
+    await pb.call(s, `collections/prefs/records/${prefs.id}`, { method: "DELETE" });
+  }
+});
+
 test("tags rename: every note and task carrying it is a rev write, columns copied out of the text", async () => {
   const from = `old${id()}`, to = `new${id()}`;
   const n = await pb.create(s, `notes/${id()}.md`, `---\ntitle: "Tagged"\ntags: [${from}, keep]\n---\nBody\n`);
@@ -89,4 +106,28 @@ test("tags: describedBy is decided by the server; a request can only mark a desc
   expect((await patch(agent.id, { description: "Still an agent's", describedBy: "agent" })).describedBy).toBe("agent");
   expect((await patch(agent.id, { description: "The owner's now" })).describedBy).toBe("owner");
   expect((await patch(agent.id, { color: "red", describedBy: "agent" })).describedBy).toBe("owner");
+});
+
+test("every route answers a failure as { error } alone (lib/http.js), which the clients read with core serverError", async () => {
+  const refused = async (path: string, init?: RequestInit) => {
+    const res = await fetch(`${url}/api/${path}`, init);
+    const body = await res.json();
+    return { status: res.status, keys: Object.keys(body), error: serverError(body) };
+  };
+  const post = (body: unknown) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const private_ = encodeURIComponent("http://10.0.0.1/");
+  for (const [path, init] of [
+    [`tefnotes/link-preview?url=${private_}`],
+    [`tefnotes/page?url=${private_}`],
+    [`tefnotes/clip/image?url=${private_}`],
+    ["tefnotes/summary", post({ url: "http://10.0.0.1/" })],
+    ["tefnotes/tags/rename", post({ from: "a" })],
+    ["tefnotes/tags/describe", post({})],
+    ["tefnotes/tags/guess", post({ title: 3 })],
+    ["tefnotes/clip/suggest", post({ title: "" })],
+  ] as [string, RequestInit?][]) {
+    const r = await refused(path, init);
+    expect([path, r.status, r.keys]).toEqual([path, 400, ["error"]]);
+    expect(r.error?.length).toBeGreaterThan(3);
+  }
 });

@@ -1,8 +1,6 @@
 // The web share target: Android's form as a share, and the stash that carries it from the service worker to the page.
 import { describe, expect, it } from "bun:test";
-import { NEW, NEW_TASK } from "../src/clip";
-import type { Lens } from "../src/lens";
-import { clipOf, clipTags, fromPasted, fromPost } from "../src/share";
+import { clipOf, fromPasted, fromPost } from "../src/share";
 import { stashPost, takePost, type Stash } from "../src/share-stash";
 
 const U = "https://example.com/a?b=1";
@@ -34,17 +32,6 @@ describe("Android's form as a share", () => {
     expect(clipOf(fromPost({ ...none, files: [{ name: "a.png", type: "image/png" }] })!, null)).toEqual({ url: "", title: "", images: [{ src: "" }] });
     expect(clipOf(fromPost({ ...none, files: [{ name: "a.png", type: "image/png" }, { name: "b.png", type: "image/png" }] })!, null)).toEqual({ url: "", title: "", images: [{ src: "" }, { src: "" }] });
     expect(clipOf(fromPost({ ...none, files: [{ name: "a.pdf", type: "application/pdf" }] })!, null)).toEqual({ url: "", title: "", pdfs: [{ name: "a.pdf" }] });
-  });
-});
-
-describe("what a lens gives a clip", () => {
-  const work: Lens = { rec: "w", name: "Work", tags: ["work", "clients"], exclude: [], accent: null, theme: null };
-  it("its first tag to what is made, nothing to what is appended to", () => {
-    expect(clipTags(NEW, work)).toEqual(["work"]);
-    expect(clipTags(NEW_TASK, work)).toEqual(["work"]);
-    expect(clipTags({ kind: "note", path: "notes/a.md" }, work)).toEqual([]);
-    expect(clipTags({ kind: "task", id: "t" }, work)).toEqual([]);
-    expect(clipTags(NEW, null)).toEqual([]);
   });
 });
 

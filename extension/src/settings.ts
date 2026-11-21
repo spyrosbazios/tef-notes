@@ -21,10 +21,13 @@ export async function getServer(): Promise<string | undefined> {
   return typeof server === "string" && server ? server : undefined;
 }
 
-/** Ask Chrome for access to `origin` (needs a user gesture), then keep it. False if the user declined. */
+/** Ask Chrome for access to `origin` (needs a user gesture), then keep it, and give up the access the previous address had:
+ *  the extension reaches the one server it is set to. False if the user declined (the old address and its access stay). */
 export async function setServer(origin: string): Promise<boolean> {
   if (!(await chrome.permissions.request(pattern(origin)))) return false;
+  const was = await getServer();
   await chrome.storage.sync.set({ server: origin });
+  if (was && was !== origin) await chrome.permissions.remove(pattern(was));
   return true;
 }
 

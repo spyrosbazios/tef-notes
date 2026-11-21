@@ -47,11 +47,6 @@ describe("which notes", () => {
     expect(lib.rejected(rows, "HOME")).toEqual(["C"]);
     expect(lib.rejected(rows, "x")).toEqual([]);
   });
-  test("tagsOf reads the column's JSON text or a list, and nothing else", () => {
-    expect(lib.tagsOf('["a",3,"b"]')).toEqual(["a", "b"]);
-    expect(lib.tagsOf(null)).toEqual([]);
-    expect(lib.tagsOf('{"a":1}')).toEqual([]);
-  });
 });
 
 describe("the sample", () => {
@@ -121,6 +116,38 @@ describe("the hourly description", () => {
     expect(lib.due(13, 3, "auto")).toBe(true);
     expect(lib.due(39, 20, "auto")).toBe(false);
     expect(lib.due(40, 20, "auto")).toBe(true);
+  });
+  test("never over an agent's either: it was saved on purpose", () => {
+    expect(lib.due(50, 0, "agent")).toBe(false);
+    expect(lib.due(50, 3, "agent")).toBe(false);
+  });
+});
+
+describe("the hourly job's save", () => {
+  /** A transaction over one tag record; `saved` lists what was saved. */
+  const txOf = (fields) => {
+    const saved = [], rec = { fields: { ...fields }, getString: (k) => String(rec.fields[k] ?? ""), set: (k, v) => { rec.fields[k] = v; } };
+    return { saved, rec, findRecordById: (c, id) => { if (c !== "tags" || id !== "t1") throw new Error("not found"); return rec; }, save: (r) => saved.push(r) };
+  };
+  test("writes the description, the count it was drawn at and who wrote it, re-read where it is saved", () => {
+    const tx = txOf({ name: "home", description: "", describedBy: "" });
+    expect(lib.saveDescription(tx, "t1", "home", "Notes about the house.", 3)).toBe(true);
+    expect(tx.saved).toHaveLength(1);
+    expect(tx.rec.fields).toMatchObject({ name: "home", description: "Notes about the house.", described: 3, describedBy: "auto" });
+    expect(lib.saveDescription(txOf({ name: "home", description: "Old", describedBy: "auto" }), "t1", "home", "New", 6)).toBe(true);
+  });
+  test("leaves a tag renamed meanwhile, or described by the owner or an agent meanwhile, as it is", () => {
+    for (const fields of [
+      { name: "house", description: "", describedBy: "" },
+      { name: "home", description: "Mine", describedBy: "owner" },
+      { name: "home", description: "An agent's", describedBy: "agent" },
+    ]) {
+      const tx = txOf(fields);
+      expect(lib.saveDescription(tx, "t1", "home", "Notes about the house.", 3)).toBe(false);
+      expect(tx.saved).toEqual([]);
+      expect(tx.rec.fields).toEqual(fields);
+    }
+    expect(lib.saveDescription(txOf({ name: "home" }), "gone", "home", "x", 3)).toBe(false);
   });
 });
 

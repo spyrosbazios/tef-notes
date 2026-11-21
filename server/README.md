@@ -224,7 +224,8 @@ record has moved since; clients re-read and merge instead of overwriting. Detail
 
 ## Custom HTTP routes
 
-PocketBase's own `/api/collections/...` API serves the records. The hooks add:
+PocketBase's own `/api/collections/...` API serves the records. The hooks add the routes below; each answers a failure
+as `{ error }` alone (`pb_hooks/lib/http.js`, held by `test/http.test.js`), which clients read with core `serverError`:
 
 | Method | Path | What it does |
 |---|---|---|
@@ -243,7 +244,7 @@ PocketBase's own `/api/collections/...` API serves the records. The hooks add:
 | `GET` | `/agent/companion/hello`, `/agent/companion/tasks?list=`, `/agent/companion/notes` | What the native companion (`android/`) draws: the owner's colours, a task list and the notes, ready to draw, under the lens on. Contract: `packages/core/src/companion.ts`. |
 | `POST` | `/agent/companion/tasks`, `/agent/companion/tasks/:id/done` | The companion's two writes: a new task (`{ title, list? }`) and a tick, a repeating task rolled over. |
 
-Cron jobs: `autotag` every minute (evaluates up to 50 notes per run) and `link_previews_prune` daily.
+Cron jobs: `autotag` every minute (evaluates up to 50 notes per run, never-tried first; a note JEV keeps refusing backs off, `notes.tagFailed`), `tag-describe` hourly and `link_previews_prune` daily.
 
 ## Schema and migrations
 

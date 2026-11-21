@@ -27,11 +27,11 @@ const lensOn = () => {
 
 describe("hello", () => {
   it("answers with the defaults before any preference is saved", async () => {
-    expect(await (await helloRoute(pb)).json() as Hello).toEqual({ app: "tefnotes", contract: COMPANION_CONTRACT, look: DEFAULT_LOOK, summary: false, tag: null });
+    expect(await (await helloRoute(pb)).json() as Hello).toEqual({ app: "tefnotes", contract: COMPANION_CONTRACT, look: DEFAULT_LOOK, summary: false });
   });
   it("answers in the owner's theme, the lens's accent, the summary box as left", async () => {
     lensOn();
-    expect(await (await helloRoute(pb)).json() as Hello).toMatchObject({ look: { bg: THEMES.nord.C.bg, brand: ACCENTS.teal.dark }, summary: true, tag: "work" });
+    expect(await (await helloRoute(pb)).json() as Hello).toMatchObject({ look: { bg: THEMES.nord.C.bg, brand: ACCENTS.teal.dark }, summary: true });
   });
 });
 

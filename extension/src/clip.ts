@@ -3,6 +3,7 @@
 // is the only place a choice is made; the tags are asked for beside the suggestions (tagsFor); the context menu hands its page to it (background.ts).
 // The shapes are packages/core/src/clip.ts's, shared with the phone's Share screen. The picture's bytes: picture.ts.
 import { CLIP_TEXT, type ClipPage, type ClipResult, type ClipTags, saveBody, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
+import { serverError } from "@/core/http";
 import { likeLit } from "@/core/record-contracts";
 import { getServer, hasAccess } from "./settings";
 
@@ -40,9 +41,7 @@ async function call(route: string, init: RequestInit = {}): Promise<Response> {
     throw new Error("Can't reach the server. Check the address and that you are on the server's network.");
   }
   if (!res.ok) {
-    const json: unknown = await res.json().catch(() => null);
-    const error = json && typeof json === "object" && "error" in json ? String(json.error) : "";
-    throw new Error(error || `The server answered ${res.status}.`);
+    throw new Error(serverError(await res.json().catch(() => null)) ?? `The server answered ${res.status}.`);
   }
   return res;
 }

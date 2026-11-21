@@ -1,6 +1,6 @@
 // The native companion's feeds (src/companion.ts): rows worked out here, so a companion only draws them.
 import { describe, expect, it } from "bun:test";
-import { choices, CLIP_FILES, describe as describeResult, filesWord, savedTags, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
+import { choices, CLIP_FILES, describe as describeResult, filesWord, summaryNotice, unpickedTags, type ClipResult, type ClipTags, type Suggestions } from "../src/clip";
 import { COMPANION_CONTRACT, DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, shareClip, switchesOf, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
@@ -24,8 +24,7 @@ describe("the look", () => {
     expect(ownerLook({ theme: "nord", accent: "rose" }, work)).toMatchObject({ scheme: "light", bg: THEMES.light.C.bg, brand: ACCENTS.teal.light });
   });
   it("hello names the app, the contract and the summary box as left", () => {
-    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 3, look: DEFAULT_LOOK, summary: true, tag: null });
-    expect(helloOf(DEFAULT_PREFS, work).tag).toBe("work");
+    expect(helloOf({ ...DEFAULT_PREFS, clip: { summary: true } }, null)).toEqual({ app: "tefnotes", contract: 3, look: DEFAULT_LOOK, summary: true });
   });
 });
 
@@ -146,9 +145,6 @@ describe("the rules a companion copies", () => {
     it(`the choices: ${c.name}`, () => expect(choices(c.suggestions, c.files)).toEqual(c.choices as ReturnType<typeof choices>));
   for (const c of cases.tags as { name: string; all: ClipTags["tags"]; picked: string[]; offered: ClipTags["tags"]; more: string[] }[])
     it(`the tags not picked: ${c.name}`, () => expect(unpickedTags(c.all, c.picked)).toEqual({ offered: c.offered, more: c.more }));
-  it("the tags a save sends: the picks, then what the lens tags, each once", () => {
-    for (const c of cases.saved) expect(savedTags(c.picked, c.made)).toEqual(c.tags);
-  });
   it("the contract a companion draws: bumped here and there together", () => expect(COMPANION_CONTRACT).toBe(cases.contract));
   it("the task lists, in the order and under the names a companion offers", () =>
     expect(TASK_LISTS.map((l) => [l, TASK_LIST_LABEL[l]])).toEqual(cases.taskLists));

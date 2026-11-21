@@ -10,8 +10,8 @@
 //     Asks JEV, writes nothing. `line` is the page's own passage JEV picked as what the page is: the save sends it back.
 //   POST /api/tefnotes/clip  multipart: `@jsonPayload` { url?, title, selection?, line?, note?, images?: [{ src, alt?, caption? }], pdfs?: [{ name }],
 //        target: { kind: "new", title? } | { kind: "note", path } | { kind: "task", id } | { kind: "newtask", title? },
-//        summary?: true, text? (the page's innerText, read only with summary), tags?: [name] (the owner's: a new note or
-//        task carries them, an append adds those missing) } and, for a clip to a note, a new note or a new task, one `file`
+//        summary?: true, text? (the page's innerText, read only with summary), tags?: [name] (the owner's picks: a new note or
+//        task carries them and the lens's tag, added here, an append adds the picks missing) } and, for a clip to a note, a new note or a new task, one `file`
 //        part per file in the payload's order: each picture's JPEG, then each PDF as it is (an existing task takes none: it
 //        holds no attachment). The body may be up to 260 MB (PocketBase's default is 32 MB: a couple of PDFs pass it).
 //     200 { kind: "note", path, title, action: "created" | "appended", summary? } | { kind: "task", id, title,
@@ -44,7 +44,7 @@
 // the note's write fails: never one without the other.
 // A handler runs in its own VM and sees nothing of this file's top level: each requires what it uses.
 
-routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
+routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "No suggestions could be made.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
@@ -89,9 +89,9 @@ routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
     log("suggest failed", "url", clip.url, "error", String(err).slice(0, 300));
     return e.json(500, { error: "No suggestions could be made." });
   }
-});
+}));
 
-routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
+routerAdd("POST", "/api/tefnotes/clip/tags", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The tags could not be scored.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), auto = require(`${__hooks}/lib/autotag.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
@@ -124,11 +124,11 @@ routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
     log("tags failed", "error", String(err).slice(0, 200));
     return scored([]);
   }
-});
+}));
 
-routerAdd("POST", "/api/tefnotes/clip", (e) => {
+routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The clip could not be saved.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
-  const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`), records = require(`${__hooks}/lib/records.js`);
+  const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`), records = require(`${__hooks}/lib/records.js`), rows = require(`${__hooks}/lib/rows.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
   let clip, files = [];
@@ -138,25 +138,42 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
   }
   try { files = e.findUploadedFiles("file"); } catch (_) { /* a page: no file part */ }
 
+  // Each file is a `file` part, kept as an attachment of the note it goes in (for a new task, a new note the task links
+  // to); a clip to an existing task sends none. Checked before anything is fetched or asked.
+  if (files.length !== lib.filesSent(clip)) {
+    return e.json(400, { error: "A clip to a note, a new note or a new task sends a `file` part per picture and PDF, in that order; a clip to an existing task sends none." });
+  }
+
+  // A new note or task carries the lens's tag, whichever client sent it: the clients send the owner's picks alone
+  let prefs = null;
+  try { prefs = JSON.parse(e.app.findFirstRecordByData("prefs", "key", "owner").getString("data") || "null"); } catch (_) { /* none saved yet: no lens */ }
+  clip.tags = lib.savedTags(clip, lib.lensTag(prefs, (id) => {
+    try { return rows.names(e.app.findRecordById("lenses", id).getString("tags")); } catch (_) { return null; }
+  }));
+
+  // Every call to another service below (the page's title, the note's write-up, the summary, the agent's title) shares one
+  // deadline, so the save answers well inside the clients' wait; one that would start too late is skipped, as if it failed.
+  const until = Date.now() + lib.DEADLINE_MS, lp = require(`${__hooks}/lib/link-preview.js`);
+  /** `$http.send(req)` with its timeout cut to what is left; throws when too little is left to try. */
+  const send = (req) => {
+    const timeout = lib.secondsLeft(until, req.timeout);
+    if (!timeout) throw new Error("out of time: the clip's deadline passed");
+    return $http.send({ ...req, timeout });
+  };
+
   // A link without its page's title (the companion sends none; the web's preview may have failed): the page's own, from the
-  // link-preview cache or fetched through its guard. None found: titled as before, by the text or the site.
+  // link-preview cache (keyed by the URL as lib/link-preview.js parseUrl writes it) or fetched through its guard. None
+  // found: titled as before, by the text or the site.
   if (clip.url && !clip.title) {
     try {
-      const r = e.app.findFirstRecordByFilter("link_previews", "url = {:url}", { url: clip.url });
+      const r = e.app.findFirstRecordByFilter("link_previews", "url = {:url}", { url: lp.parseUrl(clip.url).href });
       clip.title = r.getString("title");
-    } catch (_) { /* not cached */ }
+    } catch (_) { /* not cached, or a URL the server won't fetch */ }
     if (!clip.title) {
-      const lp = require(`${__hooks}/lib/link-preview.js`), run = (name, ...args) => toString($os.exec(name, ...args).output());
-      try { clip.title = ((lp.previewOf(clip.url, { lookup: lp.getent(run), get: lp.curl(run) }) || {}).title || "").trim(); } catch (err) {
+      try { clip.title = ((lp.previewOf(clip.url, lp.io({ deadline: until })) || {}).title || "").trim(); } catch (err) {
         log("no page title", "url", clip.url, "error", String(err).slice(0, 200));
       }
     }
-  }
-  // Each file is a `file` part, kept as an attachment of the note it goes in (for a new task, a new note the task links
-  // to); a clip to an existing task sends none.
-  const kept = clip.target.kind === "task" ? 0 : clip.images.length + clip.pdfs.length;
-  if (files.length !== kept) {
-    return e.json(400, { error: "A clip to a note, a new note or a new task sends a `file` part per picture and PDF, in that order; a clip to an existing task sends none." });
   }
 
   // The owner's note, written up: as typed without a key, or when the model fails.
@@ -166,7 +183,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     if (!key) log(`no ${ds.label} key: the note goes in as typed`);
     else {
       try {
-        const q = lib.noteRequest(clip, clip.line), res = $http.send(ds.request(key, q.system, q.user));
+        const q = lib.noteRequest(clip, clip.line), res = send(ds.request(key, q.system, q.user));
         if (res.statusCode === 200) note = lib.noteOf(ds.text(res.json), clip.note);
         else log(`${ds.label} refused: the note goes in as typed`, "status", res.statusCode);
       } catch (err) {
@@ -176,16 +193,16 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
   }
 
   // The summary, when the owner asked for one: "added", "skipped" (nothing to summarise it from) or "failed" (no key, the
-  // page could not be read, or the model failed); the clip is saved either way, and the answer says which. lib/clip.js summarise.
+  // page could not be read, the model failed, or no time was left); the clip is saved either way, and the answer says
+  // which. lib/clip.js summarise.
   let summary = "", outcome;
   if (clip.summary) {
-    const lp = require(`${__hooks}/lib/link-preview.js`), run = (name, ...args) => toString($os.exec(name, ...args).output());
     const key = ds.credential(keys.read);
     const r = lib.summarise(clip, {
       key,
-      page: (url) => lp.textOf(url, { lookup: lp.getent(run), get: lp.curl(run) }),
+      page: (url) => lp.textOf(url, lp.io({ deadline: until })),
       blocked: (err) => err instanceof lp.Blocked,
-      ask: (system, user) => { const res = $http.send(ds.request(key, system, user, 30)); return { status: res.statusCode, text: res.statusCode === 200 ? ds.text(res.json) : "" }; },
+      ask: (system, user) => { const res = send(ds.request(key, system, user, 30)); return { status: res.statusCode, text: res.statusCode === 200 ? ds.text(res.json) : "" }; },
       log,
     });
     summary = r.block; outcome = r.outcome;
@@ -226,7 +243,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
   const retitle = (made, title) => {
     if (!made || !lib.filesOnly(clip)) return title;
     try {
-      const res = $http.send({
+      const res = send({
         url: `${AGENT}/agent/title`, method: "POST", timeout: 50,
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: notes.idOf(made.path) }),
       });
@@ -258,8 +275,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
           const next = lib.taskNotes(r.getString("notes"), body);
           if (next == null) { full = true; return false; }
           r.set("notes", next);
-          let had = [];
-          try { const v = JSON.parse(r.getString("tags") || "[]"); if (Array.isArray(v)) had = v.filter((t) => typeof t === "string"); } catch (_) { /* none */ }
+          const had = rows.names(r.getString("tags"));
           r.set("tags", [...had, ...without(clip.tags, had)]);
         }, { taint: true });
         if (rec) out = { kind: "task", id, title: rec.getString("title"), action: "appended" };
@@ -322,9 +338,9 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     log("failed", "url", clip.url, "error", String(err).slice(0, 300));
     return e.json(500, { error: "The clip could not be saved." });
   }
-}, $apis.bodyLimit(260 * 1024 * 1024));   // FILES (10) PDFs of 25 MB each, and the JSON
+}), $apis.bodyLimit(260 * 1024 * 1024));   // FILES (10) PDFs of 25 MB each, and the JSON
 
-routerAdd("GET", "/api/tefnotes/clip/image", (e) => {
+routerAdd("GET", "/api/tefnotes/clip/image", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The picture could not be fetched.", () => {
   const lp = require(`${__hooks}/lib/link-preview.js`);
   const fail = (status, error) => e.json(status, { error });
 
@@ -335,9 +351,8 @@ routerAdd("GET", "/api/tefnotes/clip/image", (e) => {
   }
   const file = `${$os.tempDir()}/tefnotes-clip-${$security.randomString(20)}`;
   try {
-    const run = (name, ...args) => toString($os.exec(name, ...args).output());
     let page;
-    try { page = lp.fetchPage(url, { lookup: lp.getent(run), get: lp.curlFile(run, file) }); } catch (err) {
+    try { page = lp.fetchPage(url, lp.io({ file })); } catch (err) {
       if (err instanceof lp.Blocked) return fail(400, `The server won't fetch that picture: ${err.message}.`);
       return fail(502, "The picture's site did not answer.");
     }
@@ -353,4 +368,4 @@ routerAdd("GET", "/api/tefnotes/clip/image", (e) => {
   } finally {
     try { $os.remove(file); } catch (_) { /* never written */ }
   }
-});
+}));

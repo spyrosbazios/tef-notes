@@ -12,13 +12,13 @@
 // didn't answer and nothing is cached (not saved: asked again next time).
 // Nothing is signed in, like the rest: the tailnet is the gate, and it is why the guard in the lib exists.
 
-routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
+routerAdd("GET", "/api/tefnotes/link-preview", (e) => require(`${__hooks}/lib/http.js`).route(e, "link-preview", "The preview could not be made.", () => {
   const lib = require(`${__hooks}/lib/link-preview.js`);
   const FIELDS = ["title", "description", "site", "image", "icon"];
 
   let url;
   try { url = lib.parseUrl(e.request.url.query().get("url") || "").href; } catch (err) {
-    if (err instanceof lib.Blocked) throw new BadRequestError(err.message);
+    if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     throw err;
   }
 
@@ -31,10 +31,10 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
   /** The record's kept picture as `<record>/<file>`, or "". */
   const pictureOf = (r) => (r.getString("picture") ? `${r.id}/${encodeURIComponent(r.getString("picture"))}` : "");
   /** The page's picture into a temp file through the guard, as a file to keep; null when it is no picture we take. */
-  const fetchPicture = (src, run, file) => {
+  const fetchPicture = (src, file) => {
     if (!src) return null;
     try {
-      const got = lib.fetchPage(src, { lookup: lib.getent(run), get: lib.curlFile(run, file) });
+      const got = lib.fetchPage(src, lib.io({ file }));
       const type = got.type.split(";")[0].trim();
       if (got.status >= 400 || !/^image\/(jpeg|png|webp|gif)$/.test(type)) return null;
       const size = $os.stat(file).size();
@@ -45,12 +45,11 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
     } catch (err) { return null; }                       // blocked, or the site didn't answer: no picture, still a preview
   };
   if (!fresh) {
-    const run = (name, ...args) => toString($os.exec(name, ...args).output());
     let page = null;
     // A URL refused on the way (its name resolves to a private address, a redirect leads to one): a 400 like one refused
     // up front, and nothing cached for it
-    try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) {
-      if (err instanceof lib.Blocked) throw new BadRequestError(err.message);
+    try { page = lib.previewOf(url, lib.io()); } catch (err) {
+      if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     }
     // the site didn't answer (down, slow, rate-limited) and there is nothing to fall back on: a 502, not cached, so the
     // editor asks again later instead of drawing an empty card for an hour
@@ -63,7 +62,7 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
       r.set("fetched", Date.now());
       const file = `${$os.tempDir()}/tefnotes-preview-${$security.randomString(20)}`;
       try {
-        if (page) r.set("picture", fetchPicture(out.image, run, file));   // null clears a stale one; a failed refresh keeps it
+        if (page) r.set("picture", fetchPicture(out.image, file));   // null clears a stale one; a failed refresh keeps it
         try { e.app.save(r); rec = r; } catch (err) { /* a concurrent request saved the same URL first */ }
       } finally {
         try { $os.remove(file); } catch (_) { /* never written */ }
@@ -73,10 +72,10 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
 
   e.response.header().set("Cache-Control", "private, max-age=3600");
   return e.json(200, { url, ...out, picture: rec ? pictureOf(rec) : "" });
-});
+}));
 
-// Previews nobody asked for in a quarter: gone
+// Previews nobody asked for in a quarter: gone, with their kept pictures (lib/link-preview.js prune)
 cronAdd("link_previews_prune", "17 4 * * *", () => {
-  const lib = require(`${__hooks}/lib/link-preview.js`);
-  $app.db().newQuery("DELETE FROM link_previews WHERE fetched < {:t}").bind({ t: Date.now() - lib.KEEP_TTL }).execute();
+  const gone = require(`${__hooks}/lib/link-preview.js`).prune($app);
+  if (gone) $app.logger().info("link-preview: pruned", "records", gone);
 });

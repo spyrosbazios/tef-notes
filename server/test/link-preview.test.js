@@ -73,7 +73,34 @@ function net(pages, dns = {}) {
   };
 }
 
+describe("io", () => {
+  test("getent and curl over the runner; a file sends the body there; the deadline rides along", () => {
+    const ran = [];
+    const run = (name, ...args) => { ran.push([name, ...args]); return name === "timeout" ? "93.184.216.34 STREAM a.example.org\n" : reply(200, {}); };
+    const plain = lib.io({ run });
+    expect(plain.lookup("a.example.org")).toEqual(["93.184.216.34"]);
+    expect(ran[0]).toEqual(["timeout", "5", "getent", "ahosts", "a.example.org"]);
+    plain.get(["--", "https://a.example.org/"], 9);
+    expect(ran[1][2]).toContain("--max-time 9");
+    expect(ran[1][2]).toContain("head -c 300000");
+    expect(lib.io({ run, max: lib.PAGE_BYTES }).get([], 9) && ran[2][2]).toContain(`head -c ${lib.PAGE_BYTES}`);
+    lib.io({ run, file: "/tmp/x" }).get([], 9);
+    expect(ran[3].slice(3, 5)).toEqual(["sh", "/tmp/x"]);
+    expect(lib.io({ run, deadline: 123 }).deadline).toBe(123);
+  });
+});
+
 describe("fetchPage", () => {
+  test("a deadline sooner than the budget cuts the seconds curl gets, and ends the fetch once passed", () => {
+    let t = 1_000_000, seconds = 0;
+    const io = { ...net({ "https://a.example.org/": reply(200, {}) }), deadline: t + 7_500 };
+    const get = io.get;
+    io.get = (args, s) => { seconds = s; return get(args); };
+    fetchPage("https://a.example.org/", io, () => t);
+    expect(seconds).toBe(7);
+    t += 6_000;
+    expect(() => fetchPage("https://a.example.org/", io, () => t)).toThrow("took too long");
+  });
   test("follows redirects, checking each hop", () => {
     const io = net({
       "https://a.example.org/": reply(301, { location: "https://b.example.org/next" }),
@@ -193,10 +220,10 @@ describe("previewOf", () => {
   });
 });
 
-describe("curlFile", () => {
+describe("io: a picture to a file", () => {
   test("the body to the file, cut; only the headers come back on stdout", () => {
     let call;
-    const get = lib.curlFile((...a) => { call = a; return "HTTP/1.1 200 OK\r\ncontent-type: image/png\r\n\r\n"; }, "/tmp/f");
+    const { get } = lib.io({ run: (...a) => { call = a; return "HTTP/1.1 200 OK\r\ncontent-type: image/png\r\n\r\n"; }, file: "/tmp/f" });
     expect(get(["--", "https://a.example/x.png"], 9)).toContain("image/png");
     const [sh, flag, script, name, file, ...args] = call;
     expect([sh, flag, name, file, args]).toEqual(["sh", "-c", "sh", "/tmp/f", ["--", "https://a.example/x.png"]]);
@@ -206,9 +233,9 @@ describe("curlFile", () => {
   });
 });
 
-describe("curl", () => {
+describe("io: no proxy", () => {
   test("both fetches ignore any proxy in the environment: a proxy would connect past the pinned address", () => {
-    for (const make of [(run) => lib.curl(run), (run) => lib.curlFile(run, "/tmp/f")]) {
+    for (const make of [(run) => lib.io({ run }).get, (run) => lib.io({ run, file: "/tmp/f" }).get]) {
       let call;
       make((...a) => { call = a; return "HTTP/1.1 200 OK\r\n\r\n"; })(["--", "https://a.example/"], 9);
       expect(call[2]).toContain("--noproxy '*'");
@@ -272,5 +299,24 @@ describe("htmlOf", () => {
   });
   test("goes through the same guard", () => {
     expect(() => htmlOf(U, net({ [U]: reply(302, { location: "http://10.0.0.1/" }) }))).toThrow(Blocked);
+  });
+});
+
+describe("prune", () => {
+  test("deletes each old record through the app, so its picture files go with it, page by page", () => {
+    const now = 1_000_000_000_000, old = now - lib.KEEP_TTL - 1;
+    let rows = [...Array.from({ length: 250 }, (_, i) => ({ id: `o${i}`, fetched: old })), { id: "fresh", fetched: now }];
+    const deleted = [], asked = [];
+    const app = {
+      findRecordsByFilter: (coll, filter, sort, limit, offset, params) => {
+        asked.push({ coll, filter, limit, params });
+        return rows.filter((r) => r.fetched < params.t).slice(0, limit);
+      },
+      delete: (r) => { deleted.push(r.id); rows = rows.filter((x) => x !== r); },
+    };
+    expect(lib.prune(app, now)).toBe(250);
+    expect(deleted).toHaveLength(250);
+    expect(rows.map((r) => r.id)).toEqual(["fresh"]);
+    expect(asked[0]).toEqual({ coll: "link_previews", filter: "fetched < {:t}", limit: 200, params: { t: now - lib.KEEP_TTL } });
   });
 });

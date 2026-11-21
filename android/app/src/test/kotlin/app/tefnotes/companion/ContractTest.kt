@@ -26,9 +26,8 @@ class ContractTest {
 
     @Test
     fun helloIsOnlyATefNotesServers() {
-        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":3,"look":$look,"summary":true,"tag":"work"}"""))!!
-        assertEquals(Hello(3, JSONObject(look).toString(), true, "work"), h)
-        assertNull(helloOf(JSONObject("""{"app":"tefnotes","contract":3,"look":$look,"summary":false,"tag":null}"""))!!.tag)
+        val h = helloOf(JSONObject("""{"app":"tefnotes","contract":3,"look":$look,"summary":true}"""))!!
+        assertEquals(Hello(3, JSONObject(look).toString(), true), h)
         assertNull(helloOf(JSONObject("""{"app":"other","look":$look}""")))
         assertNull(helloOf(JSONObject("""{"message":"Not found"}""")))
     }

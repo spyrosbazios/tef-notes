@@ -39,7 +39,7 @@ object Store {
     }
 
     fun keep(context: Context, hello: Hello) =
-        prefs(context).edit { putString("look", hello.look).putBoolean("summary", hello.summary).putString("tag", hello.tag) }
+        prefs(context).edit { putString("look", hello.look).putBoolean("summary", hello.summary) }
 
     /** The owner's look as last answered; before any answer, the default theme (generated from the core's). */
     fun look(context: Context): Look = prefs(context).getString("look", null)?.let { lookOf(JSONObject(it)) } ?: Look(
@@ -53,9 +53,6 @@ object Store {
 
     /** "Add a summary", as the owner last left it in the app. */
     fun summary(context: Context) = prefs(context).getBoolean("summary", false)
-
-    /** The tag a note or task made now carries: the lens's, none with no lens on. */
-    fun tag(context: Context): String? = prefs(context).getString("tag", null)
 
     // A widget's tick and the sync both change the set: one at a time, so neither undoes the other's.
     @Synchronized fun ticks(context: Context): Set<String> = prefs(context).getStringSet("ticks", emptySet())!!.toSet()

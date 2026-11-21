@@ -45,13 +45,13 @@ fun lookOf(j: JSONObject?): Look? {
 }
 
 /** `GET hello`. `look`: its JSON as it came, kept to draw with before the next answer. */
-data class Hello(val contract: Int, val look: String, val summary: Boolean, val tag: String?)
+data class Hello(val contract: Int, val look: String, val summary: Boolean)
 
 /** null when the answer is not a TEF Notes server's. */
 fun helloOf(j: JSONObject): Hello? {
     val look = j.optJSONObject("look")
     if (j.optString("app") != APP || lookOf(look) == null) return null
-    return Hello(j.optInt("contract"), look!!.toString(), j.optBoolean("summary"), j.optString("tag").takeIf { !j.isNull("tag") && it.isNotEmpty() })
+    return Hello(j.optInt("contract"), look!!.toString(), j.optBoolean("summary"))
 }
 
 // ---- the feeds
@@ -206,9 +206,6 @@ sealed interface Target {
         is Note -> JSONObject().put("kind", "note").put("path", path)
         is Task -> JSONObject().put("kind", "task").put("id", id)
     }
-
-    /** Made by the save: what the lens on tags. */
-    val makes get() = this == New || this == NewTask
 }
 
 fun targetOf(j: JSONObject?): Target? = when (j?.optString("kind")) {
@@ -274,10 +271,6 @@ fun unpickedTags(all: List<ScoredTag>, picked: List<String>): Unpicked {
     val rest = all.filter { it.name !in picked }
     return Unpicked(rest.filter { it.p >= TAG_OFFER }, rest.filter { it.p < TAG_OFFER }.map { it.name }.sortedWith(Collator.getInstance()))
 }
-
-/** The tags a save sends: the owner's picks, then what the lens on tags a new note or task with, each once, ignoring
- *  case (clip.ts `savedTags`). */
-fun savedTags(picked: List<String>, made: List<String>): List<String> = (picked + made).distinctBy { it.lowercase() }
 
 /** A chance as the owner reads it. */
 fun percent(p: Double) = "${Math.round(p * 100)}%"

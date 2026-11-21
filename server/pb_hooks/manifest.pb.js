@@ -9,7 +9,7 @@
 // GET /manifest.webmanifest -> 200 application/manifest+json; 404 when the build has none.
 //
 // A handler runs in its own VM and sees nothing of this file's top level: it requires what it uses.
-routerAdd("GET", "/manifest.webmanifest", (e) => {
+routerAdd("GET", "/manifest.webmanifest", (e) => require(`${__hooks}/lib/http.js`).route(e, "manifest", "The manifest could not be made.", () => {
   const lib = require(`${__hooks}/lib/manifest.js`);
   const pub = `${__hooks}/../pb_public`;
   const read = (name) => JSON.parse(toString($os.readFile(`${pub}/${name}`)));
@@ -23,4 +23,4 @@ routerAdd("GET", "/manifest.webmanifest", (e) => {
 
   e.response.header().set("Cache-Control", "no-cache");
   return e.blob(200, "application/manifest+json; charset=utf-8", JSON.stringify(lib.themed(manifest, colors, prefs)));
-});
+}));

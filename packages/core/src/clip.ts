@@ -85,11 +85,6 @@ export function unpickedTags(all: ClipTags["tags"], picked: readonly string[]): 
   return { offered: rest.filter((t) => t.p >= TAG_OFFER), more: rest.filter((t) => t.p < TAG_OFFER).map((t) => t.name).sort((a, b) => a.localeCompare(b)) };
 }
 
-/** The tags a save sends: the owner's picks, then `made` (what the lens on tags a new note or task with, share.ts
- *  `clipTags`), each once, ignoring case. */
-export const savedTags = (picked: readonly string[], made: readonly string[]): string[] =>
-  [...picked, ...made].filter((t, i, all) => all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i);
-
 /** Whether a save sends the files' bytes: a clip with files to a note, a new note or a new task, never to an existing task. */
 export const sendsFiles = (page: ClipPage, target: Target) => clipFiles(page) > 0 && target.kind !== "task";
 

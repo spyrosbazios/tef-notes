@@ -25,6 +25,7 @@ const TITLE_CHARS = 80;                 // of an example's title
 // ---- tag names
 
 const { fold } = require("./notes.js");
+const { spread, noteTags } = require("./rows.js");
 
 /** The names in `list` that `names` does not have, ignoring case and tonos, each once. */
 function without(list, names) {
@@ -66,6 +67,36 @@ function fresh(tagged, rev, hash, content) {
   return p.length === 3 && p[1] === hash && p[2] === content;
 }
 
+// ---- notes JEV keeps refusing
+
+// A note JEV refuses for itself (a 400 or 413 even asked by its words alone, or one that fails to be read) used to stay
+// unstamped and be asked again every minute, first among the newest, starving the backlog behind it. Each such failure
+// is kept on the note (`tagFailed`, pb_migrations/1795500000_note_tag_failed.js) for the state it was asked in: it waits
+// BACKOFF_MS, doubling each time, and after FAIL_CAP failures it is not asked again until the note or the definitions
+// change. A refusal that says JEV itself is down (lib/jev.js down) is no failure of the note's.
+const BACKOFF_MS = 10 * 60 * 1000;
+const FAIL_CAP = 5;
+
+/** `tagFailed` after one more failure of the note at `rev` under definitions `hash`: `{ rev, hash, n, next }`, `n`
+ *  counted from the last one when it was in this same state, `next` when it may be asked again (ms since the epoch). */
+function failed(prev, rev, hash, now) {
+  const same = prev && typeof prev === "object" && prev.rev === rev && prev.hash === hash && Number.isInteger(prev.n);
+  const n = same ? prev.n + 1 : 1;
+  return { rev, hash, n, next: now + BACKOFF_MS * 2 ** (n - 1) };
+}
+
+// The `tagFailed` of a row, as JSON only when it is (a value a client wrote by hand is none), and whether it is for the row's
+// current state: what NOTES_SQL orders and filters by.
+const FAILED = "CASE WHEN json_valid(tagFailed) THEN tagFailed END";
+const FAILED_HERE = `(IFNULL(json_extract(${FAILED}, '$.rev'), -1) = CAST(rev AS INTEGER) AND IFNULL(json_extract(${FAILED}, '$.hash'), '') = {:hash})`;
+
+/** The notes a run asks about (bind `hash`, `now`, `cap`: FAIL_CAP, `n`: BATCH): not evaluated in their current state,
+ *  and not waiting out a failure in it nor past the cap; the never-tried first, then those due again, newest first. */
+const NOTES_SQL = "SELECT id FROM notes WHERE path LIKE 'notes/%'"
+  + " AND IFNULL(tagged, '') NOT LIKE CAST(CAST(rev AS INTEGER) AS TEXT) || ':' || {:hash} || ':%'"
+  + ` AND NOT (${FAILED_HERE} AND (json_extract(${FAILED}, '$.n') >= {:cap} OR json_extract(${FAILED}, '$.next') > {:now}))`
+  + ` ORDER BY ${FAILED_HERE} ASC, updated DESC LIMIT {:n}`;
+
 // ---- what the owner taught it
 
 /** Each tag's record, by folded name, from every note's `{ id, title, tags, auto, updated }` (`auto`: the tagger's
@@ -99,19 +130,9 @@ const definitions = (tags, profiles) => tags.map((t) => ({ name: t.name.trim(), 
     return { ...d, yes: p ? p.yes : [], no: p ? p.no : [], cut: cutOf(p) };
   });
 
-/** `n` of `list` spread over it (the first, the last and evenly between), so a few examples aren't all last week's. */
-function spread(list, n) {
-  if (list.length <= n) return list;
-  if (n === 1) return [list[0]];
-  return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))]);
-}
-
 /** The definitions from the database (hooks only): the tag records and every note's tags. */
 function load(app) {
-  const rows = arrayOf(new DynamicModel({ id: "", title: "", tags: "", autotagged: "", updated: "" }));
-  app.db().newQuery("SELECT id, title, CAST(IFNULL(tags, '[]') AS TEXT) AS tags, CAST(IFNULL(autotagged, '[]') AS TEXT) AS autotagged, updated FROM notes WHERE path LIKE 'notes/%'").all(rows);
-  const list = (s) => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch (_) { return []; } };
-  const profiles = profile(rows.map((r) => ({ id: r.id, title: r.title, tags: list(r.tags), auto: list(r.autotagged), updated: r.updated })));
+  const profiles = profile(noteTags(app).map((r) => ({ id: r.id, title: r.title, tags: r.tags, auto: r.autotagged, updated: r.updated })));
   return definitions(app.findAllRecords("tags").map((r) => ({ name: r.getString("name"), description: r.getString("description"), describedBy: r.getString("describedBy") })), profiles);
 }
 
@@ -181,5 +202,5 @@ function guessInput(body) {
 
 module.exports = {
   GUESS_CHARS, guessInput, PER_CALL, MAX_CHARS, BATCH, PHOTOS, AUTO, STRICT, CEIL, MAX_AUTO, EXAMPLES,
-  without, defsHash, contentKey, taggedKey, fresh, profile, cutOf, definitions, spread, load, taskItem, requests, probabilities, decide,
+  BACKOFF_MS, FAIL_CAP, failed, NOTES_SQL, without, defsHash, contentKey, taggedKey, fresh, profile, cutOf, definitions, load, taskItem, requests, probabilities, decide,
 };

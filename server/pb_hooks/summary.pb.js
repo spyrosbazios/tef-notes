@@ -7,7 +7,7 @@
 // 200 { summary } (the markdown block, a blockquote under a bold "Summary"); 400 a URL this server won't take; 422 nothing
 // on the page worth summarising; 502 no key, the page or the model failed. No sign-in, like the rest: the tailnet is the gate.
 
-routerAdd("POST", "/api/tefnotes/summary", (e) => {
+routerAdd("POST", "/api/tefnotes/summary", (e) => require(`${__hooks}/lib/http.js`).route(e, "summary", "The summary couldn't be written.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), lp = require(`${__hooks}/lib/link-preview.js`);
   const ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`summary: ${msg}`, ...kv);
@@ -18,11 +18,10 @@ routerAdd("POST", "/api/tefnotes/summary", (e) => {
     throw err;
   }
   const title = typeof body.title === "string" ? body.title.slice(0, 300) : "";
-  const run = (name, ...args) => toString($os.exec(name, ...args).output());
   const key = ds.credential(keys.read);
   const r = lib.summarise({ url, title, text: "", selection: "", images: [], pdfs: [] }, {
     key,
-    page: (u) => lp.textOf(u, { lookup: lp.getent(run), get: lp.curl(run) }),
+    page: (u) => lp.textOf(u, lp.io()),
     blocked: (err) => err instanceof lp.Blocked,
     ask: (system, user) => { const res = $http.send(ds.request(key, system, user, 30)); return { status: res.statusCode, text: res.statusCode === 200 ? ds.text(res.json) : "" }; },
     log,
@@ -30,4 +29,4 @@ routerAdd("POST", "/api/tefnotes/summary", (e) => {
   if (r.outcome === "added") return e.json(200, { summary: r.block });
   if (r.outcome === "skipped") return e.json(422, { error: "There is nothing on that page to summarise." });
   return e.json(502, { error: "The summary couldn't be written." });
-});
+}));

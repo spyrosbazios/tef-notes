@@ -170,15 +170,16 @@ function splitResponse(out) {
  * The page at `raw`, redirects followed by hand (each hop is checked like the first). `io`:
  *   lookup(host) -> string[]          the addresses of a name
  *   get(args, seconds) -> string      curl's stdout for these extra arguments
+ *   deadline?: number                 ms since the epoch the whole fetch ends by, when sooner than BUDGET_MS from now
  * Returns `{ url, status, type, body }` of the last response; throws Blocked for a URL refused, Error for a site that
  * did not answer.
  */
 function fetchPage(raw, io, now = Date.now) {
-  const t0 = now();
+  const end = Math.min(now() + BUDGET_MS, io.deadline || Infinity);
   let url = raw;
   for (let hop = 0; ; hop++) {
     const u = parseUrl(url), ip = addressFor(u, io.lookup);
-    const left = Math.floor((BUDGET_MS - (now() - t0)) / 1000);
+    const left = Math.floor((end - now()) / 1000);
     if (left < 2) throw new Error("took too long");
     const pin = ip ? ["--resolve", `${u.host}:${u.port}:${u.bracket || ip.includes(":") ? `[${ip}]` : ip}`] : [];
     const res = splitResponse(io.get([...pin, "--", u.href], left));
@@ -212,6 +213,15 @@ function getent(run) {
     try { out = run("timeout", "5", "getent", "ahosts", host); } catch (e) { return []; }
     return [...new Set(out.split("\n").map((l) => l.trim().split(/\s+/)[0]).filter(Boolean))];
   };
+}
+
+/** PocketBase's command runner (hooks only): stdout as a string, a throw when the command fails. */
+const exec = (name, ...args) => toString($os.exec(name, ...args).output());
+
+/** The `io` every hook fetches through: getent and curl over `run` (PocketBase's `$os.exec` unless a test gives one).
+ *  `max`: the response is cut there; `file`: the body goes to that file instead (curlFile); `deadline`: fetchPage's. */
+function io({ max = MAX_BYTES, file, deadline, run = exec } = {}) {
+  return { lookup: getent(run), get: file ? curlFile(run, file) : curl(run, max), deadline };
 }
 
 // ---- the page
@@ -384,4 +394,19 @@ function htmlOf(raw, io) {
   return { url: page.url, html: page.body };
 }
 
-module.exports = { FOUND_TTL, PAGE_BYTES, htmlOf, EMPTY_TTL, KEEP_TTL, IMAGE_BYTES, Blocked, isPublicIp, parseUrl, resolveUrl, fetchPage, parsePage, pageText, textOf, previewOf, curl, curlFile, getent };
+// ---- the cache
+
+const PRUNE_PAGE = 200;                      // records deleted per query by prune
+
+/** Deletes every `link_previews` record nobody refreshed in KEEP_TTL, each through `app.delete`, so its kept `picture`
+ *  and that picture's thumbs leave storage with it (a raw DELETE leaves the files behind). Returns how many went. */
+function prune(app, now = Date.now()) {
+  let gone = 0;
+  for (;;) {
+    const old = app.findRecordsByFilter("link_previews", "fetched < {:t}", "", PRUNE_PAGE, 0, { t: now - KEEP_TTL });
+    for (const r of old) { app.delete(r); gone++; }
+    if (old.length < PRUNE_PAGE) return gone;
+  }
+}
+
+module.exports = { io, prune, FOUND_TTL, PAGE_BYTES, htmlOf, EMPTY_TTL, KEEP_TTL, IMAGE_BYTES, Blocked, isPublicIp, parseUrl, resolveUrl, fetchPage, parsePage, pageText, textOf, previewOf };

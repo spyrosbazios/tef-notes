@@ -3,7 +3,7 @@
 // definition leaves notes alone; renaming a tag is the server's (renameTag), so every item carrying it follows. The server tags notes itself (its `autotagged` column);
 // a client's own tag edits go through applyTags.
 // Platform-neutral, like pocketbase.ts: fetch only, so the phone, the web app and the CLI share it.
-import { getJson, HttpError } from "./http";
+import { getJson } from "./http";
 import { fold, parseNote, withFlags, type Color } from "./notes";
 import { call, json, type Server } from "./pocketbase";
 import type { Task } from "./todo";
@@ -57,11 +57,8 @@ export const renameTag = (s: Server, from: string, to: string): Promise<Renamed>
 const DESCRIBE_ALL_MS = 600_000;
 export type Described = { tag: string; description: string };
 
-/** The server's words for a failed describe (`{error}`: no note carries the tag, no key, the model failed), else HTTP's. */
-export const describeError = (e: unknown): string =>
-  e instanceof HttpError && typeof e.body?.error === "string" ? e.body.error : e instanceof Error ? e.message : String(e);
-
-/** A description for every tag that has a note, by name. A tag the model failed on is left out. */
+/** A description for every tag that has a note, by name. A tag the model failed on is left out. Its failure's message is
+ *  the server's words (no note carries the tag, no key, the model failed: http.ts `serverError`). */
 export const describeAllTags = (s: Server): Promise<Described[]> =>
   getJson(`${s.url}/api/tefnotes/tags/describe`, json("POST", { all: true }), 1, DESCRIBE_ALL_MS);
 

@@ -8,7 +8,7 @@
 // What a companion does copy is small, and checked: how a share reads as a clip (`shareClip`), the sizes a picture is
 // sent at and its JPEG qualities (photos.ts `storedSize`, `lookSize`, `QUALITY`, `LOOK_QUALITY`), how many files a clip takes and how
 // large a PDF (clip.ts `CLIP_FILES`, photos.ts `MAX_PDF`), the choices a clip offers, its tags and what its save says (clip.ts
-// `filesWord`, `choices`, `unpickedTags`, `savedTags`, `describe`, `summaryNotice`), the contract number (`COMPANION_CONTRACT`), the task
+// `filesWord`, `choices`, `unpickedTags`, `describe`, `summaryNotice`; the tags a save sends are the owner's picks, and the server adds the lens's), the contract number (`COMPANION_CONTRACT`), the task
 // lists and their names (prefs.ts `TASK_LISTS`), the server's address as typed (no core copy: held to the URL standard's origin), and
 // the feed a widget shows from a tick until the server has it (held to `tasksFeed` of the tasks without it). They run before the
 // server is reached, or beside its answer. test/companion-cases.json holds the cases; this core's tests and each companion's run the
@@ -24,7 +24,7 @@
 // A share is a clip (clip.ts, the routes the extension calls); `shareClip` shapes one from what the share sheet hands over.
 import type { ClipPage } from "./clip";
 import { dayLabel, dayParts } from "./dates";
-import { inLens, lensAccent, lensTag, lensTheme, type Lens } from "./lens";
+import { inLens, lensAccent, lensTheme, type Lens } from "./lens";
 import { isNotePath, parseNote, snippetOf } from "./notes";
 import { DEFAULT_PREFS, TASK_LISTS, TASK_LIST_LABEL, type Prefs, type TaskList } from "./prefs";
 import { taskUrl } from "./push";
@@ -64,12 +64,11 @@ export const ownerLook = (prefs: Pick<Prefs, "theme" | "accent">, lens: Lens | n
 /** The look before any server has answered: the default theme. */
 export const DEFAULT_LOOK: Look = ownerLook(DEFAULT_PREFS, null);
 
-/** `summary`: "Add a summary", as the owner last left it. `tag`: the tag a note or task made now carries (the lens's first,
- *  lens.ts `lensTag`), null with no lens on. */
-export type Hello = { app: typeof COMPANION_APP; contract: number; look: Look; summary: boolean; tag: string | null };
+/** `summary`: "Add a summary", as the owner last left it. */
+export type Hello = { app: typeof COMPANION_APP; contract: number; look: Look; summary: boolean };
 
 export const helloOf = (prefs: Prefs, lens: Lens | null): Hello =>
-  ({ app: COMPANION_APP, contract: COMPANION_CONTRACT, look: ownerLook(prefs, lens), summary: prefs.clip.summary, tag: lensTag(lens) ?? null });
+  ({ app: COMPANION_APP, contract: COMPANION_CONTRACT, look: ownerLook(prefs, lens), summary: prefs.clip.summary });
 
 // ---- what every feed carries
 

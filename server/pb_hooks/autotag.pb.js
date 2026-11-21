@@ -26,8 +26,10 @@
 // own thumbnailer (a temporary file beside the original, deleted at once), one too small, or that cannot be read, is
 // left out (lib/images.js). If TypeSafe still answers 400 or 413 the note is asked again without them. A task has none.
 //
-// The key: lib/jev.js. Without it, or without definitions, nothing runs. A failed request leaves `tagged` alone, so the
-// next run retries; the log gets its status, never the key. pb_migrations/1792500002_autotag.js adds the columns to
+// The key: lib/jev.js. Without it, or without definitions, nothing runs. A failed request leaves `tagged` alone, so a
+// later run retries; the log gets its status, never the key. JEV down (lib/jev.js down) ends the run, and the next asks
+// again. A refusal of the note itself, or a note that can't be read, is kept on it (`tagFailed`, lib/autotag.js failed):
+// it waits, longer each time, and after a few is left until it or the definitions change; the never-tried go first. pb_migrations/1792500002_autotag.js adds the columns to
 // notes, 1793500000_task_tags.js to tasks.
 //
 // The rev contract (rev.pb.js) is enforced by request hooks, and a save from here fires none of them, so the write goes
@@ -46,9 +48,7 @@ cronAdd("autotag", "* * * * *", () => {
   if (!defs.length) return;
   const hash = lib.defsHash(defs);
 
-  const names = (rec, field) => {
-    try { const v = JSON.parse(rec.getString(field) || "null"); return Array.isArray(v) ? v.filter((s) => typeof s === "string") : []; } catch (err) { return []; }
-  };
+  const names = (rec, field) => require(`${__hooks}/lib/rows.js`).names(rec.getString(field));
   const log = (msg, ...kv) => $app.logger().warn(`autotag: ${msg}`, ...kv);
 
   /** The note's pictures as `lib.requests` takes them: at most PHOTOS, in body order, each fitting what TypeSafe takes
@@ -75,12 +75,12 @@ cronAdd("autotag", "* * * * *", () => {
     return out;
   };
 
-  /** The notes to evaluate (`sql`, newest first) and, for one record, what is asked (`item`, as `lib.requests` takes
+  /** The notes to evaluate (`sql`: lib/autotag.js NOTES_SQL) and, for one record, what is asked (`item`, as `lib.requests` takes
    *  it; `askable`: whether there is anything to ask about), the tags it has, its pictures (`photos()`), and
    *  `withTags(cur, tags)`: how those tags are written into the fresh record. */
   const NOTES = {
     coll: "notes", noun: "note",
-    sql: "SELECT id FROM notes WHERE path LIKE 'notes/%' AND IFNULL(tagged, '') NOT LIKE CAST(CAST(rev AS INTEGER) AS TEXT) || ':' || {:hash} || ':%' ORDER BY updated DESC LIMIT {:n}",
+    sql: lib.NOTES_SQL,
     subject: (rec) => {
       const path = rec.getString("path"), text = rec.getString("text"), note = notes.parse(path, text);
       return {
@@ -112,12 +112,22 @@ cronAdd("autotag", "* * * * *", () => {
   /** One run over one collection: up to BATCH records whose `tagged` isn't their current state. */
   const evaluate = ({ coll, noun, sql, subject }) => {
     const rows = arrayOf(new DynamicModel({ id: "" }));
-    $app.db().newQuery(sql).bind({ hash, n: lib.BATCH }).all(rows);
-    let done = 0, added = 0;
+    $app.db().newQuery(sql).bind({ hash, now: Date.now(), cap: lib.FAIL_CAP, n: lib.BATCH }).all(rows);
+    let done = 0, added = 0, failures = 0;
+    /** The record's failure in the state it was read at `rev`, kept by a guarded UPDATE: no rev bump, no new `updated`. */
+    const fail = (rec, rev) => {
+      let prev = null;
+      try { prev = JSON.parse(rec.getString("tagFailed") || "null"); } catch (_) { /* none */ }
+      $app.db().newQuery(`UPDATE ${coll} SET tagFailed = {:f} WHERE id = {:id} AND rev = {:rev}`)
+        .bind({ f: JSON.stringify(lib.failed(prev, rev, hash, Date.now())), id: rec.id, rev }).execute();
+      failures++;
+    };
     for (const { id } of rows) {
       if (state.down) break;
+      let rec = null, rev = 0;
       try {
-        const rec = $app.findRecordById(coll, id), rev = rec.getInt("rev"), had = names(rec, "autotagged");
+        rec = $app.findRecordById(coll, id); rev = rec.getInt("rev");
+        const had = names(rec, "autotagged");
         const sub = subject(rec), content = lib.contentKey(sub.item);
         // Only re-stamped, in the same guarded UPDATE as a verdict with nothing to add
         const stamp = (tx) => tx.db().newQuery(`UPDATE ${coll} SET tagged = {:tagged} WHERE id = {:id} AND rev = {:rev}`)
@@ -144,7 +154,10 @@ cronAdd("autotag", "* * * * *", () => {
           log("TypeSafe refused the photos: asking by the text", noun, id, "photos", photos.length);
           found = ask([]);
         }
-        if (!found) continue;                                   // `tagged` stays: next run asks again
+        if (!found) {                                           // `tagged` stays: a later run asks again
+          if (!state.down) fail(rec, rev);                      // JEV refused this one: it waits its turn
+          continue;
+        }
         const add = lib.decide(found, defs, room);
 
         $app.runInTransaction((tx) => {
@@ -164,9 +177,10 @@ cronAdd("autotag", "* * * * *", () => {
         });
       } catch (err) {
         log(`${noun} skipped`, noun, id, "error", String(err).slice(0, 200));
+        if (rec) { try { fail(rec, rev); } catch (_) { /* logged above; asked again next run */ } }
       }
     }
-    if (done) $app.logger().info("autotag: evaluated", coll, done, "tags added", added);
+    if (done || failures) $app.logger().info("autotag: evaluated", coll, done, "tags added", added, "failed", failures);
   };
 
   $app.store().set("autotag-running", true);
@@ -177,7 +191,7 @@ cronAdd("autotag", "* * * * *", () => {
   }
 });
 
-routerAdd("POST", "/api/tefnotes/tags/guess", (e) => {
+routerAdd("POST", "/api/tefnotes/tags/guess", (e) => require(`${__hooks}/lib/http.js`).route(e, "autotag", "The tags could not be guessed.", () => {
   const lib = require(`${__hooks}/lib/autotag.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const input = lib.guessInput(e.requestInfo().body);
   if (!input) return e.json(400, { error: "Send { title, notes? } as strings." });
@@ -200,4 +214,4 @@ routerAdd("POST", "/api/tefnotes/tags/guess", (e) => {
     ps.push(...lib.probabilities(r.defs, res.json));
   }
   return e.json(200, { tags: lib.decide(ps, defs) });
-});
+}));

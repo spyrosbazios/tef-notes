@@ -123,7 +123,8 @@ Things-style to-dos, records of their own (`tasks`; schema in
 
 A lens (`packages/core/src/lens.ts`) is a name and a set of tags: a global filter. While one is on, a note or task is shown
 only if it carries any of its tags (`inLens`, tonos and case ignored) in every list, count, search and tag view, and a note
-or task made meanwhile gets the lens's first tag (`inheritTags`). A record opened by its address stays reachable whatever the
+or task made meanwhile gets the lens's first tag (`inheritTags`; for a clip, from any client, the server adds it: `lib/clip.js`
+`savedTags`). A record opened by its address stays reachable whatever the
 lens says; only lists are narrowed.
 
 - The definitions are the `lenses` collection (`server/pb_migrations/1793600000_lenses.js`: `name`, unique ignoring case, and
@@ -297,9 +298,10 @@ follows redirects unseen, or loosen the check.
 **Tag descriptions** (`tags.pb.js`, `lib/tags.js`). `{tag}` or `{all: true}`; the model writes a description (up to 400
 characters, the auto-tagger's hint) from up to 12 notes you filed under the tag by hand, spread over its history (any that
 carry it when there are none), and the titles of notes you took it off. Clients save it with the tag. An hourly job
-(`tags.pb.js`) writes one itself only for a tag whose description you didn't write (`tags.describedBy`: `owner`, `auto`
+(`tags.pb.js`) writes one itself only for a tag with no description or one it wrote itself (`tags.describedBy`: `owner`, `auto`
 the job's, or `agent`, one a request marked an outside agent's, as the CLI does under `TEF_NOTES_AGENT=1`; the server
-decides it on every save, a request can't claim `owner` or `auto`, and only `owner` is trusted): first at 3 hand-tagged notes, then each time they double (`tags.described`). It never draws on the
+decides it on every save, a request can't claim `owner` or `auto`, and only `owner` is trusted): first at 3 hand-tagged notes, then each time they double, at least 10 more (`tags.described`).
+It re-reads the tag where it saves, and drops its answer when the tag was renamed or described meanwhile. It never draws on the
 auto-tagger's own tags: a description drawn from them described its mistakes, and spread them.
 
 **Where AI is allowed to write.** JEV only decides (tags, suggestions). The writing model (the server's provider) only tidies your own note on a clip,

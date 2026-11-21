@@ -1,6 +1,7 @@
 // The auto-tagger's lib (pb_hooks/lib/autotag.js): what it asks JEV and does with the answers. The `tags:` line it writes
 // is lib/notes.js's, checked against the clients' in notes.test.js.
 import { describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import lib from "../pb_hooks/lib/autotag.js";
 import notes from "../pb_hooks/lib/notes.js";
 
@@ -33,6 +34,48 @@ describe("names", () => {
     expect(lib.fresh("3:h", 3, "g", "c")).toBe(true);             // evaluated before this key: no sweep on deploy
     expect(lib.fresh("3:h", 4, "g", "c")).toBe(false);
     for (const t of ["", null, undefined, "x"]) expect(lib.fresh(t, 1, "h", "c")).toBe(false);
+  });
+});
+
+describe("notes JEV keeps refusing", () => {
+  const H = "h1", NOW = 1_000_000_000;
+  test("failed: counted in the same state, from one again in a new one, each wait twice the last", () => {
+    const one = lib.failed(null, 4, H, NOW);
+    expect(one).toEqual({ rev: 4, hash: H, n: 1, next: NOW + lib.BACKOFF_MS });
+    const two = lib.failed(one, 4, H, NOW);
+    expect(two).toEqual({ rev: 4, hash: H, n: 2, next: NOW + 2 * lib.BACKOFF_MS });
+    expect(lib.failed(two, 5, H, NOW).n).toBe(1);                 // edited since
+    expect(lib.failed(two, 4, "h2", NOW).n).toBe(1);              // new definitions
+    for (const junk of ["x", 3, { rev: 4, hash: H, n: "2" }]) expect(lib.failed(junk, 4, H, NOW).n).toBe(1);
+  });
+
+  // NOTES_SQL against SQLite itself, as PocketBase runs it ({:name} bound by name)
+  const pick = (rows) => {
+    const db = new Database(":memory:");
+    db.run("CREATE TABLE notes (id TEXT, path TEXT, rev NUMERIC, tagged TEXT, tagFailed JSON, updated TEXT)");
+    const add = db.prepare("INSERT INTO notes VALUES ($id, $path, $rev, $tagged, $tagFailed, $updated)");
+    for (const r of rows) add.run({ $path: `notes/${r.id}.md`, $tagged: "", $tagFailed: null, ...Object.fromEntries(Object.entries(r).map(([k, v]) => [`$${k}`, v])) });
+    const sql = lib.NOTES_SQL.replace(/\{:(\w+)\}/g, "$$$1");
+    return db.query(sql).all({ $hash: H, $now: NOW, $cap: lib.FAIL_CAP, $n: lib.BATCH }).map((r) => r.id);
+  };
+  const failedAt = (rev, n, next, hash = H) => JSON.stringify({ rev, hash, n, next });
+
+  test("the never-tried first, newest first; those due again after them; the waiting and the capped not at all", () => {
+    expect(pick([
+      { id: "old", rev: 1, updated: "2026-01-01" },
+      { id: "poison", rev: 2, updated: "2026-11-20", tagFailed: failedAt(2, 2, NOW - 1) },        // due again
+      { id: "new", rev: 1, updated: "2026-11-19" },
+      { id: "waiting", rev: 3, updated: "2026-11-21", tagFailed: failedAt(3, 1, NOW + 1) },
+      { id: "capped", rev: 3, updated: "2026-11-21", tagFailed: failedAt(3, lib.FAIL_CAP, NOW - 1) },
+      { id: "done", rev: 2, updated: "2026-11-21", tagged: `2:${H}:abc` },
+      { id: "edited", rev: 4, updated: "2026-11-18", tagFailed: failedAt(3, lib.FAIL_CAP, NOW + 99) },  // a stale failure: never tried in this state
+      { id: "redefined", rev: 1, updated: "2026-11-17", tagFailed: failedAt(1, lib.FAIL_CAP, NOW + 99, "h0") },
+      { id: "junk", rev: 1, updated: "2026-11-16", tagFailed: "not json" },
+    ])).toEqual(["new", "edited", "redefined", "junk", "old", "poison"]);
+  });
+  test("past the cap, a note waits for an edit or new definitions however long ago it failed", () => {
+    expect(pick([{ id: "capped", rev: 1, updated: "2026-11-21", tagFailed: failedAt(1, lib.FAIL_CAP, 0) }])).toEqual([]);
+    expect(pick([{ id: "below", rev: 1, updated: "2026-11-21", tagFailed: failedAt(1, lib.FAIL_CAP - 1, 0) }])).toEqual(["below"]);
   });
 });
 
@@ -92,11 +135,6 @@ describe("what the owner taught it", () => {
     expect(h).toMatchObject({ name: "home", own: true, cut: lib.cutOf(ps.get("home")) });
     expect(h.yes.length).toBe(3);
     expect(w).toMatchObject({ name: "work", own: false, yes: [{ id: "n3", title: "Sprint notes" }], no: [], cut: lib.AUTO });
-  });
-  test("spread: the first, the last and evenly between", () => {
-    expect(lib.spread([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([1, 4, 7]);
-    expect(lib.spread([1, 2], 3)).toEqual([1, 2]);
-    expect(lib.spread([1, 2, 3], 1)).toEqual([1]);
   });
   test("the question names the owner's examples, never the note asked about, quotes made safe", () => {
     const [d] = lib.definitions([{ name: "home", description: "the house", describedBy: "owner" }], lib.profile([...rows, { id: "n5", title: 'The "big" move', tags: ["home"], auto: [], updated: "2026-06-01" }]));

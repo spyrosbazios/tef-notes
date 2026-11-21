@@ -15,9 +15,8 @@ import { Turns } from "@/components/swap";
 import { Textarea } from "@/components/ui/textarea";
 import { choices, CLIP_FILES, clipFiles, filesWord, sendsFiles, summaryNotice, type ClipResult, type Suggestions, type Target } from "@/core/clip";
 import { noteIdOf } from "@/core/notes";
-import { askText, clipOf, clipTags, fromPasted, fromPost, type Shared } from "@/core/share";
+import { askText, clipOf, fromPasted, fromPost, type Shared } from "@/core/share";
 import { useAssistant } from "@/hooks/assistant";
-import { useActiveLens } from "@/hooks/lens";
 import { ALL_PHOTOS } from "@/hooks/photos";
 import { setPrefs, usePrefs } from "@/hooks/prefs";
 import { previewQuery } from "@/hooks/previews";
@@ -87,7 +86,7 @@ function Shown({ shared, files, title, image }: { shared: Shared; files: File[];
 }
 
 export function SharePage() {
-  const qc = useQueryClient(), assistant = useAssistant(), lens = useActiveLens();
+  const qc = useQueryClient(), assistant = useAssistant();
   const navigate = useNavigate(), { shared: arrived } = useSearch({ from: "/share" });
   // `?shared=err`: the worker could not read what was shared; the box is shown with a line saying so
   const [failed, setFailed] = useState(arrived === "err");
@@ -172,7 +171,7 @@ export function SharePage() {
     setBusy("clip"); setErr(null);
     try {
       const stored = sendsFiles(clip, target) ? [...(await Promise.all(pictures.map(downscale))), ...pdfs] : [];
-      const r = await clips.save(clip, ask.s?.line, target, note.trim(), summary, clipTags(target, lens), stored);
+      const r = await clips.save(clip, ask.s?.line, target, note.trim(), summary, [], stored);   // the lens's tag is the server's to add
       const notice = summaryNotice(r);
       if (notice) { setDone({ r, notice }); setBusy(null); } else await open(r);
     } catch (e) {

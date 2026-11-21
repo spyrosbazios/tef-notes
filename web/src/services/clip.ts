@@ -1,6 +1,6 @@
 // Filing a share through the server's clip routes (core/clip.ts has the shapes, extension/AGENTS.md the contract): suggest
 // where JEV would put it, then save where the owner chose. A model is behind each, so they wait longer than a read, and
-// neither is retried: a save that failed after landing would land twice. Failures are the server's `{error}` (`message`).
+// neither is retried: a save that failed after landing would land twice. Failures are the server's `{error}` (api.ts `message`).
 import { saveBody, sendsFiles, suggestBody, type ClipPage, type ClipResult, type Suggestions, type Target } from "@/core/clip";
 import { api } from "./api";
 
