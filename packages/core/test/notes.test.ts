@@ -233,6 +233,42 @@ describe("merge", () => {
     expect(merge3(base, base + "\nthis is a co", base + "\nthis is a code block")).toBe(base + "\nthis is a code block");
     expect(merge3(base, base + "\nmine\n", base + "\ntheirs\n")).toBeNull();
   });
+
+  it("typing on is taken whichever side did it", () => {
+    expect(merge3("a\nHello", "a\nHello world", "a\nHello wor")).toBe("a\nHello world");
+    expect(merge3("a\nHello", "a\nHello wor", "a\nHello world")).toBe("a\nHello world");
+  });
+
+  it("a shrink on one side against an extension on the other is a conflict, never a silent drop", () => {
+    expect(merge3("x\nHello world", "x\nHello", "x\nHello world!")).toBeNull();
+    expect(merge3("x\nHello world", "x\nHello world!", "x\nHello")).toBeNull();
+    expect(merge3("x\nHello world", "x\nHello", "x\nHello w")).toBeNull();
+  });
+
+  it("is quick and small on a long note", () => {
+    const lines = Array.from({ length: 4000 }, (_, i) => `line ${i} of the note`);
+    const mineAt = [10, 1500, 3000], theirsAt = [700, 2200, 3900];
+    const edit = (ls: string[], at: number[], tag: string) => ls.map((l, i) => (at.includes(i) ? `${l} ${tag}` : l));
+    const t0 = performance.now();
+    const m = merge3(lines.join("\n"), edit(lines, mineAt, "mine").join("\n"), edit(lines, theirsAt, "theirs").join("\n"));
+    expect(m).toBe(lines.map((l, i) => (mineAt.includes(i) ? `${l} mine` : theirsAt.includes(i) ? `${l} theirs` : l)).join("\n"));
+    // Nothing in common: the worst case for the diff (the old table was 16 million cells, about a second and 180 MB)
+    const other = lines.map((_, i) => `other ${i}`);
+    expect(merge3(lines.join("\n"), other.join("\n"), lines.join("\n"))).toBe(other.join("\n"));
+    expect(performance.now() - t0).toBeLessThan(2500);
+  });
+
+  it("merges a long note with many repeated lines", () => {
+    const base = Array.from({ length: 3000 }, (_, i) => `l${i % 700}`), mine = base.slice();
+    mine.splice(40, 3);
+    mine.splice(1000, 0, "new a", "new b");
+    mine[2500] = "changed";
+    const theirs = base.slice();
+    theirs[10] = "head edit";
+    const want = mine.slice();
+    want[10] = "head edit";
+    expect(merge3(base.join("\n"), mine.join("\n"), theirs.join("\n"))).toBe(want.join("\n"));
+  });
 });
 
 describe("withBody", () => {
