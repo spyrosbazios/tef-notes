@@ -8,7 +8,8 @@ import { useMemo, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { actionLine, DECLINED, diffLines, flagLine, lensLine, rowsOf, tagLine, todoLines, todoWords, type Line, type WriteInput } from "@/core/agent";
-import { appended, parseNote } from "@/core/notes";
+import { previewWrite, type NoteRead } from "@/core/note-read";
+import { appended, MEMORY, parseNote, withBody } from "@/core/notes";
 import { useNotes } from "@/hooks/notes";
 import { cn } from "@/lib/utils";
 import { memory } from "@/services/notes";
@@ -54,9 +55,27 @@ function useBody(path: string | undefined) {
   return useMemo(() => (path && text != null ? parseNote(path, text).body : ""), [path, text]);
 }
 
-/** A rewrite: the body as it is now against the proposed one, and a retitle if there is one. */
-function RewriteDiff({ path, title, input }: { path: string; title: string; input: WriteInput }) {
-  const body = useBody(path);
+/** What the server will make of a whole-file write over a file edited since the agent read it (core/note-read.ts previewWrite),
+ *  in words under the diff: the edits kept, or why it will be refused. Nothing while the file is as it was read. */
+function WriteNote({ view }: { view: ReturnType<typeof previewWrite> | null }) {
+  if (!view) return null;
+  if ("text" in view) return view.merged ? <p className="text-xs text-dim">Your edits since the agent read this are kept.</p> : null;
+  return (
+    <p className="text-xs text-warn">
+      {view.problem === "overlap" ? "This was edited since the agent read it, in the same lines" : "This was edited since the agent read it"}: confirming writes nothing, and the agent reads it again.
+    </p>
+  );
+}
+
+/** A rewrite: the body as it is now against the one it will leave (the proposed one, with edits made since the agent read the note
+ *  folded in), and a retitle if there is one. */
+function RewriteDiff({ path, title, input, reads }: { path: string; title: string; input: WriteInput; reads: readonly NoteRead[] }) {
+  const { data } = useNotes();
+  const body = useBody(path), live = data?.find((n) => n.path === path);
+  const view = useMemo(() => (live && input.rev != null
+    ? previewWrite(path, input.rev, reads, live, (file) => withBody(file, parseNote(path, file), `${(input.text ?? "").trimEnd()}\n`, input.title?.trim()))
+    : null), [live, path, input.rev, input.text, input.title, reads]);
+  const after = view && "text" in view ? parseNote(path, view.text).body : (input.text ?? "");
   const retitle = input.title?.trim() && input.title.trim() !== title ? input.title.trim() : undefined;
   return (
     <div className="space-y-3">
@@ -67,7 +86,8 @@ function RewriteDiff({ path, title, input }: { path: string; title: string; inpu
           <p className="text-up">+ {retitle}</p>
         </div>
       ) : null}
-      <TextDiff before={body.trimEnd()} after={(input.text ?? "").trimEnd()} />
+      <TextDiff before={body.trimEnd()} after={after.trimEnd()} />
+      <WriteNote view={view} />
     </div>
   );
 }
@@ -88,9 +108,17 @@ function TodoPreview({ name, input }: { name: string; input: WriteInput }) {
   return <div className="space-y-1">{lines.length ? lines.map((l, i) => <p key={i} className="whitespace-pre-wrap break-words text-sm">{l}</p>) : <p className="text-sm">No change</p>}</div>;
 }
 
-function MemoryDiff({ text }: { text: string }) {
+/** The memory file as it is now against the one it will leave (core/note-read.ts previewWrite, as a rewrite's). */
+function MemoryDiff({ text, rev, reads }: { text: string; rev?: number; reads: readonly NoteRead[] }) {
   const { data } = useQuery({ queryKey: ["memory"], queryFn: memory });
-  return <TextDiff before={(data?.text ?? "").trimEnd()} after={text.trimEnd()} />;
+  const view = useMemo(() => (data !== undefined && rev != null ? previewWrite(MEMORY, rev, reads, data, () => `${text.trimEnd()}\n`) : null), [data, rev, reads, text]);
+  const after = view && "text" in view ? view.text : text;
+  return (
+    <div className="space-y-3">
+      <TextDiff before={(data?.text ?? "").trimEnd()} after={after.trimEnd()} />
+      <WriteNote view={view} />
+    </div>
+  );
 }
 
 /** What an answered card says: what was done, or what was left undone. */
@@ -104,8 +132,8 @@ const VERB: Record<string, [done: string, skipped: string]> = {
 
 /** The agent wants to write one of the notes (or, after reading the web, its memory): show it and why; The user decides.
  *  `answer`: once decided the card is one line (a tick or a dash). */
-export function Confirm({ name, input, id, respond, answer }: {
-  name: string; input: WriteInput; id: string; respond: ChatAddToolApproveResponseFunction; answer?: "yes" | "no";
+export function Confirm({ name, input, reads, id, respond, answer }: {
+  name: string; input: WriteInput; reads: readonly NoteRead[]; id: string; respond: ChatAddToolApproveResponseFunction; answer?: "yes" | "no";
 }) {
   const { data } = useNotes();
   const title = (input.path ? data?.find((n) => n.path === input.path)?.note.title : undefined) ?? input.path ?? "the note";
@@ -140,7 +168,7 @@ export function Confirm({ name, input, id, respond, answer }: {
       <div className="border-t border-line pt-3">
         {name === "create_note" ? <Markdown body={input.body ?? ""} />
           : name === "append_to_note" && input.path ? <AppendPreview path={input.path} input={input} />
-          : name === "rewrite_note" && input.path ? <RewriteDiff path={input.path} title={title} input={input} />
+          : name === "rewrite_note" && input.path ? <RewriteDiff path={input.path} title={title} input={input} reads={reads} />
           : (name === "create_tag" || name === "update_tag") ? <p className="whitespace-pre-wrap text-sm">{tagLine(name, input)}</p>
           : name === "create_lens" ? <p className="whitespace-pre-wrap text-sm">{lensLine(input)}</p>
           : name === "save_note_action" ? <p className="whitespace-pre-wrap text-sm">{actionLine(input)}</p>
@@ -150,7 +178,7 @@ export function Confirm({ name, input, id, respond, answer }: {
           : name === "attach_file" ? <p className="whitespace-pre-wrap text-sm">{[input.text?.trim(), `${input.file ?? "The file"}, saved to the note`, flagLine(input)].filter(Boolean).join("\n")}</p>
           : name === "delete_note" ? <p className="text-sm">Delete it for good, with its photos and PDFs</p>
           : todo ? <TodoPreview name={name} input={input} />
-          : name === "update_memory" ? <MemoryDiff text={input.text ?? ""} />
+          : name === "update_memory" ? <MemoryDiff text={input.text ?? ""} rev={input.rev} reads={reads} />
           : <p className="text-sm">{input.text ?? ""}</p>}
       </div>
       <div className="flex gap-2">

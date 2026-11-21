@@ -9,7 +9,7 @@ import { useSyncExternalStore } from "react";
 import { isPrefPath, PREFS_KEY, prefsOf, type LayoutPrefs, type Prefs, type PrefsPatch } from "@/core/prefs";
 import { prefsSync, type PrefsCopy } from "@/core/prefs-sync";
 import { STORAGE } from "@/lib/storage-keys";
-import * as remote from "@/services/prefs";
+import { remote } from "@/services/prefs";
 import { layoutNow } from "./media";
 import { persisted } from "./store";
 
@@ -54,7 +54,7 @@ export function setPrefs(patch: PrefsPatch) {
 
 /** A `prefs` record from the realtime feed: the owner's becomes the copy, what is unsent here kept over it. */
 export function takePrefs(record: { id: string; key?: unknown; data?: unknown }) {
-  if (record.key === PREFS_KEY) sync.take({ rec: record.id, prefs: prefsOf(record.data) });
+  if (record.key === PREFS_KEY) sync.take(prefsOf(record.data));
 }
 
 /** Fetches the server's preferences into the copy, then sends what is unsent here. */

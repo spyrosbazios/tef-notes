@@ -31,7 +31,7 @@ test("clip: a new note starts at rev 1, tainted, with its columns copied out of 
 });
 
 test("clip: an append to a note bumps rev and copies its columns; the client's stale write is refused", async () => {
-  const n = await pb.create(s, `notes/${id()}.md`, '---\ntitle: "Target"\ntags: [a]\n---\nFirst\n');
+  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, '---\ntitle: "Target"\ntags: [a]\n---\nFirst\n');
   const out = await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
   expect(out).toMatchObject({ kind: "note", path: n.path, title: "Target", action: "appended" });
   const rec = await record("notes", n.rec);
@@ -63,7 +63,7 @@ test("clip: under the owner's lens, a new note or task takes its tag on the serv
     expect((await record("notes", (await pb.read(s, note.path))!.rec)).tags).toEqual(["ideas", "Work"]);
     const task = await clip({ target: { kind: "newtask", title: "Under the lens" }, tags: ["work"] });
     expect((await record("tasks", task.id)).tags).toEqual(["work"]);             // picked already, ignoring case
-    const n = await pb.create(s, `notes/${id()}.md`, '---\ntitle: "Mine"\ntags: [a]\n---\nFirst\n');
+    const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, '---\ntitle: "Mine"\ntags: [a]\n---\nFirst\n');
     await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
     expect((await record("notes", n.rec)).tags).toEqual(["a", "b"]);
   } finally {
@@ -73,7 +73,7 @@ test("clip: under the owner's lens, a new note or task takes its tag on the serv
 
 test("tags rename: every note and task carrying it is a rev write, columns copied out of the text", async () => {
   const from = `old${id()}`, to = `new${id()}`;
-  const n = await pb.create(s, `notes/${id()}.md`, `---\ntitle: "Tagged"\ntags: [${from}, keep]\n---\nBody\n`);
+  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, `---\ntitle: "Tagged"\ntags: [${from}, keep]\n---\nBody\n`);
   const t = await pb.tasks.create(s, newTask(id(), { title: "Tagged task", tags: [from] }));
   const res = await pb.call(s, "tefnotes/tags/rename", pb.json("POST", { from, to }));
   expect(res).toMatchObject({ tag: to, notes: 1, tasks: 1 });
@@ -84,13 +84,13 @@ test("tags rename: every note and task carrying it is a rev write, columns copie
 });
 
 test("tainted: a write never takes the mark off a note or a task", async () => {
-  const n = await pb.create(s, `notes/${id()}.md`, "# Web text\n", { tainted: true });
+  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Web text\n", { tainted: true });
   const patched = await pb.call(s, `collections/notes/records/${n.rec}`, pb.json("PATCH", { ...pb.noteColumns(n.path, "# Mine now\n"), rev: n.rev, tainted: false }));
   expect(patched).toMatchObject({ rev: 2, tainted: true });
   const t = await pb.tasks.create(s, newTask(id(), { title: "Web task" }), { tainted: true });
   const task = await pb.call(s, `collections/tasks/records/${t.id}`, pb.json("PATCH", { rev: t.rev, title: "Mine", tainted: false }));
   expect(task).toMatchObject({ rev: 2, title: "Mine", tainted: true });
-  const plain = await pb.create(s, `notes/${id()}.md`, "# Mine\n");
+  const plain = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Mine\n");
   expect((await record("notes", plain.rec)).tainted).toBe(false);
 });
 

@@ -185,6 +185,8 @@ export type WriteInput = {
   /** create_lens': the tags it hides and its colour (`tags`: those it shows). */
   exclude?: string[]; accent?: string;
   path?: string; title?: string; body?: string; text?: string; why?: string; section?: string;
+  /** The whole-file writes' (rewrite_note, update_memory): the rev of the file the text was written over (core/note-read.ts). */
+  rev?: number;
   /** attach_file's: the attached file's name. */
   file?: string;
   pinned?: boolean; archived?: boolean; color?: string | null; tags?: string[];

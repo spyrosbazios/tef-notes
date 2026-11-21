@@ -107,7 +107,11 @@ Things-style to-dos, records of their own (`tasks`; schema in
 - Values: days are `YYYY-MM-DD`, and there is no "today" value: a past `when` is Today. `evening` (This Evening) only goes
   with `when`. `remind` is `HH:MM` on the `when` day. `every` is `Nd Nw Nm Ny` fixed (next from
   the scheduled day, skipping to after today), `+Nd` and so on from the day it was done, or `mon,thu` weekdays. A
-  month's last day stays the last day (Jan 31, Feb 28, Mar 31).
+  monthly or yearly repeat keeps the day of the month it was set for: a short month clamps one round to its last day and
+  the `every` of that round carries the anchor (`1m@30`, `1y@29`; `everyOn` in `packages/core/src/dates.ts`), so the next
+  counts from it (Jan 30, Feb 28, Mar 30). An anchor stays only while the task sits on that clamped day (`everyAt`, in
+  `normalizeTask`); move the task and its new day is the anchor. The `every` pattern in
+  `server/pb_migrations/1795600000_every_anchor.js` allows `@29` to `@31` on `m` and `y` only.
 - `tainted`, as on notes: set by the chat agent with web text in view, the CLI under `TEF_NOTES_AGENT=1`, and the clip
   routes' new task or append; never cleared (`taskOf` drops it from a read, and `tainted.pb.js` keeps it on every save).
 - A client names a new record itself (`recordId`, 15 characters of `[a-z0-9]`), so a record made
@@ -161,7 +165,9 @@ note (its backlinks), a task made from a clipped picture (about the new note hol
 
 ## The write contract
 
-Every write to a note or task carries the `rev` it was based on. Links are outside it (above).
+Every write to a note or task carries the `rev` it was based on, and so does one to the preferences record (`prefs`, whose `data`
+holds every setting: a device that is refused re-reads and puts the paths it changed over the newer record, `packages/core/src/prefs-sync.ts`;
+the agent writes it the same way). Links are outside it (above).
 
 - `server/pb_hooks/rev.pb.js` (logic in `lib/rev.js`) is a compare-and-swap: a write whose `rev` is not the record's
   current one is refused, and a successful write bumps it.

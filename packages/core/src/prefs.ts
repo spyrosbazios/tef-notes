@@ -11,8 +11,8 @@
 //   2. The state of a window rather than a choice (the dock open and how wide, the chat it is on, when it was last seen): kept by
 //      that device alone, never sent (the web's every key: web/src/lib/storage-keys.ts).
 //   3. What lasts only while the app is open (the list Home's box was left on): a component's state, not saved.
-// A device holds a copy and sends what it changed field by field (prefs-sync.ts), so two devices changing different preferences
-// never undo each other's. `prefsOf` reads whatever was stored: an unknown or missing field is its default. A field moved or
+// A device holds a copy and sends what it changed field by field over the record's `rev` (prefs-sync.ts), so two devices changing
+// different preferences never undo each other's. `prefsOf` reads whatever was stored: an unknown or missing field is its default. A field moved or
 // renamed is a migration of the record (server/pb_migrations/1794600000_prefs_layouts.js is one), never a second reader.
 // Pure and platform-neutral.
 import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";

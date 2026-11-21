@@ -126,6 +126,22 @@ describe("deliver", () => {
     expect(await push.deliver(server, v, await stored(push.MAX_FAILED - 1), payload, { resolve: publicDns, send: refuse(503) })).toBe("dropped");
     expect(recs.size).toBe(0);
   });
+  it("counts every failed send, not one per scan: reminders sent in a row to the same subscription each add one", async () => {
+    const s = await stored();
+    for (let i = 1; i < push.MAX_FAILED; i++) {
+      expect(await push.deliver(server, v, s, payload, { resolve: publicDns, send: refuse(500) })).toBe("failed");
+      expect([...recs.values()][0].failed).toBe(i);
+    }
+    expect(await push.deliver(server, v, s, payload, { resolve: publicDns, send: refuse(500) })).toBe("dropped");
+    expect(recs.size).toBe(0);
+  });
+  it("a success after failures in the same scan clears the count", async () => {
+    const s = await stored();
+    await push.deliver(server, v, s, payload, { resolve: publicDns, send: refuse(500) });
+    expect(await push.deliver(server, v, s, payload, { resolve: publicDns, send: async () => {} })).toBe("sent");
+    expect([...recs.values()][0].failed).toBe(0);
+    expect(s.failed).toBe(0);
+  });
 });
 
 describe("the endpoint's address", () => {

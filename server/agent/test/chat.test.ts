@@ -180,19 +180,19 @@ describe("POST /agent/chat as a note action's run", () => {
   });
 
   it("its write is the chat's: a card under Ask first, done at once under Just do it", async () => {
-    replies = [toolCall("rewrite_note", { path: NOTE, text: "## Shopping\n- eggs", why: "A heading" })];
+    replies = [toolCall("rewrite_note", { rev: 1, path: NOTE, text: "## Shopping\n- eggs", why: "A heading" })];
     const asked = await send([pressed("Tidy")], {}, undefined, run("tidy"));
     expect(asked.parts.find(isToolUIPart)).toMatchObject({ type: "tool-rewrite_note", state: "approval-requested" });
     expect(pb.notes.get(NOTE)!.rev).toBe(1);
 
-    replies = [toolCall("rewrite_note", { path: NOTE, text: "## Shopping\n- eggs", why: "A heading" }), text("Added a heading.")];
+    replies = [toolCall("rewrite_note", { rev: 1, path: NOTE, text: "## Shopping\n- eggs", why: "A heading" }), text("Added a heading.")];
     await send([pressed("Tidy")], { editNote: "auto" }, undefined, run("tidy"));
     expect(parseNote(NOTE, pb.notes.get(NOTE)!.text).body).toBe("## Shopping\n- eggs\n");
   });
 
   it("refuses a write to another note, and a task not linked to this one, even under Just do it", async () => {
     pb.put("notes/20261002-other.md", "---\ntitle: Other\ncreated: 2026-10-02\n---\nkeep\n");
-    replies = [toolCall("rewrite_note", { path: "notes/20261002-other.md", text: "gone", why: "x" }), text("Couldn't.")];
+    replies = [toolCall("rewrite_note", { rev: 1, path: "notes/20261002-other.md", text: "gone", why: "x" }), text("Couldn't.")];
     const other = await send([pressed("Tidy")], UNASKED, undefined, run("tidy"));
     expect(other.parts.find(isToolUIPart)).toMatchObject({ state: "output-denied" });
     expect(pb.notes.get("notes/20261002-other.md")!.rev).toBe(1);

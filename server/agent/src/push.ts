@@ -120,7 +120,8 @@ export async function reachable(endpoint: string, resolve: Resolve = resolveAll)
 export type Deps = { send?: Send; resolve?: Resolve };
 
 /** `payload` to `sub`, and the record kept as it should be: a 404 or 410 (the browser unsubscribed, or the subscription
- *  expired) deletes it; any other failure counts, and the fifth in a row deletes it; a success clears the count. Never throws
+ *  expired) deletes it; any other failure counts (each send is one, `sub.failed` is updated in place so a scan's later reminders see
+ *  it), and the fifth in a row deletes it; a success clears the count. Never throws
  *  for a push service's answer. Before every send the endpoint's host is resolved and must be public only: a subscription that
  *  is not is deleted ("dropped"), one whose name does not resolve counts as a failure. */
 export async function deliver(server: pb.Server, v: Vapid, sub: Sub, payload: PushPayload, { send = webpush.sendNotification, resolve }: Deps = {}): Promise<Outcome> {
@@ -133,14 +134,16 @@ export async function deliver(server: pb.Server, v: Vapid, sub: Sub, payload: Pu
     await send({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), {
       vapidDetails: { subject: v.subject, publicKey: v.publicKey, privateKey: v.privateKey }, TTL: 3600, urgency: "high", timeout: 15_000,
     });
-    if (sub.failed) await pb.call(server, `${COLLECTION}/${sub.rec}`, pb.json("PATCH", { failed: 0 }));
+    if (sub.failed) { sub.failed = 0; await pb.call(server, `${COLLECTION}/${sub.rec}`, pb.json("PATCH", { failed: 0 })); }
     return "sent";
   } catch (e) {
     const status = (e as { statusCode?: number }).statusCode;
     if (status === 404 || status === 410) { await removeRec(server, sub.rec); return "gone"; }
     console.error(`agent: push to ${new URL(sub.endpoint).hostname} failed (${status ?? (e as Error).message})`);
-    if (sub.failed + 1 >= MAX_FAILED) { await removeRec(server, sub.rec); return "dropped"; }
-    await pb.call(server, `${COLLECTION}/${sub.rec}`, pb.json("PATCH", { failed: sub.failed + 1 }));
+    // `sub.failed` is kept current, so the several reminders one scan sends to the same dead endpoint each count
+    sub.failed += 1;
+    if (sub.failed >= MAX_FAILED) { await removeRec(server, sub.rec); return "dropped"; }
+    await pb.call(server, `${COLLECTION}/${sub.rec}`, pb.json("PATCH", { failed: sub.failed }));
     return "failed";
   }
 }

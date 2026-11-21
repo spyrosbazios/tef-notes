@@ -60,13 +60,18 @@ export function fakePb() {
         const lens = { ...(await req.json() as Rec), id: `lens${lenses.length + 1}` }; lenses.push(lens);
         return Response.json(lens);
       }
-      if (col === "prefs") {                                  // the owner's one record: read, made, saved whole
+      if (col === "prefs") {                                  // the owner's one record, under the rev contract: made at rev 1, saved at the rev read
         if (req.method === "GET") return Response.json({ items: prefs });
         const body = await req.json() as Rec;
-        if (req.method === "POST") { const rec = { ...body, id: "prefs1" }; prefs.push(rec); return Response.json(rec); }
+        if (req.method === "POST") {
+          if (prefs.some((p) => p.key === body.key)) return err(400, { data: { key: { code: "validation_not_unique" } } });
+          const rec = { ...body, id: "prefs1", rev: 1 }; prefs.push(rec); return Response.json(rec);
+        }
         const rec = prefs.find((p) => p.id === id);
         if (!rec) return err(404);
-        Object.assign(rec, body);
+        before?.(rec);
+        if (body.rev !== (rec.rev ?? 0)) return err(409, { message: "This preferences record changed since that version." });
+        Object.assign(rec, body, { rev: (rec.rev ?? 0) + 1 });
         return Response.json(rec);
       }
       if (col === "tags") {

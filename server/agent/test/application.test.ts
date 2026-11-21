@@ -25,15 +25,33 @@ it("note append retries against fresh text, marks taint, and invalidates the req
 
 it("whole-note edits merge disjoint changes and refuse overlap without writing", async () => {
   pb.put(path, file("one\ntwo\nthree\n"));
-  const notes = new NoteService(server);
+  const notes = new NoteService(server), read = { rev: 1, text: file("one\ntwo\nthree\n") };
   pb.meanwhile((rec) => { pb.meanwhile(); rec.text = file("one\ntwo\nthree\nfour\n"); rec.rev++; });
-  expect(await notes.change(path, (text) => text.replace("one", "ONE"), { merge: true })).toEqual({
+  expect(await notes.change(path, (text) => text.replace("one", "ONE"), { base: read })).toEqual({
     saved: path, rev: 3, text: file("ONE\ntwo\nthree\nfour\n"),
   });
   pb.meanwhile((rec) => { pb.meanwhile(); rec.text = file("other\ntwo\nthree\nfour\n"); rec.rev++; });
-  expect(await notes.change(path, (text) => text.replace("ONE", "mine"), { merge: true })).toEqual({ error: expect.stringContaining("changed meanwhile") });
+  expect(await notes.change(path, (text) => text.replace("ONE", "mine"), { base: { rev: 3, text: file("ONE\ntwo\nthree\nfour\n") } })).toEqual({ error: expect.stringContaining("changed meanwhile") });
   expect(pb.notes.get(path)?.rev).toBe(4);
   expect(pb.notes.get(path)?.text).toContain("other");
+});
+
+it("a whole-note edit made over the text the writer read keeps what was typed since, however long ago", async () => {
+  pb.put(path, file("one\ntwo\nthree\n"));
+  const notes = new NoteService(server), read = { rev: 1, text: file("one\ntwo\nthree\n") };
+  const rec = pb.notes.get(path)!;
+  rec.text = file("one\ntwo\nthree\ntyped while the card waited\n"); rec.rev = 2;
+  expect(await notes.change(path, (text) => text.replace("one", "ONE"), { base: read })).toEqual({
+    saved: path, rev: 3, text: file("ONE\ntwo\nthree\ntyped while the card waited\n"),
+  });
+});
+
+it("a whole-note edit over a file that moved, with no base text to merge from, is refused unwritten", async () => {
+  pb.put(path, file("one\n"));
+  const notes = new NoteService(server), rec = pb.notes.get(path)!;
+  rec.text = file("typed\n"); rec.rev = 2;
+  expect(await notes.change(path, () => file("mine\n"), { base: { rev: 1, text: null } })).toEqual({ error: expect.stringContaining("changed since you read it") });
+  expect(pb.notes.get(path)).toMatchObject({ rev: 2, text: file("typed\n") });
 });
 
 it("note creation and memory writes return saved text without presentation", async () => {
@@ -41,7 +59,7 @@ it("note creation and memory writes return saved text without presentation", asy
   const result = await notes.create("Test", () => file("body\n"), true);
   expect(result).toMatchObject({ rev: 1, text: file("body\n") });
   expect(result).not.toHaveProperty("card");
-  expect(await notes.change("agent/memory.md", () => "memory", { create: true })).toEqual({ saved: "agent/memory.md", rev: 1, text: "memory" });
+  expect(await notes.change("agent/memory.md", () => "memory", { base: { rev: 0, text: null }, create: true })).toEqual({ saved: "agent/memory.md", rev: 1, text: "memory" });
 });
 
 it("task retries preserve concurrent checklist edits and taint, then release cached reads", async () => {
