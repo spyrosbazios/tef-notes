@@ -24,6 +24,7 @@ version is one semver number for the whole repository, set by the git tag (see [
   missed), and the shared photos' temporary addresses are released when the page is left.
 - Place picker: Enter pressed right after typing waits for the suggestions for those words instead of picking from the
   previous words' list.
+- A task's place card tries its map again when the map's address changes (another place or theme) after a failed load.
 
 ## 0.13.0 - 2026-11-19
 

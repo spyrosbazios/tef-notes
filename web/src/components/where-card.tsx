@@ -35,12 +35,17 @@ export function PlacePick({ trigger, start, title, onSet }: { trigger: React.Rea
 function MapPicture({ where }: { where: Place }) {
   const { theme, accent: shown } = useShownLook();
   const src = mapSrc(where, MAP_W, MAP_H, theme, shown);
+  // Keyed by the address: a new map (another place, another theme) starts over, so one that failed is tried again
+  return src ? <MapImage key={src} src={src} where={where} /> : null;
+}
+
+function MapImage({ src, where }: { src: string; where: Place }) {
   const [state, setState] = useState<"loading" | "shown" | "broken">("loading");
-  if (!src || state === "broken") return null;
+  if (state === "broken") return null;
   return (
     <a href={mapsUrl(where)} {...away} aria-label={`${where.name} in Google Maps`} tabIndex={-1}
       className={cn("relative block h-32 overflow-hidden border-b border-line bg-muted md:h-40", state === "loading" && "animate-pulse")}>
-      <img key={src} src={src} alt="" loading="lazy" decoding="async" onLoad={() => setState("shown")} onError={() => setState("broken")}
+      <img src={src} alt="" loading="lazy" decoding="async" onLoad={() => setState("shown")} onError={() => setState("broken")}
         className={cn("size-full object-cover transition-opacity duration-300", state === "shown" ? "opacity-100" : "opacity-0")} />
     </a>
   );
