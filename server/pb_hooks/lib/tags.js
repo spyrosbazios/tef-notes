@@ -11,6 +11,7 @@
 // notes, then each time their count doubles, at least EVERY more (`described`, 1793900000_tag_described.js).
 
 const { parse, fold } = require("./notes.js");
+const { names, spread } = require("./rows.js");
 
 const MAX_NOTES = 12;                   // notes shown to the model per tag, spread over its history
 const MAX_REJECTED = 6;                 // titles of notes the owner took the tag off
@@ -32,22 +33,8 @@ function input(body) {
   return { tag };
 }
 
-/** A `tags` column's value (JSON text or a list) as the names in it. */
-function tagsOf(raw) {
-  let v = raw;
-  if (typeof v === "string") { try { v = JSON.parse(v || "[]"); } catch (_) { return []; } }
-  return Array.isArray(v) ? v.filter((s) => typeof s === "string") : [];
-}
-
-const has = (raw, k) => tagsOf(raw).some((t) => fold(t) === k);
+const has = (raw, k) => names(raw).some((t) => fold(t) === k);
 const newest = (rows) => rows.slice().sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : 0));
-
-/** `n` of `list` spread over it, the first and the last among them. */
-function spread(list, n) {
-  if (list.length <= n) return list;
-  if (n === 1) return [list[0]];
-  return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))]);
-}
 
 /** Whether the owner put `k` (folded) on this row by hand: it carries it and the auto-tagger never added it. */
 const byHand = (r, k) => has(r.tags, k) && !has(r.autotagged, k);
@@ -138,14 +125,7 @@ function descriptionOf(answer) {
   return t || null;
 }
 
-/** Every note's `{ path, title, tags, autotagged, updated }`, from `app`'s database (hooks only). */
-function rows(app) {
-  const out = arrayOf(new DynamicModel({ path: "", title: "", tags: "", autotagged: "", updated: "" }));
-  app.db().newQuery("SELECT path, title, CAST(IFNULL(tags, '[]') AS TEXT) AS tags, CAST(IFNULL(autotagged, '[]') AS TEXT) AS autotagged, updated FROM notes WHERE path LIKE 'notes/%'").all(out);
-  return out.map((r) => ({ path: r.path, title: r.title, tags: r.tags, autotagged: r.autotagged, updated: r.updated }));
-}
-
-/** The model's description of `name` from the notes in `have` (`rows`'): { description } | { none: true } (no note
+/** The model's description of `name` from the notes in `have` (lib/rows.js `noteTags`'): { description } | { none: true } (no note
  *  to draw it from) | { failed: true } (logged). `any`: pick's. `ds`, `key`: lib/llm.js's provider and its key (hooks only). */
 function describe(app, ds, key, have, name, log, any = false) {
   const paths = pick(have, name, MAX_NOTES, any);
@@ -204,4 +184,4 @@ function mergeDefs(defs, from, to) {
   return { keep: { ...dst, color: dst.color || (src && src.color) || "", description: theirs ? src.description : dst.description || "", describedBy: theirs ? src.describedBy || "" : dst.describedBy || "" }, drop: src, merged: true };
 }
 
-module.exports = { replaceable, saveDescription, renameInput, renamed, mergeDefs, rows, describe, EVERY, MIN, MAX_REJECTED, count, due, rejected, byHand, MAX_NOTES, BODY_CHARS, MAX_CHARS, Bad, input, tagsOf, pick, sample, request, descriptionOf };
+module.exports = { replaceable, saveDescription, renameInput, renamed, mergeDefs, describe, EVERY, MIN, MAX_REJECTED, count, due, rejected, byHand, MAX_NOTES, BODY_CHARS, MAX_CHARS, Bad, input, pick, sample, request, descriptionOf };

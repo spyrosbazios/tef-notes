@@ -31,10 +31,10 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => require(`${__hooks}/lib/ht
   /** The record's kept picture as `<record>/<file>`, or "". */
   const pictureOf = (r) => (r.getString("picture") ? `${r.id}/${encodeURIComponent(r.getString("picture"))}` : "");
   /** The page's picture into a temp file through the guard, as a file to keep; null when it is no picture we take. */
-  const fetchPicture = (src, run, file) => {
+  const fetchPicture = (src, file) => {
     if (!src) return null;
     try {
-      const got = lib.fetchPage(src, { lookup: lib.getent(run), get: lib.curlFile(run, file) });
+      const got = lib.fetchPage(src, lib.io({ file }));
       const type = got.type.split(";")[0].trim();
       if (got.status >= 400 || !/^image\/(jpeg|png|webp|gif)$/.test(type)) return null;
       const size = $os.stat(file).size();
@@ -45,11 +45,10 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => require(`${__hooks}/lib/ht
     } catch (err) { return null; }                       // blocked, or the site didn't answer: no picture, still a preview
   };
   if (!fresh) {
-    const run = (name, ...args) => toString($os.exec(name, ...args).output());
     let page = null;
     // A URL refused on the way (its name resolves to a private address, a redirect leads to one): a 400 like one refused
     // up front, and nothing cached for it
-    try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) {
+    try { page = lib.previewOf(url, lib.io()); } catch (err) {
       if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     }
     // the site didn't answer (down, slow, rate-limited) and there is nothing to fall back on: a 502, not cached, so the
@@ -63,7 +62,7 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => require(`${__hooks}/lib/ht
       r.set("fetched", Date.now());
       const file = `${$os.tempDir()}/tefnotes-preview-${$security.randomString(20)}`;
       try {
-        if (page) r.set("picture", fetchPicture(out.image, run, file));   // null clears a stale one; a failed refresh keeps it
+        if (page) r.set("picture", fetchPicture(out.image, file));   // null clears a stale one; a failed refresh keeps it
         try { e.app.save(r); rec = r; } catch (err) { /* a concurrent request saved the same URL first */ }
       } finally {
         try { $os.remove(file); } catch (_) { /* never written */ }

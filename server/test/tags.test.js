@@ -47,11 +47,6 @@ describe("which notes", () => {
     expect(lib.rejected(rows, "HOME")).toEqual(["C"]);
     expect(lib.rejected(rows, "x")).toEqual([]);
   });
-  test("tagsOf reads the column's JSON text or a list, and nothing else", () => {
-    expect(lib.tagsOf('["a",3,"b"]')).toEqual(["a", "b"]);
-    expect(lib.tagsOf(null)).toEqual([]);
-    expect(lib.tagsOf('{"a":1}')).toEqual([]);
-  });
 });
 
 describe("the sample", () => {

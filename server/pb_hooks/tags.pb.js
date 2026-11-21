@@ -36,7 +36,7 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => require(`${__hooks}/lib/ht
     if (err instanceof lib.Bad) return e.json(400, { error: err.message });
     throw err;
   }
-  const names = (raw) => lib.tagsOf(raw);
+  const { names } = require(`${__hooks}/lib/rows.js`);
   const out = { tag: req.to, notes: 0, tasks: 0, lenses: 0, merged: false };
   e.app.runInTransaction((tx) => {
     const defs = tx.findAllRecords("tags").map((r) => ({ id: r.id, name: r.getString("name"), color: r.getString("color"), description: r.getString("description"), describedBy: r.getString("describedBy") }));
@@ -105,7 +105,7 @@ routerAdd("POST", "/api/tefnotes/tags/describe", (e) => require(`${__hooks}/lib/
   if (!key) { log(`no ${ds.label} key: nothing described`); return e.json(503, { error: `The server has no ${ds.label} key.` }); }
 
   try {
-    const have = lib.rows(e.app);
+    const have = require(`${__hooks}/lib/rows.js`).noteTags(e.app);
 
     const describe = (name) => lib.describe(e.app, ds, key, have, name, log, true);
 
@@ -136,7 +136,7 @@ cronAdd("tag-describe", "17 * * * *", () => {
   const log = (msg, ...kv) => $app.logger().warn(`tags: ${msg}`, ...kv);
   const key = ds.credential(keys.read);
   if (!key) return;
-  const have = lib.rows($app);
+  const have = require(`${__hooks}/lib/rows.js`).noteTags($app);
   for (const rec of $app.findAllRecords("tags")) {
     const name = rec.getString("name").trim(), n = lib.count(have, name);
     if (!name || !lib.due(n, rec.getInt("described"), rec.getString("describedBy"))) continue;

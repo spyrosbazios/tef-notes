@@ -85,6 +85,23 @@ describe("the share text", () => {
   });
 });
 
+describe("the save's limits", () => {
+  test("a file part per picture and PDF, none for an existing task", () => {
+    const c = (kind) => ({ images: [{ src: "" }, { src: "" }], pdfs: [{ name: "a.pdf" }], target: { kind } });
+    for (const kind of ["new", "note", "newtask"]) expect(lib.filesSent(c(kind))).toBe(3);
+    expect(lib.filesSent(c("task"))).toBe(0);
+  });
+  test("one deadline: each call gets its own cap, cut to what is left, and none under 3 s", () => {
+    const now = 1_000_000;
+    expect(lib.DEADLINE_MS).toBeLessThan(120_000);
+    expect(lib.secondsLeft(now + lib.DEADLINE_MS, 60, now)).toBe(60);
+    expect(lib.secondsLeft(now + 20_500, 60, now)).toBe(20);
+    expect(lib.secondsLeft(now + 3_000, 60, now)).toBe(3);
+    expect(lib.secondsLeft(now + 2_999, 60, now)).toBe(0);
+    expect(lib.secondsLeft(now - 1, 60, now)).toBe(0);
+  });
+});
+
 describe("a title from the agent", () => {
   const c = (p) => ({ url: "", title: "", selection: "", images: [], pdfs: [], target: { kind: "new" }, ...p });
   test("is asked for a clip of files alone, never over the owner's title, a link or words", () => {

@@ -46,9 +46,7 @@ cronAdd("autotag", "* * * * *", () => {
   if (!defs.length) return;
   const hash = lib.defsHash(defs);
 
-  const names = (rec, field) => {
-    try { const v = JSON.parse(rec.getString(field) || "null"); return Array.isArray(v) ? v.filter((s) => typeof s === "string") : []; } catch (err) { return []; }
-  };
+  const names = (rec, field) => require(`${__hooks}/lib/rows.js`).names(rec.getString(field));
   const log = (msg, ...kv) => $app.logger().warn(`autotag: ${msg}`, ...kv);
 
   /** The note's pictures as `lib.requests` takes them: at most PHOTOS, in body order, each fitting what TypeSafe takes

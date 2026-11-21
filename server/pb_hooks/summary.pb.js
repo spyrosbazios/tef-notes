@@ -18,11 +18,10 @@ routerAdd("POST", "/api/tefnotes/summary", (e) => require(`${__hooks}/lib/http.j
     throw err;
   }
   const title = typeof body.title === "string" ? body.title.slice(0, 300) : "";
-  const run = (name, ...args) => toString($os.exec(name, ...args).output());
   const key = ds.credential(keys.read);
   const r = lib.summarise({ url, title, text: "", selection: "", images: [], pdfs: [] }, {
     key,
-    page: (u) => lp.textOf(u, { lookup: lp.getent(run), get: lp.curl(run) }),
+    page: (u) => lp.textOf(u, lp.io()),
     blocked: (err) => err instanceof lp.Blocked,
     ask: (system, user) => { const res = $http.send(ds.request(key, system, user, 30)); return { status: res.statusCode, text: res.statusCode === 200 ? ds.text(res.json) : "" }; },
     log,

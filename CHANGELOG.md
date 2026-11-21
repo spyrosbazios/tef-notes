@@ -7,6 +7,9 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- Saving a clip answers in time even when the page, the writing model and the agent are all slow: their calls share
+  one deadline, so the clipper and the share page no longer give up on a save that then lands anyway. A link shared
+  without its title now finds the title the server already has for it.
 - Clipper: changing the server's address gives up Chrome's access to the old one.
 - Every server route answers a failure the same way, so the web app, the clipper and `tefnotes` all show the server's
   own words (a link the server won't fetch, a rename that failed) instead of a bare status.

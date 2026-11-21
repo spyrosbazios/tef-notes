@@ -14,9 +14,8 @@ routerAdd("GET", "/api/tefnotes/page", (e) => require(`${__hooks}/lib/http.js`).
     if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     throw err;
   }
-  const run = (name, ...args) => toString($os.exec(name, ...args).output());
   let page;
-  try { page = lib.htmlOf(url, { lookup: lib.getent(run), get: lib.curl(run, lib.PAGE_BYTES) }); } catch (err) {
+  try { page = lib.htmlOf(url, lib.io({ max: lib.PAGE_BYTES })); } catch (err) {
     if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     return e.json(502, { error: `The site didn't answer: ${err.message}.` });
   }

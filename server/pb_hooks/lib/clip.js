@@ -38,6 +38,7 @@
 
 const { MODEL } = require("./jev.js");
 const { linkPath, localDay, pdfName, photoName } = require("./notes.js");
+const { names } = require("./rows.js");
 
 const RECENT = 60;              // the agent's index: every pinned note, then this many newest (tools.ts RECENT)
 const FLOOR = 0.05;             // a note's share of the choice below which it is not offered: 1 in 20 is noise among 60+
@@ -53,6 +54,9 @@ const LOOK = 3000000;           // base64 chars of the picture JEV sees: the ext
 const ALT = 200;
 const FILES = 10;               // pictures and PDFs one clip carries, at most (core clip.ts CLIP_FILES: test/clip.test.js checks they agree)
 const PDF_NAME = 200;           // a PDF's name as shared, at most
+const DEADLINE_MS = 75000;      // a save's calls to other services together (title, write-up, summary, agent title): the
+                                // clients wait 120 s (web services/clip.ts, extension clip.ts), and the writes come after
+const CALL_MIN_S = 3;           // seconds a call needs left to be worth starting
 const SUMMARY_MIN = 200;        // chars of text a page or shared text needs to be worth summarising
 const PICTURE_MIN = 25;         // chars of words (caption, alt text, text shared with it) a picture needs
 const SUMMARY_CHARS = 20000;    // of content the model reads
@@ -195,6 +199,16 @@ function titleFor(s, pageTitle) {
   return host(s.url);
 }
 
+/** How many `file` parts a save carries: one per picture and PDF, none for a clip to an existing task (it holds none). */
+const filesSent = (clip) => (clip.target.kind === "task" ? 0 : clip.images.length + clip.pdfs.length);
+
+/** The seconds a call may take: its own `cap`, cut to what is left before `deadline` (ms since the epoch); 0 when under
+ *  CALL_MIN_S is left, too little to start one. */
+function secondsLeft(deadline, cap, now = Date.now()) {
+  const left = Math.floor((deadline - now) / 1000);
+  return left < CALL_MIN_S ? 0 : Math.min(cap, left);
+}
+
 /** A clip of files alone, with no title the owner gave it: what the agent titles from the files (server/agent/src/title.ts). */
 const filesOnly = (clip) => !(clip.target && clip.target.title) && !clip.url && !clip.title && !clip.selection
   && clip.images.length + clip.pdfs.length > 0;
@@ -284,9 +298,7 @@ const indexLine = (n, now) => [n.path, n.title, n.tags.length ? `[${n.tags.join(
 
 /** A `notes` row as read by the hook: `tags` the JSON column's text, `updated` PocketBase's "YYYY-MM-DD HH:MM:SS.sssZ". */
 function row(r) {
-  let tags = [];
-  try { const v = JSON.parse(r.tags || "[]"); if (Array.isArray(v)) tags = v.filter((t) => typeof t === "string"); } catch (_) { /* not JSON: none */ }
-  return { path: r.path, title: r.title, tags, pinned: !!r.pinned, updated: Date.parse(String(r.updated).replace(" ", "T")) || 0 };
+  return { path: r.path, title: r.title, tags: names(r.tags), pinned: !!r.pinned, updated: Date.parse(String(r.updated).replace(" ", "T")) || 0 };
 }
 
 /** The notes the agent's prompt lists, in its order: every pinned one, then the newest RECENT of the rest. */
@@ -513,4 +525,4 @@ function summarise(clip, io) {
   }
 }
 
-module.exports = { filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };
+module.exports = { DEADLINE_MS, filesSent, secondsLeft, filesOnly, agentTitle, summarise, Bad, tagsOf, tagPick, FLOOR, SUGGESTIONS, RECENT, TASKS, input, saveInput, titleFor, bodyFor, linkify, titleOf, bodyOf, embedOf, pictureLine, filesUnder, fileLines, FILES, taskNotes, taskRow, taskLine, taskIndex, indexLine, row, noteIndex, passages, shorten, request, suggest, noteRequest, noteOf, needsPage, summaryContent, summaryRequest, summaryOf, summaryBlock };

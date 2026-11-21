@@ -25,6 +25,7 @@ const TITLE_CHARS = 80;                 // of an example's title
 // ---- tag names
 
 const { fold } = require("./notes.js");
+const { spread, noteTags } = require("./rows.js");
 
 /** The names in `list` that `names` does not have, ignoring case and tonos, each once. */
 function without(list, names) {
@@ -99,19 +100,9 @@ const definitions = (tags, profiles) => tags.map((t) => ({ name: t.name.trim(), 
     return { ...d, yes: p ? p.yes : [], no: p ? p.no : [], cut: cutOf(p) };
   });
 
-/** `n` of `list` spread over it (the first, the last and evenly between), so a few examples aren't all last week's. */
-function spread(list, n) {
-  if (list.length <= n) return list;
-  if (n === 1) return [list[0]];
-  return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))]);
-}
-
 /** The definitions from the database (hooks only): the tag records and every note's tags. */
 function load(app) {
-  const rows = arrayOf(new DynamicModel({ id: "", title: "", tags: "", autotagged: "", updated: "" }));
-  app.db().newQuery("SELECT id, title, CAST(IFNULL(tags, '[]') AS TEXT) AS tags, CAST(IFNULL(autotagged, '[]') AS TEXT) AS autotagged, updated FROM notes WHERE path LIKE 'notes/%'").all(rows);
-  const list = (s) => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch (_) { return []; } };
-  const profiles = profile(rows.map((r) => ({ id: r.id, title: r.title, tags: list(r.tags), auto: list(r.autotagged), updated: r.updated })));
+  const profiles = profile(noteTags(app).map((r) => ({ id: r.id, title: r.title, tags: r.tags, auto: r.autotagged, updated: r.updated })));
   return definitions(app.findAllRecords("tags").map((r) => ({ name: r.getString("name"), description: r.getString("description"), describedBy: r.getString("describedBy") })), profiles);
 }
 
@@ -181,5 +172,5 @@ function guessInput(body) {
 
 module.exports = {
   GUESS_CHARS, guessInput, PER_CALL, MAX_CHARS, BATCH, PHOTOS, AUTO, STRICT, CEIL, MAX_AUTO, EXAMPLES,
-  without, defsHash, contentKey, taggedKey, fresh, profile, cutOf, definitions, spread, load, taskItem, requests, probabilities, decide,
+  without, defsHash, contentKey, taggedKey, fresh, profile, cutOf, definitions, load, taskItem, requests, probabilities, decide,
 };

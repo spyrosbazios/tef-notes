@@ -93,11 +93,6 @@ describe("what the owner taught it", () => {
     expect(h.yes.length).toBe(3);
     expect(w).toMatchObject({ name: "work", own: false, yes: [{ id: "n3", title: "Sprint notes" }], no: [], cut: lib.AUTO });
   });
-  test("spread: the first, the last and evenly between", () => {
-    expect(lib.spread([1, 2, 3, 4, 5, 6, 7], 3)).toEqual([1, 4, 7]);
-    expect(lib.spread([1, 2], 3)).toEqual([1, 2]);
-    expect(lib.spread([1, 2, 3], 1)).toEqual([1]);
-  });
   test("the question names the owner's examples, never the note asked about, quotes made safe", () => {
     const [d] = lib.definitions([{ name: "home", description: "the house", describedBy: "owner" }], lib.profile([...rows, { id: "n5", title: 'The "big" move', tags: ["home"], auto: [], updated: "2026-06-01" }]));
     const q = lib.requests({ title: "Rent", body: "b" }, [d], [], "n4")[0].body.questions.t0.instructions;
