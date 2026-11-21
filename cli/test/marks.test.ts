@@ -91,11 +91,11 @@ describe("TEF_NOTES_AGENT=1", () => {
     ] as const) expect(has(r.steps, name).some((w) => w.collection === collection && w.method === method), `${name}: ${method} ${collection}`).toBe(true);
   });
 
-  test("draw --replace marks the note before it swaps the scene", () => {
+  test("draw --replace marks the note in the write that moves its link, before the old scene goes", () => {
     const ws = has(r.steps, "draw --replace"), mark = ws.findIndex((w) => w.collection === "notes" && w.method === "PATCH" && w.body.tainted === true);
-    const swap = ws.findIndex((w) => w.collection === "attachments");
+    const old = ws.findIndex((w) => w.collection === "attachments" && w.method === "DELETE");
     expect(mark).toBeGreaterThanOrEqual(0);
-    expect(swap).toBeGreaterThan(mark);
+    expect(old).toBeGreaterThan(mark);
   });
 
   test("a tag change that leaves the description alone does not claim it", () => {
@@ -108,10 +108,10 @@ describe("TEF_NOTES_AGENT=1", () => {
 });
 
 describe("without TEF_NOTES_AGENT", () => {
-  test("nothing carries a mark, and draw --replace leaves the note alone", async () => {
+  test("nothing carries a mark, and draw --replace writes the note once, to move its link", async () => {
     const r = await scenario(false);
     assertMarks(r.writes, false, 0);
-    expect(patches(has(r.steps, "draw --replace"), "notes")).toEqual([]);
+    expect(patches(has(r.steps, "draw --replace"), "notes").length).toBe(1);
   }, 120_000);
 });
 

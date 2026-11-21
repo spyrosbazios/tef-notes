@@ -2,7 +2,8 @@
 // TEF Notes from a terminal: notes and tasks, for you and for coding agents. Same client as the phone
 // (packages/core/src/pocketbase.ts), so writes are compare-and-swap on rev: nothing here writes over an edit it hasn't
 // seen. The server's address is kept in ${XDG_STATE_HOME:-~/.local/state}/tefnotes/server.json.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { exportPlan, fileNameOf } from "@/core/handoff";
@@ -11,7 +12,7 @@ import * as pb from "@/core/pocketbase";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
 import { sceneProblem } from "@/core/drawing";
-import { drawingName, drawingPreview, fileMarkdown, isDrawingName } from "@/core/photos";
+import { drawingName, drawingPreview, fileMarkdown, isDrawingName, linkPath } from "@/core/photos";
 import { describeAllTags, listTags, renameTag } from "@/core/tags";
 import { localDay } from "@/core/time";
 import { markOf, writer } from "./writes";
@@ -93,15 +94,24 @@ async function need(s: pb.Server, id: string): Promise<pb.Remote> {
   return (await pb.read(s, pathOf(id))) ?? die(`no note ${pathOf(id)}`);
 }
 
-/** Write `next(current text)` until it lands on a rev nobody moved meanwhile. */
+/** Thrown, not `die`d: a caller that has uploaded files for the edit takes them back down before the process ends (main's catch prints it). */
+const gone = (path: string): never => { throw new Error(`${path} was deleted meanwhile`); };
+
+/** Write `next(current text)` until it lands on a rev nobody moved meanwhile. A write whose answer never came may have landed:
+ *  the note is read again and, when it is past the rev written over and already holds the change, that is the answer; an edit that
+ *  adds (append, a drawing's link) is never made a second time on top of itself. */
 async function change(s: pb.Server, id: string, next: (text: string) => string): Promise<pb.Remote> {
   for (let tries = 0; tries < 3; tries++) {
-    const cur = await need(s, id);
-    try { return (await write.notes.update(s, cur, next(cur.text))) ?? die(`${cur.path} was deleted meanwhile`); } catch (e) {
-      if (!(e instanceof pb.Conflict)) throw e;
+    const cur = await need(s, id), text = next(cur.text);
+    try { return (await write.notes.update(s, cur, text)) ?? gone(cur.path); } catch (e) {
+      if (e instanceof pb.Conflict) continue;
+      if (!pb.unanswered(e)) throw e;
+      const now = await pb.read(s, cur.path);
+      if (!now) gone(cur.path);
+      if (now!.rev !== cur.rev && pb.landed(cur.text, text, now!.text)) return now!;
     }
   }
-  return die("the note keeps changing under this edit; try again");
+  throw new Error("the note keeps changing under this edit; try again");
 }
 
 /** `tefnotes draw`: the scene and the server's PNG of it uploaded as the note's drawing (core/photos.ts: the scene linked, the
@@ -120,11 +130,19 @@ async function draw(s: pb.Server, a: string[]) {
   const have = await pb.photos(s, noteId), replace = opt.get("replace");
   if (replace !== undefined) {
     if (!isDrawingName(replace) || !have.some((p) => p.name === replace)) die(`${idOf(note.path)} has no drawing ${replace}; it has: ${have.filter((p) => isDrawingName(p.name)).map((p) => p.name).join(", ") || "none"}`);
-    if (write.marks) await change(s, id!, (t) => t);   // the note carries the agent's mark before its scene is swapped
+    if (!note.text.includes(linkPath(noteId, replace))) die(`${idOf(note.path)} doesn't link ${replace}: nothing replaced`);
+    // The new scene goes up first, under a name of its own (a note's file names are unique: the next free one of the old name's
+    // stem), the note's link is moved to it at the rev read, and only then the old two files go: whatever fails on the way,
+    // the old drawing is still there and linked.
+    const stem = replace.replace(/\.excalidraw$/i, "").replace(/-\d+$/, ""), name = drawingName(stem, new Set(have.map((p) => p.name)));
+    const up = await pb.upload(s, noteId, name, blob);
+    let pre: pb.Photo | undefined;
+    try {
+      pre = await pb.upload(s, noteId, drawingPreview(name), png);
+      await change(s, id!, (t) => t.split(linkPath(noteId, replace)).join(linkPath(noteId, name)));
+    } catch (e) { for (const p of [up, pre]) if (p) await pb.removePhoto(s, p.rec); throw e; }
     for (const p of have) if (p.name === replace || p.name === drawingPreview(replace)) await pb.removePhoto(s, p.rec);
-    await pb.upload(s, noteId, replace, blob);
-    await pb.upload(s, noteId, drawingPreview(replace), png);
-    return console.log(replace);
+    return console.log(name);
   }
   const label = opt.get("label")?.trim() || "Drawing", name = drawingName(label, new Set(have.map((p) => p.name)));
   const up = await pb.upload(s, noteId, name, blob);
@@ -175,6 +193,7 @@ async function importAll(s: pb.Server, dir: string, dry: boolean, update: boolea
     : `${t.made} new, ${t.updated} updated, ${t.same} unchanged, ${t.skipped} skipped; ${t.files} attachments`);
 }
 
+const GREP_LIMIT = 20;
 const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
 type View = (typeof TASK_VIEWS)[number];
 
@@ -224,6 +243,9 @@ async function taskBy(s: pb.Server, ref: string): Promise<Task> {
   return found.length === 1 ? found[0] : die(found.length ? `${ref} starts several tasks: use more of the id` : `no task ${ref} (ids: tefnotes tasks)`);
 }
 
+/** The record id of a repeating task's next round: made from the task's own id, so the same tick run twice makes one round. */
+const nextRoundId = (task: string) => BigInt(`0x${createHash("sha256").update(`next-round:${task}`).digest("hex").slice(0, 24)}`).toString(36).padStart(15, "0").slice(0, 15);
+
 /** `--key value` and bare `--flag` options, and the words left over. */
 function options(a: string[], flags: string[]): { words: string[]; opt: Map<string, string>; all: Map<string, string[]> } {
   const words: string[] = [], opt = new Map<string, string>(), all = new Map<string, string[]>();
@@ -255,22 +277,31 @@ function taskPatch(opt: Map<string, string>, all: Map<string, string[]>): TaskPa
 const day = (v: string) => (v === "today" ? localDay() : v === "tomorrow" ? localDay(Date.now() + 86_400_000) : v);
 
 async function edit(s: pb.Server, id: string) {
-  const was = await need(s, id), file = join(tmpdir(), `tefnotes-${idOf(was.path).replace(/\//g, "_")}.md`);
-  writeFileSync(file, was.text);
+  const was = await need(s, id);
+  // The note's text in a folder of its own (owner-only), never a predictable name another user could read or replace; removed
+  // once the text is saved, kept and named whenever it isn't.
+  const dir = mkdtempSync(join(tmpdir(), "tefnotes-")), file = join(dir, `${idOf(was.path).replace(/\//g, "_")}.md`);
+  writeFileSync(file, was.text, { mode: 0o600 });
+  chmodSync(file, 0o600);
+  const keep = (why: string): never => die(`${why}; your text is in ${file}`);
   const ed = Bun.spawnSync([...(process.env.VISUAL || process.env.EDITOR || "vi").split(" "), file], { stdio: ["inherit", "inherit", "inherit"] });
-  if (ed.exitCode !== 0) die(`editor exited ${ed.exitCode}; nothing saved, your text is in ${file}`);
-  const mine = readFileSync(file, "utf8");
-  if (mine === was.text) return console.error("unchanged");
+  if (ed.exitCode !== 0) keep(`editor exited ${ed.exitCode}; nothing saved`);
+  const mine = readFileSync(file, "utf8"), done = (said: string) => { rmSync(dir, { recursive: true, force: true }); console.error(said); };
+  if (mine === was.text) return done("unchanged");
   try {
-    const r = (await write.notes.update(s, was, mine)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
-    return console.error(`saved, rev ${r.rev}`);
+    try {
+      const r = (await write.notes.update(s, was, mine)) ?? keep(`${was.path} was deleted meanwhile`);
+      return done(`saved, rev ${r.rev}`);
+    } catch (e) {
+      if (!(e instanceof pb.Conflict)) throw e;
+    }
+    const theirs = await need(s, id), merged = reconcile(was.text, mine, theirs.text);
+    if (merged == null) keep("changed on another device meanwhile, and the edits overlap");
+    const r = (await write.notes.update(s, theirs, merged!)) ?? keep(`${was.path} was deleted meanwhile`);
+    done(`merged with an edit made meanwhile, saved, rev ${r.rev}`);
   } catch (e) {
-    if (!(e instanceof pb.Conflict)) throw e;
+    keep(e instanceof pb.Conflict ? "changed again while it was being merged" : e instanceof Error ? e.message : String(e));
   }
-  const theirs = await need(s, id), merged = reconcile(was.text, mine, theirs.text);
-  if (merged == null) die(`changed on another device meanwhile, and the edits overlap; yours is in ${file}`);
-  const r = (await write.notes.update(s, theirs, merged!)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
-  console.error(`merged with an edit made meanwhile, saved, rev ${r.rev}`);
 }
 
 async function main(argv: string[]) {
@@ -317,20 +348,26 @@ async function main(argv: string[]) {
     }
     case "links": return showLinks(s, a[0] ?? die("tefnotes links <id>"));
     case "grep": {
-      for (const r of await pb.search(s, a.join(" "))) console.log(`${idOf(r.path)} · ${parseNote(r.path, r.text).title}`);
+      const found = await pb.search(s, a.join(" "), GREP_LIMIT + 1);
+      for (const r of found.slice(0, GREP_LIMIT)) console.log(`${idOf(r.path)} · ${parseNote(r.path, r.text).title}`);
+      if (found.length > GREP_LIMIT) console.error(`only the first ${GREP_LIMIT} matches (newest edit first) are listed: more notes match; use more words`);
       return;
     }
     case "new": {
       const title = a.join(" ").trim() || die("tefnotes new <title> [< body]");
       const body = (await stdin()).trimEnd(), taken = new Set((await pb.list(s)).map((e) => e.path));
+      // One record id for the note, whatever path it ends up at. A path taken meanwhile (made on the phone this very moment)
+      // is a Conflict that made nothing under the id, so the next free path goes under the same one; and a create whose answer
+      // was lost is sent again by `write.notes.create` under it, never as a second note.
+      const rec = pb.recordId();
       for (;;) {
         const path = newNotePath(title, Date.now(), taken);
         try {
-          await write.notes.create(s, pb.recordId(), path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""));
+          await write.notes.create(s, rec, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""));
           return console.log(idOf(path));
         } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
-          taken.add(path);                                                    // made on the phone this very moment
+          taken.add(path);
         }
       }
     }
@@ -343,7 +380,9 @@ async function main(argv: string[]) {
     case "put": {
       const [id, rev] = a;
       if (!id || !rev || !/^\d+$/.test(rev)) die("tefnotes put <id> <rev> [< file]   (rev: from tefnotes cat)");
-      const text = await stdin(), cur = await need(s, id);
+      const text = await stdin();
+      if (!text.trim()) die("nothing on stdin: an empty note would replace the whole text (rm deletes a note)");
+      const cur = await need(s, id);
       try {
         const r = (await write.notes.update(s, { ...cur, rev: Number(rev) }, text)) ?? die(`${cur.path} was deleted meanwhile`);
         return console.error(`saved, rev ${r.rev}`);
@@ -380,31 +419,27 @@ async function main(argv: string[]) {
       const notes = await Promise.all([...new Set(all.get("note") ?? [])].map(async (id) => (await need(s, id)).rec));   // every note must exist before the task is made
       if (fields.evening && !fields.when) die("--evening needs --when");
       fields.order = nextOrder(await pb.tasks.list(s));
-      for (let tries = 0; tries < 3; tries++) {
-        let id: string;
-        try { id = (await write.tasks.create(s, newTask(pb.recordId(), fields))).id; } catch (e) {
-          if (!(e instanceof pb.Conflict)) throw e;
-          continue;
-        }
-        for (const rec of notes) await pb.links.add(s, newLink(pb.recordId(), { type: "task", id }, { type: "note", id: rec }, "about"));
-        return console.log(id);
-      }
-      return die("couldn't name the task; try again");
+      // One id for the task: a create sent again after a lost answer finds it taken and is the same task (`write.tasks.create`).
+      const task = (await write.tasks.create(s, newTask(pb.recordId(), fields))).id;
+      for (const rec of notes) await pb.links.add(s, newLink(pb.recordId(), { type: "task", id: task }, { type: "note", id: rec }, "about"));
+      return console.log(task);
     }
     case "done": {
       const ref = a[0] ?? die("tefnotes done <task-id>   (ids from tefnotes tasks)");
       for (let tries = 0; tries < 3; tries++) {
         const cur = await pb.tasks.get(s, (await taskBy(s, ref)).id);
         if (!cur) return die(`task ${ref} was deleted meanwhile`);
-        const { rev, ...was } = cur, { task, next } = complete(was, localDay(), pb.recordId);
+        const { rev, ...was } = cur, { task, next } = complete(was, localDay(), () => nextRoundId(cur.id));
         if (task === was) return console.error("already done");
+        // The next round first, then the tick: a run that dies between the two leaves the task open with its next round made,
+        // and the run again finds that round (its id is the task's) and ticks. Ticking first would lose the round.
+        if (next) {
+          const made = await write.tasks.create(s, next);
+          for (const l of linksForNextRound(await pb.links.from(s, { type: "task", id: cur.id }), cur.id, made.id, pb.recordId)) await pb.links.add(s, l);
+          console.error(`next round ${made.id}`);
+        }
         try {
           const r = (await write.tasks.update(s, cur.id, rev, task)) ?? die(`task ${ref} was deleted meanwhile`);
-          if (next) {
-            const made = await write.tasks.create(s, next);
-            for (const l of linksForNextRound(await pb.links.from(s, { type: "task", id: cur.id }), cur.id, made.id, pb.recordId)) await pb.links.add(s, l);
-            console.error(`next round ${made.id}`);
-          }
           return console.error(`done, rev ${r.rev}`);
         } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
