@@ -1,12 +1,20 @@
 // The AI SDK's message parts as the Ask view reads them. The wording (tool labels, step summaries, write flags) is the
 // core's (@/core/agent), shared with the phone.
 import { getToolName, isToolUIPart, type UIMessage } from "ai";
+import { noteReadOf, type NoteRead } from "@/core/note-read";
 
 export type Part = UIMessage["parts"][number];
 export type ToolPart = Extract<Part, { type: `tool-${string}` | "dynamic-tool" }>;
 
 export const toolName = (p: ToolPart) => getToolName(p);
 export const isTool = (p: Part): p is ToolPart => isToolUIPart(p);
+
+/** The files `read_note` gave in these parts, whole: what a card's whole-file write is merged from when the note moved since. */
+export const readsOf = (parts: readonly Part[]): NoteRead[] =>
+  parts.flatMap((p) => {
+    const r = isTool(p) && toolName(p) === "read_note" && p.state === "output-available" ? noteReadOf(p.output) : null;
+    return r ? [r] : [];
+  });
 
 const shown = (p: Part) => p.type === "reasoning" || isTool(p) || (p.type === "text" && !!p.text);
 const settled = (p: Part) => isTool(p) && (p.state === "output-available" || p.state === "output-error" || p.state === "output-denied");

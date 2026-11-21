@@ -13,6 +13,7 @@ import { tool, type ModelMessage } from "ai";
 import type { ToolResultOutput } from "@ai-sdk/provider-utils";
 import { z } from "zod";
 import { cardKey, noteCardOf, type Card } from "@/core/agent";
+import { noteReadOf } from "@/core/note-read";
 import { appendToNote, COLORS, MEMORY, NOTES, parseNote, serializeNote, snippetOf, withBody, withFlags } from "@/core/notes";
 import { createTag, listTags, updateTag } from "@/core/tags";
 import { cardLines, withSummaries } from "@/core/link-summary";
@@ -92,6 +93,22 @@ export async function checkWrite(notes: Notes, path: string, body?: string): Pro
 export function appended(body: string, text: string, section?: string) {
   const t = text.trim();
   return appendToNote(body, t.includes("\n") ? t : t.replace(/^[-*+]\s+/, ""), section);
+}
+
+const REV = z.number().int().min(1);
+
+/** The text a read_note in `messages` gave for `path` at `rev` (the newest such read), or null: the base a whole-file write is
+ *  merged from when the file moved on since. Earlier turns' long reads are trimmed (loop.ts) and clipped ones are partial: null. */
+export function readAt(messages: ModelMessage[], path: string, rev: number): string | null {
+  for (const m of messages.toReversed()) {
+    if (m.role !== "tool") continue;
+    for (const p of m.content.toReversed()) {
+      if (p.type !== "tool-result" || p.toolName !== "read_note" || p.output.type !== "json") continue;
+      const r = noteReadOf(p.output.value);
+      if (r && r.path === path && r.rev === rev) return r.text;
+    }
+  }
+  return null;
 }
 
 const COLOR = z.enum(COLORS).describe("The note's colour: its card's tint in the list");
@@ -271,18 +288,19 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
     }),
 
     rewrite_note: tool({
-      description: "Replace a note's body — only for a restructure the user asked for: tidy, merge, reorder, split out, retitle. The user sees the change line by line and must confirm. Send the WHOLE new body (read_note it first), without the frontmatter: created, flags and tags are kept; title changes only if you pass one. Keep every item the user wrote unless they asked to drop it.",
+      description: "Replace a note's body — only for a restructure the user asked for: tidy, merge, reorder, split out, retitle. The user sees the change line by line and must confirm. Send the WHOLE new body (read_note it first, and send back the `rev` it gave), without the frontmatter: created, flags and tags are kept; title changes only if you pass one. Keep every item the user wrote unless they asked to drop it. If the note was edited after your read, your change is merged with that edit, never written over it.",
       inputSchema: z.object({
         path: z.string().describe("notes/<file>.md"),
+        rev: REV.describe("The rev read_note gave for this note: the version your text is based on"),
         text: z.string().describe("The complete new body, markdown, no frontmatter"),
         why: z.string().describe("One line: what this changes, for the confirm card"),
         title: z.string().min(1).max(80).optional().describe("A new title; omit to keep it"),
       }),
-      execute: async ({ path, text, title }, { messages }) => {
+      execute: async ({ path, rev, text, title }, { messages }) => {
         const bad = await checkWrite(notes, path, text);
         if (bad) return { error: bad };
         return notes.change(path, (file) => withBody(file, parseNote(path, file), text.trimEnd() + "\n", title?.trim()),
-          { taint: await fromPage(messages), merge: true });
+          { taint: await fromPage(messages), base: { rev, text: readAt(messages, path, rev) } });
       },
     }),
 
@@ -373,11 +391,14 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
     }),
 
     update_memory: tool({
-      description: `Rewrite agent/memory.md — what you know about the user and how they keep notes: names they use, language, where things go, recurring topics, preferences. Not note content. Send the WHOLE new file (it's in the <context> block). Keep it under ${CAP} characters: merge and prune, don't just append. Saved to their notes server. Once this chat has read web pages, the user confirms it first.`,
-      inputSchema: z.object({ text: z.string().describe("The complete new file"), why: z.string().describe("One line: what changed, for the confirm card") }),
-      execute: async ({ text }) => {
+      description: `Rewrite agent/memory.md — what you know about the user and how they keep notes: names they use, language, where things go, recurring topics, preferences. Not note content. Send the WHOLE new file: read_note ${MEMORY} first (it's also in the <context> block) and send back the \`rev\` it gave. Keep it under ${CAP} characters: merge and prune, don't just append. Saved to their notes server. Once this chat has read web pages, the user confirms it first.`,
+      inputSchema: z.object({
+        rev: z.number().int().min(0).describe(`The rev read_note gave for ${MEMORY}: the version your text is based on; 0 when it isn't there yet`),
+        text: z.string().describe("The complete new file"), why: z.string().describe("One line: what changed, for the confirm card"),
+      }),
+      execute: async ({ rev, text }, { messages }) => {
         if (text.length > CAP) return { error: `Too long (${text.length} chars, max ${CAP}). Condense and retry.` };
-        return notes.change(MEMORY, () => text.trimEnd() + "\n", { merge: true, create: true });
+        return notes.change(MEMORY, () => text.trimEnd() + "\n", { base: { rev, text: readAt(messages, MEMORY, rev) }, create: true });
       },
     }),
 
@@ -453,12 +474,12 @@ export function noteReadTools(notes: Pick<import("./application/notes").NoteServ
     }),
 
     read_note: tool({
-      description: `Read a note's whole file — frontmatter (title, created, flags, tags) and body — up to ${NOTE} characters. Paths from the index or search_notes: notes/<file>.md, or agent/memory.md.`,
+      description: `Read a note's whole file — frontmatter (title, created, flags, tags) and body — up to ${NOTE} characters, with its \`rev\` (the version read: a rewrite names it). Paths from the index or search_notes: notes/<file>.md, or agent/memory.md.`,
       inputSchema: z.object({ path: z.string().describe("notes/<file>.md or agent/memory.md") }),
       execute: async ({ path }) => {
         if (!READ_RE.test(path)) return { error: "Only notes/<file>.md and agent/memory.md." };
         const f = await notes.read(path);
-        return f ? { path, ...clip(f.text, NOTE) } : { error: `${path} not found.` };
+        return f ? { path, rev: f.rev, ...clip(f.text, NOTE) } : { error: `${path} not found.` };
       },
     }),
 

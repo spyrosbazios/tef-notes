@@ -1,7 +1,8 @@
 // Request-scoped note reads, search and writes over the shared transport.
 // Writes carry the revision read, retry additive edits, and three-way merge whole-file edits.
 // Listings are invalidated after writes; taint is persisted in the same write and never cleared.
-import { fold, newNotePath, noteKindOf, parseNote, reconcile, snippetOf, type NoteKind } from "@/core/notes";
+import { fold, newNotePath, noteKindOf, parseNote, snippetOf, type NoteKind } from "@/core/notes";
+import { mergedWrite } from "@/core/note-read";
 import * as pb from "@/core/pocketbase";
 import { HttpError } from "@/core/http";
 import { listTags, type TagDef } from "@/core/tags";
@@ -127,10 +128,14 @@ export class NoteService {
   }
 
   /** `edit(the file as it is now)` written over the rev it was read at. A refusal (someone wrote meanwhile) re-reads:
-   *  an edit that adds (`merge` off) is redone on the new text; a whole-file one (`merge`) is merged with the change
-   *  made meanwhile, and refused where they overlap. `create`: a missing file starts empty (the memory file). */
-  async change(path: string, edit: (text: string) => string, o: { taint?: boolean; merge?: boolean; create?: boolean } = {}): Promise<NoteSaved> {
-    let base: { text: string; mine: string } | undefined;
+   *  an edit that adds is redone on the new text. A whole-file edit names its `base`: the rev the writer read, and the text
+   *  read at it (null when it has none: a clipped read). The edit is made over that text and 3-way merged with whatever the
+   *  file became since, however long ago (a card waited for an answer while the owner typed), and refused where they
+   *  overlap, or when the file moved and the base text is not there to merge from. `base.rev` 0 is a file that wasn't there
+   *  (its text ""). `create`: a missing file starts empty (the memory file). */
+  async change(path: string, edit: (text: string) => string, o: { taint?: boolean; base?: { rev: number; text: string | null }; create?: boolean } = {}): Promise<NoteSaved> {
+    const { base } = o;
+    let baseText = base ? (base.rev === 0 ? "" : base.text) : null, mine: string | undefined;
     for (let i = 0; i < TRIES; i++) {
       const cur = await this.read(path);
       if (!cur) {
@@ -146,13 +151,17 @@ export class NoteService {
         }
       }
       let next: string;
-      if (!o.merge || !base) next = edit(cur.text);
-      else {
-        const m = reconcile(base.text, base.mine, cur.text);
+      if (!base || cur.rev === base.rev) {
+        // Nothing written since the read (or an additive edit): over the file as it is, which is the base
+        next = edit(cur.text);
+        if (base) { baseText = cur.text; mine = next; }
+      } else {
+        if (baseText == null) return { error: `${path} changed since you read it (rev ${base.rev}, now ${cur.rev}). read_note it again and redo the change.` };
+        mine ??= edit(baseText);
+        const m = mergedWrite(baseText, mine, cur.text);
         if (m == null) return { error: `${path} was changed meanwhile, in the same lines. read_note it again and redo the change.` };
         next = m;
       }
-      if (o.merge && !base) base = { text: cur.text, mine: next };
       try {
         const r = await pb.call(this.server, `collections/notes/records/${cur.rec}`,
           pb.json("PATCH", { ...pb.noteColumns(path, next), rev: cur.rev, ...(o.taint ? { tainted: true } : {}) }));

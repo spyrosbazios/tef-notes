@@ -20,7 +20,7 @@ import { useTasks } from "@/hooks/todo";
 import { isAppTool, uiTrouble, uiWords, type AppTool } from "@/lib/assistant";
 import { DrawRow } from "@/components/assistant/drawing";
 import { NoteChip } from "@/components/assistant/note-chip";
-import { isTool, toolName, type Part, type ToolPart } from "@/lib/ask";
+import { isTool, readsOf, toolName, type Part, type ToolPart } from "@/lib/ask";
 import { cn } from "@/lib/utils";
 import { Cards } from "./cards";
 import { Choice } from "./choice";
@@ -157,6 +157,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
       : name === "open_task" ? tasks?.find((t) => t.id === i.id)?.title : undefined;
 
   const cards = useMemo(() => cardsByPart(m.parts), [m.parts]);
+  const reads = useMemo(() => readsOf(m.parts), [m.parts]);
 
   if (m.role === "user") return <Rise live={live}><Said parts={m.parts} /></Rise>;
   const { parts } = m;
@@ -192,7 +193,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
     if ((p.state === "approval-requested" && last && !live) || decided)
       return (
         <div key={i} className="space-y-2">
-          <Confirm name={name} input={(p.input ?? {}) as WriteInput} id={approval?.id ?? ""} respond={respond} answer={decided} />
+          <Confirm name={name} input={(p.input ?? {}) as WriteInput} reads={reads} id={approval?.id ?? ""} respond={respond} answer={decided} />
           {shown ? <Cards cards={shown} live={live} /> : null}
         </div>
       );

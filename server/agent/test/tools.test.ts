@@ -101,7 +101,7 @@ describe("read_note", () => {
   });
   it("hands back the whole file, cut at 20 000 chars and saying so", async () => {
     pb.put("notes/a.md", "x".repeat(25_000));
-    expect(await run(T.read_note, { path: "notes/a.md" })).toEqual({ path: "notes/a.md", text: "x".repeat(20_000), truncated: true, chars: 25_000 });
+    expect(await run(T.read_note, { path: "notes/a.md" })).toEqual({ path: "notes/a.md", rev: 1, text: "x".repeat(20_000), truncated: true, chars: 25_000 });
   });
   it("says so when there's no such note", async () => {
     expect(await run(T.read_note, { path: "notes/a.md" })).toEqual({ error: "notes/a.md not found." });
@@ -199,12 +199,47 @@ describe("writes", () => {
     pb.put("notes/a.md", file("a", "one\ntwo\nthree\n"));
     let once = true;
     pb.meanwhile((rec) => { if (once) { once = false; rec.text = file("a", "one\ntwo\nthree\nfour\n"); rec.rev++; } });
-    expect(await run(T.rewrite_note, { path: "notes/a.md", text: "ONE\ntwo\nthree", why: "caps" })).toMatchObject({ saved: "notes/a.md", rev: 3 });
+    expect(await run(T.rewrite_note, { path: "notes/a.md", rev: 1, text: "ONE\ntwo\nthree", why: "caps" })).toMatchObject({ saved: "notes/a.md", rev: 3 });
     expect(parseNote("notes/a.md", pb.notes.get("notes/a.md")!.text).body).toBe("ONE\ntwo\nthree\nfour\n");
 
     once = true;
     pb.meanwhile((rec) => { if (once) { once = false; rec.text = file("a", "uno\ntwo\nthree\nfour\n"); rec.rev++; } });
-    expect(await run(T.rewrite_note, { path: "notes/a.md", text: "1\ntwo\nthree\nfour", why: "x" })).toEqual({ error: expect.stringMatching(/changed meanwhile/) });
+    expect(await run(T.rewrite_note, { path: "notes/a.md", rev: 3, text: "1\ntwo\nthree\nfour", why: "x" })).toEqual({ error: expect.stringMatching(/changed meanwhile/) });
+  });
+
+  /** The model's own read of a note, as it sits in the turn's messages. */
+  const readOf = (path: string, rev: number, text: string, more: object = {}): ModelMessage =>
+    ({ role: "tool", content: [{ type: "tool-result", toolCallId: `r${rev}`, toolName: "read_note", output: { type: "json", value: { path, rev, text, ...more } } }] });
+
+  it("read_note gives the rev; a rewrite made over it keeps what the owner typed while the card waited", async () => {
+    const text = file("a", "one\ntwo\nthree\n");
+    pb.put("notes/a.md", text);
+    const read = await run(T.read_note, { path: "notes/a.md" }) as { rev: number; text: string };
+    expect(read).toMatchObject({ path: "notes/a.md", rev: 1, text });
+    // The owner types a line while the Tidy card is open
+    const rec = pb.notes.get("notes/a.md")!;
+    rec.text = file("a", "one\ntwo\nthree\ntyped meanwhile\n"); rec.rev = 2;
+    const saved = await run(T.rewrite_note, { path: "notes/a.md", rev: read.rev, text: "ONE\ntwo\nthree", why: "caps" }, [readOf("notes/a.md", read.rev, read.text)]);
+    expect(saved).toMatchObject({ saved: "notes/a.md", rev: 3 });
+    expect(parseNote("notes/a.md", pb.notes.get("notes/a.md")!.text).body).toBe("ONE\ntwo\nthree\ntyped meanwhile\n");
+  });
+
+  it("a rewrite over a rev the file has moved past, with that read not in view, is refused and writes nothing", async () => {
+    pb.put("notes/a.md", file("a", "one\ntwo\n"));
+    const rec = pb.notes.get("notes/a.md")!;
+    rec.text = file("a", "typed\ntwo\n"); rec.rev = 2;
+    const input = { path: "notes/a.md", rev: 1, text: "ONE\ntwo", why: "caps" };
+    expect(await run(T.rewrite_note, input)).toEqual({ error: expect.stringMatching(/changed since you read it/) });
+    // A clipped read, another note's, or another rev's is no base
+    for (const read of [readOf("notes/a.md", 1, "one", { truncated: true }), readOf("notes/b.md", 1, "one\ntwo\n"), readOf("notes/a.md", 5, "one\ntwo\n")]) {
+      expect(await run(T.rewrite_note, input, [read])).toEqual({ error: expect.stringMatching(/changed since you read it/) });
+    }
+    expect(pb.notes.get("notes/a.md")).toMatchObject({ rev: 2, text: file("a", "typed\ntwo\n") });
+  });
+
+  it("a rewrite over the rev it read goes straight in, no read in view needed", async () => {
+    pb.put("notes/a.md", file("a", "one\ntwo\n"));
+    expect(await run(T.rewrite_note, { path: "notes/a.md", rev: 1, text: "ONE\ntwo", why: "caps" })).toMatchObject({ saved: "notes/a.md", rev: 2 });
   });
 
   it("summarise_links: the route's block under each card without one, tainted; a failure listed", async () => {
@@ -260,9 +295,19 @@ describe("writes", () => {
   });
 
   it("update_memory: creates the file the first time, refuses one too long", async () => {
-    expect(await run(T.update_memory, { text: "Writes in Greek.", why: "x" })).toEqual({ saved: "agent/memory.md", rev: 1 });
+    expect(await run(T.update_memory, { rev: 0, text: "Writes in Greek.", why: "x" })).toEqual({ saved: "agent/memory.md", rev: 1 });
     expect(pb.notes.get("agent/memory.md")!.text).toBe("Writes in Greek.\n");
-    expect(await run(T.update_memory, { text: "x".repeat(6001), why: "x" })).toEqual({ error: "Too long (6001 chars, max 6000). Condense and retry." });
+    expect(await run(T.update_memory, { rev: 1, text: "x".repeat(6001), why: "x" })).toEqual({ error: "Too long (6001 chars, max 6000). Condense and retry." });
+  });
+
+  it("update_memory: made over the rev it read; one the file moved past is merged from that read, or refused without it", async () => {
+    pb.put("agent/memory.md", "Writes in Greek.\nLives in Athens.\n");
+    const mem = pb.notes.get("agent/memory.md")!;
+    mem.text = "Writes in Greek.\nLives in Athens.\nHas a cat.\n"; mem.rev = 2;
+    const read: ModelMessage = { role: "tool", content: [{ type: "tool-result", toolCallId: "m", toolName: "read_note", output: { type: "json", value: { path: "agent/memory.md", rev: 1, text: "Writes in Greek.\nLives in Athens.\n" } } }] };
+    expect(await run(T.update_memory, { rev: 1, text: "Writes in Greek and English.\nLives in Athens.", why: "x" })).toEqual({ error: expect.stringMatching(/changed since you read it/) });
+    expect(await run(T.update_memory, { rev: 1, text: "Writes in Greek and English.\nLives in Athens.", why: "x" }, [read])).toEqual({ saved: "agent/memory.md", rev: 3 });
+    expect(pb.notes.get("agent/memory.md")!.text).toBe("Writes in Greek and English.\nLives in Athens.\nHas a cat.\n");
   });
 
   it("appended: one line is one bullet, whether or not the agent wrote the marker", () => {
@@ -544,7 +589,7 @@ describe("cards", () => {
     expect(out(made)).toEqual([{ kind: "note", path: expect.stringMatching(/^notes\/\d{8}-garage\.md$/), title: "Garage", tags: ["work"], preview: "- 1234" }]);
     const flags = await run(T.set_note_flags, { path: "notes/20261005-a.md", pinned: true });
     expect(out(flags)[0]).toMatchObject({ kind: "note", title: "Trip" });
-    expect(out(await run(T.update_memory, { text: "Writes in Greek.", why: "x" }))).toEqual([]);
+    expect(out(await run(T.update_memory, { rev: 0, text: "Writes in Greek.", why: "x" }))).toEqual([]);
   });
 
   it("a task write leaves its card; a delete none", async () => {

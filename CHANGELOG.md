@@ -21,6 +21,9 @@ version is one semver number for the whole repository, set by the git tag (see [
 - A task repeating monthly or yearly on the 29th, 30th or 31st no longer drifts: January 30 goes to February 28 and back to
   March 30 (it used to land on March 31), and a leap day comes back on the next leap year. A short month's round carries the
   day it is meant for (`1m@30`) until the task is moved.
+- The assistant's Tidy and other whole-note rewrites no longer overwrite what you typed while the card was open: the
+  rewrite is made over the version the assistant read and merged with your edits (refused where they touch the same lines),
+  and the card shows the merged result. Its memory file is updated the same way.
 - Settings no longer undo each other: the preferences record carries a `rev` like notes and tasks, a device whose save lost
   a race reads the newer record and puts only the settings it changed over it, and the assistant's own writes (the widget's
   lens, a note action it saves) go through the same path instead of saving the whole record.
