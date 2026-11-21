@@ -21,7 +21,7 @@
 //
 // POST /api/tefnotes/tags/rename JSON { from: "<name>", to: "<new name>" }
 // Renames a tag everywhere, in one transaction: every note's tags line (its text, the `tags` column, what the
-// auto-tagger added, `autotagged`) and every task's tags, each a write that bumps `rev` like any other; every lens's
+// auto-tagger added, `autotagged`) and every task's tags, each a write that bumps `rev` like any other (lib/records.js); every lens's
 // tags and hidden tags; the notes list's folded groups in the preferences; and the definition. A `to` already defined
 // (case and tonos ignored) merges the two: the existing definition stays, taking the other's colour and description
 // where it has none, and the other is deleted; the items take its name as written there. A `from` nothing defines is
@@ -29,7 +29,7 @@
 // 200 { tag, notes, tasks, lenses, merged }   tag: the name the items carry now; the counts of records changed
 // 400 bad body. Errors are { error }.
 routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
-  const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`);
+  const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`), records = require(`${__hooks}/lib/records.js`);
   let req;
   try { req = lib.renameInput(e.requestInfo().body); } catch (err) {
     if (err instanceof lib.Bad) return e.json(400, { error: err.message });
@@ -55,22 +55,19 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
       tx.db().newQuery(`SELECT id, CAST(IFNULL(tags, '[]') AS TEXT) AS tags FROM ${coll}`).all(rows);
       return rows.filter((r) => lib.renamed(names(r.tags), req.from, to)).map((r) => r.id);
     };
+    // A note's `tags` column is a copy of its frontmatter, which lib/records.js copies out of the text again: a note whose
+    // column alone carried the old name is rewritten all the same, which puts the copy right.
     for (const id of ids("notes")) {
-      const rec = tx.findRecordById("notes", id), path = rec.getString("path");
-      const next = lib.renamed(notes.parse(path, rec.getString("text")).tags, req.from, to);
-      if (next) { const c = notes.columns(path, notes.withTags(path, rec.getString("text"), next)); rec.set("text", c.text); rec.set("tags", c.tags); }
-      else rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to));      // the column alone was stale
-      const auto = lib.renamed(names(rec.getString("autotagged")), req.from, to);
-      if (auto) rec.set("autotagged", auto);
-      rec.set("rev", rec.getInt("rev") + 1);
-      tx.save(rec);
+      records.casWrite(tx, "notes", id, (rec) => {
+        const path = rec.getString("path"), next = lib.renamed(notes.parse(path, rec.getString("text")).tags, req.from, to);
+        if (next) rec.set("text", notes.withTags(path, rec.getString("text"), next));
+        const auto = lib.renamed(names(rec.getString("autotagged")), req.from, to);
+        if (auto) rec.set("autotagged", auto);
+      });
       out.notes++;
     }
     for (const id of ids("tasks")) {
-      const rec = tx.findRecordById("tasks", id);
-      rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to));
-      rec.set("rev", rec.getInt("rev") + 1);
-      tx.save(rec);
+      records.casWrite(tx, "tasks", id, (rec) => { rec.set("tags", lib.renamed(names(rec.getString("tags")), req.from, to)); });
       out.tasks++;
     }
     for (const rec of tx.findAllRecords("lenses")) {

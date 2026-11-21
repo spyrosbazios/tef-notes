@@ -36,10 +36,9 @@
 // summary): from the page's text, which for a link that came with none is fetched through lib/link-preview.js's guard; the
 // clip is saved with or without it. The log says why, never a key.
 //
-// Writes bypass the request hooks (rev.pb.js), so the rev contract is kept here: an append re-reads the note (or the
-// task, whose `notes` it adds to) inside the transaction that writes it, so it is based on the rev it replaces, and bumps
-// it; a new note or task starts at rev 1 (a new task after every other in `order`).
-// Every column a client copies out of the frontmatter is written beside `text` (lib/notes.js columns). Each file is an
+// Writes bypass the request hooks (rev.pb.js), so the rev contract is lib/records.js's: an append re-reads the note (or
+// the task, whose `notes` it adds to) inside the transaction that writes it, bumps its rev and copies a note's columns
+// out of its text; a new note or task starts at rev 1 (a new task after every other in `order`). Each file is an
 // `attachments` record under the note's id (its collection checks the type and size), saved first and deleted again if
 // the note's write fails: never one without the other.
 // A handler runs in its own VM and sees nothing of this file's top level: each requires what it uses.
@@ -128,7 +127,7 @@ routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
 
 routerAdd("POST", "/api/tefnotes/clip", (e) => {
   const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
-  const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`);
+  const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`), records = require(`${__hooks}/lib/records.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
   let clip, files = [];
@@ -209,22 +208,17 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     });
     return embed;
   };
-  /** A new note of the whole clip (the files first, when there are any), titled `title`, at rev 1: its record, unsaved. */
+  /** A new note of the whole clip (the files first, when there are any), titled `title`: its path and its text under the
+   *  title it has then (`text()`), saved by `saveNote`. Its path stays the one the first title gave it. */
   const newNote = (title) => {
     const stem = notes.pathStem(title, now), taken = arrayOf(new DynamicModel({ path: "" }));
     e.app.db().newQuery("SELECT path FROM notes WHERE path LIKE {:stem}").bind({ stem: `${stem}%` }).all(taken);
     const path = notes.newNotePath(title, now, new Set(taken.map((r) => r.path)));
     const body = lib.bodyOf(clip, clip.line, note, attach(notes.idOf(path)), summary);
-    const rec = new Record(e.app.findCollectionByNameOrId("notes"));
-    /** The note's text under the title `t`; its path stays the one the first title gave it. */
-    const titled = (t) => {
-      const cols = notes.columns(path, notes.serialize({ title: t, created: notes.localDay(now), tags: without(clip.tags, []) }, body));
-      for (const k of Object.keys(cols)) rec.set(k, cols[k]);
-    };
-    titled(title);
-    rec.set("rev", 1);
-    return { path, rec, titled };
+    const made = { path, title, text: () => notes.serialize({ title: made.title, created: notes.localDay(now), tags: without(clip.tags, []) }, body) };
+    return made;
   };
+  const saveNote = (tx, made) => records.create(tx, "notes", (r) => { r.set("path", made.path); r.set("text", made.text()); });
   /** A clip of files alone: once they are stored under `made`, the agent's title for them (a PDF's first pages, a photo
    *  looked at), on the unsaved note too; else `title`, the clip's own. Titling never fails the save. */
   const AGENT = env("TEF_NOTES_AGENT") || "http://agent:8098";
@@ -238,7 +232,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
       const t = res.statusCode === 200 ? lib.agentTitle(res.json) : "";
       if (res.statusCode !== 200) log("the agent could not title it", "status", res.statusCode);
       if (!t) return title;
-      made.titled(t);
+      made.title = t;
       return t;
     } catch (err) {
       log("the agent could not title it", "error", String(err).slice(0, 200));
@@ -259,36 +253,34 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
       const body = lib.bodyOf(clip, clip.line, note, lib.fileLines(clip), summary);
       let full = false;
       e.app.runInTransaction((tx) => {
-        let rec;
-        try { rec = tx.findRecordById("tasks", id); } catch (_) { return; }
-        const next = lib.taskNotes(rec.getString("notes"), body);
-        if (next == null) { full = true; return; }
-        rec.set("notes", next);
-        let had = [];
-        try { const v = JSON.parse(rec.getString("tags") || "[]"); if (Array.isArray(v)) had = v.filter((t) => typeof t === "string"); } catch (_) { /* none */ }
-        rec.set("tags", [...had, ...without(clip.tags, had)]);
-        rec.set("rev", rec.getInt("rev") + 1);
-        tx.save(rec);
-        out = { kind: "task", id, title: rec.getString("title"), action: "appended" };
+        const rec = records.casWrite(tx, "tasks", id, (r) => {
+          const next = lib.taskNotes(r.getString("notes"), body);
+          if (next == null) { full = true; return false; }
+          r.set("notes", next);
+          let had = [];
+          try { const v = JSON.parse(r.getString("tags") || "[]"); if (Array.isArray(v)) had = v.filter((t) => typeof t === "string"); } catch (_) { /* none */ }
+          r.set("tags", [...had, ...without(clip.tags, had)]);
+        });
+        if (rec) out = { kind: "task", id, title: rec.getString("title"), action: "appended" };
       });
       if (full) return e.json(413, { error: "That task's notes are full." });
       if (!out) return gone();
     } else if (clip.target.kind === "note") {
       const target = clip.target.path;
-      try { e.app.findFirstRecordByFilter("notes", "path = {:p}", { p: target }); } catch (_) { return e.json(404, { error: "That note no longer exists." }); }
+      let id;
+      try { id = e.app.findFirstRecordByFilter("notes", "path = {:p}", { p: target }).id; } catch (_) { return e.json(404, { error: "That note no longer exists." }); }
       const body = lib.bodyOf(clip, clip.line, note, attach(notes.idOf(target)), summary);
       e.app.runInTransaction((tx) => {
-        let rec;
-        try { rec = tx.findFirstRecordByFilter("notes", "path = {:p}", { p: target }); } catch (_) { return; }
-        const text = rec.getString("text"), n = notes.parse(target, text);
-        const added = without(clip.tags, n.tags);
-        let next = notes.withBody(text, n, notes.appended(n.body, body));
-        if (added.length) next = notes.withTags(target, next, [...n.tags, ...added]);
-        const cols = notes.columns(target, next);
-        for (const k of Object.keys(cols)) rec.set(k, cols[k]);
-        rec.set("rev", rec.getInt("rev") + 1);
-        tx.save(rec);
-        out = { kind: "note", path: target, title: n.title, action: "appended" };
+        let title = "";
+        const rec = records.casWrite(tx, "notes", id, (r) => {
+          const text = r.getString("text"), n = notes.parse(target, text);
+          const added = without(clip.tags, n.tags);
+          let next = notes.withBody(text, n, notes.appended(n.body, body));
+          if (added.length) next = notes.withTags(target, next, [...n.tags, ...added]);
+          r.set("text", next);
+          title = n.title;
+        });
+        if (rec) out = { kind: "note", path: target, title, action: "appended" };
       });
       if (!out) { unattach(); return e.json(404, { error: "That note no longer exists." }); }
     } else if (clip.target.kind === "newtask") {
@@ -299,21 +291,20 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
       const first = lib.titleOf(clip, clip.line, now), made = files.length ? newNote(first) : null;
       const title = retitle(made, first);
       e.app.runInTransaction((tx) => {
-        if (made) tx.save(made.rec);
+        const saved = made ? saveNote(tx, made) : null;
         const next = new DynamicModel({ n: 0 });
         tx.db().newQuery('SELECT IFNULL(MAX("order"), -1) + 1 AS n FROM tasks').one(next);
-        const task = new Record(tx.findCollectionByNameOrId("tasks"));
-        task.set("title", title);
-        task.set("notes", text);
-        task.set("checklist", []);
-        task.set("tags", without(clip.tags, []));
-        task.set("order", next.n);
-        task.set("rev", 1);
-        tx.save(task);
-        if (made) {
+        const task = records.create(tx, "tasks", (t) => {
+          t.set("title", title);
+          t.set("notes", text);
+          t.set("checklist", []);
+          t.set("tags", without(clip.tags, []));
+          t.set("order", next.n);
+        });
+        if (saved) {
           const link = new Record(tx.findCollectionByNameOrId("links"));
           link.set("fromTask", task.id);
-          link.set("toNote", made.rec.id);
+          link.set("toNote", saved.id);
           link.set("role", "about");
           tx.save(link);
         }
@@ -321,7 +312,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
       });
     } else {
       const first = lib.titleOf(clip, clip.line, now), made = newNote(first), title = retitle(made, first);
-      e.app.save(made.rec);
+      e.app.runInTransaction((tx) => { saveNote(tx, made); });
       out = { kind: "note", path: made.path, title, action: "created" };
     }
     return e.json(200, outcome ? { ...out, summary: outcome } : out);

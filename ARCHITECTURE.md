@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-20 -->
+<!-- reviewed: 2026-11-21 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -163,8 +163,9 @@ Every write to a note or task carries the `rev` it was based on. Links are outsi
   field by field (`mergeRecord` in `packages/core/src/todo.ts`): each side's changes are kept, a checklist is merged by
   item id, and a field both sides changed goes to the side doing the merging, there being one user. A task's tags merge as a set (an addition on either side is
   kept, a removal on either side goes). A task's exclusion (`evening` needs `when`) is mended after a merge (`normalizeTask`).
-- The server's own writers (auto-tagger, clip, agent) follow the same rule: re-read inside a transaction and drop the
-  write if `rev` moved.
+- The server's own writers follow the same rule. The hooks' (auto-tagger, clip, tag rename) fire no request hook, so
+  each goes through one helper, `server/pb_hooks/lib/records.js` `casWrite`: re-read inside a transaction, drop the write
+  if `rev` moved, copy a note's columns out of its text, bump `rev`. The agent writes over HTTP like any client.
 
 ## The chat agent
 

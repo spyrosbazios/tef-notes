@@ -80,7 +80,7 @@ try {
   if (!ready) throw new Error("PocketBase readiness timeout");
   // A wrapper outside the checkout opts into Bun discovery without adding a default-discovered test file.
   const wrapper = join(root, "contract.test.ts");
-  const suites = ["contract.ts", ...(application ? ["application.ts"] : [])];
+  const suites = ["contract.ts", "hooks.ts", ...(application ? ["application.ts"] : [])];
   await Bun.write(wrapper, suites.map((suite) => `import ${JSON.stringify(pathToFileURL(join(import.meta.dir, suite)).href)};`).join("\n"));
   if (interrupted) throw new Error("Integration run interrupted");
   tests = Bun.spawn([process.execPath, "--no-env-file", "test", wrapper, "--timeout", "15000"],
