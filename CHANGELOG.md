@@ -7,6 +7,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- Every server route answers a failure the same way, so the web app, the clipper and `tefnotes` all show the server's
+  own words (a link the server won't fetch, a rename that failed) instead of a bare status.
 - The hourly tag-description job no longer writes over a description you (or an agent) saved while it was writing, nor
   undoes a rename made meanwhile.
 - `tefnotes` run with `TEF_NOTES_AGENT=1` marks every write that carries content: `import` and `draw --replace` no longer

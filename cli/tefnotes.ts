@@ -12,7 +12,7 @@ import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Lin
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
 import { sceneProblem } from "@/core/drawing";
 import { drawingName, drawingPreview, fileMarkdown, isDrawingName } from "@/core/photos";
-import { describeAllTags, describeError, listTags, renameTag } from "@/core/tags";
+import { describeAllTags, listTags, renameTag } from "@/core/tags";
 import { localDay } from "@/core/time";
 import { markOf, writer } from "./writes";
 
@@ -301,8 +301,7 @@ async function main(argv: string[]) {
         for (const t of defs) console.log([t.name, t.color ?? "", t.description].filter(Boolean).join(" · "));
         return;
       }
-      let described;
-      try { described = await describeAllTags(s); } catch (e) { return die(describeError(e)); }
+      const described = await describeAllTags(s);   // a failure is the server's words (main's catch)
       for (const { tag, description } of described) {
         const def = defs.find((d) => d.name === tag);
         if (opt.has("write") && def) await write.tags.update(s, def, { name: def.name, color: def.color, description });

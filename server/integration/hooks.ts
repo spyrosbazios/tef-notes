@@ -3,6 +3,7 @@
 import { expect, test } from "bun:test";
 import * as pb from "../../packages/core/src/pocketbase";
 import { newTask } from "../../packages/core/src/todo";
+import { serverError } from "../../packages/core/src/http";
 
 const url = process.env.TEF_CONTRACT_URL;
 if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun --no-env-file server/integration/run.ts");
@@ -89,4 +90,28 @@ test("tags: describedBy is decided by the server; a request can only mark a desc
   expect((await patch(agent.id, { description: "Still an agent's", describedBy: "agent" })).describedBy).toBe("agent");
   expect((await patch(agent.id, { description: "The owner's now" })).describedBy).toBe("owner");
   expect((await patch(agent.id, { color: "red", describedBy: "agent" })).describedBy).toBe("owner");
+});
+
+test("every route answers a failure as { error } alone (lib/http.js), which the clients read with core serverError", async () => {
+  const refused = async (path: string, init?: RequestInit) => {
+    const res = await fetch(`${url}/api/${path}`, init);
+    const body = await res.json();
+    return { status: res.status, keys: Object.keys(body), error: serverError(body) };
+  };
+  const post = (body: unknown) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const private_ = encodeURIComponent("http://10.0.0.1/");
+  for (const [path, init] of [
+    [`tefnotes/link-preview?url=${private_}`],
+    [`tefnotes/page?url=${private_}`],
+    [`tefnotes/clip/image?url=${private_}`],
+    ["tefnotes/summary", post({ url: "http://10.0.0.1/" })],
+    ["tefnotes/tags/rename", post({ from: "a" })],
+    ["tefnotes/tags/describe", post({})],
+    ["tefnotes/tags/guess", post({ title: 3 })],
+    ["tefnotes/clip/suggest", post({ title: "" })],
+  ] as [string, RequestInit?][]) {
+    const r = await refused(path, init);
+    expect([path, r.status, r.keys]).toEqual([path, 400, ["error"]]);
+    expect(r.error?.length).toBeGreaterThan(3);
+  }
 });

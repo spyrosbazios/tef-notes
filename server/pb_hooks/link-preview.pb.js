@@ -12,13 +12,13 @@
 // didn't answer and nothing is cached (not saved: asked again next time).
 // Nothing is signed in, like the rest: the tailnet is the gate, and it is why the guard in the lib exists.
 
-routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
+routerAdd("GET", "/api/tefnotes/link-preview", (e) => require(`${__hooks}/lib/http.js`).route(e, "link-preview", "The preview could not be made.", () => {
   const lib = require(`${__hooks}/lib/link-preview.js`);
   const FIELDS = ["title", "description", "site", "image", "icon"];
 
   let url;
   try { url = lib.parseUrl(e.request.url.query().get("url") || "").href; } catch (err) {
-    if (err instanceof lib.Blocked) throw new BadRequestError(err.message);
+    if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     throw err;
   }
 
@@ -50,7 +50,7 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
     // A URL refused on the way (its name resolves to a private address, a redirect leads to one): a 400 like one refused
     // up front, and nothing cached for it
     try { page = lib.previewOf(url, { lookup: lib.getent(run), get: lib.curl(run) }); } catch (err) {
-      if (err instanceof lib.Blocked) throw new BadRequestError(err.message);
+      if (err instanceof lib.Blocked) return e.json(400, { error: `The server won't fetch that page: ${err.message}.` });
     }
     // the site didn't answer (down, slow, rate-limited) and there is nothing to fall back on: a 502, not cached, so the
     // editor asks again later instead of drawing an empty card for an hour
@@ -73,7 +73,7 @@ routerAdd("GET", "/api/tefnotes/link-preview", (e) => {
 
   e.response.header().set("Cache-Control", "private, max-age=3600");
   return e.json(200, { url, ...out, picture: rec ? pictureOf(rec) : "" });
-});
+}));
 
 // Previews nobody asked for in a quarter: gone, with their kept pictures (lib/link-preview.js prune)
 cronAdd("link_previews_prune", "17 4 * * *", () => {

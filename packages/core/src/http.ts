@@ -7,6 +7,16 @@ export class HttpError extends Error {
   }
 }
 
+/** What the server said went wrong, in words to show: a TEF Notes route's `{ error }` (every one answers a failure so,
+ *  server/pb_hooks/lib/http.js), else PocketBase's own record API's `{ message }`; null when the body says neither. The one
+ *  reader of a server's failure, for every client (web, CLI, extension). */
+export function serverError(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const { error, message } = body as { error?: unknown; message?: unknown };
+  if (typeof error === "string" && error.trim()) return error;
+  return typeof message === "string" && message.trim() ? message : null;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** A read gets 15 s a try, a write 45 s: on a dead network a listing gives up in seconds, not after a write's patience. */
@@ -21,7 +31,10 @@ export async function getJson(url: string, init: RequestInit = {}, tries = 4, ti
       const r = await fetch(url, { ...init, signal: ctl.signal });
       if (r.ok) return r.status === 204 ? null : await r.json();
       const retry = r.status === 429 || r.status >= 500;
-      if (!retry || i === tries - 1) throw new HttpError(r.status, `HTTP ${r.status}`, r.headers, await r.json().catch(() => undefined));
+      if (!retry || i === tries - 1) {
+        const body = await r.json().catch(() => undefined);
+        throw new HttpError(r.status, serverError(body) ?? `HTTP ${r.status}`, r.headers, body);
+      }
     } catch (e) {
       if (e instanceof HttpError || init.signal?.aborted || i === tries - 1) throw e;
     } finally {

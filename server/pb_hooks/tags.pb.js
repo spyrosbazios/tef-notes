@@ -29,7 +29,7 @@
 // still renamed on the items that carry it.
 // 200 { tag, notes, tasks, lenses, merged }   tag: the name the items carry now; the counts of records changed
 // 400 bad body. Errors are { error }.
-routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
+routerAdd("POST", "/api/tefnotes/tags/rename", (e) => require(`${__hooks}/lib/http.js`).route(e, "tags", "The tag could not be renamed.", () => {
   const lib = require(`${__hooks}/lib/tags.js`), notes = require(`${__hooks}/lib/notes.js`), records = require(`${__hooks}/lib/records.js`);
   let req;
   try { req = lib.renameInput(e.requestInfo().body); } catch (err) {
@@ -90,9 +90,9 @@ routerAdd("POST", "/api/tefnotes/tags/rename", (e) => {
   });
   e.app.logger().info("tags: renamed", "from", req.from, "to", out.tag, "notes", out.notes, "tasks", out.tasks, "lenses", out.lenses, "merged", out.merged);
   return e.json(200, out);
-});
+}));
 
-routerAdd("POST", "/api/tefnotes/tags/describe", (e) => {
+routerAdd("POST", "/api/tefnotes/tags/describe", (e) => require(`${__hooks}/lib/http.js`).route(e, "tags", "The descriptions could not be written.", () => {
   const lib = require(`${__hooks}/lib/tags.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`tags: ${msg}`, ...kv);
 
@@ -129,7 +129,7 @@ routerAdd("POST", "/api/tefnotes/tags/describe", (e) => {
     log("describe failed", "error", String(err).slice(0, 300));
     return e.json(500, { error: "The descriptions could not be written." });
   }
-});
+}));
 
 cronAdd("tag-describe", "17 * * * *", () => {
   const lib = require(`${__hooks}/lib/tags.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);

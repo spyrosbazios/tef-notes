@@ -55,12 +55,14 @@ describe("reaching the server", () => {
     expect(err).not.toBeInstanceOf(SetupError);
     expect((err as Error).message).toBe("Can't reach the server. Check the address and that you are on the server's network.");
   });
-  it("shows the server's own error, else its status", async () => {
+  it("shows the server's own error (core serverError), else its status", async () => {
     serve(() => Response.json({ error: "No such note." }, { status: 404 }));
     expect(((await suggest(page, "").catch((e: unknown) => e)) as Error).message).toBe("No such note.");
     serve(() => new Response("<html>bad gateway</html>", { status: 502 }));
     expect(((await suggest(page, "").catch((e: unknown) => e)) as Error).message).toBe("The server answered 502.");
-    serve(() => Response.json({ message: "no error key" }, { status: 500 }));
+    serve(() => Response.json({ message: "Request entity too large." }, { status: 413 }));   // PocketBase's own, before the route
+    expect(((await suggest(page, "").catch((e: unknown) => e)) as Error).message).toBe("Request entity too large.");
+    serve(() => Response.json({ error: "" }, { status: 500 }));
     expect(((await suggest(page, "").catch((e: unknown) => e)) as Error).message).toBe("The server answered 500.");
   });
 });

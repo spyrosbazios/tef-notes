@@ -221,7 +221,8 @@ record has moved since; clients re-read and merge instead of overwriting. Detail
 
 ## Custom HTTP routes
 
-PocketBase's own `/api/collections/...` API serves the records. The hooks add:
+PocketBase's own `/api/collections/...` API serves the records. The hooks add the routes below; each answers a failure
+as `{ error }` alone (`pb_hooks/lib/http.js`, held by `test/http.test.js`), which clients read with core `serverError`:
 
 | Method | Path | What it does |
 |---|---|---|

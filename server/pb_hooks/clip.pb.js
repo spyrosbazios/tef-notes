@@ -44,7 +44,7 @@
 // the note's write fails: never one without the other.
 // A handler runs in its own VM and sees nothing of this file's top level: each requires what it uses.
 
-routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
+routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "No suggestions could be made.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
@@ -89,9 +89,9 @@ routerAdd("POST", "/api/tefnotes/clip/suggest", (e) => {
     log("suggest failed", "url", clip.url, "error", String(err).slice(0, 300));
     return e.json(500, { error: "No suggestions could be made." });
   }
-});
+}));
 
-routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
+routerAdd("POST", "/api/tefnotes/clip/tags", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The tags could not be scored.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), auto = require(`${__hooks}/lib/autotag.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
 
@@ -124,9 +124,9 @@ routerAdd("POST", "/api/tefnotes/clip/tags", (e) => {
     log("tags failed", "error", String(err).slice(0, 200));
     return scored([]);
   }
-});
+}));
 
-routerAdd("POST", "/api/tefnotes/clip", (e) => {
+routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The clip could not be saved.", () => {
   const lib = require(`${__hooks}/lib/clip.js`), notes = require(`${__hooks}/lib/notes.js`), ds = require(`${__hooks}/lib/llm.js`).llm(), keys = require(`${__hooks}/lib/keys.js`);
   const { without } = require(`${__hooks}/lib/autotag.js`), { env } = require(`${__hooks}/lib/env.js`), records = require(`${__hooks}/lib/records.js`);
   const log = (msg, ...kv) => e.app.logger().warn(`clip: ${msg}`, ...kv);
@@ -322,9 +322,9 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => {
     log("failed", "url", clip.url, "error", String(err).slice(0, 300));
     return e.json(500, { error: "The clip could not be saved." });
   }
-}, $apis.bodyLimit(260 * 1024 * 1024));   // FILES (10) PDFs of 25 MB each, and the JSON
+}), $apis.bodyLimit(260 * 1024 * 1024));   // FILES (10) PDFs of 25 MB each, and the JSON
 
-routerAdd("GET", "/api/tefnotes/clip/image", (e) => {
+routerAdd("GET", "/api/tefnotes/clip/image", (e) => require(`${__hooks}/lib/http.js`).route(e, "clip", "The picture could not be fetched.", () => {
   const lp = require(`${__hooks}/lib/link-preview.js`);
   const fail = (status, error) => e.json(status, { error });
 
@@ -353,4 +353,4 @@ routerAdd("GET", "/api/tefnotes/clip/image", (e) => {
   } finally {
     try { $os.remove(file); } catch (_) { /* never written */ }
   }
-});
+}));

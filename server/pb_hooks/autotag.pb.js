@@ -177,7 +177,7 @@ cronAdd("autotag", "* * * * *", () => {
   }
 });
 
-routerAdd("POST", "/api/tefnotes/tags/guess", (e) => {
+routerAdd("POST", "/api/tefnotes/tags/guess", (e) => require(`${__hooks}/lib/http.js`).route(e, "autotag", "The tags could not be guessed.", () => {
   const lib = require(`${__hooks}/lib/autotag.js`), jev = require(`${__hooks}/lib/jev.js`), keys = require(`${__hooks}/lib/keys.js`);
   const input = lib.guessInput(e.requestInfo().body);
   if (!input) return e.json(400, { error: "Send { title, notes? } as strings." });
@@ -200,4 +200,4 @@ routerAdd("POST", "/api/tefnotes/tags/guess", (e) => {
     ps.push(...lib.probabilities(r.defs, res.json));
   }
   return e.json(200, { tags: lib.decide(ps, defs) });
-});
+}));

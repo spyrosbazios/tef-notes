@@ -2,6 +2,7 @@
 // (packages/core/src/pocketbase.ts), so the UI handles a stale rev the same way the phone and the CLI do. No sign-in:
 // the private network is the gate (server/pb_migrations/1792400000_open.js).
 import axios, { AxiosError } from "axios";
+import { serverError } from "@/core/http";
 import { conflictOf } from "@/core/record-contracts";
 export { lit } from "@/core/record-contracts";
 import { getNet, note } from "@/lib/net";
@@ -47,6 +48,6 @@ export async function orNull<T>(p: Promise<T>): Promise<T | null> {
 
 /** What went wrong, in words for a toast. */
 export function message(e: unknown): string {
-  if (e instanceof AxiosError) return e.response?.data?.message ?? e.response?.data?.error ?? (e.response ? `HTTP ${e.response.status}` : "The server can't be reached.");
+  if (e instanceof AxiosError) return serverError(e.response?.data) ?? (e.response ? `HTTP ${e.response.status}` : "The server can't be reached.");
   return e instanceof Error ? e.message : String(e);
 }
