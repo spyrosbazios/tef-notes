@@ -4,7 +4,7 @@ import { choices, CLIP_FILES, describe as describeResult, filesWord, savedTags, 
 import { DEFAULT_LOOK, hex8, FEED_LIMITS, helloOf, lensPickOf, newTaskOf, notesFeed, ownerLook, shareClip, switchesOf, taskListOf, tasksFeed, type NoteRow, type ShareIn } from "../src/companion";
 import type { Lens } from "../src/lens";
 import { serializeNote } from "../src/notes";
-import { fit, lookSize, MAX_PDF } from "../src/photos";
+import { lookSize, MAX_PDF, storedSize } from "../src/photos";
 import { DEFAULT_PREFS } from "../src/prefs";
 import { ACCENTS, THEMES } from "../src/theme";
 import { newTask, type Task } from "../src/todo";
@@ -130,10 +130,7 @@ describe("the rules a companion copies", () => {
     it(`a share as a clip: ${c.name}`, () => expect(shareClip(c.in)).toEqual(c.clip as ReturnType<typeof shareClip>));
 
   it("the picture stored: long edge 1600, never enlarged", () => {
-    for (const c of cases.stored) {
-      const to = fit(c.width, c.height), k = !to ? 1 : "width" in to ? to.width / c.width : to.height / c.height;
-      expect({ width: Math.round(c.width * k), height: Math.round(c.height * k) }).toEqual(c.size);
-    }
+    for (const c of cases.stored) expect(storedSize(c.width, c.height)).toEqual(c.size);
   });
   it("the picture JEV looks at", () => {
     for (const c of cases.look) expect(lookSize(c.width, c.height)).toEqual(c.size);

@@ -12,8 +12,16 @@ export function fit(width: number, height: number, max = MAX): { width: number }
   return width >= height ? { width: max } : { height: max };
 }
 
+/** The size a picture is stored at: `fit`'s long edge, ratio kept, never enlarged. */
+export function storedSize(width: number, height: number): { width: number; height: number } {
+  const to = fit(width, height);
+  if (!to) return { width, height };
+  const k = "width" in to ? to.width / width : to.height / height;
+  return { width: Math.max(1, Math.round(width * k)), height: Math.max(1, Math.round(height * k)) };
+}
+
 /** The picture JEV looks at (TypeSafe takes 280 to 1568 px a side): long edge 768 as JPEG 0.8, a smaller one made up to
- *  280 on its short side. The extension pads its canvas to that (extension/src/picture.ts); the phone resizes up. */
+ *  280 on its short side. Every client draws it at `lookSize`. */
 export const LOOK = 768, LOOK_MIN = 280, LOOK_MAX = 1568, LOOK_QUALITY = 0.8;
 
 /** The size of that picture for one of `width` x `height`: ratio kept, never a short side under LOOK_MIN nor a long one

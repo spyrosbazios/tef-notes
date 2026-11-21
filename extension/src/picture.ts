@@ -1,12 +1,12 @@
 // A picture's bytes, and the two JPEGs made from them on a canvas: the one stored in the note, downscaled as the web app
-// downscales a photo (packages/core/src/photos.ts: long edge 1600, JPEG 0.82), and the smaller one JEV looks at
-// (TypeSafe takes 280 to 1568 px a side: long edge 768, padded up to 280).
+// downscales a photo (packages/core/src/photos.ts `storedSize`: long edge 1600, JPEG 0.82), and the smaller one JEV looks at
+// (`lookSize`: long edge 768, a small picture made up to 280 on its short side; TypeSafe takes 280 to 1568 px a side).
 //
 // Where the bytes come from: the extension fetches the picture itself, with the browser's session for that site when
 // the owner has let it reach that site (or when the site lets anyone read it); else the server fetches it, which works
 // for a public picture only (its SSRF guard, server/pb_hooks/lib/link-preview.js). When both fail the popup offers to
 // ask Chrome for access to the picture's site (needs the click's user gesture) and tries again.
-import { fit, LOOK, LOOK_MIN, LOOK_QUALITY, MAX, QUALITY } from "@/core/photos";
+import { LOOK_QUALITY, lookSize, QUALITY, storedSize } from "@/core/photos";
 import { C } from "@/core/theme";
 import { pictureViaServer } from "./clip";
 
@@ -43,25 +43,18 @@ async function bytes(src: string): Promise<Blob> {
   }
 }
 
-/** The picture drawn at `w` x `h` on a canvas of at least `minW` x `minH` (centred), as a JPEG. Transparency becomes the
- *  palette's light foreground: a web page's transparent picture is drawn for a light page. */
-function jpeg(img: HTMLImageElement, w: number, h: number, quality: number, minW = 0, minH = 0): Promise<Blob> {
+/** The picture drawn at `width` x `height` on a canvas of that size, as a JPEG. Transparency becomes the palette's light
+ *  foreground: a web page's transparent picture is drawn for a light page. */
+function jpeg(img: HTMLImageElement, { width, height }: { width: number; height: number }, quality: number): Promise<Blob> {
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(w, minW);
-  canvas.height = Math.max(h, minH);
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new PictureError("This picture can't be read.");
   ctx.fillStyle = C.fg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, Math.round((canvas.width - w) / 2), Math.round((canvas.height - h) / 2), w, h);
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
   return new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new PictureError("This picture can't be read."))), "image/jpeg", quality));
-}
-
-/** `w` x `h` scaled so the long edge is at most `max`. */
-function scaled(w: number, h: number, max: number): [number, number] {
-  const s = fit(w, h, max);
-  if (!s) return [w, h];
-  return "width" in s ? [max, Math.max(1, Math.round((h * max) / w))] : [Math.max(1, Math.round((w * max) / h)), max];
 }
 
 const base64 = (b: Blob) => new Promise<string>((ok, fail) => {
@@ -80,8 +73,8 @@ export async function picture(src: string): Promise<Picture> {
     await img.decode().catch(() => { throw new PictureError("This picture can't be read."); });
     const w = img.naturalWidth, h = img.naturalHeight;
     if (!w || !h) throw new PictureError("This picture can't be read.");
-    const stored = await jpeg(img, ...scaled(w, h, MAX), QUALITY);
-    const look = await base64(await jpeg(img, ...scaled(w, h, LOOK), LOOK_QUALITY, LOOK_MIN, LOOK_MIN));
+    const stored = await jpeg(img, storedSize(w, h), QUALITY);
+    const look = await base64(await jpeg(img, lookSize(w, h), LOOK_QUALITY));
     return { stored, look, preview: URL.createObjectURL(stored) };
   } finally {
     URL.revokeObjectURL(url);

@@ -1,6 +1,6 @@
 // A picture's bytes as the server takes them: what is stored (long edge 1600, JPEG 0.82) and what
 // JEV looks at when it suggests where a clip goes (core/photos.ts `lookSize`, base64 JPEG).
-import { fit, LOOK_QUALITY, lookSize, MAX, QUALITY } from "@/core/photos";
+import { LOOK_QUALITY, lookSize, QUALITY, storedSize } from "@/core/photos";
 
 async function jpeg(file: Blob, size: (w: number, h: number) => { width: number; height: number }, quality: number): Promise<Blob> {
   const bmp = await createImageBitmap(file);
@@ -12,8 +12,7 @@ async function jpeg(file: Blob, size: (w: number, h: number) => { width: number;
 }
 
 /** The picture as a note stores it. */
-export const downscale = (file: Blob): Promise<Blob> =>
-  jpeg(file, (w, h) => { const k = fit(w, h) ? MAX / Math.max(w, h) : 1; return { width: Math.round(w * k), height: Math.round(h * k) }; }, QUALITY);
+export const downscale = (file: Blob): Promise<Blob> => jpeg(file, storedSize, QUALITY);
 
 /** The picture as JEV looks at it, base64 without the data-URL prefix. */
 export async function look(file: Blob): Promise<string> {
