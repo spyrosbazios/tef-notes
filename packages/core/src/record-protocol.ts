@@ -42,21 +42,41 @@ async function orGone<T>(run: () => Promise<T>): Promise<T | null> {
 }
 const PAGE = 500;
 
+/** Every record of `records` a `filter` picks, PAGE at a time by id (`id > last`, sorted by id), with `fields` (which must
+ *  name `id`). Keyset, not offsets: a record made or deleted between two pages moves no other one out of the listing, which a
+ *  pull would read as deleted. */
+async function every(s: RecordTransport, records: string, o: { fields?: string; filter?: string } = {}): Promise<any[]> {
+  const out: any[] = [];
+  for (let last: string | null = null; ;) {
+    const filter = [o.filter ? `(${o.filter})` : "", last == null ? "" : `id > ${lit(last)}`].filter(Boolean).join(" && ");
+    const j = await call(s, `${records}?${o.fields ? `fields=${o.fields}&` : ""}sort=id&perPage=${PAGE}&skipTotal=1${filter ? `&filter=${encodeURIComponent(filter)}` : ""}`);
+    out.push(...j.items);
+    if (j.items.length < PAGE) return out;
+    last = String(j.items[j.items.length - 1].id);
+  }
+}
+
+/** `rows` in a PocketBase `sort` order (`order`, `-done,created`), ties by id: a keyset listing comes by id, and is put in the
+ *  order asked for here. */
+function sorted(rows: any[], sort: string): any[] {
+  const keys = sort.split(",").map((k) => k.trim()).filter(Boolean).map((k) => (k.startsWith("-") ? [k.slice(1), -1] as const : [k.replace(/^\+/, ""), 1] as const));
+  const cmp = (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...rows].sort((x, y) => {
+    for (const [k, d] of keys) { const c = cmp(x[k], y[k]); if (c) return c * d; }
+    return cmp(x.id, y.id);
+  });
+}
+
 /** A note reader may retain client-specific fields. Filtering the sync listing is a client policy. */
-export function noteCollection<T>(s: RecordTransport, of: (r: any) => T, options: { fields?: string; filter?: string; sort?: string } = {}) {
+export function noteCollection<T>(s: RecordTransport, of: (r: any) => T, options: { fields?: string; filter?: string } = {}) {
   const records = "collections/notes/records";
   const fields = options.fields ? `fields=${options.fields}&` : "";
   const at = (id: string) => `${records}/${id}${options.fields ? `?fields=${options.fields}` : ""}`;
   return {
+    /** Every note's record, path, rev and kind, by record id. */
     async list(): Promise<Listed[]> {
-      const out: Listed[] = [];
-      const filter = options.filter ? `&filter=${encodeURIComponent(options.filter)}` : "";
-      const sort = options.sort ? `&sort=${encodeURIComponent(options.sort)}` : "";
-      for (let page = 1; ; page++) {
-        const j = await call(s, `${records}?fields=id,path,rev,kind&perPage=${PAGE}&page=${page}&skipTotal=1${sort}${filter}`);
-        out.push(...j.items.map((r: any) => ({ rec: r.id, path: r.path, rev: r.rev, kind: noteKindOf(r.kind) })));
-        if (j.items.length < PAGE) return out;
-      }
+      return (await every(s, records, { fields: "id,path,rev,kind", filter: options.filter }))
+        .map((r: any) => ({ rec: r.id, path: r.path, rev: r.rev, kind: noteKindOf(r.kind) }));
     },
     get: (id: string) => orGone(async () => of(await call(s, at(id)))),
     async read(path: string, timeout?: number): Promise<T | null> {
@@ -79,21 +99,13 @@ const ID_BATCH = 40;
 export function revCollection<T extends { id: string }>(name: string, of: (r: any) => T) {
   const rec = (r: any): Versioned<T> => ({ ...of(r), rev: r.rev });
   const records = `collections/${name}/records`;
-  const paged = async (s: RecordTransport, q: string): Promise<any[]> => {
-    const out: any[] = [];
-    for (let page = 1; ; page++) {
-      const j = await call(s, `${records}?${q}&perPage=${PAGE}&page=${page}&skipTotal=1`);
-      out.push(...j.items);
-      if (j.items.length < PAGE) return out;
-    }
-  };
   return {
     rec,
     /** Every record's id and rev, nothing else. */
-    revs: async (s: RecordTransport): Promise<RevEntry[]> => (await paged(s, "fields=id,rev&sort=id")).map((r) => ({ id: r.id, rev: r.rev })),
+    revs: async (s: RecordTransport): Promise<RevEntry[]> => (await every(s, records, { fields: "id,rev" })).map((r) => ({ id: r.id, rev: r.rev })),
     /** Every record, or those a PocketBase `filter` picks (build literals with lit), in `sort` order (`order`, `-done`). */
     list: async (s: RecordTransport, o: { filter?: string; sort?: string } = {}): Promise<Versioned<T>[]> =>
-      (await paged(s, [o.filter ? `filter=${encodeURIComponent(o.filter)}` : "", `sort=${encodeURIComponent(o.sort ?? "order")}`].filter(Boolean).join("&"))).map(rec),
+      sorted(await every(s, records, { filter: o.filter }), o.sort ?? "order").map(rec),
     /** One record; null when there's none. */
     async get(s: RecordTransport, id: string): Promise<Versioned<T> | null> {
       return orGone(async () => rec(await call(s, `${records}/${id}`)));
@@ -133,21 +145,12 @@ export const links = {
   /** Every link, or those a PocketBase `filter` picks (linkFilter builds one end's), oldest first. A record that isn't a
    *  link (a column set it doesn't know) is left out. */
   async list(s: RecordTransport, filter?: string): Promise<Link[]> {
-    const out: Link[] = [], f = filter ? `&filter=${encodeURIComponent(filter)}` : "";
-    for (let page = 1; ; page++) {
-      const j = await call(s, `collections/links/records?fields=${LINK_FIELDS}&sort=created,id&perPage=${PAGE}&page=${page}&skipTotal=1${f}`);
-      for (const r of j.items) { const l = linkOf(r); if (l) out.push(l); }
-      if (j.items.length < PAGE) return out;
-    }
+    const rows = sorted(await every(s, "collections/links/records", { fields: `${LINK_FIELDS},created`, filter }), "created");
+    return rows.flatMap((r) => { const l = linkOf(r); return l ? [l] : []; });
   },
   /** Every link's id: what a pull compares a phone's set against (an id never changes what it points at). */
   async ids(s: RecordTransport): Promise<string[]> {
-    const out: string[] = [];
-    for (let page = 1; ; page++) {
-      const j = await call(s, `collections/links/records?fields=id&sort=id&perPage=${PAGE}&page=${page}&skipTotal=1`);
-      out.push(...j.items.map((r: any) => String(r.id)));
-      if (j.items.length < PAGE) return out;
-    }
+    return (await every(s, "collections/links/records", { fields: "id" })).map((r) => String(r.id));
   },
   /** The links with `end` at either side: a note's, both what it points at and what points at it (its backlinks). */
   of: (s: RecordTransport, end: LinkEnd) => links.list(s, `${linkFilter("from", end)} || ${linkFilter("to", end)}`),

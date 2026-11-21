@@ -24,6 +24,8 @@ version is one semver number for the whole repository, set by the git tag (see [
   retried every 30 seconds forever. A link to something deleted is dropped; anything else the server refused is listed in
   Settings > Server & sync, to try again or let go, and the sync notice says so. A sync that fails is retried after 5
   seconds, then less and less often, up to every 5 minutes.
+- A note, task or link made or deleted on another device while a sync was listing a large notebook could be dropped from
+  this one until the next sync: listings now page by record id.
 
 ## 0.13.0 - 2026-11-19
 

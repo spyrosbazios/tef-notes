@@ -64,6 +64,15 @@ for (const collection of ["notes", "tasks"] as const) {
   });
 }
 
+test("keyset paging's filter: `id > last` sorted by id, beside a listing's own filter", async () => {
+  const [a, b] = [await task(), await task()];
+  const after = (last: string) => pb.call(s, `collections/tasks/records?fields=id&sort=id&perPage=500&skipTotal=1&filter=${encodeURIComponent(`(rev >= 1) && id > ${pb.lit(last)}`)}`);
+  const ids = (await after(a.id)).items.map((r: { id: string }) => r.id);
+  expect(ids).toContain(b.id);
+  expect(ids).not.toContain(a.id);
+  expect(ids).toEqual([...ids].sort());
+});
+
 test("noteColumns survive HTTP create/update; path and kind are immutable", async () => {
   const path = `notes/${id()}.md`;
   const text = '---\ntitle: "Δοκιμή"\ncreated: 2026-11-14\npinned: true\narchived: true\ncolor: blue\ntags: [work, home]\n---\nBody\n';

@@ -62,7 +62,7 @@ const transport = (s: Server): RecordTransport => ({
   answer: (e) => e instanceof HttpError ? { status: e.status, body: e.body } : undefined,
 });
 const remote = (r: any): Remote => ({ rec: r.id, path: r.path, rev: r.rev, text: r.text, kind: noteKindOf(r.kind) });
-const notes = (s: Server) => noteCollection(transport(s), remote, { sort: "path" });
+const notes = (s: Server) => noteCollection(transport(s), remote);
 export const list = (s: Server): Promise<Listed[]> => notes(s).list();
 export const get = (s: Server, rec: string): Promise<Remote | null> => notes(s).get(rec);
 export const read = (s: Server, path: string): Promise<Remote | null> => notes(s).read(path);

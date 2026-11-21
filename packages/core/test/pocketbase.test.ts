@@ -61,7 +61,7 @@ describe("pocketbase", () => {
 
   it("lists every page of path, rev and kind, no text", async () => {
     const page = (n: number, from: number) => ({ items: Array.from({ length: n }, (_, i) => ({ id: `r${from + i}`, path: `notes/${from + i}.md`, rev: 1, kind: from + i === 501 ? "capture" : "note" })) });
-    const f = mock(async (url: string) => new Response(JSON.stringify(url.includes("page=1&") ? page(500, 0) : page(3, 500))));
+    const f = mock(async (url: string) => new Response(JSON.stringify(url.includes("filter=") ? page(3, 500) : page(500, 0))));
     stubFetch(f);
     const all = await list(S);
     expect(all).toHaveLength(503);
