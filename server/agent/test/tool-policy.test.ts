@@ -1,12 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
-import { Notes } from "../src/notes";
-import { Todo } from "../src/todo";
-import { tools, toolPolicies, policyFor } from "../src/tools";
-import { fromWeb } from "../src/tools";
+import { NoteService } from "../src/application/notes";
+import { TaskService } from "../src/application/todo";
+import { fromWeb, MODULES, tools, toolPolicies, policyFor } from "../src/tools";
 import { stepTools } from "../src/loop";
+import { offeredTo, outOfScope, type Scope } from "../src/note-action";
 import { allowed, policyApprovals, type Policy, type PolicyContext } from "../src/tool-policy";
-import { ACTIONS, DEFAULT_ACTIONS, RULES, type Actions } from "@/core/actions";
+import { ACTIONS, DEFAULT_ACTIONS, isAction, RULES, type Actions } from "@/core/actions";
+import type { Result } from "@/core/note-actions";
 
 const names = (match: (name: string) => boolean) => Object.keys(toolPolicies()).filter(match).sort();
 const result = (toolName: string, value: string): ModelMessage[] => [{
@@ -17,8 +18,38 @@ describe("colocated tool policies", () => {
   it("classifies every assembled tool exactly once", () => {
     // Constructing tools must not fetch anything; no live server or secrets are needed.
     const server = { url: "http://unused.invalid" };
-    expect(Object.keys(toolPolicies()).sort()).toEqual(Object.keys(tools(new Notes(server), new Todo(server))).sort());
+    expect(Object.keys(toolPolicies()).sort()).toEqual(Object.keys(tools(new NoteService(server), new TaskService(server))).sort());
     expect(policyFor("old_removed_tool")).toBeUndefined();
+  });
+
+  it("registers each tool in one module only, every write under one of core's actions", () => {
+    const deps = { notes: new NoteService({ url: "http://unused.invalid" }), todo: new TaskService({ url: "http://unused.invalid" }), fromPage: async () => false, files: [] };
+    const each = MODULES.flatMap((m) => Object.keys(m.tools(deps)));
+    expect(each.length).toBe(new Set(each).size);
+    for (const m of MODULES) expect(Object.keys(m.policies).sort()).toEqual(Object.keys(m.tools(deps)).sort());
+    for (const [name, p] of Object.entries(toolPolicies() as Record<string, Policy>)) {
+      if (p.approval !== "none") expect([name, isAction(p.approval)]).toEqual([name, true]);
+    }
+  });
+
+  it("offers Talk all but what needs a screen, a selection or a chat's file", () => {
+    expect(names((n) => policyFor(n)?.unavailableInTalk === true))
+      .toEqual(["attach_file", "diagram_guide", "draw", "insert_after_selection", "read_drawing", "replace_selection", "save_drawing", "show_drawing"]);
+  });
+
+  it("offers a note action's run only the tools its result needs, and narrows its writes to its note", () => {
+    const scope = (result: Result): Scope => ({ action: { id: "a", label: "A", icon: "sparkles", prompt: "p", result }, note: "notes/a.md" });
+    const offered = (result: Result) => names((n) => offeredTo(scope(result), policyFor(n)));
+    const reads = ["list_notes", "list_tags", "read_attachment", "read_drawing", "read_image", "read_note", "search_notes"];
+    expect(offered("edit")).toEqual([...reads, "append_to_note", "rewrite_note"].sort());
+    expect(offered("task")).toEqual([...reads, "add_task", "find_place", "list_tagged", "list_tasks", "set_place"].sort());
+    expect(offered("answer")).toEqual([...reads, "list_tagged", "list_tasks"].sort());
+    const edit = scope("edit");
+    expect(outOfScope(edit, policyFor("rewrite_note"), { path: "notes/b.md" })).toContain("no other note");
+    expect(outOfScope(edit, policyFor("append_to_note"), { path: "notes/a.md" })).toBeNull();
+    expect(outOfScope(edit, policyFor("add_task"), { title: "x" })).toContain("notes/a.md");
+    expect(outOfScope(edit, policyFor("add_task"), { title: "x", link: ["notes/a.md"] })).toBeNull();
+    expect(outOfScope(edit, policyFor("read_note"), { path: "notes/b.md" })).toBeNull();
   });
 
   it("preserves which results taint directly and which follow record provenance", () => {

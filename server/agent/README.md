@@ -1,5 +1,7 @@
 # TEF Notes chat agent
 
+<!-- reviewed: 2026-11-21 -->
+
 A small bun server that runs the chat agent: it streams an AI SDK UI message stream (`useChat` with
 `DefaultChatTransport`) and edits notes and tasks through PocketBase's API, every write a `rev`
 compare-and-swap. It is a sidecar because PocketBase's JS hooks cannot stream a response. Its design (tools, memory,
@@ -47,9 +49,11 @@ keeps these services independent of assistant modules and card builders.
 
 ## Tool policies
 
-Each tool-definition module also declares a typed policy table: approval mode and validator, whether its result
-contains external text or record references, whether taint withdraws it, and whether it requires Exa. Adding a tool
-requires a policy entry (`Policies<T>` in `src/tool-policy.ts`). `src/tools.ts` assembles the tables; `src/turn.ts`
+Each tool module is its tools and a typed policy for each (`toolModule` in `src/tool-policy.ts`): approval mode, the
+core action it falls under and its validator (a call the validator fails is refused with the reason, never waved past
+its card), whether its result contains external text or record references, whether taint withdraws it, whether it
+requires Exa, whether Talk leaves it out, and which note action runs it is offered to (and their scope). A tool without
+a policy does not compile. `src/tools.ts` `MODULES` registers the modules, the only list; `src/turn.ts`
 derives approval callbacks and availability from them. The pure guard and loop utilities receive policy lookup as an
 argument, so they do not import the tool registry. Tests cover completeness and the existing approval/taint behavior.
 

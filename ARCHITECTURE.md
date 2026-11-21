@@ -189,8 +189,8 @@ the agent writes it the same way). Links are outside it (above).
 - The prompt, the notes context, the memory, the owner's rules and the model's timeout are in `src/turn.ts`, one turn of the
   agent that the chat (`src/agent.ts`, which also saves the chat) and Talk share. Its tools work on PocketBase through
   the same `rev` compare-and-swap. `src/application/notes.ts` and `todo.ts` own persistence, revision retries, merges,
-  links and recurrence, returning domain records/text. `src/notes.ts` and `todo.ts` are assistant card adapters;
-  `src/tools.ts` and `todoTools.ts` expose them as tools. Companion routes, direct search and index warming use the
+  links and recurrence, returning domain records/text. The tool modules (`src/notes.ts`, `todoTools.ts`, …) expose them as tools
+  and add the assistant's cards. Companion routes, direct search and index warming use the
   application services directly. Import boundaries are checked by `scripts/check-boundaries.ts` in CI.
 - `search_notes` finds a note by its words and by meaning (`src/semantic.ts`): a small multilingual embedding model
   (bekko-embedding-v1-a8m, MIT) runs in the agent on the CPU, so a Greek question finds an English note; no key, nothing
@@ -213,7 +213,9 @@ the agent writes it the same way). Links are outside it (above).
   what it found in front of you. Card shapes (`NoteCard`, `TaskCard`) and builders are in
   `packages/core/src/agent.ts`.
 - Tool policy lives beside each tool-definition module in typed tables (`src/tool-policy.ts`): approval and validation,
-  result provenance, availability after taint, and the Exa requirement. `src/tools.ts` assembles them; the agent derives
+  result provenance, availability after taint, the Exa requirement, whether Talk is offered it and which note action
+  runs are (and the run's scope). A module is its tools and their policies (`toolModule`), and `src/tools.ts` registers
+  the modules once; the agent derives
   approvals from them and supplies policy lookup to the pure guard and loop utilities.
 - Web-taint guard: once a chat has read the web (a search result, a fetched page, or a note marked `tainted`), the
   next write asks first even with cards off, and what it writes is marked `tainted`. See `src/guard.ts`. The owner can turn

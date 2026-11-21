@@ -24,7 +24,7 @@ export function violations(rules: Boundary[], imports: (module: string) => strin
 const root = resolve(import.meta.dir, "..");
 const agent = "server/agent/src/";
 const core = "packages/core/src/";
-const adapters = new Set(["notes", "todo", "tools", "todoTools", "widgetTools", "fileTools", "placeTools", "noteActionTools", "drawings", "agent"].map((name) => `${agent}${name}.ts`));
+const adapters = new Set(["notes", "tools", "tagTools", "webTools", "todoTools", "widgetTools", "fileTools", "placeTools", "noteActionTools", "drawings", "assistant", "agent"].map((name) => `${agent}${name}.ts`));
 const sdk = (name: string) => name === "external:ai" || name.startsWith("external:@ai-sdk/");
 const pure = ["notes", "todo", "sync", "prefs", "prefs-sync", "record-contracts", "record-protocol", "chat-history"];
 

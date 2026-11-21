@@ -1,14 +1,25 @@
-// Policy lives beside each tool factory. These small tables describe guard/approval behavior; they neither wrap execution nor
-// replace the validators or the rev compare-and-swap. A write's card is the owner's rule for its action (@/core/actions), read
-// from their preferences for every turn: the one path every write's approval takes.
+// Policy lives beside each tool factory: a tool module (`toolModule`) is its tools and a policy for every one of them, and
+// tools.ts registers the modules. These small tables describe guard/approval behavior and where a tool is offered; they
+// neither wrap execution nor replace the validators or the rev compare-and-swap. A write's card is the owner's rule for its
+// action (@/core/actions), read from their preferences for every turn: the one path every write's approval takes.
 import type { ModelMessage, ToolSet } from "ai";
 import type { InferToolInput } from "@ai-sdk/provider-utils";
 import { decide, refused, type Action, type Actions } from "@/core/actions";
 import type { Attached } from "@/core/assistant";
-import type { Notes } from "./notes";
-import type { Todo } from "./todo";
+import { RESULTS, type Result } from "@/core/note-actions";
+import type { NoteService } from "./application/notes";
+import type { TaskService } from "./application/todo";
 
-export type PolicyContext = { notes: Notes; todo: Todo; files: readonly Attached[] };
+/** What a module's tools are built over, for one request: its view of the notes and tasks; `fromPage`, whether a write is
+ *  marked `tainted` (web text in view); `files`, what the owner attached in the chat (attach_file). */
+export type ToolDeps = {
+  notes: NoteService; todo: TaskService; fromPage: (messages: ModelMessage[]) => Promise<boolean>; files: readonly Attached[];
+};
+export type PolicyContext = Pick<ToolDeps, "notes" | "todo" | "files">;
+
+/** A note action's run of any kind (@/core/note-actions): what the reads are offered to. */
+export const EVERY_RUN = RESULTS;
+
 export type Policy<I = never> = {
   /** none: reads and the client's own edits, never a card. An action: the owner's rule for it decides (decide, @/core/actions). */
   approval: "none" | Action;
@@ -19,10 +30,21 @@ export type Policy<I = never> = {
   taints?: (output: unknown) => boolean;
   unavailableWhenTainted?: true;
   requiresExa?: true;
+  /** Left out of Talk, the spoken conversation (turn.ts): it needs what Talk hasn't, the screen's canvas, a selection made
+   *  with the mouse, or a file attached to a chat message. */
+  unavailableInTalk?: true;
+  /** Offered to a note action's run whose action ends in one of `results` (note-action.ts); absent, never. `scope`: why a call
+   *  falls outside the run on `note` (refused before it can ask), or null. */
+  run?: { results: readonly Result[]; scope?: (note: string, input: I) => string | null };
   check?: (context: PolicyContext, input: I) => string | null | Promise<string | null>;
 };
 export type PolicyLookup = (name: string) => Policy | undefined;
 export type Policies<T extends ToolSet> = { [K in keyof T]: Policy<InferToolInput<T[K]>> };
+
+/** A tool module: its tools for a request, and a policy for each of them. A tool without one, or a policy without its tool,
+ *  doesn't compile. */
+export type ToolModule<T extends ToolSet> = { tools: (deps: ToolDeps) => T; policies: Policies<T> };
+export const toolModule = <T extends ToolSet>(tools: (deps: ToolDeps) => T, policies: NoInfer<Policies<T>>): ToolModule<T> => ({ tools, policies });
 
 type Options = { messages: ModelMessage[] };
 type Status = "not-applicable" | "user-approval" | { type: "denied"; reason: string };

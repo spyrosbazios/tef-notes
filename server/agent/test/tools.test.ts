@@ -6,14 +6,15 @@ import { DEFAULT_ACTIONS, type Actions } from "@/core/actions";
 import { cardsOf } from "@/core/agent";
 import { parseNote } from "@/core/notes";
 import { approvals, guarded } from "../src/turn";
-import { Notes } from "../src/notes";
+import { NoteService } from "../src/application/notes";
 import { newTask, type Task } from "@/core/todo";
 import { localDay } from "@/core/time";
 import { linkRecord, newLink } from "@/core/record-links";
-import { Todo } from "../src/todo";
+import { TaskService } from "../src/application/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";
 import { stepTools } from "../src/loop";
-import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, policyFor, readWeb, tools, type Line } from "../src/tools";
+import { ago, appended, checkWrite, indexLine, noteIndex, NOTE_RE, READ_RE, type Line } from "../src/notes";
+import { policyFor, readWeb, tools } from "../src/tools";
 import { fakePb } from "./fake-pb";
 
 /** The owner's rules as the old switch left them (pb_migrations/1795000000_agent_actions.js): off is the defaults; on, the
@@ -24,12 +25,12 @@ const UNASKED: Actions = { ...DEFAULT_ACTIONS, createTask: "auto", editTask: "au
 const pb = fakePb();
 afterAll(() => pb.stop());
 
-let notes: Notes, todo: Todo, T: ReturnType<typeof tools>;
+let notes: NoteService, todo: TaskService, T: ReturnType<typeof tools>;
 beforeEach(() => {
   pb.notes.clear(); pb.chats.clear(); pb.tasks.clear(); pb.links.clear(); pb.created.length = 0; pb.meanwhile();
   pb.lenses.length = 0; pb.tags.splice(0, pb.tags.length, { id: "t1", name: "Σπίτι", description: "" }, { id: "t2", name: "work", description: "" });
-  notes = new Notes({ url: pb.url });
-  todo = new Todo({ url: pb.url });
+  notes = new NoteService({ url: pb.url });
+  todo = new TaskService({ url: pb.url });
   T = tools(notes, todo);
 });
 

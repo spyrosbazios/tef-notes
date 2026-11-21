@@ -8,7 +8,7 @@ import { z } from "zod";
 import { ACTION_ICONS, LIMITS, newActionId, promptProblem, RESULTS, type PromptAction } from "@/core/note-actions";
 import type { Server } from "@/core/pocketbase";
 import { ownerPrefs, patchOwnerPrefs } from "./prefs";
-import type { Policies } from "./tool-policy";
+import { toolModule } from "./tool-policy";
 
 export type SaveInput = { id?: string; label: string; prompt: string; result: PromptAction["result"]; icon?: PromptAction["icon"] };
 
@@ -30,49 +30,46 @@ export async function saveProblem(server: Server, i: SaveInput): Promise<string 
 /** A save the newest record refuses: another device changed the actions between the card and the write. */
 class Refused extends Error {}
 
-export function noteActionTools(server: Server) {
-  return {
-    list_note_actions: tool({
-      description: "The owner's note actions: the buttons on a note that run a saved prompt on it (Settings → Notes). Each has an id, a name, its prompt and what it does.",
-      inputSchema: z.object({}),
-      execute: async () => ({ actions: (await ownerPrefs(server)).prefs.noteActions }),
-    }),
+export const noteActionModule = toolModule(({ notes: { server } }) => ({
+  list_note_actions: tool({
+    description: "The owner's note actions: the buttons on a note that run a saved prompt on it (Settings → Notes). Each has an id, a name, its prompt and what it does.",
+    inputSchema: z.object({}),
+    execute: async () => ({ actions: (await ownerPrefs(server)).prefs.noteActions }),
+  }),
 
-    save_note_action: tool({
-      description: "Save a note action: a button on every note that runs this prompt on the open note. Only when the owner asks for such a button or shortcut; list_note_actions first. Without `id` it adds one, with an `id` it changes that one. The owner sees it and must confirm.",
-      inputSchema: z.object({
-        id: z.string().optional().describe("An existing action's id, to change it; omit to add a new one"),
-        label: z.string().trim().min(1).max(LIMITS.label).describe("The button's name, two or three words: \"Summarise\", \"Checklist it\""),
-        prompt: z.string().trim().min(1).max(LIMITS.prompt).describe("The instruction run on the open note, written to the assistant and about \"this note\", with the limits the owner gave (\"invent nothing\")"),
-        result: z.enum(RESULTS).describe("What it does: edit rewrites this note (shown as a diff first), task makes a task from it, answer only replies"),
-        icon: z.enum(ACTION_ICONS).optional().describe("The button's icon"),
-      }),
-      execute: async (i) => {
-        // Over the newest record, and redone over a newer one when another device saved meanwhile: the list is read and checked each time
-        let saved = undefined as { action: PromptAction; changed: boolean } | undefined;
-        try {
-          await patchOwnerPrefs(server, ({ noteActions: all }) => {
-            const bad = problem(i, all);
-            if (bad) throw new Refused(bad);
-            const old = all.find((a) => a.id === i.id);
-            const action: PromptAction = {
-              id: old?.id ?? newActionId(i.label, all.map((a) => a.id)), label: i.label, prompt: i.prompt, result: i.result, icon: i.icon ?? old?.icon ?? "sparkles",
-            };
-            saved = { action, changed: !!old };
-            return { noteActions: old ? all.map((a) => (a === old ? action : a)) : [...all, action] };
-          });
-        } catch (e) {
-          if (e instanceof Refused) return { error: e.message };
-          throw e;
-        }
-        if (!saved) return { error: "Nothing was saved." };
-        return { saved: saved.action, where: saved.changed ? "Changed where it already sits." : "It is in every note's menu now. The owner pins it to the header from that menu or in Settings → Notes." };
-      },
+  save_note_action: tool({
+    description: "Save a note action: a button on every note that runs this prompt on the open note. Only when the owner asks for such a button or shortcut; list_note_actions first. Without `id` it adds one, with an `id` it changes that one. The owner sees it and must confirm.",
+    inputSchema: z.object({
+      id: z.string().optional().describe("An existing action's id, to change it; omit to add a new one"),
+      label: z.string().trim().min(1).max(LIMITS.label).describe("The button's name, two or three words: \"Summarise\", \"Checklist it\""),
+      prompt: z.string().trim().min(1).max(LIMITS.prompt).describe("The instruction run on the open note, written to the assistant and about \"this note\", with the limits the owner gave (\"invent nothing\")"),
+      result: z.enum(RESULTS).describe("What it does: edit rewrites this note (shown as a diff first), task makes a task from it, answer only replies"),
+      icon: z.enum(ACTION_ICONS).optional().describe("The button's icon"),
     }),
-  };
-}
-
-export const noteActionPolicies = {
+    execute: async (i) => {
+      // Over the newest record, and redone over a newer one when another device saved meanwhile: the list is read and checked each time
+      let saved = undefined as { action: PromptAction; changed: boolean } | undefined;
+      try {
+        await patchOwnerPrefs(server, ({ noteActions: all }) => {
+          const bad = problem(i, all);
+          if (bad) throw new Refused(bad);
+          const old = all.find((a) => a.id === i.id);
+          const action: PromptAction = {
+            id: old?.id ?? newActionId(i.label, all.map((a) => a.id)), label: i.label, prompt: i.prompt, result: i.result, icon: i.icon ?? old?.icon ?? "sparkles",
+          };
+          saved = { action, changed: !!old };
+          return { noteActions: old ? all.map((a) => (a === old ? action : a)) : [...all, action] };
+        });
+      } catch (e) {
+        if (e instanceof Refused) return { error: e.message };
+        throw e;
+      }
+      if (!saved) return { error: "Nothing was saved." };
+      return { saved: saved.action, where: saved.changed ? "Changed where it already sits." : "It is in every note's menu now. The owner pins it to the header from that menu or in Settings → Notes." };
+    },
+  }),
+}), {
   list_note_actions: { approval: "none", result: "plain" },
   save_note_action: { approval: "noteActions", result: "plain", unavailableWhenTainted: true, check: ({ notes }, i) => saveProblem(notes.server, i) },
-} satisfies Policies<ReturnType<typeof noteActionTools>>;
+});
+
