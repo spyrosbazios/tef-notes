@@ -17,7 +17,8 @@
 // Routes, all under /agent/companion (server/agent/src/companion.ts), errors `{error}`:
 //   GET  hello                 -> Hello: is this a TEF Notes server, at which contract, in which colours
 //   GET  tasks?list=           -> TasksFeed: one of the task lists (TASK_LISTS), under the lens on
-//   POST tasks  {title, list?} -> {id}: a new open task (in `today`: planned for today), tagged as the lens tags one
+//   POST tasks  {id, title, list?} -> {id}: a new open task under the companion's own `id` (a record id's shape, made once and
+//        kept for every send of it: a repeat is the same task, never a second); in `today`: planned for today; tagged as the lens tags one
 //   POST tasks/:id/done        -> {ok: true}: ticked, a repeating one rolled over (404 when it is gone)
 //   GET  notes                 -> NotesFeed: the pinned notes, then the latest, under the lens on
 //   POST lens   {lens}         -> {ok: true}: that lens on for every screen of the owner's, "" for none (404 when it is gone)
@@ -35,7 +36,7 @@ import { progress } from "./things";
 import { views, type Task } from "./todo";
 
 /** Raised when a route's answer changes shape. A companion built for another number says so instead of drawing it wrong. */
-export const COMPANION_CONTRACT = 3;
+export const COMPANION_CONTRACT = 4;
 
 /** The app's name in `Hello`: what tells a companion the address it was given is a TEF Notes server. */
 export const COMPANION_APP = "tefnotes";
@@ -146,16 +147,18 @@ export function tasksFeed(tasks: readonly Task[], list: TaskList, today: string,
   return { contract: COMPANION_CONTRACT, list, title: heading(TASK_LIST_LABEL[list], lens), url: listUrl(list), sections, more, look, ...switchesOf(lenses, lens) };
 }
 
-/** A new task from a companion: its title, and the list it was added from (`today` plans it for today). */
-export type NewTask = { title: string; list: TaskList };
+/** A new task from a companion: the `id` it made for it (15 of a-z0-9, kept across re-sends), its title, and the list it was
+ *  added from (`today` plans it for today). */
+export type NewTask = { id: string; title: string; list: TaskList };
 
 export const TASK_TITLE_MAX = 500;
 
-/** The body of `POST tasks`, read defensively; null without a title. */
+/** The body of `POST tasks`, read defensively; null without a title or a record id's worth of `id`. */
 export function newTaskOf(raw: unknown): NewTask | null {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const title = typeof r.title === "string" ? r.title.replace(/\s+/g, " ").trim().slice(0, TASK_TITLE_MAX) : "";
-  return title ? { title, list: r.list === "today" ? "today" : "inbox" } : null;
+  const id = typeof r.id === "string" && /^[a-z0-9]{15}$/.test(r.id) ? r.id : "";
+  return title && id ? { id, title, list: r.list === "today" ? "today" : "inbox" } : null;
 }
 
 // ---- notes

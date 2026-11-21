@@ -31,7 +31,7 @@ class OutboxTest {
 
     @Test
     fun aTaskWaitsThenIsSentOnceAndLeavesNothingBehind() {
-        Outbox.addTask(context, "Buy milk", "inbox")
+        Outbox.addTask(context, newId(), "Buy milk", "inbox")
         assertEquals(listOf("Buy milk" to null), Outbox.list(context).map { it.what to it.refused })
 
         send()
@@ -81,7 +81,7 @@ class OutboxTest {
 
     @Test
     fun whatWaitsIsSentOldestFirst() {
-        for (t in listOf("a", "b", "c")) Outbox.addTask(context, t, "inbox")
+        for (t in listOf("a", "b", "c")) Outbox.addTask(context, newId(), t, "inbox")
         val byTitle = Outbox.list(context).associateBy { it.what }
         byTitle.getValue("a").file.setLastModified(3_000)
         byTitle.getValue("b").file.setLastModified(1_000)
@@ -95,8 +95,8 @@ class OutboxTest {
     @Test
     fun oneRefusedForGoodStaysMarkedWithWhyAndIsPassedOver() {
         server.answer = { if (JSONObject(it.text).getString("title") == "bad") 400 to """{"error":"No such list."}""" else 200 to "{}" }
-        Outbox.addTask(context, "bad", "nowhere")
-        Outbox.addTask(context, "good", "inbox")
+        Outbox.addTask(context, newId(), "bad", "nowhere")
+        Outbox.addTask(context, newId(), "good", "inbox")
         Outbox.list(context).single { it.what == "bad" }.file.setLastModified(1_000)
         Outbox.list(context).single { it.what == "good" }.file.setLastModified(2_000)
 
@@ -112,7 +112,7 @@ class OutboxTest {
     @Test
     fun aRefusalWithoutAnErrorKeyIsWordedByItsStatus() {
         server.answer = { 404 to "<html>nothing here</html>" }
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
         send()
         assertEquals("The server answered 404", Outbox.list(context).single().refused)
     }
@@ -136,8 +136,8 @@ class OutboxTest {
     fun aRefusalThatMayChangeStopsTheRunAndMarksNothing() {
         var status = 503
         server.answer = { status to """{"error":"restarting"}""" }
-        Outbox.addTask(context, "first", "inbox")
-        Outbox.addTask(context, "second", "inbox")
+        Outbox.addTask(context, newId(), "first", "inbox")
+        Outbox.addTask(context, newId(), "second", "inbox")
         Outbox.list(context).single { it.what == "first" }.file.setLastModified(1_000)
         Outbox.list(context).single { it.what == "second" }.file.setLastModified(2_000)
 
@@ -155,7 +155,7 @@ class OutboxTest {
 
     @Test
     fun aServerOutOfReachLeavesEverythingWaiting() {
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
         Outbox.addClip(context, JSONObject().put("title", "c"), emptyList(), "c")
         server.close()
 
@@ -180,7 +180,7 @@ class OutboxTest {
         outbox.mkdirs()
         File(outbox, "1-broken.json").writeText("not json")
         File(outbox, "2-empty.json").writeText("""{"kind":"clip","what":"Half an entry"}""")
-        Outbox.addTask(context, "fine", "inbox")
+        Outbox.addTask(context, newId(), "fine", "inbox")
         File(outbox, "1-broken.json").setLastModified(1_000)
         File(outbox, "2-empty.json").setLastModified(2_000)
         Outbox.list(context).single { it.what == "fine" }.file.setLastModified(3_000)
@@ -196,9 +196,73 @@ class OutboxTest {
         assertFalse(outbox.listFiles()!!.any { it.extension == "json" })
     }
 
+    private fun ids() = server.seen.map { JSONObject(it.text.let { t -> if (t.startsWith("{")) t else t.substringAfter("\r\n\r\n").substringBefore("\r\n--") }).getString("id") }
+
+    @Test
+    fun aTaskIsSentAgainUnderTheSameIdWhenItsAnswerWasLost() {
+        var status = 503
+        server.answer = { status to "{}" }
+        Outbox.addTask(context, "abcdefghij01234", "Buy milk", "inbox")
+
+        assertThrows(Refused::class.java) { send() }
+        status = 200
+        send()
+
+        assertEquals(listOf("abcdefghij01234", "abcdefghij01234"), ids())
+        assertTrue(Outbox.list(context).isEmpty())
+    }
+
+    @Test
+    fun aClipIsSentAgainUnderTheIdItsPayloadCarries() {
+        var status = 503
+        server.answer = { status to "{}" }
+        Outbox.addClip(context, JSONObject().put("id", "clipclipclip001").put("title", "t"), emptyList(), "t")
+
+        assertThrows(Refused::class.java) { send() }
+        status = 200
+        send()
+
+        assertEquals(listOf("clipclipclip001", "clipclipclip001"), ids())
+    }
+
+    @Test
+    fun anEntryWithNoIdIsGivenOneBeforeItsFirstSendAndKeepsIt() {
+        outbox.mkdirs()
+        File(outbox, "1-old.json").writeText("""{"kind":"task","what":"Old","title":"Old","list":"inbox"}""")
+        server.answer = { 503 to "{}" }
+        assertThrows(Refused::class.java) { send() }
+        server.answer = { 200 to "{}" }
+        send()
+
+        val sent = ids()
+        assertEquals(2, sent.size)
+        assertEquals(sent[0], sent[1])
+        assertTrue(Regex("^[a-z0-9]{15}$").matches(sent[0]))
+    }
+
+    @Test
+    fun whatACrashLeftIsSweptAtTheNextSendAndNothingElse() {
+        val old = System.currentTimeMillis() - 10 * 60_000
+        outbox.mkdirs()
+        val loose = listOf("1-aaa.json.part", "1-aaa-1.jpg", "2-bbb-1.pdf").map { File(outbox, it).apply { writeBytes(byteArrayOf(1)); setLastModified(old) } }
+        val fresh = File(outbox, "3-ccc-1.jpg").apply { writeBytes(byteArrayOf(1)) }              // being copied for an entry right now
+        val freshDraft = File(outbox, "3-ccc.json.part").apply { writeText("{") }
+        Outbox.addClip(context, JSONObject().put("title", "kept"), listOf(Part(file("a.jpg", 1), Part.JPEG_TYPE)), "kept")
+        val keptEntry = left().single { it.endsWith(".json") }
+        val keptPart = left().single { it.endsWith("-1.jpg") && it.startsWith(keptEntry.removeSuffix(".json")) }
+        File(outbox, keptPart).setLastModified(old)                                               // old, but its entry is there
+
+        server.answer = { 503 to "{}" }
+        assertThrows(Refused::class.java) { send() }
+
+        assertTrue("old leftovers are gone", loose.none { it.exists() })
+        assertTrue("a recent one may still be being written", fresh.exists() && freshDraft.exists())
+        assertTrue("an entry's own files are kept", File(outbox, keptPart).exists() && File(outbox, keptEntry).exists())
+    }
+
     @Test
     fun anEntryIsWrittenWholeOrNotAtAll() {
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
         server.answer = { 400 to """{"error":"no"}""" }
         send()
         assertEquals("no", Outbox.list(context).single().refused)

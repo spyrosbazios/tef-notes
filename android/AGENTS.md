@@ -64,8 +64,11 @@ it is and how to build it: `README.md`. Root `AGENTS.md` has the server; this fi
   is pending the component stays on and there is no loop.
 - A widget's composition only re-runs when its Glance state changes. Whatever a widget draws must be in that state
   (`Keys`), written with `updateAppWidgetState`; a value read from `Store` alone never redraws it.
-- A sync never runs beside another (the worker's mutex): a clip's save is not idempotent, and two at once would send
-  it twice. A save whose answer was lost, or cut off by the process dying, is still sent again. Retrying is its own
+- Every save and every new task carries an id the app made before its first send (`newId`; a clip's in its payload, a task's
+  beside its title in the outbox entry): the server records what it did under it and answers a repeat as the first, so a send
+  whose answer was lost, or cut off by the process dying, is sent again and lands once. A sync still never runs beside another
+  (the worker's mutex). A crash's loose ends (`*.json.part`, files copied for an entry never written) are swept at the next
+  send (`Outbox.sweep`, only those older than a minute). Retrying is its own
   piece of work (`Sync.again`): a `Result.retry()` on the `sync` chain would hold every later run behind its backoff.
 - Unit tests read JSON with `org.json:json` from Maven; on the device it is the platform's. Code that compiles against
   one may miss in the other (`keySet()` is not in the platform's).

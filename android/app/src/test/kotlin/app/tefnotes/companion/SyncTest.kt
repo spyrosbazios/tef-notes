@@ -47,7 +47,7 @@ class SyncTest {
 
     @Test
     fun ticksGoBeforeTheOutbox() {
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
         Store.addTick(context, "abc")
 
         assertTrue(run())
@@ -60,7 +60,7 @@ class SyncTest {
     fun aTickForATaskThatIsGoneIsDroppedAndTheRunGoesOn() {
         server.answer = { if (it.path.endsWith("/gone/done")) 404 to """{"error":"No such task."}""" else 200 to "{}" }
         Store.addTick(context, "gone")
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
 
         assertTrue(run())
 
@@ -73,7 +73,7 @@ class SyncTest {
     fun aBusyServerStopsTheRunWithTheTickStillWaitingAndTheOutboxUntouched() {
         server.answer = { 503 to """{"error":"busy"}""" }
         Store.addTick(context, "abc")
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
 
         assertFalse(run())
 
@@ -85,7 +85,7 @@ class SyncTest {
     @Test
     fun aServerOutOfReachLeavesEverythingWaiting() {
         Store.addTick(context, "abc")
-        Outbox.addTask(context, "t", "inbox")
+        Outbox.addTask(context, newId(), "t", "inbox")
         server.close()
 
         assertFalse(run())
@@ -96,8 +96,8 @@ class SyncTest {
 
     @Test
     fun aBusyServerMidOutboxLeavesTheRestForTheNextRun() {
-        Outbox.addTask(context, "first", "inbox")
-        Outbox.addTask(context, "second", "inbox")
+        Outbox.addTask(context, newId(), "first", "inbox")
+        Outbox.addTask(context, newId(), "second", "inbox")
         Outbox.list(context).single { it.what == "first" }.file.setLastModified(1_000)
         Outbox.list(context).single { it.what == "second" }.file.setLastModified(2_000)
         server.answer = { if (JSONObject(it.text).getString("title") == "first") 200 to "{}" else 429 to """{"error":"slow down"}""" }
@@ -113,7 +113,7 @@ class SyncTest {
     @Test
     fun anEntryRefusedForGoodDoesNotMakeTheRunFailOrKeepRetrying() {
         server.answer = { 400 to """{"error":"No such list."}""" }
-        Outbox.addTask(context, "t", "nowhere")
+        Outbox.addTask(context, newId(), "t", "nowhere")
 
         assertTrue(run())
 

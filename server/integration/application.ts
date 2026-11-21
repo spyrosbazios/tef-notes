@@ -56,13 +56,17 @@ test("application writes expose domain results and recurrence carries links over
 });
 
 test("companion add and tick execute the application service against real PocketBase", async () => {
-  const request = new Request(`${url}/agent/companion/tasks`, {
-    method: "POST", body: JSON.stringify({ title: "From companion", list: "today" }),
+  const made = pb.recordId();
+  const send = () => addTaskRoute(new Request(`${url}/agent/companion/tasks`, {
+    method: "POST", body: JSON.stringify({ id: made, title: "From companion", list: "today" }),
     headers: { "Content-Type": "application/json" },
-  });
-  const response = await addTaskRoute(request, server);
+  }), server);
+  const response = await send();
   expect(response.status).toBe(200);
   const { id } = await response.json() as { id: string };
+  expect(id).toBe(made);
+  expect((await send()).status).toBe(200);                                    // the same send again: the same task
+  expect((await pb.tasks.list(server, { filter: `title = "From companion"` })).length).toBe(1);
   expect((await pb.tasks.get(server, id))?.title).toBe("From companion");
   expect((await tickRoute(server, id)).status).toBe(200);
   const completed = await pb.tasks.get(server, id);

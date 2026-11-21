@@ -77,8 +77,9 @@ class Api(private val origin: String) {
     suspend fun tasks(list: String): String = text("GET", "/agent/companion/tasks?list=${URLEncoder.encode(list, "UTF-8")}")
     suspend fun notes(): String = text("GET", "/agent/companion/notes")
 
-    suspend fun addTask(title: String, list: String) {
-        json("POST", "/agent/companion/tasks", JSONObject().put("title", title).put("list", list))
+    /** A new task under `id` (newId), made once and kept for every send of it: the server makes it once however often it is sent. */
+    suspend fun addTask(id: String, title: String, list: String) {
+        json("POST", "/agent/companion/tasks", JSONObject().put("id", id).put("title", title).put("list", list))
     }
 
     /** The lens `id` on for every screen of the owner's; "" for none. */
@@ -159,7 +160,9 @@ class Api(private val origin: String) {
 
     private companion object {
         const val CONNECT_MS = 8_000
-        // The suggest step asks a model and a save may tidy a note or write a summary with one.
-        const val READ_MS = 90_000
+        // The suggest step asks a model and a save may tidy a note or write a summary with one: the server gives its calls 75 s
+        // together and writes after them, and the web app and the extension wait 120 s. A save and a task carry an id, so one
+        // sent again after this wait ran out is the same one, not a second.
+        const val READ_MS = 120_000
     }
 }

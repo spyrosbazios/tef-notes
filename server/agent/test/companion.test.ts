@@ -12,6 +12,7 @@ import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute 
 import { fakePb } from "./fake-pb";
 
 const TODAY = localDay();
+const ID = "abcdefghij01234";
 let pb: ReturnType<typeof fakePb>;
 beforeEach(() => { pb = fakePb(); });
 afterEach(() => pb.stop());
@@ -55,17 +56,28 @@ describe("the task lists", () => {
 describe("a new task", () => {
   it("added from Today is planned for today, after the last one", async () => {
     task("a", { order: 4 });
-    const r = await addTaskRoute(post({ title: " Buy milk ", list: "today" }), pb);
+    const r = await addTaskRoute(post({ id: ID, title: " Buy milk ", list: "today" }), pb);
     const { id } = await r.json() as { id: string };
+    expect(id).toBe(ID);
     expect(pb.tasks.get(id)).toMatchObject({ title: "Buy milk", when: TODAY, order: 5, rev: 1, done: "" });
   });
   it("added from the Inbox has no day, and carries the lens's tag", async () => {
     lensOn();
-    const { id } = await (await addTaskRoute(post({ title: "Call" }), pb)).json() as { id: string };
+    const { id } = await (await addTaskRoute(post({ id: ID, title: "Call" }), pb)).json() as { id: string };
     expect(pb.tasks.get(id)).toMatchObject({ title: "Call", when: "", tags: ["work"] });
   });
-  it("is refused without a title", async () => {
-    expect((await addTaskRoute(post({ title: " " }), pb)).status).toBe(400);
+  it("sent again under its id is the same task, whatever came between", async () => {
+    const first = await (await addTaskRoute(post({ id: ID, title: "Call", list: "inbox" }), pb)).json() as { id: string };
+    expect((await tickRoute(pb, first.id)).status).toBe(200);
+    const again = await addTaskRoute(post({ id: ID, title: "Call", list: "inbox" }), pb);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ id: ID });
+    expect(pb.tasks.size).toBe(1);
+    expect(pb.tasks.get(ID)).toMatchObject({ done: TODAY });
+  });
+  it("is refused without a title or an id of its own", async () => {
+    expect((await addTaskRoute(post({ id: ID, title: " " }), pb)).status).toBe(400);
+    expect((await addTaskRoute(post({ title: "Call" }), pb)).status).toBe(400);
     expect((await addTaskRoute(new Request("http://x", { method: "POST", body: "not json" }), pb)).status).toBe(400);
     expect(pb.tasks.size).toBe(0);
   });
