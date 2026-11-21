@@ -101,7 +101,7 @@ export function Shell() {
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "a" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); setDock({ open: !dockNow().open }); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "/" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); setPalette(true); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "[" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); toggleRail(); }
-      else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "n") { e.preventDefault(); newNote(); }
+      else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "n" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); newNote(); }
       else if (!typing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "q" && !document.querySelector("[role=dialog],[role=alertdialog]")) { e.preventDefault(); setAdding(startOf(startKind)); }
     };
     addEventListener("keydown", key);

@@ -26,6 +26,7 @@ version is one semver number for the whole repository, set by the git tag (see [
   previous words' list.
 - A task's place card tries its map again when the map's address changes (another place or theme) after a failed load.
 - PDF viewer: the zoom buttons wait until the pages can zoom, so the percentage always matches what is shown.
+- The `n` key no longer creates a note behind an open dialog.
 
 ## 0.13.0 - 2026-11-19
 
