@@ -58,7 +58,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   (`list_notes "archived"`). Archiving unpins it (`archivePatch`, `packages/core/src/bulk.ts`).
 - There is no `updated` field on purpose: both sides would touch it on every edit and the line merge would conflict every
   time. The server's own `updated` column tracks it.
-- `color` is one of `yellow pink blue green purple gray`: the note card's tint in the list.
+- `color` is one of `yellow orange red pink purple blue teal green gray` (`COLORS`, `packages/core/src/notes.ts`): the note card's tint in the list.
 - A photo is a record in `attachments` (note id and name). The body shows it as
   `![caption](../attachments/<note-id>/<name>.jpg)`, downscaled by the client (max 1600 px, JPEG).
 - A PDF is a record in the same collection, kept as it is (max 25 MB), named by the slug of its filename. The body links
@@ -270,7 +270,7 @@ JS VM: a handler sees none of its file's top-level scope, so shared code is `req
 | `POST /api/tefnotes/tags/describe` | `tags.pb.js` | The model drafts a tag's description; returned, never saved (the hourly job below saves its own) |
 | `GET /api/tefnotes/link-preview?url=` | `link-preview.pb.js` | Page title, description and picture for link cards; cached in `link_previews` |
 | `POST /agent/chat`, `GET /agent/models`, `GET /agent/search` | `server/agent/` | The chat agent and its search by meaning (a separate process) |
-| `GET /agent/companion/hello`, `tasks`, `notes`; `POST /agent/companion/tasks`, `tasks/:id/done` | `server/agent/src/companion.ts` | What the native companion (`android/`) draws and its two writes: feeds ready to draw, in the owner's colours and under the lens on. Contract: `packages/core/src/companion.ts` |
+| `GET /agent/companion/hello`, `tasks`, `notes`; `POST /agent/companion/tasks`, `tasks/:id/done`, `lens` | `server/agent/src/companion.ts` | What the native companion (`android/`) draws and its three writes (a new task, a tick, the lens on): feeds ready to draw, in the owner's colours and under the lens on. Contract: `packages/core/src/companion.ts` |
 
 **Auto-tagger** (`autotag.pb.js`, `lib/autotag.js`). A cron that runs every minute asks JEV about notes whose title,
 text or tag definitions changed since they were last evaluated, looking at up to 3 of a note's photos (`lib/images.js`).
