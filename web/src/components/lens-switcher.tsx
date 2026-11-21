@@ -1,7 +1,7 @@
 // The lens switcher, at the bottom of the rail (and, as the app's mark, in Home's header on a phone): pick the lens on, or none (every device follows), make, edit and delete lenses.
 // A lens is a name, tags and hidden tags (core/lens.ts): while one is on, every list shows only what carries any of its tags and none of the hidden, and what is made
 // carries its first tag. The definitions are the server's, shared by every device; which one is on is a preference too (hooks/prefs.ts).
-import { Check, ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, Focus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
@@ -9,6 +9,7 @@ import { fold } from "@/core/notes";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, type ThemeName } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
 import { Mark } from "@/components/brand";
+import { SwatchPicker } from "@/components/swatch-picker";
 import { Turns } from "@/components/swap";
 import { TagEditor } from "@/components/tag-editor";
 import {
@@ -96,59 +97,29 @@ function Field({ label, hint, htmlFor, children }: { label: string; hint?: strin
 
 /** The primary colour the app takes while the lens is on: none (this browser's own accent) or one of the accents, in one row that scrolls sideways. */
 function LensAccent({ value, theme: picked, onChange }: { value: LensAccentName | null; theme: ThemeName | null; onChange: (a: LensAccentName | null) => void }) {
-  const { theme: ownTheme, accent: own } = useAppearance(), theme = picked ?? ownTheme, headId = useId();
+  const { theme: ownTheme, accent: own } = useAppearance(), theme = picked ?? ownTheme;
   const label = (a: LensAccentName | null) => (a ? ACCENTS[a].label : "This browser's own");
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <p id={headId} className="text-sm font-semibold">Colour</p>
-        <span className="text-xs text-dim">{label(value)}</span>
-      </div>
-      <div role="radiogroup" aria-labelledby={headId} className="-mx-1 flex gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none]">
-        {ACCENT_NAMES.map((a) => {
-          const pick = a === "theme" ? null : a, on = pick === value, colour = accentColor(THEMES[theme], a === "theme" ? own : a);
-          return (
-            <button key={a} type="button" role="radio" aria-checked={on} aria-label={label(pick)} title={label(pick)} onClick={() => onChange(pick)}
-              className="grid size-9 shrink-0 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-              style={{ borderColor: on ? colour : "transparent" }}>
-              <span className={cn("grid size-6 place-items-center rounded-full", a === "theme" && "border-2 border-dashed border-bg")} style={{ backgroundColor: colour }}>
-                {on ? <Check className="size-3.5 text-bg" strokeWidth={3} /> : null}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <SwatchPicker title="Colour" shown={label(value)} swatches={ACCENT_NAMES.map((a) => {
+      const pick = a === "theme" ? null : a, colour = accentColor(THEMES[theme], a === "theme" ? own : a);
+      return { key: a, label: label(pick), on: pick === value, ring: colour, fill: { backgroundColor: colour }, rim: a === "theme" ? "border-2 border-dashed border-bg" : undefined, pick: () => onChange(pick) };
+    })} />
   );
 }
 
 /** The theme the app takes while the lens is on: none (the owner's own) or one of the themes, each a swatch of its ground and
  *  brand, in one row that scrolls sideways. */
 function LensTheme({ value, onChange }: { value: ThemeName | null; onChange: (t: ThemeName | null) => void }) {
-  const { theme: own } = useAppearance(), headId = useId();
+  const { theme: own } = useAppearance();
   const label = (t: ThemeName | null) => (t ? THEMES[t].label : "Your own");
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <p id={headId} className="text-sm font-semibold">Theme</p>
-        <span className="text-xs text-dim">{label(value)}</span>
-      </div>
-      <div role="radiogroup" aria-labelledby={headId} className="-mx-1 flex gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none]">
-        {[null, ...THEME_NAMES].map((t) => {
-          const on = t === value, { C } = THEMES[t ?? own];
-          return (
-            <button key={t ?? "own"} type="button" role="radio" aria-checked={on} aria-label={label(t)} title={label(t)} onClick={() => onChange(t)}
-              className="grid size-9 shrink-0 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-              style={{ borderColor: on ? C.brand : "transparent" }}>
-              <span className={cn("grid size-6 place-items-center overflow-hidden rounded-full border border-line", t === null && "border-2 border-dashed")}
-                style={{ background: `linear-gradient(135deg, ${C.bg} 50%, ${C.brand} 50%)` }}>
-                {on ? <Check className="size-3.5" style={{ color: C.fg }} strokeWidth={3} /> : null}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <SwatchPicker title="Theme" shown={label(value)} swatches={[null, ...THEME_NAMES].map((t) => {
+      const { C } = THEMES[t ?? own];
+      return {
+        key: t ?? "own", label: label(t), on: t === value, ring: C.brand, tick: C.fg, rim: cn("border border-line", t === null && "border-2 border-dashed"),
+        fill: { background: `linear-gradient(135deg, ${C.bg} 50%, ${C.brand} 50%)` }, pick: () => onChange(t),
+      };
+    })} />
   );
 }
 

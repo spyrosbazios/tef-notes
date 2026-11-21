@@ -4,8 +4,8 @@
 import { GripVertical, Monitor, Pencil, Plus, Smartphone } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { BUILTIN_ICON, PROMPT_ICON } from "@/components/note-action-icons";
-import { Choice } from "@/components/settings-choice";
-import { SUB, TITLE } from "@/components/settings-style";
+import { Choice } from "@/components/settings/choice";
+import { SUB, TITLE } from "@/components/settings/style";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";

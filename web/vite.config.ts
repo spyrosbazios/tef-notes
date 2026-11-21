@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { defineConfig, type ProxyOptions } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { boot } from "./vite-boot";
+import { editorIcons } from "./vite-icons";
 import { alias, at, identity, theme } from "./vite-shared";
 
 /** The dev proxy's way to the real server. */
@@ -17,7 +18,7 @@ export default defineConfig({
   plugins: [
     // The file routes (src/routes/) into src/routeTree.gen.ts, each route's component split into its own chunk; before react()
     tanstackRouter({ target: "react", autoCodeSplitting: true, quoteStyle: "double" }),
-    react(), tailwindcss(), theme(), identity({ manifest: true }), boot(),
+    react(), tailwindcss(), theme(), editorIcons(), identity({ manifest: true }), boot(),
     // The service worker (sw/sw.ts): the built app precached, so a return visit opens what is installed and a new deploy is
     // announced by a toast (src/components/update-toast.tsx) rather than taken mid-session; and the share target's POST to
     // /share, which Android's Share sheet sends. Nothing from the server is ever cached: /api, /agent, the admin UI and the

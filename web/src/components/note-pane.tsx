@@ -5,27 +5,25 @@
 // note: the format tools, attach, pin and ⋮. A note is pure markdown: tasks are records of their own (task-detail.tsx), and those linked to it show under its title.
 import { useQueryClient } from "@tanstack/react-query";
 import { Archive, Check, Loader2, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { DrawingLayer } from "@/components/drawing-layer";
 import { FormatTools } from "@/components/format-tools";
+import { ClashDialog, DeleteNoteDialog } from "@/components/note-dialogs";
 import { NoteHeaderActions } from "@/components/note-header";
+import { useNoteRunActions } from "@/components/note-pane-run";
 import { NoteRunPanel, RunSheen } from "@/components/note-run";
 import { MicButton } from "@/components/mic-button";
 import { ContentsRail } from "@/components/note-contents";
 import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
-import type { PromptAction } from "@/core/note-actions";
-import { UNTITLED, pastedNote, undoEdit, type FlagEdit } from "@/core/notes";
+import { UNTITLED, pastedNote, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
 import { SelectionBar } from "@/components/selection-bar";
 import { TagEditor } from "@/components/tag-editor";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import type { Editor } from "@/editor";
 import { useContents } from "@/hooks/contents";
 import { dictateInto } from "@/hooks/dictation";
@@ -33,14 +31,12 @@ import { openDrawing, useOpened } from "@/hooks/drawing";
 import { useDraft, type Status } from "@/hooks/draft";
 import { deleteNote, NOTES, setFlags, write } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
-import { useNoteRun, useRunning } from "@/hooks/note-run";
 import { useKeyboard } from "@/hooks/keyboard";
 import { useNarrow } from "@/hooks/media";
 import { useNow } from "@/hooks/now";
 import { attachable, useAddFiles } from "@/hooks/photos";
 import { noteHref, useNav } from "@/lib/nav";
 import { ms } from "@/lib/search";
-import { syncNow } from "@/lib/sync";
 import { noteScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
@@ -108,33 +104,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
     await out[what]([fresh()]);
   };
 
-  /** An assistant action pressed (core/note-actions.ts): the note saved first, so the agent reads what is on screen. */
-  const about = useMemo(() => ({ path: n.path, title: n.note.title }), [n.path, n.note.title]);
-  const runs = useNoteRun(about), running = useRunning(runs.run);
-  const runAction = async (a: PromptAction) => {
-    try { await d.flush(); } catch (e) { toast.error(message(e)); return; }
-    await runs.start(a, fresh().text);
-  };
-  /** The run wrote: the panel closes and a toast says what it did; a note's change can be put back as it was. */
-  const ran = (said: string) => {
-    const r = runs.run?.meta;
-    if (!r) return;
-    runs.close();
-    // What the run wrote, once it has reached this browser's copy: Undo takes back that edit and keeps what was written after
-    const wrote = syncNow().then(() => fresh().text);
-    wrote.catch(() => undefined);
-    const undo = r.action.result === "edit" ? {
-      label: "Undo",
-      onClick: () => {
-        void wrote.then((after) => syncNow().then(() => write(qc, fresh(), (current) => {
-          const text = undoEdit(r.before, after, current);
-          if (text == null) throw new Error("Not undone: the note was edited in the same place since.");
-          return text;
-        }))).catch((e: unknown) => toast.error(message(e)));
-      },
-    } : undefined;
-    toast(r.action.label, { description: said || (r.action.result === "edit" ? "The note was changed." : "The task was added."), action: undo });
-  };
+  const { runs, running, runAction, ran } = useNoteRunActions(n, d.flush, fresh);
 
   const remove = async () => {
     try { await deleteNote(qc, fresh()); toast(`Deleted “${note.title}”`); onGone(); } catch (e) { toast.error(message(e)); }
@@ -227,39 +197,8 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
 
       {drawing ? <DrawingLayer key={drawing.seq} opened={drawing} onCreated={place} /> : null}
 
-      <AlertDialog open={!!d.clash}>
-        <AlertDialogContent className="sm:max-w-4xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Edited on another device too</AlertDialogTitle>
-            <AlertDialogDescription>Both changed the same lines, so nothing was written. Keep one side; the other is lost.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="grid max-h-[50vh] grid-cols-2 gap-3 overflow-hidden">
-            {(["mine", "theirs"] as const).map((k) => (
-              <div key={k} className="flex min-h-0 flex-col gap-1.5">
-                <p className="text-xs font-semibold text-dim">{k === "mine" ? "Yours, here" : "Theirs, on the server"}</p>
-                <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-card p-3 font-mono text-xs">{d.clash?.[k]}</pre>
-              </div>
-            ))}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => d.resolve("theirs")}>Keep theirs</AlertDialogCancel>
-            <AlertDialogAction onClick={() => d.resolve("mine")}>Keep mine</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={confirm} onOpenChange={setConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{note.title}”?</AlertDialogTitle>
-            <AlertDialogDescription>The note and its photos go from every device. There is no undo and no backup.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={remove}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ClashDialog clash={d.clash} onResolve={(keep) => { void d.resolve(keep); }} />
+      <DeleteNoteDialog open={confirm} onOpenChange={setConfirm} title={note.title} onDelete={remove} />
     </article>
   );
 }

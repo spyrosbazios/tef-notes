@@ -220,12 +220,12 @@
   .pm-editor .pm-image-missing { @apply flex min-h-24 w-56 max-w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line px-3 py-4 text-faint text-xs leading-snug; }
   .pm-editor .pm-image-missing::before {
     content: ""; @apply inline-block size-4 shrink-0 bg-faint;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l20 20'/%3E%3Cpath d='M10.41 10.41a2 2 0 1 1-2.83-2.83'/%3E%3Cpath d='M13.5 13.5 6 21'/%3E%3Cpath d='M18 12l3 3'/%3E%3Cpath d='M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59'/%3E%3Cpath d='M21 15V5a2 2 0 0 0-2-2H9'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: var(--icon-image-off) center / contain no-repeat;
   }
   /* A bare URL's item (src/editor/link-cards.ts): thumbnail, text, then Read and Summary; they wrap under it when narrow. */
   .pm-editor .pm-card { @apply mt-2 flex max-w-2xl cursor-pointer flex-wrap items-center gap-3 whitespace-normal rounded-xl border border-line bg-card p-2.5 text-left transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-brand/60; }
   .pm-editor .pm-card-thumb { @apply flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-raised; }
-  .pm-editor .pm-card-thumb[data-empty]::before { content: ""; @apply block size-6 bg-faint; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .pm-editor .pm-card-thumb[data-empty]::before { content: ""; @apply block size-6 bg-faint; mask: var(--icon-link) center / contain no-repeat; }
   .pm-editor .pm-card-image { @apply m-0 size-full max-h-none rounded-none object-cover; }
   .pm-editor .pm-card-favicon { @apply m-0 size-8 rounded-md object-contain; }
   .pm-editor .pm-card-body { @apply flex min-w-40 flex-1 flex-col gap-0.5; }
@@ -262,18 +262,18 @@
   .pm-editor a { @apply cursor-text; }
   .pm-editor a[data-note] { @apply cursor-pointer hover:decoration-2; }
   /* A link's Copy, Read, Summary and Delete buttons (src/editor/link-tools.ts), after the link in the prose and on its card: small
-     pills, quiet until hovered so a note's prose stays prose. The icon is lucide's (book-open, sparkles) as a mask; the trash is
+     pills, quiet until hovered so a note's prose stays prose. The icons are lucide's as masks (--icon-*, vite-icons.ts); the trash is
      a picture's corner Delete button's too. */
   .pm-editor .pm-link-tools { @apply mx-1 inline-flex gap-1 align-[1px]; }
   .pm-editor .pm-link-tool {
     @apply inline-flex cursor-pointer select-none items-center gap-1 whitespace-nowrap rounded-full border border-line bg-card px-2 py-px font-sans text-xs font-medium leading-5 text-dim transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand focus-visible:outline-2 focus-visible:outline-brand/60 disabled:cursor-default;
   }
   .pm-editor .pm-link-tool::before { content: ""; @apply block size-3.5 shrink-0 bg-current; mask: var(--tool-icon) center / contain no-repeat; }
-  .pm-editor .pm-link-tool[data-icon="copy"] { --tool-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='14' x='8' y='8' rx='2' ry='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E"); }
-  .pm-editor .pm-link-tool[data-icon="read"] { --tool-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v16'/%3E%3Cpath d='M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z'/%3E%3C/svg%3E"); }
-  .pm-editor [data-icon="delete"] { --tool-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6'/%3E%3Cpath d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2'/%3E%3C/svg%3E"); }
+  .pm-editor .pm-link-tool[data-icon="copy"] { --tool-icon: var(--icon-copy); }
+  .pm-editor .pm-link-tool[data-icon="read"] { --tool-icon: var(--icon-book-open); }
+  .pm-editor [data-icon="delete"] { --tool-icon: var(--icon-trash); }
   .pm-editor .pm-link-tool[data-icon="delete"]:hover { @apply border-destructive/40 bg-destructive/10 text-destructive; }
-  .pm-editor .pm-link-tool[data-icon="summary"] { --tool-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z'/%3E%3Cpath d='M20 3v4'/%3E%3Cpath d='M22 5h-4'/%3E%3Cpath d='M4 17v2'/%3E%3Cpath d='M5 18H3'/%3E%3C/svg%3E"); }
+  .pm-editor .pm-link-tool[data-icon="summary"] { --tool-icon: var(--icon-sparkles); }
   /* The slash menu (src/editor/slash.ts): a list under the `/` typed, on the page's body, so outside .pm-editor. */
   .pm-slash { @apply fixed z-50 flex max-h-72 w-60 flex-col overflow-y-auto rounded-xl border border-line bg-raised p-1 font-sans text-sm text-fg shadow-lg; }
   .pm-slash[hidden] { display: none; }
@@ -288,11 +288,11 @@
      file-text (or shapes, for a drawing) as a mask, so it takes the brand colour. A drawing's chip has the drawing itself above
      it, as Excalidraw shows it: its white ground turned dark by Excalidraw's own dark-mode filter in a dark theme. */
   .md .file-chip, .md a.file-chip {
-    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
+    --chip-icon: var(--icon-file-text);
     @apply cursor-pointer rounded-lg border border-line bg-card px-2 py-0.5 text-fg no-underline hover:no-underline; box-decoration-break: clone;
   }
   .md .drawing-chip, .md a.drawing-chip {
-    --chip-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1'/%3E%3Ccircle cx='17.5' cy='17.5' r='3.5'/%3E%3C/svg%3E");
+    --chip-icon: var(--icon-shapes);
   }
   .md .file-chip::before { content: ""; @apply mr-1.5 inline-block size-4 bg-brand align-[-3px]; mask: var(--chip-icon) center / contain no-repeat; }
   .pm-editor .drawing-page { @apply mb-1.5 block w-fit max-w-full cursor-pointer overflow-hidden rounded-lg border border-line; }

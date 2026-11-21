@@ -132,7 +132,7 @@ options and the query client are `src/router.ts`; `src/root.tsx` puts it under t
 | `/` | `_app/index.tsx` | Home; a bare launch goes on to the chosen start screen (`lib/start.ts`, `beforeLoad`) | `tags` (a comma list) |
 | `/inbox` `/today` `/upcoming` `/logbook` | `_app/<list>.tsx` | `components/task-screen.tsx`: the list, and from `md` the open task beside it | |
 | `/notes` | `_app/notes.tsx` | `notes-page.tsx`: the notes alone (its tab off until turned on in Settings → Layout) | `tags` (a comma list) |
-| `/settings` | `_app/settings.tsx` | `settings-pane.tsx` | `section` |
+| `/settings` | `_app/settings.tsx` | `settings-pane.tsx`, the shell; each section is a file in `components/settings/` | `section` |
 | `/share` | `share.tsx` | `share-page.tsx`, outside the shell | `shared` (`1`, `err`) |
 | `/note/$id` | `note.$id.tsx` | redirects to `/?note=<id>`, replacing itself | |
 - **Route transitions** are the router's View Transitions, typed by what changes (`router.ts` `transitionOf`, drawn in

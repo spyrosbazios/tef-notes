@@ -3,7 +3,7 @@
 // note pane's bar (format-tools.tsx); the shell hands the editor up to it. A click on a photo opens the lightbox, on a
 // PDF chip the PDF viewer, on a drawing chip the pane's drawing dialog (`onDrawing`).
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { Lightbox, type LightboxItem } from "@/components/lightbox";
 import { Reader } from "@/components/reader";
 import { PdfViewer } from "@/components/pdf-viewer";
@@ -83,11 +83,14 @@ export function NoteEditor({ noteId, markdown, onChange, onFiles, onNote, onDraw
     return () => { ed.destroy(); editorRef.current = null; props.current.onEditor(null); };
   }, [noteId, qc]);
 
+  // Leaving the note reports what was just typed first: a layout effect's cleanup runs before the note pane's own, which sends the draft
+  useLayoutEffect(() => () => editorRef.current?.flush(), [noteId, qc]);
+
   // A body that arrives from elsewhere; what the editor itself sent comes back equal, and is left alone
   useEffect(() => {
     if (markdown === sent.current) return;
+    editorRef.current?.setMarkdown(markdown);     // reports what was typed first, which sets `sent`
     sent.current = markdown;
-    editorRef.current?.setMarkdown(markdown);
   }, [markdown]);
 
   useEffect(() => { editorRef.current?.setResolveImage(resolve); }, [resolve]);

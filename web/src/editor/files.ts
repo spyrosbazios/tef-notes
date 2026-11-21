@@ -7,9 +7,10 @@
 // corner, as a photo does (./views): a tap takes the link out of the note.
 import type { Mark, Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
-import { Plugin } from "prosemirror-state";
-import { Decoration, DecorationSet } from "prosemirror-view";
+import { PluginKey } from "prosemirror-state";
+import { Decoration } from "prosemirror-view";
 import { attachmentLink, drawingPreview, isDrawing, isPdf } from "@/core/photos";
+import { blockDecorations } from "./incremental";
 import { schema } from "./markdown";
 import { cornerDelete, onCornerDelete } from "./views";
 import type { ResolveImage } from "./views";
@@ -81,39 +82,38 @@ function page(url: string, href: string, label: string, count: Promise<number | 
   return box;
 }
 
-/** One chip per run of text under the same PDF or drawing link, so a name with bold in it is still one chip. */
-function chips(doc: Node, resolve: ResolveImage, pdfPage: PdfPage | undefined, counted: (href: string) => Promise<number | null> | undefined): DecorationSet {
+/** One chip per run of text under the same PDF or drawing link in a text block, so a name with bold in it is still one chip. */
+function chipsIn(block: Node, at: number, doc: Node, resolve: ResolveImage, pdfPage: PdfPage | undefined, counted: (href: string) => Promise<number | null> | undefined): Decoration[] {
   const out: Decoration[] = [];
-  doc.descendants((block, at) => {
-    if (!block.isTextblock) return true;
-    let run: { mark: Mark; from: number; to: number } | null = null;
-    const close = () => {
-      if (run) {
-        const href: string = run.mark.attrs.href, label = doc.textBetween(run.from, run.to);
-        out.push(Decoration.inline(run.from, run.to, { class: kindOf(href) ?? FILE_CHIP, "data-href": href }));
-        const url = isDrawingLink(href) ? resolve(drawingPreviewSrc(href)) : null;
-        if (url) out.push(Decoration.widget(run.from, (view, getPos) => page(url, href, label, undefined, () => removeLink(view, getPos(), href), DRAWING_PAGE), { side: -1, key: `drawing\n${url}`, ignoreSelection: true, stopEvent: onCornerDelete }));
-        const first = isPdfLink(href) ? pdfPage?.(href) : null;
-        if (first) out.push(Decoration.widget(run.from, (view, getPos) => page(first, href, label, counted(href), () => removeLink(view, getPos(), href)), { side: -1, key: `page\n${first}`, ignoreSelection: true, stopEvent: onCornerDelete }));
-      }
-      run = null;
-    };
-    block.forEach((child, offset) => {
-      const mark = schema.marks.link.isInSet(child.marks);
-      const from = at + 1 + offset;
-      if (mark && kindOf(mark.attrs.href)) {
-        if (run && run.mark.eq(mark)) run.to = from + child.nodeSize;
-        else { close(); run = { mark, from, to: from + child.nodeSize }; }
-      } else close();
-    });
-    close();
-    return false;
+  let run: { mark: Mark; from: number; to: number } | null = null;
+  const close = () => {
+    if (run) {
+      const href: string = run.mark.attrs.href, label = doc.textBetween(run.from, run.to);
+      out.push(Decoration.inline(run.from, run.to, { class: kindOf(href) ?? FILE_CHIP, "data-href": href }));
+      const url = isDrawingLink(href) ? resolve(drawingPreviewSrc(href)) : null;
+      if (url) out.push(Decoration.widget(run.from, (view, getPos) => page(url, href, label, undefined, () => removeLink(view, getPos(), href), DRAWING_PAGE), { side: -1, key: `drawing\n${url}`, ignoreSelection: true, stopEvent: onCornerDelete }));
+      const first = isPdfLink(href) ? pdfPage?.(href) : null;
+      if (first) out.push(Decoration.widget(run.from, (view, getPos) => page(first, href, label, counted(href), () => removeLink(view, getPos(), href)), { side: -1, key: `page\n${first}`, ignoreSelection: true, stopEvent: onCornerDelete }));
+    }
+    run = null;
+  };
+  block.forEach((child, offset) => {
+    const mark = schema.marks.link.isInSet(child.marks);
+    const from = at + 1 + offset;
+    if (mark && kindOf(mark.attrs.href)) {
+      if (run && run.mark.eq(mark)) run.to = from + child.nodeSize;
+      else { close(); run = { mark, from, to: from + child.nodeSize }; }
+    } else close();
   });
-  return DecorationSet.create(doc, out);
+  close();
+  return out;
 }
 
-/** The chips plugin; `resolve` is asked for a drawing's preview, `pdfPage` for a PDF's first page, each time the
- *  decorations are drawn; `pdfPages` once per PDF for as long as the editor lives (a stored file never changes). */
+/** Tells the chips plugin to draw every drawing's picture again: the page's resolver changed. */
+export const redrawChips = new PluginKey("fileChips");
+
+/** The chips plugin; `resolve` is asked for a drawing's preview, `pdfPage` for a PDF's first page, as a chip is read
+ *  (every chip again on `redrawChips`); `pdfPages` once per PDF for as long as the editor lives (a stored file never changes). */
 export function fileChips(resolve: () => ResolveImage, pdfPage?: PdfPage, pdfPages?: PdfPages) {
   const counts = new Map<string, Promise<number | null>>();
   const counted = (href: string) => {
@@ -122,7 +122,7 @@ export function fileChips(resolve: () => ResolveImage, pdfPage?: PdfPage, pdfPag
     if (!n) { n = pdfPages(href); n.catch(() => counts.delete(href)); counts.set(href, n); }
     return n;
   };
-  return new Plugin({ props: { decorations: (state) => chips(state.doc, resolve(), pdfPage, counted) } });
+  return blockDecorations((block, at, _parent, doc) => chipsIn(block, at, doc, resolve(), pdfPage, counted), { redraw: redrawChips });
 }
 
 /** The PDF or drawing link a click (on its chip, thumbnail or page) landed on, as its href; null when it landed anywhere else. */

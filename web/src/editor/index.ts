@@ -12,7 +12,7 @@ import { cellAround, tableEditing } from "prosemirror-tables";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { base, commands, isActive, keys, linkAt, setLink, typed } from "./commands";
 import type { CommandName } from "./commands";
-import { chipHref, drawingPreviewSrc, fileChips, isDrawingLink, isPdfLink, type PdfPage, type PdfPages } from "./files";
+import { chipHref, drawingPreviewSrc, fileChips, isDrawingLink, isPdfLink, redrawChips, type PdfPage, type PdfPages } from "./files";
 import { heldMark, heldRange, hold, type Held } from "./held";
 import { markdownSlice, normalizeBody, parse, schema, serialize, sliceMarkdown } from "./markdown";
 import { cardUrl, linkCards } from "./link-cards";
@@ -20,6 +20,7 @@ import type { ResolveLink } from "./link-cards";
 import { readLinks } from "./link-read";
 import type { Summarize } from "./link-tools";
 import { outlineOf, sameOutline, type OutlineItem } from "./outline";
+import { pending } from "./pending";
 import { slashMenu } from "./slash";
 import { ImageView, ListItemView } from "./views";
 import { noteLinkPath, safeHref } from "@/core/links";
@@ -36,7 +37,9 @@ export type GalleryItem = { src: string; alt: string };
 export type EditorOptions = {
   /** The body to open with. Opening never calls `onChange`. */
   markdown: string;
-  /** The body as markdown after each edit the user makes (not after `setMarkdown`), and only when it changed. */
+  /** The body as markdown after the edits the user makes (not after `setMarkdown`), and only when it changed. It is read
+   *  out of the document once per `REPORT` ms of typing, not once per key; `flush` (and a blur, a shortcut chord, the page
+   *  going away, `destroy`) reports what waits now. */
   onChange: (markdown: string) => void;
   /** The URL to show for an image's `src` (a note's `../attachments/<id>/<name>.jpg`); null: not available, a placeholder shows. Default: `src` itself. */
   resolveImage?: ResolveImage;
@@ -66,6 +69,8 @@ export type EditorOptions = {
 export type Editor = {
   /** The body now, as markdown. */
   markdown(): string;
+  /** Report an edit still waiting for its `onChange` now; nothing when none waits. */
+  flush(): void;
   /** Replace the body with one that came from elsewhere (another device, a settled conflict). Not an edit: no `onChange`. */
   setMarkdown(markdown: string): void;
   /** Insert markdown at the cursor (the end, if the editor was never touched). */
@@ -104,6 +109,8 @@ export type Editor = {
 };
 
 const EXTERNAL = "tefnotes-external";
+/** The longest an edit waits before `onChange` is told of it, ms. */
+const REPORT = 150;
 
 /** Grey hint in an empty note. */
 function placeholder(text: string) {
@@ -183,6 +190,16 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
 
   // Focus lands after the event that reports it: tell the listeners once it has
   const notify = () => { queueMicrotask(() => listeners.forEach((l) => l())); };
+  // The body is read out of the document once per burst of typing, and at once whenever something is about to read it
+  const report = pending(() => {
+    const md = serialize(view.state.doc);
+    if (md !== last) { last = md; options.onChange(md); }
+  }, REPORT);
+  const leaving = () => report.flush();
+  const hidden = () => { if (el.ownerDocument.visibilityState === "hidden") report.flush(); };
+  window.addEventListener("pagehide", leaving, true);
+  window.addEventListener("beforeunload", leaving, true);
+  el.ownerDocument.addEventListener("visibilitychange", hidden, true);
   const open = (raw: string) => {
     const href = safeHref(raw);
     if (href !== null && !options.onLink?.(href)) window.open(href, "_blank", "noopener,noreferrer");
@@ -209,15 +226,12 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     },
     dispatchTransaction(tr) {
       view.updateState(view.state.apply(tr));
-      if (tr.docChanged && !tr.getMeta(EXTERNAL)) {
-        const md = serialize(view.state.doc);
-        if (md !== last) { last = md; options.onChange(md); }
-      }
+      if (tr.docChanged && !tr.getMeta(EXTERNAL)) report.poke();
       listeners.forEach((l) => l());
     },
     handleDOMEvents: {
       focus: () => { touched = true; notify(); return false; },
-      blur: () => { notify(); return false; },
+      blur: () => { report.flush(); notify(); return false; },
       // A selection being dragged out with the mouse isn't settled yet: what floats over it waits for the button's release
       mousedown: (_v, e) => {
         if (e.button !== 0) return false;
@@ -228,6 +242,8 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       // A chip is a link's text: its click must not follow the href, which is no address
       click: (_v, e) => { if (chipHref(e.target)) e.preventDefault(); return false; },
     },
+    // A chord may act on the saved note (Ctrl+S): what was typed before it is reported first
+    handleKeyDown(_v, event) { if (event.metaKey || event.ctrlKey) report.flush(); return false; },
     handleClick(v, _pos, event) {
       const file = chipHref(event.target);
       if (file && options.onFile) { options.onFile(file); return true; }
@@ -266,8 +282,10 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
 
   return {
     markdown: () => serialize(view.state.doc),
+    flush: report.flush,
 
     setMarkdown(markdown) {
+      report.flush();      // what was typed is the caller's before a body from elsewhere is weighed against it
       // Parsing loses what typing leaves mid-word, a trailing space above all: a body that differs from the editor's only by
       // that (the save of "hello " read back, or the copy from before it) is the same text, and replacing it would eat the space.
       const doc = parse(markdown), next = serialize(doc), now = serialize(view.state.doc);
@@ -304,7 +322,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     setResolveImage(fn) {
       resolve = fn;
       images.forEach((v) => v.refresh());
-      view.dispatch(view.state.tr.setMeta(EXTERNAL, true));     // a drawing's thumbnail follows the resolver: redraw the decorations
+      view.dispatch(view.state.tr.setMeta(EXTERNAL, true).setMeta(redrawChips, true));     // a drawing's thumbnail follows the resolver: draw the chips again
     },
 
     gallery: () => gallery(view.state.doc),
@@ -337,6 +355,13 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     hold: () => hold(view),
     dom: view.dom,
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    destroy() { listeners.clear(); view.destroy(); },
+    destroy() {
+      report.flush();
+      window.removeEventListener("pagehide", leaving, true);
+      window.removeEventListener("beforeunload", leaving, true);
+      el.ownerDocument.removeEventListener("visibilitychange", hidden, true);
+      listeners.clear();
+      view.destroy();
+    },
   };
 }

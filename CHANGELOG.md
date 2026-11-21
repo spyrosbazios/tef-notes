@@ -44,6 +44,10 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Talk: speaking over a reply stops it for good (it used to go on thinking, and could speak and bill a second reply over
   the new one), and a model that stops answering ends the turn after a minute instead of holding it open. A conversation
   ends after 5 minutes with nothing from you, and after an hour in all, so Fish's ear is never left billing.
+- The note editor keeps up in long notes: a keystroke or a caret move rereads only the lines it touched (links, link
+  cards, PDF and drawing chips) instead of the whole note, and the body is handed to the save once per pause in
+  typing, at once on leaving the field, the note or the page.
+
 ### Security
 
 - Talk follows the same rules as the chat, read every turn: a chat that read the web is still treated as having read it
