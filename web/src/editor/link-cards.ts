@@ -15,6 +15,7 @@ import type { EditorView } from "prosemirror-view";
 import type { LinkPreview } from "@/core/pocketbase";
 import { hostOf, youtubeEmbed, youtubeVideo } from "@/core/links";
 import { isPdfLink } from "./files";
+import { blockRanges, touched } from "./incremental";
 import { copyButton, deleteButton, readButton, summarised, summaryButton, type Summarize } from "./link-tools";
 
 /** The preview of a URL. null: the page has nothing to show (no card). A rejection: it could not be asked (offline), so
@@ -47,12 +48,20 @@ export function cardUrl(p: Node): string | null {
   return BARE.test(text) && !isPdfLink(text) ? text : null;
 }
 
-/** Every paragraph that is one URL at the top of the note, with the position just after it. */
-function bareUrls(doc: Node): { url: string; end: number; from: number }[] {
-  const out: { url: string; end: number; from: number }[] = [];
-  doc.forEach((n, offset) => {
+/** One URL paragraph at the top of the note: where it sits, and whether a summary block follows it (and how big). */
+type Card = { url: string; from: number; end: number; summary: number };
+
+/** Every card among the top-level blocks within `from`..`to`. */
+function cardsIn(doc: Node, from: number, to: number): Card[] {
+  const out: Card[] = [];
+  doc.nodesBetween(from, to, (n, pos, parent) => {
+    if (parent !== doc) return false;
     const url = cardUrl(n);
-    if (url) out.push({ url, from: offset, end: offset + n.nodeSize });
+    if (url) {
+      const end = pos + n.nodeSize;
+      out.push({ url, from: pos, end, summary: summarised(doc, end) ? doc.resolve(end).nodeAfter?.nodeSize ?? 0 : 0 });
+    }
+    return false;
   });
   return out;
 }
@@ -199,75 +208,119 @@ function video(url: string, v: { id: string; start: number }): HTMLElement {
   return root;
 }
 
+type CardsState = { cards: Card[]; caret: number[]; decorations: DecorationSet | null };
+
 /** The plugin. `resolve`: where previews come from; `open`: what a click on a card does; `read`: its Read button and
  *  `summarize`: its Summary button (none without them; Summary shown done once the link has one under it, and that
- *  summary drawn as the card's lower half). A YouTube link's card is its player (see `video`). */
+ *  summary drawn as the card's lower half). A YouTube link's card is its player (see `video`).
+ *  The cards are the plugin's state: a transaction maps them and reads again only the top-level blocks it touched and
+ *  the one on either side (a summary under a card is the next block's). Looking a URL up is the plugin view's, after an
+ *  update, never a decoration's. */
 export function linkCards(resolve: ResolveLink, open: (url: string) => void, read?: (url: string) => void, summarize?: Summarize): Plugin {
   const known = new Map<string, LinkPreview | null>();      // looked up: a preview, or null for nothing to show
-  const asked = new Map<string, number>();                  // in flight (0) or failed (when to try again)
+  const asked = new Set<string>();                          // in flight, or failed and waiting for its retry
   const queued = new Set<string>();                         // waiting to be looked up (a tick, or the typing pause)
   const timers = new Set<ReturnType<typeof setTimeout>>();
   let view: EditorView | null = null;
 
+  const later = (ms: number, f: () => void) => {
+    const t = setTimeout(() => { timers.delete(t); f(); }, ms);
+    timers.add(t);
+  };
+
   const lookup = (url: string) => {
-    asked.set(url, 0);
+    asked.add(url);
     resolve(url).then(
       (p) => { known.set(url, p); asked.delete(url); },
-      () => { asked.set(url, Date.now() + RETRY); },
-    ).then(() => { if (view && !view.isDestroyed) view.dispatch(view.state.tr.setMeta("link-cards", url)); });
+      () => { later(RETRY, () => { asked.delete(url); if (view && !view.isDestroyed) want(view.state); }); },
+    ).then(() => { if (view && !view.isDestroyed) view.dispatch(view.state.tr.setMeta(plugin, url)); });
   };
 
   /** Ask for what is not known yet; a URL under the cursor waits to see whether it is still being typed. */
   const want = (state: EditorState) => {
     const at = state.selection.from;
-    for (const { url, from, end } of bareUrls(state.doc)) {
+    for (const { url, from, end } of plugin.getState(state)?.cards ?? []) {
       if (youtubeVideo(url)) continue;                      // a player, not a card: nothing to look up
-      const retryAt = asked.get(url);
-      if (known.has(url) || queued.has(url) || (retryAt !== undefined && (retryAt === 0 || retryAt > Date.now()))) continue;
+      if (known.has(url) || queued.has(url) || asked.has(url)) continue;
       queued.add(url);
       const go = () => {
         queued.delete(url);
-        if (view && !view.isDestroyed && bareUrls(view.state.doc).some((b) => b.url === url)) lookup(url);
+        if (view && !view.isDestroyed && plugin.getState(view.state)?.cards.some((c) => c.url === url)) lookup(url);
       };
-      if (at >= from && at <= end) {
-        const t = setTimeout(() => { timers.delete(t); go(); }, TYPING);
-        timers.add(t);
-      } else queueMicrotask(go);
+      if (at >= from && at <= end) later(TYPING, go);
+      else queueMicrotask(go);
     }
   };
 
-  return new Plugin({
+  /** The cards the selection touches (their index): their lines show for editing. */
+  const caretCards = (cards: Card[], state: EditorState) => {
+    const { from, to } = state.selection;
+    return cards.flatMap((c, i) => (to >= c.from && from <= c.end ? [i] : []));
+  };
+
+  const draw = (doc: Node, cards: Card[], caret: number[]) => {
+    if (!cards.length) return null;
+    const out: Decoration[] = [];
+    cards.forEach((c, i) => {
+      const { url, from, end } = c;
+      // The line itself is hidden under its card or player: the card is the link. The caret on it (arrows, a
+      // selection across it) shows it again to edit, while the editor has the focus (the stylesheet's rule, which
+      // knows that), and the note's markdown never changes.
+      out.push(Decoration.node(from, end, { class: caret.includes(i) ? "pm-card-line pm-card-line-caret" : "pm-card-line" }));
+      const v = youtubeVideo(url);
+      if (v) {
+        out.push(Decoration.widget(end, () => video(url, v), { key: `video:${url}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
+        return;
+      }
+      const p = known.get(url) ?? null, done = c.summary > 0;
+      out.push(Decoration.widget(end, (view, getPos) => card(url, p, open, { read, summarize, done, view, getPos }),
+        { key: `card:${url}:${known.has(url) ? 1 : 0}:${done ? 1 : 0}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
+      // Its summary (the blockquote under the link) drawn as the card's lower half: still the note's own, editable text
+      if (done) out.push(Decoration.node(end, end + c.summary, { class: "pm-card-summary" }));
+    });
+    return DecorationSet.create(doc, out);
+  };
+
+  const plugin: Plugin<CardsState> = new Plugin<CardsState>({
+    state: {
+      init: (_config, state) => {
+        const cards = cardsIn(state.doc, 0, state.doc.content.size), caret = caretCards(cards, state);
+        return { cards, caret, decorations: draw(state.doc, cards, caret) };
+      },
+      apply(tr, value, _old, state) {
+        const { cards, changed } = tr.docChanged ? remapCards(value.cards, tr) : { cards: value.cards, changed: false };
+        const caret = caretCards(cards, state);
+        const redraw = changed || tr.getMeta(plugin) !== undefined || caret.length !== value.caret.length || caret.some((c, i) => c !== value.caret[i]);
+        if (!redraw && !tr.docChanged) return value;
+        // Cards that only moved keep their decorations, moved the same way
+        return { cards, caret, decorations: redraw ? draw(tr.doc, cards, caret) : value.decorations?.map(tr.mapping, tr.doc) ?? null };
+      },
+    },
     view(v) {
       view = v;
-      return { destroy() { timers.forEach(clearTimeout); timers.clear(); view = null; } };
+      want(v.state);
+      return {
+        update: (v2) => want(v2.state),
+        destroy() { timers.forEach(clearTimeout); timers.clear(); view = null; },
+      };
     },
     appendTransaction: settled,
     props: {
-      decorations(state) {
-        want(state);
-        const out: Decoration[] = [];
-        const { from: selFrom, to: selTo } = state.selection;
-        for (const { url, from, end } of bareUrls(state.doc)) {
-          // The line itself is hidden under its card or player: the card is the link. The caret on it (arrows, a
-          // selection across it) shows it again to edit, while the editor has the focus (the stylesheet's rule, which
-          // knows that), and the note's markdown never changes.
-          const caret = selTo >= from && selFrom <= end;
-          out.push(Decoration.node(from, end, { class: caret ? "pm-card-line pm-card-line-caret" : "pm-card-line" }));
-          const v = youtubeVideo(url);
-          if (v) {
-            out.push(Decoration.widget(end, () => video(url, v), { key: `video:${url}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
-            continue;
-          }
-          const p = known.get(url) ?? null;
-          const done = summarised(state.doc, end);
-          out.push(Decoration.widget(end, (view, getPos) => card(url, p, open, { read, summarize, done, view, getPos }),
-            { key: `card:${url}:${known.has(url) ? 1 : 0}:${done ? 1 : 0}`, side: -1, stopEvent: () => true, ignoreSelection: true }));
-          // Its summary (the blockquote under the link) drawn as the card's lower half: still the note's own, editable text
-          const summary = done ? state.doc.resolve(end).nodeAfter : null;
-          if (summary) out.push(Decoration.node(end, end + summary.nodeSize, { class: "pm-card-summary" }));
-        }
-        return out.length ? DecorationSet.create(state.doc, out) : null;
+      decorations(this: Plugin<CardsState>, state) {
+        return this.getState(state)?.decorations ?? null;
       },
     },
   });
+  return plugin;
+}
+
+/** The cards after a transaction: the ones it left alone, moved with it, and the ones read again from the top-level
+ *  blocks it touched and the block on either side. `changed`: they are not the cards the transaction found there. */
+function remapCards(cards: Card[], tr: Transaction): { cards: Card[]; changed: boolean } {
+  const dirty = blockRanges(tr.doc, touched(tr), 1, 1);
+  const moved = cards.map((c) => ({ ...c, from: tr.mapping.map(c.from, 1), end: tr.mapping.map(c.end, -1) }));
+  const kept = moved.filter((c) => c.end > c.from && !dirty.some(([a, b]) => c.end >= a && c.from <= b));
+  const next = [...kept, ...dirty.flatMap(([a, b]) => cardsIn(tr.doc, a, b))].sort((x, y) => x.from - y.from);
+  const same = next.length === moved.length && next.every((c, i) => c.url === moved[i].url && c.from === moved[i].from && c.end === moved[i].end && c.summary === moved[i].summary);
+  return { cards: same ? moved : next, changed: !same };
 }
