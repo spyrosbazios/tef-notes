@@ -1,8 +1,9 @@
 // The writing model, the server's one provider as the chat agent calls it (server/agent/src/models.ts: the same
 // TEF_NOTES_PROVIDER, model and key; that file's PROVIDERS and this one's must agree, server/test/llm.test.js checks).
-// Used by the clip save (clip.pb.js) to write up the owner's note on a clip and, when the owner ticks "Add a summary",
-// to summarise what was clipped, and by the tag describer (tags.pb.js) to write a tag's description when asked; nothing
-// else on the server writes text.
+// The hooks' one writing model: the clip save (clip.pb.js) writes up the owner's note on a clip and, when the owner ticks
+// "Add a summary", summarises what was clipped; the Summary button's route (summary.pb.js) summarises a linked page; the
+// tag describer (tags.pb.js) writes a tag's description when asked, and the hourly job one where there is none or its own.
+// Beside the hooks, the chat agent (server/agent) writes text with the same provider and key.
 //
 // Every provider but Anthropic takes OpenAI-style Chat Completions (no tools are sent, so OpenAI's needn't be the
 // Responses API). The key is the `llm` one (lib/keys.js); Ollama has none, TEF_NOTES_OLLAMA_URL instead. TEF_NOTES_MODEL
