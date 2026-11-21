@@ -5,6 +5,11 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Fixed
+
+- `tefnotes` run with `TEF_NOTES_AGENT=1` marks every write that carries content: `import` and `draw --replace` no longer
+  leave a note unmarked, and a tag description it writes is recorded as an agent's, not the owner's.
+
 ### Changed
 
 - The auto-tagger learns from you. Each tag is judged against a few notes you filed under it by hand and a few you took

@@ -13,8 +13,9 @@ Every command: `tefnotes --help`. Setup: [`cli/README.md`](../../cli/README.md).
 ## Before anything
 
 - **Run every command with `TEF_NOTES_AGENT=1`** (`export TEF_NOTES_AGENT=1` once per shell). Your writes are then
-  marked `tainted`, so the in-app assistant treats them like web text and asks before writing after reading them.
-  Never leave it off.
+  marked `tainted` (notes and tasks) or `describedBy: agent` (tag descriptions), so the in-app assistant treats them like
+  web text and asks before writing after reading them. Never leave it off. Deleting, linking and renaming a tag carry
+  no mark.
 - `tefnotes ls` fails with "no server set": ask the user for the server's private address, then `tefnotes server <url>`.
   Never point it at a public address: the server has no sign-in.
 
@@ -71,4 +72,4 @@ Save replaces it with Excalidraw's own.
 
 ## Tags
 
-Only tags from `tefnotes tags`. Define or change one when the user asks: `tefnotes tag <name> [--color <colour>] [--about "<what it means>"]`. Rename one only when asked: `tefnotes rename-tag <old> <new>` renames it on every note, task and lens (a `<new>` already defined merges them).
+Only tags from `tefnotes tags`. Define or change one when the user asks: `tefnotes tag <name> [--color <colour>] [--about "<what it means>"]` (a description you write is marked as an agent's, so the auto-tagger may replace it, unlike one the user wrote). Rename one only when asked: `tefnotes rename-tag <old> <new>` renames it on every note, task and lens (a `<new>` already defined merges them).

@@ -4,6 +4,7 @@
 import { importPlan } from "./handoff";
 import { noteIdOf } from "./notes";
 import * as pb from "./pocketbase";
+import type { Mark } from "./record-contracts";
 
 /** The files to import: every path, relative with `/`, and how to read one. */
 export type Source = { paths: string[]; text: (path: string) => Promise<string>; blob: (path: string) => Promise<Blob> };
@@ -17,8 +18,9 @@ async function inBatches<T>(items: T[], fn: (x: T) => Promise<void>, size: numbe
 }
 
 /** Every `.md` in `src` as a note. A taken id is left alone unless `update`, and then written over at the rev just read;
- *  an attachment the note already has by that name stays. `dry`: decide and report, write nothing. */
-export async function importNotes(s: pb.Server, src: Source, o: { dry: boolean; update: boolean; today: string; onLine?: (l: ImportLine) => void }): Promise<ImportTally> {
+ *  an attachment the note already has by that name stays. `dry`: decide and report, write nothing. `mark` rides on every
+ *  note written (an outside agent's import is `tainted`, like its other writes). */
+export async function importNotes(s: pb.Server, src: Source, o: { dry: boolean; update: boolean; today: string; mark?: Mark; onLine?: (l: ImportLine) => void }): Promise<ImportTally> {
   const md = src.paths.filter((f) => /\.md$/i.test(f));
   const plan = importPlan(await Promise.all(md.map(async (from) => ({ from, text: await src.text(from) }))), new Set(src.paths), o.today);
   const there = new Map((await pb.list(s)).map((e) => [e.path, e]));
@@ -31,9 +33,9 @@ export async function importNotes(s: pb.Server, src: Source, o: { dry: boolean; 
     if (same) t.same++;
     line(!cur ? "new" : same ? "same" : "update");
     if (o.dry) return;
-    if (!cur) { await pb.create(s, e.path, e.text); t.made++; }
+    if (!cur) { await pb.create(s, e.path, e.text, o.mark); t.made++; }
     else if (!same) {
-      if (!(await pb.update(s, cur, e.text))) throw new Error(`${e.path} was deleted meanwhile`);
+      if (!(await pb.update(s, cur, e.text, o.mark))) throw new Error(`${e.path} was deleted meanwhile`);
       t.updated++;
     }
     const have = new Set(cur ? (await pb.photos(s, id)).map((p) => p.name) : []);

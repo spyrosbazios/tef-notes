@@ -6,15 +6,15 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { exportPlan, fileNameOf } from "@/core/handoff";
-import { importNotes } from "@/core/import";
 import { appendToNote, COLORS, isNotePath, MEMORY, newNotePath, parseNote, reconcile, serializeNote, type Color } from "@/core/notes";
 import * as pb from "@/core/pocketbase";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
 import { sceneProblem } from "@/core/drawing";
 import { drawingName, drawingPreview, fileMarkdown, isDrawingName } from "@/core/photos";
-import { createTag, describeAllTags, describeError, listTags, renameTag, updateTag } from "@/core/tags";
+import { describeAllTags, describeError, listTags, renameTag } from "@/core/tags";
 import { localDay } from "@/core/time";
+import { markOf, writer } from "./writes";
 
 const HELP = `tefnotes — the notes on the server
 
@@ -64,13 +64,15 @@ const HELP = `tefnotes — the notes on the server
 
 <id>: 20261005-lidl, notes/20261005-lidl.md, or "memory".
 
-TEF_NOTES_AGENT=1: every note and task written is marked as an outside agent's (\`tainted\`): the in-app assistant
-treats it like web text and asks before writing once it has read it. Coding agents run with it (skills/tefnotes).`;
+TEF_NOTES_AGENT=1: every note, task and tag description written (new, append, put, edit, draw, import, add, set, done, tag,
+tags --write) is marked as an outside agent's: a note or task \`tainted\`, so the in-app assistant treats it like web text and
+asks before writing once it has read it; a description \`describedBy: agent\`, so it isn't taken for the owner's. Deletions,
+links and tag renames carry no mark. Coding agents run with it (skills/tefnotes).`;
 
 const DIR = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "tefnotes"), SERVER = join(DIR, "server.json");
 
-/** What every note and task write carries (pocketbase.ts `Mark`). */
-const MARK: pb.Mark = process.env.TEF_NOTES_AGENT === "1" ? { tainted: true } : {};
+/** Every write that carries content goes through this, marked when TEF_NOTES_AGENT=1 (writes.ts). */
+const write = writer(markOf(process.env));
 
 const die = (msg: string): never => { console.error(`tefnotes: ${msg}`); process.exit(1); };
 
@@ -95,7 +97,7 @@ async function need(s: pb.Server, id: string): Promise<pb.Remote> {
 async function change(s: pb.Server, id: string, next: (text: string) => string): Promise<pb.Remote> {
   for (let tries = 0; tries < 3; tries++) {
     const cur = await need(s, id);
-    try { return (await pb.update(s, cur, next(cur.text), MARK)) ?? die(`${cur.path} was deleted meanwhile`); } catch (e) {
+    try { return (await write.notes.update(s, cur, next(cur.text))) ?? die(`${cur.path} was deleted meanwhile`); } catch (e) {
       if (!(e instanceof pb.Conflict)) throw e;
     }
   }
@@ -118,6 +120,7 @@ async function draw(s: pb.Server, a: string[]) {
   const have = await pb.photos(s, noteId), replace = opt.get("replace");
   if (replace !== undefined) {
     if (!isDrawingName(replace) || !have.some((p) => p.name === replace)) die(`${idOf(note.path)} has no drawing ${replace}; it has: ${have.filter((p) => isDrawingName(p.name)).map((p) => p.name).join(", ") || "none"}`);
+    if (write.marks) await change(s, id!, (t) => t);   // the note carries the agent's mark before its scene is swapped
     for (const p of have) if (p.name === replace || p.name === drawingPreview(replace)) await pb.removePhoto(s, p.rec);
     await pb.upload(s, noteId, replace, blob);
     await pb.upload(s, noteId, drawingPreview(replace), png);
@@ -166,7 +169,7 @@ function walk(dir: string, root = dir): string[] {
 /** A folder of Markdown in as notes (core `importNotes`), each note's fate printed as it is decided. */
 async function importAll(s: pb.Server, dir: string, dry: boolean, update: boolean) {
   if (!existsSync(dir)) die(`no folder ${dir}`);
-  const t = await importNotes(s, { paths: walk(dir), text: async (f) => readFileSync(join(dir, f), "utf8"), blob: async (f) => Bun.file(join(dir, f)) },
+  const t = await write.importNotes(s, { paths: walk(dir), text: async (f) => readFileSync(join(dir, f), "utf8"), blob: async (f) => Bun.file(join(dir, f)) },
     { dry, update, today: localDay(), onLine: (l) => console.log(`${l.what.padEnd(6)}  ${l.from} -> ${l.id}${l.what === "skip" ? " (taken)" : l.files ? ` (${l.files} files)` : ""}`) });
   console.error(dry ? `${t.found} notes found, ${t.taken} already there; nothing written (--dry-run)`
     : `${t.made} new, ${t.updated} updated, ${t.same} unchanged, ${t.skipped} skipped; ${t.files} attachments`);
@@ -259,14 +262,14 @@ async function edit(s: pb.Server, id: string) {
   const mine = readFileSync(file, "utf8");
   if (mine === was.text) return console.error("unchanged");
   try {
-    const r = (await pb.update(s, was, mine, MARK)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
+    const r = (await write.notes.update(s, was, mine)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
     return console.error(`saved, rev ${r.rev}`);
   } catch (e) {
     if (!(e instanceof pb.Conflict)) throw e;
   }
   const theirs = await need(s, id), merged = reconcile(was.text, mine, theirs.text);
   if (merged == null) die(`changed on another device meanwhile, and the edits overlap; yours is in ${file}`);
-  const r = (await pb.update(s, theirs, merged!, MARK)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
+  const r = (await write.notes.update(s, theirs, merged!)) ?? die(`${was.path} was deleted meanwhile; your text is in ${file}`);
   console.error(`merged with an edit made meanwhile, saved, rev ${r.rev}`);
 }
 
@@ -302,7 +305,7 @@ async function main(argv: string[]) {
       try { described = await describeAllTags(s); } catch (e) { return die(describeError(e)); }
       for (const { tag, description } of described) {
         const def = defs.find((d) => d.name === tag);
-        if (opt.has("write") && def) await updateTag(s, def.rec, { name: def.name, color: def.color, description });
+        if (opt.has("write") && def) await write.tags.update(s, def, { name: def.name, color: def.color, description });
         console.log(`${tag} · ${description}`);
       }
       if (opt.has("write")) console.error(`saved ${described.length} description${described.length === 1 ? "" : "s"}`);
@@ -324,7 +327,7 @@ async function main(argv: string[]) {
       for (;;) {
         const path = newNotePath(title, Date.now(), taken);
         try {
-          await pb.create(s, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""), MARK);
+          await write.notes.create(s, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""));
           return console.log(idOf(path));
         } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
@@ -343,7 +346,7 @@ async function main(argv: string[]) {
       if (!id || !rev || !/^\d+$/.test(rev)) die("tefnotes put <id> <rev> [< file]   (rev: from tefnotes cat)");
       const text = await stdin(), cur = await need(s, id);
       try {
-        const r = (await pb.update(s, { ...cur, rev: Number(rev) }, text, MARK)) ?? die(`${cur.path} was deleted meanwhile`);
+        const r = (await write.notes.update(s, { ...cur, rev: Number(rev) }, text)) ?? die(`${cur.path} was deleted meanwhile`);
         return console.error(`saved, rev ${r.rev}`);
       } catch (e) {
         if (e instanceof pb.Conflict) die(`${cur.path} is at rev ${cur.rev} now, not ${rev}: cat it again and redo the change`);
@@ -380,7 +383,7 @@ async function main(argv: string[]) {
       fields.order = nextOrder(await pb.tasks.list(s));
       for (let tries = 0; tries < 3; tries++) {
         let id: string;
-        try { id = (await pb.tasks.create(s, newTask(pb.recordId(), fields), MARK)).id; } catch (e) {
+        try { id = (await write.tasks.create(s, newTask(pb.recordId(), fields))).id; } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
           continue;
         }
@@ -397,9 +400,9 @@ async function main(argv: string[]) {
         const { rev, ...was } = cur, { task, next } = complete(was, localDay(), pb.recordId);
         if (task === was) return console.error("already done");
         try {
-          const r = (await pb.tasks.update(s, cur.id, rev, task, MARK)) ?? die(`task ${ref} was deleted meanwhile`);
+          const r = (await write.tasks.update(s, cur.id, rev, task)) ?? die(`task ${ref} was deleted meanwhile`);
           if (next) {
-            const made = await pb.tasks.create(s, next, MARK);
+            const made = await write.tasks.create(s, next);
             for (const l of linksForNextRound(await pb.links.from(s, { type: "task", id: cur.id }), cur.id, made.id, pb.recordId)) await pb.links.add(s, l);
             console.error(`next round ${made.id}`);
           }
@@ -422,7 +425,7 @@ async function main(argv: string[]) {
         let next: Task;
         try { next = patchTask(was, patch); } catch (e) { return die((e as Error).message); }
         try {
-          const r = (await pb.tasks.update(s, cur.id, rev, next, MARK)) ?? die(`task ${ref} was deleted meanwhile`);
+          const r = (await write.tasks.update(s, cur.id, rev, next)) ?? die(`task ${ref} was deleted meanwhile`);
           return console.error(`saved, rev ${r.rev}`);
         } catch (e) {
           if (!(e instanceof pb.Conflict)) throw e;
@@ -448,10 +451,10 @@ async function main(argv: string[]) {
       const color = opt.has("color") ? colorOf(opt.get("color")!) : undefined;
       const had = (await listTags(s)).find((d) => d.name.toLowerCase() === name.toLowerCase());
       if (had) {
-        await updateTag(s, had.rec, { name: had.name, color: opt.has("color") ? color : had.color, description: opt.get("about") ?? had.description });
+        await write.tags.update(s, had, { name: had.name, color: opt.has("color") ? color : had.color, description: opt.get("about") ?? had.description });
         return console.error(`changed ${had.name}`);
       }
-      await createTag(s, { name, color, description: opt.get("about") ?? "" });
+      await write.tags.create(s, { name, color, description: opt.get("about") ?? "" });
       return console.error(`defined ${name}`);
     }
     case "rename-tag": {

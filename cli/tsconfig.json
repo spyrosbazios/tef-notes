@@ -4,5 +4,5 @@
     "strict": true, "noEmit": true, "skipLibCheck": true, "allowImportingTsExtensions": true,
     "paths": { "@/core/*": ["../packages/core/src/*"] }
   },
-  "include": ["tefnotes.ts"]
+  "include": ["tefnotes.ts", "writes.ts", "test"]
 }
