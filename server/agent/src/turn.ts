@@ -67,7 +67,7 @@ export async function context(notes: Notes, page: AssistantContext | undefined, 
 
 /** Notes and tasks are the user's: each write asks, goes ahead or is refused by the owner's rule for its action (`rules`, their
  *  preferences' `actions`, @/core/actions), and one allowed without asking still asks once the chat has read the web or a PDF
- *  (`web`), where a page can carry instructions aimed at the agent. A bad path skips the card: the tool's error goes straight back. */
+ *  (`web`), where a page can carry instructions aimed at the agent. A call its check fails (a bad path) is refused with the reason. */
 export function approvals(notes: Notes, todo: Todo, rules: Actions, web = readWeb(notes, todo), files: readonly Attached[] = []) {
   return policyApprovals(toolPolicies(), { notes, todo, files }, rules, web);
 }

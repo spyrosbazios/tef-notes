@@ -34,8 +34,10 @@ type Approvals<P> = {
 /** Whether the owner allows the tool at all: a tool whose action is "never" is withdrawn from the model. */
 export const allowed = (policy: Policy | undefined, rules: Actions) => !policy || policy.approval === "none" || rules[policy.approval] !== "never";
 
-/** A "never" action is refused before anything else; otherwise an invalid call goes directly to execution's error (only valid
- *  calls can request a card), and a valid one asks when its rule is "ask", or "auto" in a tainted turn. */
+/** A "never" action is refused before anything else; then a call its check fails is refused with the check's reason (the model
+ *  reads it; no card is shown), and a valid one asks when its rule is "ask", or "auto" in a tainted turn. A failed check is never
+ *  waved through to `execute`: the SDK decides every call of a step before it runs any, so one that fails now (a note the call
+ *  beside it is about to create) could pass by the time it runs, with no card. */
 export function policyApprovals<P extends Record<string, Policy<any>>>(
   policies: P, context: PolicyContext, rules: Actions,
   untrusted: (messages: ModelMessage[]) => Promise<boolean>,
@@ -46,7 +48,8 @@ export function policyApprovals<P extends Record<string, Policy<any>>>(
     const action = policy.approval, rule = rules[action];
     out[name] = async (input, { messages }) => {
       if (rule === "never") return { type: "denied", reason: refused(action) };
-      if (await policy.check?.(context, input)) return "not-applicable";
+      const bad = await policy.check?.(context, input);
+      if (bad) return { type: "denied", reason: bad };
       // "ask" never reads the history: nothing a turn holds can turn its card off
       return decide(rule, rule === "auto" && await untrusted(messages)) === "ask" ? "user-approval" : "not-applicable";
     };

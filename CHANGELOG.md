@@ -7,6 +7,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- The assistant: a write it can't make (a note that isn't there, a bad date) is refused before it runs, with the reason
+  shown in the chat. Two writes proposed at once can no longer let one under "Ask first" through without its card.
 - A clip saved as a new note or task under a lens gets the lens's tag whichever way it was saved: the clipper used to
   leave it off, the share page to drop your picked tags. The server adds it now; every client sends just your picks.
 - Auto-tagging: a note the tagging service keeps refusing no longer holds up the rest; it is retried less and less

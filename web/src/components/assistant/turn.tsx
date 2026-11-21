@@ -188,8 +188,10 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
     // Asked and passed over for a newer message: it never ran
     const passed = !last && answered(p);
     const unconfirmed = passed || (p.state === "output-denied" && approval?.reason === UNCONFIRMED);
-    const declined = p.state === "output-denied" && !unconfirmed;
-    const decided = approval?.approved === undefined || unconfirmed || p.state === "output-error" ? undefined : approval.approved ? "yes" : "no";
+    // Refused by the server, never asked (the owner's "Never", or a call its check failed): a failed row with the reason
+    const refused = p.state === "output-denied" && approval?.isAutomatic === true;
+    const declined = p.state === "output-denied" && !unconfirmed && !refused;
+    const decided = approval?.approved === undefined || unconfirmed || refused || p.state === "output-error" ? undefined : approval.approved ? "yes" : "no";
     if ((p.state === "approval-requested" && last && !live) || decided)
       return (
         <div key={i} className="space-y-2">
@@ -205,7 +207,7 @@ export const Turn = memo(function Turn({ m, streaming, live, last, respond, choo
     const detail = p.input && typeof p.input === "object" ? detailOf(name, p.input as Record<string, unknown>, titleOf) : "";
     const failed = p.state === "output-error" || p.state === "output-denied" || passed;
     const running = !failed && !settledState(p);
-    const why = p.state === "output-error" ? p.errorText : unconfirmed ? "Not confirmed" : declined ? "You declined" : "";
+    const why = p.state === "output-error" ? p.errorText : unconfirmed ? "Not confirmed" : refused ? approval?.reason ?? "" : declined ? "You declined" : "";
     return (
       <div key={`${i}${failed ? "!" : ""}`} className="space-y-2">
         <Fold icon={failed ? <TriangleAlert className="size-4 shrink-0 text-warn" /> : <Check className="size-4 shrink-0" />}

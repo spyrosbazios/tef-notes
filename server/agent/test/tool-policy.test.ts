@@ -42,7 +42,7 @@ describe("colocated tool policies", () => {
     expect(stepTools(["draw", "delete_note", "old_removed_tool"], true, policyFor)).toEqual(["draw", "delete_note", "old_removed_tool"]);
   });
 
-  it("follows the owner's rule per action; validators short-circuit; a tainted turn asks even when allowed", async () => {
+  it("follows the owner's rule per action; a failed check is refused with its reason; a tainted turn asks even when allowed", async () => {
     const context = {} as PolicyContext; // Synthetic validators below never access a server.
     for (const rule of RULES) {
       for (const tainted of [false, true]) {
@@ -60,7 +60,7 @@ describe("colocated tool policies", () => {
           expect(await approval.invalid({}, { messages: [] })).toMatchObject({ type: "denied" });
         } else {
           expect(write).toBe(rule === "ask" || tainted ? "user-approval" : "not-applicable");
-          expect(await approval.invalid({}, { messages: [] })).toBe("not-applicable");
+          expect(await approval.invalid({}, { messages: [] })).toEqual({ type: "denied", reason: "invalid" });
         }
         // "ask" never consults the history: nothing in the turn can talk it out of the card
         expect(reads).toBe(rule === "auto" ? 1 : 0);

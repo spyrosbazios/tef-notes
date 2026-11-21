@@ -67,12 +67,12 @@ describe("attach_file", () => {
     expect([...pb.attachments.values()].map((a) => a.name)).toEqual(["lease-2026.pdf"]);
   });
 
-  it("a bad call goes back to the agent without a card", async () => {
+  it("a bad call is refused with its reason, without a card", async () => {
     const ask = approvals(notes, new Todo({ url: pb.url }), DEFAULT_ACTIONS, undefined, [pic]);
     pb.put("notes/a.md", file("A"));
     expect(await run(T, { file: "nope.png", path: "notes/a.md" })).toMatchObject({ error: expect.stringContaining("receipt.jpg") });
     expect(await run(T, { file: "receipt.jpg" })).toMatchObject({ error: expect.stringContaining("either path") });
-    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/nope.md" }, { messages: [] })).toBe("not-applicable");
+    expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/nope.md" }, { messages: [] })).toMatchObject({ type: "denied", reason: expect.stringContaining("No note") });
     expect(await ask.attach_file({ file: "receipt.jpg", path: "notes/a.md" }, { messages: [] })).toBe("user-approval");
     expect(pb.attachments.size).toBe(0);
   });

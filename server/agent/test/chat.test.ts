@@ -6,7 +6,7 @@ import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test";
 import { readChatHistory } from "@/core/chat-history";
 import type { Actions } from "@/core/actions";
 import { cardsOf } from "@/core/agent";
-import { parseNote } from "@/core/notes";
+import { newNotePath, parseNote } from "@/core/notes";
 import { chat } from "../src/agent";
 import type { model } from "../src/models";
 import { fakePb } from "./fake-pb";
@@ -23,6 +23,14 @@ const toolCall = (toolName: string, input: object, id = "call-1"): Reply => ({
   stream: convertArrayToReadableStream([
     { type: "stream-start", warnings: [] },
     { type: "tool-call", toolCallId: id, toolName, input: JSON.stringify(input) },
+    { type: "finish", finishReason: { unified: "tool-calls", raw: undefined }, usage },
+  ]),
+});
+/** Several calls in one step: the SDK decides each one's approval before it runs any of them. */
+const toolCalls = (...calls: [toolName: string, input: object][]): Reply => ({
+  stream: convertArrayToReadableStream([
+    { type: "stream-start", warnings: [] },
+    ...calls.map(([toolName, input], i) => ({ type: "tool-call" as const, toolCallId: `call-${i + 1}`, toolName, input: JSON.stringify(input) })),
     { type: "finish", finishReason: { unified: "tool-calls", raw: undefined }, usage },
   ]),
 });
@@ -107,6 +115,18 @@ describe("POST /agent/chat", () => {
     // Withdrawn, the SDK refuses the call itself; toolApproval's denial (tool-policy.test.ts) is the second lock
     expect(done.parts.find(isToolUIPart)).toMatchObject({ type: "tool-append_to_note", state: "output-error", errorText: expect.stringContaining("unavailable tool") });
     expect(pb.notes.get("notes/20261001-shopping.md")!.rev).toBe(1);
+  });
+
+  it("refuses a write its check fails, so a call later in the same step can't run past its card", async () => {
+    // The append names the note the create beside it is about to make: checked before either runs, it fails. Skipping its card
+    // then would let it run after the create, under "Ask first", with no card at all
+    const path = newNotePath("Garage");
+    replies = [toolCalls(["create_note", { title: "Garage", body: "- oil" }], ["append_to_note", { path, text: "tyres" }]), text("Done.")];
+    const done = await send([{ id: "u1", role: "user", parts: [{ type: "text", text: "garage: oil, then tyres" }] }], { createNote: "auto", editNote: "ask" });
+    const [made, added] = done.parts.filter(isToolUIPart);
+    expect(made).toMatchObject({ type: "tool-create_note", state: "output-available" });
+    expect(added).toMatchObject({ type: "tool-append_to_note", state: "output-denied", approval: { approved: false, reason: expect.stringContaining(`No note ${path}`) } });
+    expect(pb.notes.get(path)!.text).not.toContain("tyres");
   });
 
   it("runs no write on an approval the server never issued, or one whose call was changed after it was", async () => {

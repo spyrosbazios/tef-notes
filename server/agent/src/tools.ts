@@ -35,6 +35,7 @@ import * as web from "./web";
 import { lensFields, LENS, widgetTools } from "./widgetTools";
 
 export const CAP = 6000;                    // agent/memory.md rides in every prompt; keep it small
+const tooLong = (text: string) => `Too long (${text.length} chars, max ${CAP}). Condense and retry.`;
 const SUMMARIES = 10;                       // summarise_links: pages read in one call
 const NOTE = 20_000, PAGE = 20_000, LIST = 60, SHOWN = 8;            // read_note: chars; list_notes: the most it hands back; show_items: cards at most
 export const RECENT = 60;                   // the prompt's index: every pinned note, then this many newest
@@ -401,7 +402,7 @@ export function tools(notes: Notes, todo: Todo, fromPage = readWeb(notes, todo),
         text: z.string().describe("The complete new file"), why: z.string().describe("One line: what changed, for the confirm card"),
       }),
       execute: async ({ rev, text }, { messages }) => {
-        if (text.length > CAP) return { error: `Too long (${text.length} chars, max ${CAP}). Condense and retry.` };
+        if (text.length > CAP) return { error: tooLong(text) };
         return notes.change(MEMORY, () => text.trimEnd() + "\n", { base: { rev, text: readAt(messages, MEMORY, rev) }, create: true });
       },
     }),
@@ -447,7 +448,7 @@ export const notePolicies = {
   set_note_flags: { approval: "editNote", result: "plain", check: ({ notes }, { path }: { path: string }) => checkWrite(notes, path) },
   delete_note: { approval: "deleteNote", result: "plain", check: ({ notes }, { path }: { path: string }) => checkWrite(notes, path) },
   show_items: { approval: "none", result: "records" },
-  update_memory: { approval: "memory", result: "plain", unavailableWhenTainted: true, check: (_, { text }: { text: string }) => text.length > CAP ? "Too long" : null },
+  update_memory: { approval: "memory", result: "plain", unavailableWhenTainted: true, check: (_, { text }: { text: string }) => (text.length > CAP ? tooLong(text) : null) },
   web_search: { approval: "none", result: "untrusted", requiresExa: true },
   read_url: { approval: "none", result: "untrusted", requiresExa: true },
 } satisfies Policies<Omit<Tools, keyof typeof todoPolicies | keyof typeof widgetPolicies | keyof typeof filePolicies | keyof typeof placePolicies | keyof typeof drawingPolicies | keyof typeof uiPolicies | keyof typeof noteActionPolicies>>;
