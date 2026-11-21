@@ -9,8 +9,8 @@ const MEMORY = "agent/memory.md";
 const COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green", "gray"];
 const KEYS = ["title", "created", "pinned", "archived", "color", "tags"];
 
-/** Accents and Greek tonos off: the combining marks NFD splits out (goja's regexp: the range, not \p{M}). */
-const unmark = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").normalize("NFC");
+/** Accents and Greek tonos off, and every other script's combining marks: what NFD splits out, as core's fold (goja takes \p{M} with the u flag: two applied migrations use it). */
+const unmark = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
 
 /** Case and Greek tonos folded away, as the clients compare tag names. */
 const fold = (s) => unmark(s).toLowerCase();
