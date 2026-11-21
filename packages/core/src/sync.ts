@@ -111,18 +111,17 @@ export type Want = (path: string) => boolean;
 
 // ---- one sync at a time
 
-/** A function that runs `run` one at a time: a call while it runs sets a flag and gets the running promise back, and when
- *  the run ends it runs once more. `running()` says whether one is out. The flag is cleared in `.finally()` on the stored
- *  promise: an async function that never awaits finishes before the line storing its promise does, so a `finally` inside it
- *  would clear nothing and every later call would return early (the phone app this was ported from bit on this). */
+/** A function that runs `run` one at a time. A call while it runs asks for one more run after it and gets that rerun's promise
+ *  (every caller arriving mid-run shares the one rerun): a caller that awaits a sync to see a write made just now sees a round
+ *  that started after it, never the round already out. `running()` says whether one is out. `current` is cleared in
+ *  `.finally()` on the stored promise: an async function that never awaits finishes before the line storing its promise does,
+ *  so a `finally` inside it would clear nothing and every later call would return early (the phone app this was ported from
+ *  bit on this). The rerun chains on that same stored promise, so it starts after `current` is cleared. */
 export function coalesced(run: () => Promise<void>): (() => Promise<void>) & { running: () => boolean } {
-  let current: Promise<void> | null = null, again = false;
+  let current: Promise<void> | null = null, next: Promise<void> | null = null;
   const go = (): Promise<void> => {
-    if (current) { again = true; return current; }
-    const p: Promise<void> = run().catch(() => {}).finally(() => {
-      current = null;
-      if (again) { again = false; void go(); }
-    });
+    if (current) return (next ??= current.then(() => { next = null; return go(); }));
+    const p: Promise<void> = run().catch(() => {}).finally(() => { current = null; });
     current = p;
     return p;
   };

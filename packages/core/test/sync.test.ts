@@ -123,18 +123,25 @@ function run(s: Store, server: ReturnType<typeof fakeServer>, over: Partial<Run>
 }
 
 describe("coalesced", () => {
-  test("a call while one runs shares it and runs once more after", async () => {
-    let started = 0, release!: () => void;
+  test("calls while one runs share one rerun after it, and their promise is that rerun's", async () => {
+    let started = 0, seen = 0, release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
-    const go = coalesced(async () => { started++; await gate; });
-    const a = go(), b = go(), c = go();
+    let server = 0;
+    const go = coalesced(async () => { started++; const at = server; await gate; seen = at; });
+    const a = go();
+    server = 1;                                                // a write lands while the first run is out
+    const b = go(), c = go();
     expect(go.running()).toBe(true);
-    expect(b).toBe(a); expect(c).toBe(a);
+    expect(b).not.toBe(a); expect(c).toBe(b);
     release();
     await a;
-    await Bun.sleep(5);
+    expect(seen).toBe(0);
+    await b;
+    expect(seen).toBe(1);                                      // the caller that arrived mid-run sees the write
     expect(started).toBe(2);
     expect(go.running()).toBe(false);
+    await go();
+    expect(started).toBe(3);
   });
   test("a run that never awaits still clears running", async () => {
     let started = 0;

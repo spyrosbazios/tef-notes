@@ -16,6 +16,11 @@ version is one semver number for the whole repository, set by the git tag (see [
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
 
+### Fixed
+
+- Waiting for a sync while one is already out now waits for a fresh round: the assistant opening a note it just made, a
+  note action's Undo and the Share page no longer see the notebook as it was before the write.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added
