@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { placeOf, type Place, type Suggestion } from "@/core/places";
 import { Input } from "@/components/ui/input";
 import { useHovers } from "@/hooks/hover";
+import { answered, MIN_QUERY } from "@/lib/place-query";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
 import { suggest } from "@/services/places";
@@ -31,6 +32,8 @@ function Row({ icon: Icon, name, detail, active, ...props }: React.ComponentProp
 export function PlacePicker({ start = "", onPick }: { start?: string; onPick: (p: Place) => void }) {
   const [typed, setTyped] = useState(start), [asked, setAsked] = useState(start.trim());
   const [at, setAt] = useState(0);
+  // Enter pressed before the suggestions for the typed words are in: the pick waits for them
+  const [submit, setSubmit] = useState(false);
   const hovers = useHovers();
   useEffect(() => {
     const t = setTimeout(() => setAsked(typed.trim()), WAIT);
@@ -38,30 +41,38 @@ export function PlacePicker({ start = "", onPick }: { start?: string; onPick: (p
   }, [typed]);
   const found = useQuery({
     queryKey: ["places", asked], queryFn: ({ signal }) => suggest(asked, signal),
-    enabled: asked.length >= 2, placeholderData: keepPreviousData, staleTime: 5 * 60_000, retry: false,
+    enabled: asked.length >= MIN_QUERY, placeholderData: keepPreviousData, staleTime: 5 * 60_000, retry: false,
   });
-  const list: Suggestion[] = asked.length >= 2 ? (found.data ?? []) : [];
+  const list: Suggestion[] = asked.length >= MIN_QUERY ? (found.data ?? []) : [];
   const name = typed.trim();
   // The rows in order: the map's suggestions, then the typed words as a name
   const rows = [...list.map((s, i) => ({ key: s.place_id ?? `${i}`, s })), ...(name ? [{ key: "typed", s: null }] : [])];
   const active = Math.min(at, rows.length - 1);
+  const settled = answered(name, asked, found);
 
   const choose = (s: Suggestion | null) => {
     const p = s && placeOf(s);
     if (p) onPick(p);
     else if (name) onPick({ name });
   };
+  useEffect(() => {
+    if (submit && settled) { setSubmit(false); choose(rows[active].s); }
+  });
 
   return (
     <div className="space-y-2" role="combobox" aria-expanded={rows.length > 0}>
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" />
-        <Input value={typed} onChange={(e) => { setTyped(e.target.value); setAt(0); }} placeholder="Search a place" aria-label="Place"
+        <Input value={typed} onChange={(e) => { setTyped(e.target.value); setAt(0); setSubmit(false); }} placeholder="Search a place" aria-label="Place"
           autoFocus={!matchMedia("(pointer: coarse)").matches} enterKeyHint="search" className="pl-8"
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") { e.preventDefault(); setAt((i) => Math.min(i + 1, rows.length - 1)); }
             else if (e.key === "ArrowUp") { e.preventDefault(); setAt((i) => Math.max(i - 1, 0)); }
-            else if (e.key === "Enter" && rows.length) { e.preventDefault(); choose(rows[active].s); }
+            else if (e.key === "Enter" && name) {
+              e.preventDefault();
+              if (settled) choose(rows[active].s);
+              else { setAsked(name); setSubmit(true); }
+            }
           }} />
         {found.isFetching ? <Loader2 className="absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin text-faint" /> : null}
       </div>

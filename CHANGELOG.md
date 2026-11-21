@@ -22,6 +22,8 @@ version is one semver number for the whole repository, set by the git tag (see [
   the speech service) in the background.
 - Share page: the note you type reranks where the share fits from its current text (the first character used to be
   missed), and the shared photos' temporary addresses are released when the page is left.
+- Place picker: Enter pressed right after typing waits for the suggestions for those words instead of picking from the
+  previous words' list.
 
 ## 0.13.0 - 2026-11-19
 
