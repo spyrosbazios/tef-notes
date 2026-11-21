@@ -1,6 +1,6 @@
 # Contributing
 
-<!-- reviewed: 2026-11-18 -->
+<!-- reviewed: 2026-11-21 -->
 
 Thanks for looking. Read [ARCHITECTURE.md](ARCHITECTURE.md) first; it explains the note format and the write contract
 that most changes have to respect. Security reports go through [SECURITY.md](SECURITY.md), not issues.
@@ -49,7 +49,7 @@ Clone the whole repository: every module imports `packages/core`.
 
 Each module's README has its setup and commands:
 
-- `packages/core`: `cd packages/core && bun test && bun run typecheck`
+- `packages/core`: `cd packages/core && bun run lint && bun test && bun run typecheck`
 - `server` (hooks and the agent): [server/README.md](server/README.md); `cd server && bun test`
 - `web`: [web/README.md](web/README.md)
 - `cli`: [cli/README.md](cli/README.md)

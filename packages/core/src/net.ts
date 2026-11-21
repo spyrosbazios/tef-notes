@@ -42,7 +42,7 @@ function v6(input: string): number[] | null {
   const parse = (part: string) => (part === "" ? [] : part.split(":").map((g) => (/^[0-9a-f]{1,4}$/i.test(g) ? parseInt(g, 16) : NaN)));
   const head = parse(halves[0]!), rest = halves.length === 2 ? parse(halves[1]!) : [];
   const gap = 8 - head.length - rest.length;
-  const all = halves.length === 2 ? (gap >= 1 ? [...head, ...new Array<number>(gap).fill(0), ...rest] : []) : head;
+  const all = halves.length === 2 ? (gap >= 1 ? [...head, ...Array.from({ length: gap }, () => 0), ...rest] : []) : head;
   return all.length === 8 && all.every((g) => Number.isInteger(g)) ? all : null;
 }
 

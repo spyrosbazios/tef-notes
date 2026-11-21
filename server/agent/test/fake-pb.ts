@@ -16,9 +16,10 @@ export function fakePb() {
   const links = new Map<string, Rec>();
   const linkKey = (r: Rec) => [...LINK_COLUMNS, "role"].map((c) => r[c] ?? "").join("|");
   /** Links whose column names any of `ids`: what an end's delete takes. */
-  const unlink = (ids: Set<string>) => { for (const l of [...links.values()]) if (LINK_COLUMNS.some((c) => ids.has(l[c]))) links.delete(l.id); };
+  const unlink = (ids: Set<string>) => { for (const l of links.values()) if (LINK_COLUMNS.some((c) => ids.has(l[c]))) links.delete(l.id); };
   const tags: Rec[] = [], lenses: Rec[] = [], prefs: Rec[] = [];
   const attachments = new Map<string, Rec & { bytes: Uint8Array }>();
+  const withoutBytes = (r: Rec & { bytes: Uint8Array }) => { const { bytes: _, ...a } = r; return a; };
   const created: { col: string; body: Rec }[] = [];
   let n = 0, before: ((r: Rec) => void) | undefined;
   const stamp = () => new Date(Date.now() + n).toISOString().replace("T", " ");
@@ -78,13 +79,12 @@ export function fakePb() {
         const form = await req.formData(), note = String(form.get("note")), name = String(form.get("name")), f = form.get("file") as Blob;
         if ([...attachments.values()].some((x) => x.note === note && x.name === name)) return err(400, { data: { name: { code: "validation_not_unique" } } });
         const rec = attach(note, name, new Uint8Array(await f.arrayBuffer()));
-        const { bytes: _, ...a } = attachments.get(rec)!;
-        return Response.json(a);
+        return Response.json(withoutBytes(attachments.get(rec)!));
       }
       if (col === "attachments" && req.method === "DELETE") return attachments.delete(id ?? "") ? new Response(null, { status: 204 }) : err(404);
       if (col === "attachments") {
         const note = /^note = "(.*)"$/.exec(u.searchParams.get("filter") ?? "")?.[1];
-        return Response.json({ items: [...attachments.values()].filter((a) => !note || a.note === note).map(({ bytes: _, ...a }) => a) });
+        return Response.json({ items: [...attachments.values()].filter((a) => !note || a.note === note).map(withoutBytes) });
       }
       if (col === "links") {
         if (req.method === "GET") {

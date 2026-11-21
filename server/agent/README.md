@@ -102,6 +102,7 @@ runtime, so there is no build step.
 
 ```sh
 bun install
+bun run lint
 bun test
 bun run typecheck
 TEF_NOTES_PB=http://localhost:8097 TEF_NOTES_KEYS_DIR=/path/to/keys bun run start   # against a running PocketBase

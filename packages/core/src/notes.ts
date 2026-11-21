@@ -405,7 +405,7 @@ function hunks(a: string[], b: string[]): Hunk[] {
   while (p < a.length && p < b.length && a[p] === b[p]) p++;
   while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
   const A = a.slice(p, a.length - q), B = b.slice(p, b.length - q);
-  const L = Array.from({ length: A.length + 1 }, () => new Array<number>(B.length + 1).fill(0));
+  const L = Array.from({ length: A.length + 1 }, () => Array.from({ length: B.length + 1 }, () => 0));
   for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
   const out: Hunk[] = [];
   let i = 0, j = 0, h: Hunk | null = null;

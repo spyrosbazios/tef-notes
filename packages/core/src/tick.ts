@@ -45,6 +45,6 @@ export function ticker(settle: (id: string) => void, wait = TICK_MS, clock: Cloc
       pending.delete(id);
       return true;
     },
-    flush: () => { for (const id of [...pending.keys()]) done(id); },
+    flush: () => { for (const id of pending.keys()) done(id); },
   };
 }

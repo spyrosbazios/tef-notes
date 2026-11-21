@@ -96,7 +96,7 @@ export class Semantic {
 
   private async syncNow(notes: Meta[], docs: Doc[]) {
     const live = new Map(notes.filter((n) => n.path.startsWith("notes/")).map((n) => [n.path, n]));
-    for (const path of [...this.mem.keys()]) if (!live.has(path)) this.forget(path);
+    for (const path of this.mem.keys()) if (!live.has(path)) this.forget(path);
     const attached = Map.groupBy(docs, (d) => d.path);
     for (const n of live.values()) {
       const body = parseNote(n.path, n.text).body, pdfs = (attached.get(n.path) ?? []).sort((a, b) => a.key.localeCompare(b.key));
