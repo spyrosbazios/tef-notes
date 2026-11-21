@@ -49,7 +49,7 @@ Each module has its own `README.md`; `extension/` and `android/` also have an `A
 | `server/agent/src/application/` | Note/task reads, writes, retries, merges, caches and recurrence. `src/notes.ts` and `todo.ts` add assistant cards; companion and direct search use application services. `src/tool-policy.ts` types policy tables beside each tool factory; guard/loop receive policy lookup | ⭐ application services and tool policy |
 | `packages/core/src/chat-history.ts` | Legacy reads and versioned writes of chat history; migration `1794900000_chat_history.js` adds `historyVersion` without rewriting messages. Repair is an execution projection; historical tool inputs/outputs stay in streamed and persisted messages, with taint classified before repair | ⭐ chat persistence |
 | `web/src/lib/sync-controller.ts`, `local-records.ts`, `hooks/live.ts` | Instance-owned sync lifecycle, shared cache projections, and app-wide realtime subscriptions mounted by the root frame. `scripts/check-boundaries.ts` enforces these boundaries and the service/core boundaries in CI | |
-| `packages/core/src/notes.ts` | Frontmatter parse and serialize, ids, 3-way merge | ⭐ note format in code |
+| `packages/core/src/notes.ts` | Frontmatter parse and serialize, ids, 3-way merge (a Myers diff; `undoEdit` runs it backwards for a note action's Undo) | ⭐ note format in code |
 | `packages/core/src/agent.ts` | Card shapes (`NoteCard`, `TaskCard`) and builders, the model pick, a write's diff and flags, the confirm reasons | ⭐ |
 | `packages/core/src/theme.ts` | The themes (`THEMES`): the web app's, the site's and the extension's CSS variables are generated from it | ⭐ colours |
 | `web/src/services/` | The web app's transport (axios), errors mapped to the core's `Conflict` | |

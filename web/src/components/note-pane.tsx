@@ -17,7 +17,7 @@ import { LinkedTasks } from "@/components/linked-tasks";
 import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
 import type { PromptAction } from "@/core/note-actions";
-import { UNTITLED, pastedNote, type FlagEdit } from "@/core/notes";
+import { UNTITLED, pastedNote, undoEdit, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
 import { ago } from "@/core/time";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
@@ -119,10 +119,18 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
     const r = runs.run;
     if (!r) return;
     runs.close();
+    // What the run wrote, once it has reached this browser's copy: Undo takes back that edit and keeps what was written after
+    const wrote = syncNow().then(() => fresh().text);
+    wrote.catch(() => undefined);
     const undo = r.action.result === "edit" ? {
       label: "Undo",
-      // The agent's write may not have reached this browser's copy yet: fetched first, so the text put back replaces it
-      onClick: () => { void syncNow().then(() => write(qc, fresh(), () => r.before)).catch((e: unknown) => toast.error(message(e))); },
+      onClick: () => {
+        void wrote.then((after) => syncNow().then(() => write(qc, fresh(), (current) => {
+          const text = undoEdit(r.before, after, current);
+          if (text == null) throw new Error("Not undone: the note was edited in the same place since.");
+          return text;
+        }))).catch((e: unknown) => toast.error(message(e)));
+      },
     } : undefined;
     toast(r.action.label, { description: said || (r.action.result === "edit" ? "The note was changed." : "The task was added."), action: undo });
   };

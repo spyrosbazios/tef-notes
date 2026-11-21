@@ -2,7 +2,7 @@
 // (packages/core/src/notes.ts, pocketbase.ts) writes, or the phone's 3-way merge sees a change that isn't one.
 import { describe, expect, test } from "bun:test";
 import lib from "../pb_hooks/lib/notes.js";
-import { appendToNote, newNotePath, parseNote, serializeNote, slugify, withBody, withFlags } from "../../packages/core/src/notes";
+import { appendToNote, fold, newNotePath, parseNote, serializeNote, slugify, withBody, withFlags } from "../../packages/core/src/notes";
 import { noteColumns } from "../../packages/core/src/pocketbase";
 import { linkPath, pdfName, photoName } from "../../packages/core/src/photos";
 
@@ -58,6 +58,22 @@ describe("frontmatter", () => {
       const n = parseNote(P, text);
       expect(lib.withBody(text, lib.parse(P, text), "New.\n")).toBe(withBody(text, n, "New.\n"));
     }
+  });
+});
+
+describe("tag names", () => {
+  // Marks of every script, as combining characters (NFD splits the precomposed ones too): Hebrew points, Devanagari
+  // vowel signs, Arabic harakat, Japanese dakuten and handakuten, Thai tone marks, Vietnamese tones
+  const names = ["ΈΡΓΟ", "Café", "שָׁלוֹם", "हिन्दी", "مَرْحَبًا", "か\u3099", "は\u309a", "ガ", "ก่อน", "Việt Nam", "e\u0301\u0323", "Ÿ"];
+  test("fold as the core's: every combining mark goes, not Greek's range only", () => {
+    for (const t of names) expect(lib.fold(t)).toBe(fold(t));
+    expect(lib.fold("שָׁלוֹם")).toBe(fold("שָׁלוֹם"));
+    expect(lib.fold("שָׁלוֹם")).toBe("שלום");
+    expect(lib.fold("हिन्दी")).toBe(fold("हिन्दी"));
+    expect(lib.fold("か\u3099")).toBe(lib.fold("か"));
+  });
+  test("slugs as the core's with such marks in a title", () => {
+    for (const t of ["Café שָׁלוֹם", "Việt Nam", "ガ か\u3099"]) expect(lib.slugify(t)).toBe(slugify(t));
   });
 });
 

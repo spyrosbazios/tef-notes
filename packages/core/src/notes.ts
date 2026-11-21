@@ -161,10 +161,12 @@ export function serializeNote(meta: Meta, body: string): string {
   return `---\n${KEYS.map((k) => lineFor(k, meta)).filter((l) => l != null).join("\n")}\n---\n${body}`;
 }
 
-/** The file with a new body under its frontmatter as is: keys the laptop added, and its quoting, stay. A retitle
- *  rewrites the frontmatter with serializeNote. */
-export const withBody = (text: string, n: Note, body: string, title?: string) =>
-  title && title !== n.title ? serializeNote({ ...n, title }, body) : text.slice(0, text.length - n.body.length) + body;
+/** The file with a new body under its frontmatter as is: keys the laptop added, its quoting and its line ends stay. A
+ *  retitle replaces the title line in place (withKeys), nothing else of the frontmatter. */
+export function withBody(text: string, n: Note, body: string, title?: string): string {
+  const kept = text.slice(0, text.length - n.body.length) + body;
+  return title && title !== n.title ? withKeys(kept, { ...n, title, body }, ["title"]) : kept;
+}
 
 /** The note with these flags, edited in place (withKeys). `color: null` clears. */
 export function withFlags(path: string, text: string, flags: FlagEdit): string {
@@ -176,12 +178,13 @@ export function withFlags(path: string, text: string, flags: FlagEdit): string {
 }
 
 /** `text` with these keys' lines as serializeNote would write them from `next`, in place: other frontmatter lines (keys
- *  the laptop added, its quoting) stay as they are; a file serializeNote wrote comes out as serializeNote would write it. */
+ *  the laptop added, its quoting, its line ends) stay as they are; a file serializeNote wrote comes out as serializeNote
+ *  would write it. */
 function withKeys(text: string, next: Note, keys: readonly string[]): string {
   const f = front(text);
   if (!f) return serializeNote(next, next.body);
   const es = entries(f.lines);
-  for (const k of KEYS.filter((k) => FLAG_KEYS.includes(k) && keys.includes(k))) {
+  for (const k of KEYS.filter((k) => keys.includes(k))) {
     const line = lineFor(k, next), i = es.findIndex((e) => e.key === k);
     if (i >= 0) { if (line == null) es.splice(i, 1); else es[i] = { key: k, lines: line.split("\n") }; continue; }
     if (line == null) continue;
@@ -399,21 +402,62 @@ export const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").nor
 
 type Hunk = { s: number; e: number; lines: string[] };       // base lines [s, e) became `lines`
 
-/** The edits from `a` to `b`, by longest common subsequence of lines. Same head and tail trimmed first. */
+/** The lines `a[a0..a1)` and `b[b0..b1)` have in common, in order, as runs `[i, j, len]` (a run of `len` lines from
+ *  `a[i]` and `b[j]`): Myers' O(ND) diff in linear space, by its middle snake, so a long note costs time by how much
+ *  changed and memory by how long it is. */
+function common(a: string[], b: string[], a0: number, a1: number, b0: number, b1: number, out: [number, number, number][]): void {
+  let p = 0;
+  while (a0 + p < a1 && b0 + p < b1 && a[a0 + p] === b[b0 + p]) p++;
+  if (p) out.push([a0, b0, p]);
+  a0 += p; b0 += p;
+  let q = 0;
+  while (q < a1 - a0 && q < b1 - b0 && a[a1 - 1 - q] === b[b1 - 1 - q]) q++;
+  a1 -= q; b1 -= q;
+  if (a0 < a1 && b0 < b1) {
+    const [x0, y0, x1, y1] = middle(a, b, a0, a1, b0, b1);
+    common(a, b, a0, x0, b0, y0, out);
+    if (x1 > x0) out.push([x0, y0, x1 - x0]);
+    common(a, b, x1, a1, y1, b1, out);
+  }
+  if (q) out.push([a1, b1, q]);
+}
+
+/** The middle snake of the shortest edit script between two non-empty ranges (Myers 1986, section 4b): the diagonal run
+ *  `[x0, y0]` to `[x1, y1]` (absolute indexes) the forward and the backward search meet on. */
+function middle(a: string[], b: string[], a0: number, a1: number, b0: number, b1: number): [number, number, number, number] {
+  const n = a1 - a0, m = b1 - b0, delta = n - m, odd = (delta & 1) === 1, half = Math.ceil((n + m) / 2) + 1;
+  const off = half, fwd = new Int32Array(2 * half + 2), bwd = new Int32Array(2 * half + 2);
+  for (let d = 0; d <= half; d++) {
+    for (let k = -d; k <= d; k += 2) {
+      let x = k === -d || (k !== d && fwd[off + k - 1] < fwd[off + k + 1]) ? fwd[off + k + 1] : fwd[off + k - 1] + 1;
+      const sx = x, sy = x - k;
+      let y = sy;
+      while (x < n && y < m && a[a0 + x] === b[b0 + y]) { x++; y++; }
+      fwd[off + k] = x;
+      if (odd && k >= delta - (d - 1) && k <= delta + (d - 1) && x + bwd[off + delta - k] >= n) return [a0 + sx, b0 + sy, a0 + x, b0 + y];
+    }
+    for (let k = -d; k <= d; k += 2) {
+      let x = k === -d || (k !== d && bwd[off + k - 1] < bwd[off + k + 1]) ? bwd[off + k + 1] : bwd[off + k - 1] + 1;
+      const sx = x, sy = x - k;
+      let y = sy;
+      while (x < n && y < m && a[a1 - 1 - x] === b[b1 - 1 - y]) { x++; y++; }
+      bwd[off + k] = x;
+      if (!odd && k >= delta - d && k <= delta + d && x + fwd[off + delta - k] >= n) return [a1 - x, b1 - y, a1 - sx, b1 - sy];
+    }
+  }
+  throw new Error("diff: no middle snake");
+}
+
+/** The edits from `a` to `b`: the lines they don't have in common (`common`). */
 function hunks(a: string[], b: string[]): Hunk[] {
-  let p = 0, q = 0;
-  while (p < a.length && p < b.length && a[p] === b[p]) p++;
-  while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
-  const A = a.slice(p, a.length - q), B = b.slice(p, b.length - q);
-  const L = Array.from({ length: A.length + 1 }, () => Array.from({ length: B.length + 1 }, () => 0));
-  for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const runs: [number, number, number][] = [];
+  common(a, b, 0, a.length, 0, b.length, runs);
+  runs.push([a.length, b.length, 0]);
   const out: Hunk[] = [];
-  let i = 0, j = 0, h: Hunk | null = null;
-  while (i < A.length || j < B.length) {
-    if (i < A.length && j < B.length && A[i] === B[j]) { h = null; i++; j++; continue; }
-    if (!h) out.push((h = { s: p + i, e: p + i, lines: [] }));
-    if (j < B.length && (i === A.length || L[i][j + 1] >= L[i + 1][j])) h.lines.push(B[j++]);
-    else h.e = p + ++i;
+  let i = 0, j = 0;
+  for (const [x, y, len] of runs) {
+    if (x > i || y > j) out.push({ s: i, e: x, lines: b.slice(j, y) });
+    i = x + len; j = y + len;
   }
   return out;
 }
@@ -436,9 +480,10 @@ export function merge3(base: string, mine: string, theirs: string): string | nul
     const same = prev && h.s === prev.s && h.e === prev.e;
     if (same && h.lines.join("\n") === prev!.lines.join("\n")) continue;     // the same edit on both sides
     if (same) {
-      // One side's edit grown on the other (typing went on after a save the other side already has): the longer one
-      const [short, long] = h.lines.length < prev!.lines.length ? [h.lines, prev!.lines] : [prev!.lines, h.lines];
-      if (!extends_(long, short)) return null;                                // two different inserts at one spot
+      // Typing that went on after a save the other side already has: both grew the lines they replaced, one further than
+      // the other, and the longer wins. Anything else, a shrink against a growth included, is two different edits.
+      const [short, long] = extends_(h.lines, prev!.lines) ? [prev!.lines, h.lines] : [h.lines, prev!.lines];
+      if (!extends_(long, short) || !extends_(short, o.slice(h.s, h.e))) return null;
       out.splice(out.length - prev!.lines.length, prev!.lines.length, ...long);
       continue;
     }
@@ -448,6 +493,11 @@ export function merge3(base: string, mine: string, theirs: string): string | nul
   }
   return [...out, ...o.slice(at)].join("\n");
 }
+
+/** The note as it was before an edit (`before`) put back over what is there now (`current`), when `after` is what the edit
+ *  wrote: the inverse of the edit, merged into everything written since. null where the owner's later writing touches
+ *  the same lines: the edit can no longer be undone without losing theirs. */
+export const undoEdit = (before: string, after: string, current: string): string | null => merge3(after, before, current);
 
 /** The editor's draft when the stored body moved on under it (a pull, a merge on push, an agent append): both
  *  edits against `start`, the body it began from. Overlap keeps the draft as typed, `clash` set to say so. */

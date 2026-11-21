@@ -61,6 +61,16 @@ version is one semver number for the whole repository, set by the git tag (see [
 - The assistant's last step of a turn is sent no tools at all, and the app refuses a call to an app tool the turn did not
   offer. What an untrusted tool's error said now counts as read from the web in the turns that follow, as in its own.
 
+### Fixed
+
+- A note action's Undo takes back only what the action wrote and keeps what you wrote after it; where you changed the same
+  lines it says so instead of overwriting them.
+- Merging two edits of one line no longer drops a deletion made on one side against typing on the other (it is a conflict
+  now, and typing on is taken from whichever side did it). A long note merges in milliseconds, not about a second.
+- Renaming a note keeps its other frontmatter keys and its line ends.
+- The server folds tag names as the apps do, so tags with Hebrew, Devanagari, Arabic or Japanese marks no longer
+  duplicate or escape a rename.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added
