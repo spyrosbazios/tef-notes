@@ -7,7 +7,7 @@ import { isAxiosError } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cutOf, joined, MAX_SECONDS, RATE, spliced } from "@/core/voice";
-import { canRecord, loudness, micTrouble, openMic, type Mic } from "@/lib/mic";
+import { canRecord, loudness, micTrouble, openMic, openWhileWanted, type Mic } from "@/lib/mic";
 import { message } from "@/services/api";
 import { transcribe } from "@/services/voice";
 
@@ -44,7 +44,7 @@ export const canDictate = canRecord;
 export function useDictation(onText: (text: string) => void) {
   const [state, setState] = useState<DictationState>("idle");
   const [level, setLevel] = useState(0), [seconds, setSeconds] = useState(0);
-  const live = useRef<Live | null>(null), cb = useRef(onText);
+  const live = useRef<Live | null>(null), cb = useRef(onText), mounted = useRef(false);
   useEffect(() => { cb.current = onText; });
 
   /** The samples held so far, `n` of them sent as a piece; the rest kept. */
@@ -102,14 +102,17 @@ export function useDictation(onText: (text: string) => void) {
       const n = cutOf(flat(l.frames, l.held));
       if (n) send(l, n);
     };
-    let mic: Mic;
+    let mic: Mic | null;
     try {
-      mic = await openMic({ rate: RATE, frame: FRAME, onFrame });
+      // Leaving while the microphone opens: it is closed as soon as it is open, and nothing is recorded or sent
+      mic = await openWhileWanted(() => openMic({ rate: RATE, frame: FRAME, onFrame }), () => mounted.current);
     } catch (e) {
+      if (!mounted.current) return;
       setState("idle");
       toast.error(why(e));
       return;
     }
+    if (!mic) return;
     const began = performance.now();
     const tick = setInterval(() => {
       const s = (performance.now() - began) / 1000;
@@ -121,8 +124,11 @@ export function useDictation(onText: (text: string) => void) {
     setState("recording");
   }, [send, stop]);
 
-  // Leaving mid-recording drops the clip
-  useEffect(() => () => { const l = live.current; if (l && !l.ended) { l.cancelled = true; void finish(l); } }, [finish]);
+  // Leaving mid-recording drops the clip; leaving while the microphone is still opening is `start`'s to see (`mounted`)
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; const l = live.current; if (l && !l.ended) { l.cancelled = true; void finish(l); } };
+  }, [finish]);
 
   const toggle = useCallback(() => { if (state === "recording") { haptic("success"); stop(); } else if (state === "idle") { haptic("start"); void start(); } }, [state, start, stop]);
   return { state, level, seconds, start, stop, cancel, toggle };

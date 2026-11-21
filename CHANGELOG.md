@@ -16,6 +16,11 @@ version is one semver number for the whole repository, set by the git tag (see [
   doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
   re-tags every note. The ones it wrote before are rewritten once this way.
 
+### Fixed
+
+- Voice input: leaving the screen while the microphone was still opening no longer leaves it recording (and streaming to
+  the speech service) in the background.
+
 ## 0.13.0 - 2026-11-19
 
 ### Added
