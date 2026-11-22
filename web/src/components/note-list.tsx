@@ -104,7 +104,7 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
           : peek ? <Peek md={peek} className={cn("line-clamp-6 overflow-hidden", tint ? "opacity-85" : "text-dim")} /> : null}
         {n.note.tags.length ? (
           <span className="flex flex-wrap gap-1 max-md:[&>*:nth-child(n+3)]:hidden">
-            {n.note.tags.map((t) => <TagBadge key={t} name={t} onClick={() => onTag(t)} />)}
+            {n.note.tags.map((t) => <TagBadge key={t} name={t} onClick={selecting ? undefined : () => onTag(t)} />)}
           </span>
         ) : null}
         <span className={cn("flex items-center gap-1.5 text-[11px] tabular-nums", tint ? "text-tile-line" : "text-faint")}>
