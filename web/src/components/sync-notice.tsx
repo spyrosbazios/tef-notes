@@ -5,38 +5,20 @@
 import { blur, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { CloudAlert, CloudUpload, HardDrive, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
 import { Swap } from "@/components/swap";
-import { useOnline } from "@/hooks/online";
-import { useSyncStatus } from "@/hooks/sync";
-
-/** How long the server must have been out of reach before the pill says so: one failed request or the realtime stream dropping
- *  (every return from the background) marks it unreachable until the next answer, a second or two later. */
-const GRACE = 3000;
+import { useConnection } from "@/hooks/sync";
 
 const changes = (n: number) => `${n} ${n === 1 ? "change" : "changes"} waiting`;
-
-/** `on`, once it has stayed so for `ms`; off at once. */
-function useHeld(on: boolean, ms: number): boolean {
-  const [held, setHeld] = useState(false);
-  useEffect(() => {
-    if (!on) return;
-    const t = setTimeout(() => setHeld(true), ms);
-    return () => { clearTimeout(t); setHeld(false); };
-  }, [on, ms]);
-  return on && held;
-}
 
 /** Offline that has lasted, changes the last sync failed to send, changes the server refused (Settings lists them, to send
  *  again or let go), or the copy failing to be written to this device (edits would not outlive the page). Changes only waiting their turn (an edit goes up a moment after the last, lib/sync.ts) are not news, nor is
  *  a conflict, which Settings lists. A count changing swaps in place. */
 export function SyncNotice() {
-  const online = useOnline(), { waiting, error, refused, unsaved } = useSyncStatus();
+  const { state, waiting, refused } = useConnection();
   const appear = useTempoTransition(transition.disclosure);
-  const offline = useHeld(!online, GRACE), stuck = online && waiting > 0 && !!error, refusedOnly = online && !stuck && refused.length > 0;
-  const notKept = !offline && !stuck && !refusedOnly && !!unsaved;
+  const offline = state === "offline", stuck = state === "stuck", refusedOnly = state === "refused", notKept = state === "notKept";
   const count = <Swap id={waiting}>{changes(waiting)}</Swap>;
-  const refusals = <Swap id={`r${refused.length}`}>{`${refused.length} ${refused.length === 1 ? "change" : "changes"} refused · see Settings`}</Swap>;
+  const refusals = <Swap id={`r${refused}`}>{`${refused} ${refused === 1 ? "change" : "changes"} refused · see Settings`}</Swap>;
   return (
     <AnimatePresence>
       {offline || stuck || refusedOnly || notKept ? (
