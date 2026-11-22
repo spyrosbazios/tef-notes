@@ -96,7 +96,7 @@ export function Tile({ id, n, link, now, selecting = false, selected = false, me
       {onHold ? null : <TileMenu paths={menuPaths} open={menu} onOpenChange={setMenu} onTags={onTags} onDelete={onDelete} className={cn(chrome, "right-2 max-md:hidden")} />}
       <Mosaic sources={pictures} more={more} className={pictures.length > 2 ? "h-44" : "h-32"} />
       <div className="flex flex-col gap-1.5 p-3">
-        <h3 className="line-clamp-2 font-semibold text-[15px] leading-snug">{n.note.title}</h3>
+        <h3 className={cn("line-clamp-2 font-semibold text-[15px] leading-snug", !pictures.length && onCheck && "indent-6", !pictures.length && !onHold && "md:pr-6")}>{n.note.title}</h3>
         {why ? <p className="line-clamp-6 text-[13px] leading-snug"><Sparkles className="mr-1 inline size-3 opacity-70" />{why}</p>
           : peek ? <Peek md={peek} className={cn("line-clamp-6 overflow-hidden", tint ? "opacity-85" : "text-dim")} /> : null}
         {n.note.tags.length ? (
