@@ -100,8 +100,15 @@ type PhonePrefs = LayoutPrefs & {
   tasksList: OpeningList;
 };
 
+/** What the assistant's round button at the corner does: opens the chat, or a small menu of the chat and Talk. */
+export const FAB_ACTIONS = ["chat", "menu"] as const;
+export type FabAction = (typeof FAB_ACTIONS)[number];
+export const FAB_ACTION_LABEL: Record<FabAction, string> = { chat: "Open the chat", menu: "Ask: chat or Talk" };
+
 /** The desktop's, with its sidebar. */
 type DesktopPrefs = LayoutPrefs & {
+  /** The assistant's button (FAB_ACTIONS); the phone has none, Ask is a tab there. */
+  fab: FabAction;
   /** The sidebar's screens it doesn't list (a hidden one is still reached by its link, the palette or the start screen). */
   hidden: RailItem[];
 };
@@ -159,7 +166,7 @@ export const DEFAULT_PREFS: Prefs = {
   clip: { summary: false },
   lens: null,
   phone: { ...layoutDefaults("phone"), tabs: [...TABS], hidden: [...OFF], tabLabels: "active", tasksList: "today" },
-  desktop: { ...layoutDefaults("desktop"), hidden: [...RAIL_OFF] },
+  desktop: { ...layoutDefaults("desktop"), hidden: [...RAIL_OFF], fab: "chat" },
 };
 
 // ---- reading
@@ -212,7 +219,8 @@ export function prefsOf(raw: unknown): Prefs {
       tabLabels: one(TAB_LABELS, phone.tabLabels, "active"),
       tasksList: one(OPENING_LISTS, phone.tasksList, "today"),
     },
-    desktop: { ...layoutOf(desktop, "desktop", noteActions), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF] },
+    desktop: { ...layoutOf(desktop, "desktop", noteActions), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF],
+      fab: one(FAB_ACTIONS, desktop.fab, "chat") },
   };
 }
 

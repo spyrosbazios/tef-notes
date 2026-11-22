@@ -1,7 +1,7 @@
 // Settings → Layout: each layout's own preferences (core/prefs.ts): where the app opens, Home's list, the phone's tabs, the desktop's sidebar.
 import { ChevronDown, Monitor, Smartphone } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, OPENING_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
+import { FAB_ACTION_LABEL, FAB_ACTIONS, HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, OPENING_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
 import { TASK_LIST_LABEL } from "@/core/things";
 import { Choice } from "@/components/settings/choice";
 import { TITLE } from "@/components/settings/style";
@@ -12,7 +12,7 @@ import { prefsNow, setPrefs, usePrefs } from "@/hooks/prefs";
 import { TAB_ICON } from "@/components/tab-icons";
 import { RAIL_ICON } from "@/components/task-icons";
 import { useLayout } from "@/hooks/media";
-import { useOffered } from "@/hooks/talk";
+import { useOffered, useTalkOn } from "@/hooks/talk";
 import { cn } from "@/lib/utils";
 
 /** What a phone tab's row opens to, when it has a choice of its own. */
@@ -97,14 +97,21 @@ function PhoneLayout() {
 
 /** The desktop's: Home's list, and the screens the sidebar lists. */
 function DesktopLayout() {
-  const { homeList, hidden } = usePrefs().desktop;
-  const offered = useOffered();
+  const { homeList, hidden, fab } = usePrefs().desktop;
+  const offered = useOffered(), talkOn = useTalkOn();
   return (
     <LayoutCard layout="desktop">
       <div className="space-y-2.5 px-3 py-2.5">
         <p className="text-sm font-semibold">Home's task box opens on</p>
         <Choice label="Home's task box opens on, Desktop" value={homeList} options={OPENING_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ desktop: { homeList: v } })} />
       </div>
+      {talkOn ? (
+        <div className="space-y-2.5 px-3 py-2.5">
+          <p className="text-sm font-semibold">The assistant's button</p>
+          <p className="text-[13px] leading-snug text-dim">The round button at the corner: straight to the chat, or a menu to type or talk.</p>
+          <Choice label="The assistant's button" value={fab} options={FAB_ACTIONS} names={FAB_ACTION_LABEL} onPick={(v) => setPrefs({ desktop: { fab: v } })} />
+        </div>
+      ) : null}
       <div className="px-3 py-2.5">
         <p className="text-sm font-semibold">Sidebar</p>
         <p className="text-[13px] leading-snug text-dim">Home, Search and Settings always stay.</p>

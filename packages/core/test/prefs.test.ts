@@ -24,7 +24,7 @@ describe("prefsOf", () => {
   test("each layout keeps its own", () => {
     const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"] } });
     expect(p.phone).toMatchObject({ start: "inbox", homeList: "upcoming" });
-    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"], noteHeader: DEFAULT_PREFS.desktop.noteHeader });
+    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"], fab: "chat", noteHeader: DEFAULT_PREFS.desktop.noteHeader });
   });
   test("the shape before layouts reads as defaults: the migration moved it (1794600000_prefs_layouts.js)", () => {
     expect(prefsOf({ start: "inbox", tabs: ["ask", "home"] }).phone).toEqual(DEFAULT_PREFS.phone);
@@ -111,4 +111,10 @@ describe("talkThinking", () => {
     expect(talkThinking(q)).toEqual({ model: "quick", effort: "quick" });
     expect(prefsOf({ talk: { agent: { effort: "huge" } } }).talk.agent).toEqual({});
   });
+});
+
+test("the desktop's assistant button opens the chat unless the owner picked the menu", () => {
+  expect(prefsOf({}).desktop.fab).toBe("chat");
+  expect(prefsOf({ desktop: { fab: "menu" } }).desktop.fab).toBe("menu");
+  expect(prefsOf({ desktop: { fab: "bogus" } }).desktop.fab).toBe("chat");
 });
