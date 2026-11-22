@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { Conflict, Refused, Unavailable } from "@/core/pocketbase";
+import { Conflict, Refused, Unavailable } from "@/core/record-contracts";
 import { linkRecord, type Link } from "@/core/record-links";
 import { newTask } from "@/core/todo";
 import { api, Offline } from "@/services/api";

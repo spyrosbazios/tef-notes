@@ -1,10 +1,11 @@
 // A folder of Markdown brought in as notes: `importPlan` (handoff.ts) carried out against the server. One run for the
 // CLI (`tefnotes import`, files on disk) and the web app (Settings → Import, a picked folder or an export's zip); each
 // hands it a `Source` over its own files.
-import { importPlan } from "./handoff";
-import { noteIdOf } from "./notes";
+import { importPlan } from "../handoff";
+import { noteIdOf } from "../notes";
 import * as pb from "./pocketbase";
-import type { Mark } from "./record-contracts";
+import { Conflict, type Mark } from "../record-contracts";
+import type { Server } from "../urls";
 
 /** The files to import: every path, relative with `/`, and how to read one. */
 export type Source = { paths: string[]; text: (path: string) => Promise<string>; blob: (path: string) => Promise<Blob> };
@@ -20,7 +21,7 @@ async function inBatches<T>(items: T[], fn: (x: T) => Promise<void>, size: numbe
 /** Every `.md` in `src` as a note. A taken id is left alone unless `update`, and then written over at the rev just read;
  *  an attachment the note already has by that name stays. `dry`: decide and report, write nothing. `mark` rides on every
  *  note written (an outside agent's import is `tainted`, like its other writes). */
-export async function importNotes(s: pb.Server, src: Source, o: { dry: boolean; update: boolean; today: string; mark?: Mark; onLine?: (l: ImportLine) => void }): Promise<ImportTally> {
+export async function importNotes(s: Server, src: Source, o: { dry: boolean; update: boolean; today: string; mark?: Mark; onLine?: (l: ImportLine) => void }): Promise<ImportTally> {
   const md = src.paths.filter((f) => /\.md$/i.test(f));
   const plan = importPlan(await Promise.all(md.map(async (from) => ({ from, text: await src.text(from) }))), new Set(src.paths), o.today);
   const there = new Map((await pb.list(s)).map((e) => [e.path, e]));
@@ -42,7 +43,7 @@ export async function importNotes(s: pb.Server, src: Source, o: { dry: boolean; 
     for (const f of e.files) {
       if (have.has(f.name)) continue;
       try { await pb.upload(s, id, f.name, await src.blob(f.from)); t.files++; } catch (err) {
-        if (!(err instanceof pb.Conflict)) throw err;                     // added meanwhile: it is there
+        if (!(err instanceof Conflict)) throw err;                     // added meanwhile: it is there
       }
     }
   }, 4);

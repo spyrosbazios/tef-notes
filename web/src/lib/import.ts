@@ -2,7 +2,7 @@
 // Markdown, or a zip such as Settings → Export makes. Paths are the folder's own: a picked folder's name, or a zip's
 // single top folder, is dropped so links between its files resolve as they do on disk.
 import { strFromU8, unzipSync } from "fflate";
-import type { Source } from "@/core/import";
+import type { Source } from "@/core/client/import";
 
 /** The common first folder of every path, dropped; none when they don't share one. */
 function rooted(paths: string[]): (p: string) => string {

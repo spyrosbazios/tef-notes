@@ -1,6 +1,7 @@
 // The one reader of a server's failure (serverError), and getJson's HttpError carrying its words.
 import { afterEach, describe, expect, it } from "bun:test";
-import { getJson, HttpError, serverError } from "../src/http";
+import { getJson, HttpError } from "../src/client/http";
+import { serverError } from "../src/record-contracts";
 
 const real = globalThis.fetch;
 afterEach(() => { globalThis.fetch = real; });

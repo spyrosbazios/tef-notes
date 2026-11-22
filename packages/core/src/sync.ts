@@ -61,7 +61,7 @@ export type Store = { notes: Table<NoteRow>; tasks: Table<TaskRow>; links: Table
  *  note's `created` day instead). It is the row's `updated` when the note is first seen or taken, so the list's order is the server's. */
 export type Fetched = Remote & { at?: number };
 
-/** What the engine asks of the server, the core's `pocketbase.ts` calls with the server bound (the web wraps its axios services
+/** What the engine asks of the server, the core client's calls (`client/pocketbase.ts`) with the server bound (the web wraps its axios services
  *  the same way). Every call rejects with a typed outcome of record-contracts (record-protocol maps PocketBase's answers to
  *  them): `Conflict` for a stale rev or a taken name, `Gone`, `Refused`, `Unavailable`. */
 export type Transport = {

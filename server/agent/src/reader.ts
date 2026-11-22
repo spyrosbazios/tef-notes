@@ -6,9 +6,10 @@
 // 200 an Article; 400 a URL the server won't fetch; 422 a page with no article in it; 502 the site didn't answer.
 import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
-import { HttpError } from "@/core/http";
-import * as pb from "@/core/pocketbase";
+import { HttpError } from "@/core/client/http";
+import * as pb from "@/core/client/pocketbase";
 import type { Article } from "@/core/reader";
+import type { Server } from "@/core/urls";
 
 const fail = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -24,7 +25,7 @@ export async function parse(html: string, url: string): Promise<Article | null> 
   };
 }
 
-export async function reader(req: Request, server: pb.Server): Promise<Response> {
+export async function reader(req: Request, server: Server): Promise<Response> {
   const url = new URL(req.url).searchParams.get("url") ?? "";
   if (!/^https?:\/\//i.test(url)) return fail(400, "Only http(s) URLs.");
   let page: { url: string; html: string };

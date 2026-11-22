@@ -1,6 +1,6 @@
 # Architecture
 
-<!-- reviewed: 2026-11-21 -->
+<!-- reviewed: 2026-11-22 -->
 
 How TEF Notes fits together: the pieces, the note format, the write contract, tasks, links, and the server's jobs. For setup see
 [README.md](README.md) and the module READMEs.
@@ -21,11 +21,12 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
   PocketBase hooks cannot stream. Speech — dictation's transcripts and Talk's ears and voice — is Fish Audio's, reached
   from the agent with the `fish` key (`server/README.md`, "Voice input" and "Talk").
 - `packages/core/`: dependency-free TypeScript shared by the web app, CLI, extension and agent, imported as
-  `@/core/*`. It holds the note format, the merge, the PocketBase client, task logic, agent card shapes and the theme
-  palettes. `record-contracts.ts` holds transport-free record types, the typed failures (`Conflict`, `Gone`, `Refused`,
+  `@/core/*`. It holds the note format, the merge, task logic, agent card shapes and the theme
+  palettes, all pure; its one I/O is the fetch client under `src/client/` (the CLI's, the agent's), which nothing else in the
+  core loads (`scripts/check-boundaries.ts`). `record-contracts.ts` holds transport-free record types, the typed failures (`Conflict`, `Gone`, `Refused`,
   `Unavailable`) and derived note columns; `record-protocol.ts` holds note/task/link requests over an injected transport and
   maps PocketBase's answers to those failures (`outcomeOf`: a relation to a deleted record is `Gone`). The fetch client
-  (`pocketbase.ts`) and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports
+  (`client/pocketbase.ts`) and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports
   the contracts, not the HTTP client, and switches on those types, never on status codes: a `Refused` change is parked
   (`refused`) and shown to the owner instead of being retried. The server's hooks run in PocketBase's JS VM and import no TypeScript, so what they use of the core (the note
   format, the share text, links) and of the agent (the notes index, the provider table) is bundled for it, at image build
@@ -73,7 +74,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
   Each `draw` answers with a picture of the drawing after it, which the model looks at to fix what is off; a saved chat
   keeps no picture. A drawing's PNG is also a tile picture of its note, like a photo.
 - The `title`, `day`, flag and `tags` columns are copies of the frontmatter, written by the client beside `text`. Edit the
-  text; never set those columns alone (`noteColumns` in `packages/core/src/pocketbase.ts` builds them for every writer).
+  text; never set those columns alone (`noteColumns` in `packages/core/src/record-contracts.ts` builds them for every writer).
 - `autotagged` and `tagged` belong to the server's auto-tagger and are never written by a client. The auto-tagger suggests nothing: every tag it judges likely enough (p >= 0.7, more for a tag you keep taking off) it adds
   itself, at most 3 of its own on a note, and a wrong one is removed by hand. `autotagged` holds every name it ever added to the note, which it never
   adds again, so a tag you removed by hand stays removed; the ones no longer on the note are what it learns from. `tagged` is
@@ -88,7 +89,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
 - `kind` says what the note is: `note`, the only kind today; a select that grows as kinds are added
   (`server/pb_migrations/1793300000_note_kind.js`). It is set when the note is made and never changes (`notes.pb.js`: a
   create without one is a `note`). It is the only test of what a note is: nothing reads a kind out of a path. Clients get it
-  with every listing (`Listed`, `Remote`, `Card` in `packages/core/src/pocketbase.ts`; `noteKindOf`). The removed screenshot
+  with every listing (`Listed`, `Remote` in `packages/core/src/record-contracts.ts`, `Card` in `packages/core/src/client/pocketbase.ts`; `noteKindOf`). The removed screenshot
   captures' `capture` is still in old data and reads as `note`.
 - A `- [ ]` box in a note is only a box, ticked in the note's editor. Tasks are
   records (below), never lines in a note.
@@ -123,7 +124,7 @@ Things-style to-dos, records of their own (`tasks`; schema in
   (`server/pb_hooks/notes.pb.js`) and its links (cascade); no task changes.
 - Ticking a repeating task marks it done without `every` and makes its next round a new record (`complete`), linked to
   what the done one was linked to (`linksForNextRound` in `packages/core/src/record-links.ts`).
-- Transport: `packages/core/src/pocketbase.ts` (`tasks`: `revs`, `list`, `get`, `getMany`, `create`,
+- Transport: `packages/core/src/client/pocketbase.ts` (`tasks`: `revs`, `list`, `get`, `getMany`, `create`,
   `update`, `remove`).
 
 ## Lenses
@@ -136,7 +137,7 @@ lens says; only lists are narrowed.
 
 - The definitions are the `lenses` collection (`server/pb_migrations/1793600000_lenses.js`: `name`, unique ignoring case, and
   `tags` as JSON), so every device has the same ones. Like the `tags` definitions it has open rules and no `rev`: a lens is
-  edited whole and the last save wins. Calls: `packages/core/src/pocketbase.ts` `lenses`.
+  edited whole and the last save wins. Calls: `packages/core/src/client/pocketbase.ts` `lenses`.
 - Which lens is on is a preference every device shares (`packages/core/src/prefs.ts` `lens`), and none is the unfiltered app. A lens deleted elsewhere is none (`activeLens`).
   The web switcher is at the bottom of the rail; on a phone it is on Home, and the lens filters every tab.
 - The assistant is told: the web app sends the lens as the request context's `filter` (`lens: Work (tags: work, clients)`,
@@ -147,7 +148,7 @@ lens says; only lists are narrowed.
 
 One `links` record per relation between two records, `from` → `to` with a `role` (schema:
 `server/pb_migrations/1793300001_links.js`; shape in code: `packages/core/src/record-links.ts`; calls:
-`packages/core/src/pocketbase.ts` `links`). It replaced the single `tasks.note`: a task about several notes, what links to a
+`packages/core/src/client/pocketbase.ts` `links`). It replaced the single `tasks.note`: a task about several notes, what links to a
 note (its backlinks), a task made from a clipped picture (about the new note holding it).
 
 - Ends are typed relations, one column per kind of record on each side: `fromNote` `fromTask`, `toNote` `toTask` (the
@@ -174,7 +175,7 @@ the agent writes it the same way). Links are outside it (above).
 
 - `server/pb_hooks/rev.pb.js` (logic in `lib/rev.js`) is a compare-and-swap: a write whose `rev` is not the record's
   current one is refused, and a successful write bumps it.
-- A write is never sent twice by the transport (`packages/core/src/http.ts`: only a GET or DELETE is retried), since a reply lost
+- A write is never sent twice by the transport (`packages/core/src/client/http.ts`: only a GET or DELETE is retried), since a reply lost
   after the server acted would make it act twice. What must survive a lost reply is idempotent by construction: every create
   carries an id its client made (notes, tasks, links, lenses, tags, a push claim, a companion's task, a clip save: the clip
   routes record each save under its `id` in `clip_saves` and answer a repeat as the first), and a create sent again that finds

@@ -21,8 +21,8 @@
 import { generateId, isTextUIPart } from "ai";
 import type { Effort } from "@/core/agent";
 import { talkThinking } from "@/core/prefs";
-import type * as pb from "@/core/pocketbase";
 import { bytesOf, costOf, talkClientEventOf, TALK_LIMITS, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
+import type { Server } from "@/core/urls";
 import { hold, load, saver } from "./chats";
 import { ownerPrefs } from "./prefs";
 import { settle } from "./guard";
@@ -90,7 +90,7 @@ export type Talk = { audio(pcm: Uint8Array): void; client(e: TalkClientEvent): v
 /** What a conversation needs of the world: the notes, how it speaks, and how it thinks. The owner's rules for the agent's
  *  writes are not here: every turn reads them from the preferences (turn.ts). */
 export type Deps = {
-  server: pb.Server;
+  server: Server;
   /** The voice model and voice the owner picked (prefs.ts `talk`). */
   sea: Sea;
   /** The chat model for the turns, and the owner's effort (the steps a turn may take). */
@@ -440,7 +440,7 @@ export async function talkVoicesRoute(req: Request, fish: Fish): Promise<Respons
   }
 }
 
-export async function talkRoute(req: Request, srv: Bun.Server<Sock>, server: pb.Server, fish: Fish): Promise<Response | undefined> {
+export async function talkRoute(req: Request, srv: Bun.Server<Sock>, server: Server, fish: Fish): Promise<Response | undefined> {
   if (!(await key("fish"))) return new Response("Talk is off", { status: 404 });
   const { prefs } = await ownerPrefs(server);
   let voice = prefs.talk.voice || process.env.TEF_NOTES_TALK_VOICE || "";

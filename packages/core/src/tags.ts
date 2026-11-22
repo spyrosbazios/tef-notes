@@ -1,11 +1,8 @@
 // Tags. A tag *definition* (name, badge colour, a hint for the AI) is a record in `tags` on the server; a note's own
 // tags are its frontmatter `tags:` line, copied into the `tags` column by noteColumns like every flag. Deleting a
 // definition leaves notes alone; renaming a tag is the server's (renameTag), so every item carrying it follows. The server tags notes itself (its `autotagged` column);
-// a client's own tag edits go through applyTags.
-// Platform-neutral, like pocketbase.ts: fetch only, so the phone, the web app and the CLI share it.
-import { getJson, HttpError } from "./http";
+// a client's own tag edits go through applyTags. The calls to the server: client/tags.ts.
 import { fold, parseNote, withFlags, type Color } from "./notes";
-import { call, createdUnder, json, recordId, type Server } from "./pocketbase";
 import type { Task } from "./todo";
 
 /** `describedBy`: who wrote the description (the server's column): only "owner" is the owner's own words; the auto-tagger's ("auto")
@@ -26,43 +23,15 @@ export const tagDef = (r: any): TagDef => ({ rec: r.id, name: r.name, color: r.c
 export const tagColumns = (t: TagFields, mark?: TagMark) =>
   ({ name: t.name.trim(), color: t.color ?? "", description: t.description.trim(), ...(mark && t.description.trim() ? { describedBy: mark } : {}) });
 
-/** Every definition, by name. */
-export async function listTags(s: Server): Promise<TagDef[]> {
-  const j = await call(s, "collections/tags/records?perPage=500&skipTotal=1&sort=name");
-  return j.items.map(tagDef);
-}
-
-/** A new definition, under an id of its own (`id`, made here when not given): sent again when no answer came, never twice.
- *  Conflict: a tag by that name (ignoring case) exists. */
-export const createTag = (s: Server, t: TagFields, mark?: TagMark, id = recordId()): Promise<TagDef> => createdUnder(
-  async () => tagDef(await call(s, "collections/tags/records", json("POST", { id, ...tagColumns(t, mark) }))),
-  async () => { try { return tagDef(await call(s, `collections/tags/records/${id}`)); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; } });
-
-/** Conflict: the new name is taken. */
-export const updateTag = async (s: Server, rec: string, t: TagFields, mark?: TagMark): Promise<TagDef> =>
-  tagDef(await call(s, `collections/tags/records/${rec}`, json("PATCH", tagColumns(t, mark))));
-
 /** What a rename did (server/pb_hooks/tags.pb.js): the name the items carry now, how many records changed, and whether
  *  `to` was a tag already, which the renamed one merged into. */
 export type Renamed = { tag: string; notes: number; tasks: number; lenses: number; merged: boolean };
 
-/** Renames the tag `from` to `to` on every note, task, lens and its definition, in one transaction on the server; a
- *  `to` already defined (case and tonos ignored) merges the two. */
-export const renameTag = (s: Server, from: string, to: string): Promise<Renamed> =>
-  getJson(`${s.url}/api/tefnotes/tags/rename`, json("POST", { from, to }), 1);
-
 // ---- descriptions written from the notes
 
 // The server writes a tag's description from the notes that carry it (server/pb_hooks/tags.pb.js, its model) and saves
-// nothing: the editor shows it, and it is saved with the tag as any edit is. A model call is behind each, so they wait
-// longer than a read and are not retried.
-const DESCRIBE_ALL_MS = 600_000;
+// nothing: the editor shows it, and it is saved with the tag as any edit is.
 export type Described = { tag: string; description: string };
-
-/** A description for every tag that has a note, by name. A tag the model failed on is left out. Its failure's message is
- *  the server's words (no note carries the tag, no key, the model failed: http.ts `serverError`). */
-export const describeAllTags = (s: Server): Promise<Described[]> =>
-  getJson(`${s.url}/api/tefnotes/tags/describe`, json("POST", { all: true }), 1, DESCRIBE_ALL_MS);
 
 // ---- a task being typed
 
@@ -70,13 +39,7 @@ export const describeAllTags = (s: Server): Promise<Described[]> =>
 // nothing: the new-task forms ask GUESS_DELAY after the typing stops and show the answer on the draft. Once the task is
 // saved its tags are what the form held; the server never tags a task by itself.
 export const GUESS_DELAY = 800;
-const GUESS_MIN = 3, GUESS_MS = 20_000;
-
-/** The tags JEV gives a task with this title and notes, likeliest first. */
-export async function guessTags(s: Server, draft: { title: string; notes: string }, signal: AbortSignal): Promise<string[]> {
-  const j = await getJson(`${s.url}/api/tefnotes/tags/guess`, { ...json("POST", draft), signal }, 1, GUESS_MS);
-  return Array.isArray(j?.tags) ? j.tags.filter((t: unknown): t is string => typeof t === "string") : [];
-}
+const GUESS_MIN = 3;
 
 /** The draft's tags once a new guess is in: the ones put on by hand (`tags` less the previous guess, `before`), then
  *  the new guess less what was taken off by hand (`dismissed`), each once (case and tonos folded). */

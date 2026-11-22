@@ -25,7 +25,7 @@ export const REMIND = /^([01]\d|2[0-3]):[0-5]\d$/;
 export type ChecklistItem = { id: string; text: string; done: boolean };
 
 export type Task = {
-  /** The record id (15 of [a-z0-9], core/pocketbase.ts recordId), made by the client that adds it. */
+  /** The record id (15 of [a-z0-9], core/client/pocketbase.ts recordId), made by the client that adds it. */
   id: string;
   title: string;
   /** Markdown. */

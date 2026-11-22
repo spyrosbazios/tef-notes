@@ -3,7 +3,7 @@
 // answers (server/integration/contract.ts pins them), read by the protocol's own `outcomeOf`.
 import { describe, expect, test } from "bun:test";
 import { serializeNote } from "../src/notes";
-import { Conflict, Unavailable, type Remote, type Versioned } from "../src/pocketbase";
+import { Conflict, Unavailable, type Remote, type Versioned } from "../src/record-contracts";
 import { outcomeOf } from "../src/record-protocol";
 import { sameLink, type Link } from "../src/record-links";
 import {

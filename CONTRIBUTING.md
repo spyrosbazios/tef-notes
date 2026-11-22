@@ -1,6 +1,6 @@
 # Contributing
 
-<!-- reviewed: 2026-11-21 -->
+<!-- reviewed: 2026-11-22 -->
 
 Thanks for looking. Read [ARCHITECTURE.md](ARCHITECTURE.md) first; it explains the note format and the write contract
 that most changes have to respect. Security reports go through [SECURITY.md](SECURITY.md), not issues.
@@ -29,7 +29,8 @@ Clone the whole repository: every module imports `packages/core`.
 
 ## Rules
 
-- **`packages/core` stays dependency-free and shared.** No runtime dependencies, no platform APIs. If two clients need the
+- **`packages/core` stays dependency-free and shared.** No runtime dependencies, no platform APIs; its one I/O, the fetch
+  client, is under `src/client/`, which nothing else in it loads. If two clients need the
   same logic, it goes there; never copy it into a client. (The server's hooks run in PocketBase's JS VM, so they get the
   core as a bundle, never a copy: export what they need from `server/pb_hooks/bundle/core.ts`, which builds `lib/core.js`.
   Only pure code goes in it. One deliberate copy, kept in step by a test: the few rules in `android/`'s `Contract.kt`,
@@ -59,8 +60,8 @@ Each module's README has its setup and commands:
 - `site` and `video` (the public page and the promo film drawn from its screens): [site/README.md](site/README.md),
   [video/README.md](video/README.md); a change to a screen in `site/src/components/mock/` is checked in both
 
-`bun scripts/check-boundaries.ts` checks runtime import boundaries without installing dependencies: core domain/sync
-code stays independent of HTTP adapters, application services stay independent of assistant cards/tools and the AI SDK,
+`bun scripts/check-boundaries.ts` checks runtime import boundaries without installing dependencies: the core loads no
+package, and nothing in it outside `src/client/` (the fetch client) loads that client; application services stay independent of assistant cards/tools and the AI SDK,
 and web record features share projections rather than coordinating each other. CI runs this check separately.
 
 Run the checks of every module you touched, and of `packages/core` if you changed it (all clients depend on it).

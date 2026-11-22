@@ -1,8 +1,8 @@
 # TEF Notes CLI
 
-<!-- reviewed: 2026-11-21 -->
+<!-- reviewed: 2026-11-22 -->
 
-TEF Notes from a terminal: notes and tasks, for you and for coding agents. It is the same client the web app uses (`packages/core/src/pocketbase.ts`), so every write is a compare-and-swap on the record's `rev`: nothing here
+TEF Notes from a terminal: notes and tasks, for you and for coding agents. It is the same client the web app uses (`packages/core/src/client/pocketbase.ts`), so every write is a compare-and-swap on the record's `rev`: nothing here
 overwrites an edit it has not seen. The note format and the write contract are in
 [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 

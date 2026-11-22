@@ -4,6 +4,9 @@
 // web app's Excalidraw scene, kept beside a PNG preview of it, shown as a link to the scene.
 import { ATTACHMENTS, slugify } from "./notes";
 
+/** A file's record in `attachments`: which note, its name in the body, the stored file. */
+export type Photo = { rec: string; note: string; name: string; file: string; size?: number };
+
 export const MAX = 1600, QUALITY = 0.82;
 
 /** The resize that brings the long edge down to `max`, ratio kept; null when it's within already (or unknown, 0). */

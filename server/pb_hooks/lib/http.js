@@ -1,5 +1,5 @@
 // How every TEF Notes route (a `routerAdd` in pb_hooks) answers a failure: a 4xx or 5xx with `{ error }`, one sentence fit
-// to show the owner, and nothing else. Clients read it with one reader, packages/core/src/http.ts `serverError`.
+// to show the owner, and nothing else. Clients read it with one reader, packages/core/src/record-contracts.ts `serverError`.
 // test/http.test.js holds the hooks to it: no route answers `{ message }` or throws PocketBase's ApiErrors.
 //
 // PocketBase's own record API answers `{ message }` (with `data` naming the field), and so do the request hooks that refuse

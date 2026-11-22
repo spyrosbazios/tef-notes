@@ -2,7 +2,7 @@
 // (exa.ai/docs/search/best-practices): the model writes query + objective, search is type auto with highlights
 // (excerpts sized to relevance), and full text only for pages it picks. What comes back is a claim, not data:
 // every result carries its URL.
-import { getJson, HttpError } from "@/core/http";
+import { getJson, HttpError } from "@/core/client/http";
 import { key } from "./keys";
 
 export const PAGE = 10_000;        // chars per page read_url hands back — exa-js's default cap

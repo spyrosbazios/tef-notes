@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useNotes } from "@/hooks/notes";
 import { downloadZip } from "@/lib/export";
-import { importNotes, type ImportTally, type Source } from "@/core/import";
+import { importNotes, type ImportTally, type Source } from "@/core/client/import";
 import { folderSource, zipSource } from "@/lib/import";
 import { localDay } from "@/core/time";
 import { message } from "@/services/api";

@@ -16,7 +16,7 @@
 // open, and unsent ones are lost with it. The same trade the query cache's persister makes (lib/persist.ts).
 import { clear, createStore, entries, promisifyRequest } from "idb-keyval";
 import type { Topic } from "@/core/changes";
-import { recordId } from "@/core/pocketbase";
+import { recordId } from "@/core/client/pocketbase";
 import { linkRowOf, noteRowOf, ROWS_VERSION, taskRowOf } from "@/core/rows";
 import type { LinkRow, NoteRow, Store, Table, TaskRow } from "@/core/sync";
 import type { Rows } from "./tab-sync";

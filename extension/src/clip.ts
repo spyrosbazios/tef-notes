@@ -3,8 +3,7 @@
 // is the only place a choice is made; the tags are asked for beside the suggestions (tagsFor); the context menu hands its page to it (background.ts).
 // The shapes are packages/core/src/clip.ts's, shared with the phone's Share screen. The picture's bytes: picture.ts.
 import { CLIP_TEXT, type ClipPage, type ClipResult, type ClipTags, saveBodies, sendsFiles, suggestBody, type Suggestions, type Target } from "@/core/clip";
-import { serverError } from "@/core/http";
-import { likeLit } from "@/core/record-contracts";
+import { likeLit, serverError } from "@/core/record-contracts";
 import { getServer, hasAccess } from "./settings";
 
 export type Page = ClipPage;

@@ -9,7 +9,8 @@
 import type { UIMessage } from "ai";
 import { isPdf, PDF } from "@/core/photos";
 import { parseNote } from "@/core/notes";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
+import { type Server, photoUrl, type ThumbSize } from "@/core/urls";
 import { fileBytes } from "./chat-files";
 import { ocr } from "./ocr";
 import { render, RenderError } from "./render";
@@ -38,14 +39,14 @@ const UNSURE = 60;
 const ASK_PAGES = 12, ASK_MS = 60_000;
 
 /** The stored file's name in OCR's books, and where its bytes are. */
-const sourceOf = (server: pb.Server, p: Pick<Pdf, "rec" | "file">) => ({ key: `${p.rec}/${p.file}`, url: pb.photoUrl(server, p) });
+const sourceOf = (server: Server, p: Pick<Pdf, "rec" | "file">) => ({ key: `${p.rec}/${p.file}`, url: photoUrl(server, p) });
 
 /** The PDF itself can't be read (it wants a password, it is broken, it hangs or crashes pdf.js): no retry will change that. */
 export class Unreadable extends Error {}
 
 /** The stored file's bytes, for the render process. */
-async function bytesOf(server: pb.Server, p: Pick<Pdf, "rec" | "file">): Promise<Uint8Array> {
-  const res = await fetch(pb.photoUrl(server, p));
+async function bytesOf(server: Server, p: Pick<Pdf, "rec" | "file">): Promise<Uint8Array> {
+  const res = await fetch(photoUrl(server, p));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
@@ -64,7 +65,7 @@ const fold = (t: string) => t.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n")
 const cache = new Map<string, Promise<string[]>>();
 
 /** The PDF's own text, one string per page, whitespace runs folded. */
-function own(server: pb.Server, p: Pdf): Promise<string[]> {
+function own(server: Server, p: Pdf): Promise<string[]> {
   const key = `${p.rec}/${p.file}`, hit = cache.get(key);
   if (hit) { cache.delete(key); cache.set(key, hit); return hit; }        // newest last: the oldest goes first
   const run = textOf(() => bytesOf(server, p));
@@ -75,7 +76,7 @@ function own(server: pb.Server, p: Pdf): Promise<string[]> {
 }
 
 /** The PDF's pages: each its own text, a scanned one what OCR has read of it so far. */
-export async function pages(server: pb.Server, p: Pdf): Promise<Page[]> {
+export async function pages(server: Server, p: Pdf): Promise<Page[]> {
   const text = await own(server, p), o = ocr();
   if (!o) return text.map((t) => ({ text: t }));
   const read = o.stored(sourceOf(server, p).key);
@@ -88,7 +89,7 @@ export async function pages(server: pb.Server, p: Pdf): Promise<Page[]> {
 
 /** Has the scanned pages among `from`..`to` read now, ahead of the background, and waits for them at most `ms`: a page
  *  takes seconds, and what isn't back by then reads as not read yet, still on its way. No-op with OCR off. */
-export async function readNow(server: pb.Server, p: Pdf, from: number, to: number, ms = ASK_MS): Promise<void> {
+export async function readNow(server: Server, p: Pdf, from: number, to: number, ms = ASK_MS): Promise<void> {
   const o = ocr();
   if (!o) return;
   const text = await own(server, p), src = sourceOf(server, p), had = o.stored(src.key), ask: number[] = [];
@@ -102,7 +103,7 @@ let sweep: Promise<void> | undefined;
  *  indexes; later ones are read when asked for), and forgets what was read of PDFs that are gone. One pass at a time.
  *  While the reader can't work (no language data yet) and is waiting out its back-off (ocr.ts `holding`), a pass opens
  *  no PDF: it would only be to queue what can't be read. */
-export function readScans(server: pb.Server): Promise<void> {
+export function readScans(server: Server): Promise<void> {
   const o = ocr();
   if (!o) return Promise.resolve();
   if (sweep) return sweep;
@@ -128,13 +129,13 @@ export function readScans(server: pb.Server): Promise<void> {
 }
 
 /** The note's PDFs (`note`: the note's own id, parseNote's, which its attachments are filed under), as their records name them. */
-export async function pdfsOf(server: pb.Server, note: string): Promise<Pdf[]> {
+export async function pdfsOf(server: Server, note: string): Promise<Pdf[]> {
   return (await pb.photos(server, note)).filter((p) => isPdf(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
 }
 
 /** Every note's PDFs for the search index (semantic.ts), from one listing of the attachments; text read on demand. A
  *  PDF's key carries how many of its scanned pages OCR has read, so its note is embedded again as they come in. */
-export async function allPdfs(server: pb.Server, notes: { path: string; text: string }[]): Promise<Doc[]> {
+export async function allPdfs(server: Server, notes: { path: string; text: string }[]): Promise<Doc[]> {
   const byId = new Map(notes.map((n) => [parseNote(n.path, n.text).id, n.path])), read = ocr()?.counts();
   return (await pb.photos(server)).flatMap((p) => {
     const path = isPdf(p.name) && byId.get(p.note), key = `${p.rec}/${p.file}`, n = read?.get(key);
@@ -158,7 +159,7 @@ export function pageRange(all: Page[], from: number, to: number, max: number) {
 
 /** The open note's PDFs as the <context>'s <pdfs> block, or "" when it has none (or they can't be read: the chat goes on
  *  without them). Text is JSON-quoted so it can't close a tag. */
-export async function preview(server: pb.Server, note: { id: string; path: string }): Promise<string> {
+export async function preview(server: Server, note: { id: string; path: string }): Promise<string> {
   let list: Pdf[];
   try { list = await pdfsOf(server, note.id); } catch { return ""; }
   if (!list.length) return "";
@@ -197,7 +198,7 @@ async function onDisk(path: string, make: () => Promise<Uint8Array>): Promise<Ui
 }
 
 /** The first page of the note's PDF `name` as JPEG at `size`; null when the note has no such PDF. */
-export async function thumb(server: pb.Server, note: string, name: string, size: pb.ThumbSize = "sharp"): Promise<Uint8Array | null> {
+export async function thumb(server: Server, note: string, name: string, size: ThumbSize = "sharp"): Promise<Uint8Array | null> {
   const p = (await pdfsOf(server, note)).find((x) => x.name === name);
   if (!p) return null;
   const base = `${p.rec}_${p.file.replace(/[^\w.-]/g, "_")}`, key = `${base}_${size}`, hit = thumbs.get(key);
@@ -213,7 +214,7 @@ export async function thumb(server: pb.Server, note: string, name: string, size:
 
 /** How many pages the note's PDF `name` has; null when the note has no such PDF. Counted once per stored file and kept
  *  on disk beside its pictures. */
-export async function pageCount(server: pb.Server, note: string, name: string): Promise<number | null> {
+export async function pageCount(server: Server, note: string, name: string): Promise<number | null> {
   const p = (await pdfsOf(server, note)).find((x) => x.name === name);
   if (!p) return null;
   const path = join(thumbDir(), `${p.rec}_${p.file.replace(/[^\w.-]/g, "_")}_pages.txt`), f = Bun.file(path);
@@ -230,7 +231,7 @@ function pdfQuery(u: URL): { note: string; name: string } | Response {
 }
 
 /** GET /agent/pdf-pages?note=<the note's id>&name=<the PDF's name>: `{ pages }`, or 404. */
-export async function pagesRoute(req: Request, server: pb.Server): Promise<Response> {
+export async function pagesRoute(req: Request, server: Server): Promise<Response> {
   const q = pdfQuery(new URL(req.url));
   if (q instanceof Response) return q;
   let n: number | null;
@@ -242,7 +243,7 @@ export async function pagesRoute(req: Request, server: pb.Server): Promise<Respo
 }
 
 /** GET /agent/pdf-thumb?note=<the note's id>&name=<the PDF's name>&size=<blur|sharp, default sharp>: the JPEG, or 404. */
-export async function thumbRoute(req: Request, server: pb.Server): Promise<Response> {
+export async function thumbRoute(req: Request, server: Server): Promise<Response> {
   const u = new URL(req.url), q = pdfQuery(u), size = u.searchParams.get("size") ?? "sharp";
   if (q instanceof Response) return q;
   if (size !== "sharp" && size !== "blur") return new Response("size: blur or sharp", { status: 400 });
@@ -260,7 +261,7 @@ const attached = new Map<string, Promise<string>>();
 
 /** An attached PDF's text, its first READ_CHARS; its bytes are read once per server run (it rides in every later turn): a
  *  stored chat file's by its address, an older chat's inline data URL's by a hash of it. */
-function attachedText(server: pb.Server, url: string): Promise<string> {
+function attachedText(server: Server, url: string): Promise<string> {
   const key = url.startsWith("data:") ? String(Bun.hash(url)) : url, hit = attached.get(key);
   if (hit) return hit;
   const run = (async () => {
@@ -276,7 +277,7 @@ function attachedText(server: pb.Server, url: string): Promise<string> {
 
 /** The history with each attached PDF as its text: no provider is asked to read a PDF itself. A copy: the chat as saved
  *  keeps the file. Photos stay file parts, sent to the model as pictures (chat-files.ts `inlinePictures`). */
-export async function inlinePdfs<M extends UIMessage>(server: pb.Server, ms: M[]): Promise<M[]> {
+export async function inlinePdfs<M extends UIMessage>(server: Server, ms: M[]): Promise<M[]> {
   return Promise.all(ms.map(async (m) => (m.role !== "user" || !m.parts.some((p) => p.type === "file" && p.mediaType === PDF) ? m : {
     ...m,
     parts: await Promise.all(m.parts.map(async (p) => {

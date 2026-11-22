@@ -8,7 +8,7 @@ import { getToolName, isToolUIPart, readUIMessageStream, type UIMessage, type UI
 import { isUiTool } from "@/core/assistant";
 import type { Effort } from "@/core/agent";
 import type { AssistantContext } from "@/core/assistant";
-import type { Server } from "@/core/pocketbase";
+import type { Server } from "@/core/urls";
 import type { model as pickModel } from "./models";
 import { runTurn, type AgentMessage } from "./turn";
 

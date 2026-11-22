@@ -1,11 +1,14 @@
 // Request-scoped note reads, search and writes over the shared transport.
 // Writes carry the revision read, retry additive edits, and three-way merge whole-file edits.
 // Listings are invalidated after writes; taint is persisted in the same write and never cleared.
+import { listTags } from "@/core/client/tags";
 import { fold, newNotePath, noteKindOf, parseNote, snippetOf, type NoteKind } from "@/core/notes";
 import { mergedWrite } from "@/core/note-read";
-import * as pb from "@/core/pocketbase";
-import { HttpError } from "@/core/http";
-import { listTags, type TagDef } from "@/core/tags";
+import * as pb from "@/core/client/pocketbase";
+import { HttpError } from "@/core/client/http";
+import { noteColumns, Conflict, landed } from "@/core/record-contracts";
+import type { TagDef } from "@/core/tags";
+import type { Server } from "@/core/urls";
 import { allPdfs } from "../pdfs";
 import { semantic, type Near } from "../semantic";
 
@@ -33,7 +36,7 @@ export type Hit = { path: string; title: string; snippet: string; match: "words"
 
 export class NoteService {
   private rows?: Promise<Map<string, Meta>>;
-  constructor(readonly server: pb.Server) {}
+  constructor(readonly server: Server) {}
 
   /** Every record, notes and memory, by path. */
   all(): Promise<Map<string, Meta>> {
@@ -102,12 +105,12 @@ export class NoteService {
       const path = newNotePath(title, Date.now(), new Set((await this.all()).keys())), body = text(path);
       try {
         const r = await pb.createdUnder(
-          () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: rec, ...pb.noteColumns(path, body), ...(taint ? { tainted: true } : {}) })),
+          () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: rec, ...noteColumns(path, body), ...(taint ? { tainted: true } : {}) })),
           () => pb.get(this.server, rec));
         this.rows = undefined;
         return { saved: r.path, rev: r.rev, text: body };
       } catch (e) {
-        if (!(e instanceof pb.Conflict)) throw e;
+        if (!(e instanceof Conflict)) throw e;
         this.rows = undefined;
       }
     }
@@ -125,7 +128,7 @@ export class NoteService {
         this.rows = undefined;
         return { deleted: path, rev: cur.rev };
       } catch (e) {
-        if (!(e instanceof pb.Conflict)) throw e;
+        if (!(e instanceof Conflict)) throw e;
       }
     }
     return { error: `${path} keeps changing; try again in a moment.` };
@@ -148,12 +151,12 @@ export class NoteService {
         const first = edit("");
         try {
           const r = await pb.createdUnder(
-            () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: made, ...pb.noteColumns(path, first), ...(o.taint ? { tainted: true } : {}) })),
+            () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: made, ...noteColumns(path, first), ...(o.taint ? { tainted: true } : {}) })),
             () => pb.get(this.server, made));
           this.rows = undefined;
           return { saved: path, rev: r.rev, text: first };
         } catch (e) {
-          if (e instanceof pb.Conflict) continue;      // made meanwhile: edit that one
+          if (e instanceof Conflict) continue;      // made meanwhile: edit that one
           throw e;
         }
       }
@@ -171,17 +174,17 @@ export class NoteService {
       }
       try {
         const r = await pb.call(this.server, `collections/notes/records/${cur.rec}`,
-          pb.json("PATCH", { ...pb.noteColumns(path, next), rev: cur.rev, ...(o.taint ? { tainted: true } : {}) }));
+          pb.json("PATCH", { ...noteColumns(path, next), rev: cur.rev, ...(o.taint ? { tainted: true } : {}) }));
         this.rows = undefined;
         return { saved: path, rev: r.rev, text: next };
       } catch (e) {
         if (e instanceof HttpError && e.status === 404) return { error: `No note ${path}: it was deleted meanwhile.` };
-        if (e instanceof pb.Conflict) continue;
+        if (e instanceof Conflict) continue;
         if (!pb.unanswered(e)) throw e;
         // No answer: the write may have landed. Redoing an edit that adds on the text it already is in would add it twice.
         const now = await this.read(path);
         if (!now) return { error: `No note ${path}: it was deleted meanwhile.` };
-        if (now.rev !== cur.rev && pb.landed(cur.text, next, now.text)) { this.rows = undefined; return { saved: path, rev: now.rev, text: now.text }; }
+        if (now.rev !== cur.rev && landed(cur.text, next, now.text)) { this.rows = undefined; return { saved: path, rev: now.rev, text: now.text }; }
       }
     }
     return { error: `${path} keeps changing under this edit; try again in a moment.` };

@@ -14,7 +14,7 @@
 // Nothing typed is dropped but by the owner deleting the note here.
 import { tickChanges, type Change } from "@/core/changes";
 import { NOTES as NOTE_DIR, newNotePath, noteIdOf, parseNote, serializeNote, withBody, withFlags, type FlagEdit } from "@/core/notes";
-import { recordId } from "@/core/pocketbase";
+import { recordId } from "@/core/client/pocketbase";
 import type { Mark } from "@/core/record-contracts";
 import { newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "@/core/record-links";
 import { liveLinks, type NoteRow, type Refusal, type Store } from "@/core/sync";

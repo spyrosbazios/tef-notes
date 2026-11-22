@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // TEF Notes from a terminal: notes and tasks, for you and for coding agents. Same client as the phone
-// (packages/core/src/pocketbase.ts), so writes are compare-and-swap on rev: nothing here writes over an edit it hasn't
+// (packages/core/src/client/pocketbase.ts), so writes are compare-and-swap on rev: nothing here writes over an edit it hasn't
 // seen. The server's address is kept in ${XDG_STATE_HOME:-~/.local/state}/tefnotes/server.json.
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -8,13 +8,15 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { exportPlan, fileNameOf } from "@/core/handoff";
 import { appendToNote, COLORS, isNotePath, MEMORY, newNotePath, parseNote, reconcile, serializeNote, type Color } from "@/core/notes";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
+import { describeAllTags, listTags, renameTag } from "@/core/client/tags";
+import { type Remote, Conflict, landed } from "@/core/record-contracts";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
 import { sceneProblem } from "@/core/drawing";
-import { drawingName, drawingPreview, fileMarkdown, isDrawingName, linkPath } from "@/core/photos";
-import { describeAllTags, listTags, renameTag } from "@/core/tags";
+import { drawingName, drawingPreview, fileMarkdown, isDrawingName, linkPath, type Photo } from "@/core/photos";
 import { localDay } from "@/core/time";
+import { type Server, photoUrl, serverUrl } from "@/core/urls";
 import { markOf, writer } from "./writes";
 
 const HELP = `tefnotes — the notes on the server
@@ -77,7 +79,7 @@ const write = writer(markOf(process.env));
 
 const die = (msg: string): never => { console.error(`tefnotes: ${msg}`); process.exit(1); };
 
-function server(): pb.Server {
+function server(): Server {
   if (!existsSync(SERVER)) die("no server set: tefnotes server <url>");
   return JSON.parse(readFileSync(SERVER, "utf8"));
 }
@@ -90,7 +92,7 @@ async function stdin(): Promise<string> {
   return await new Response(Bun.stdin.stream()).text();
 }
 
-async function need(s: pb.Server, id: string): Promise<pb.Remote> {
+async function need(s: Server, id: string): Promise<Remote> {
   return (await pb.read(s, pathOf(id))) ?? die(`no note ${pathOf(id)}`);
 }
 
@@ -100,15 +102,15 @@ const gone = (path: string): never => { throw new Error(`${path} was deleted mea
 /** Write `next(current text)` until it lands on a rev nobody moved meanwhile. A write whose answer never came may have landed:
  *  the note is read again and, when it is past the rev written over and already holds the change, that is the answer; an edit that
  *  adds (append, a drawing's link) is never made a second time on top of itself. */
-async function change(s: pb.Server, id: string, next: (text: string) => string): Promise<pb.Remote> {
+async function change(s: Server, id: string, next: (text: string) => string): Promise<Remote> {
   for (let tries = 0; tries < 3; tries++) {
     const cur = await need(s, id), text = next(cur.text);
     try { return (await write.notes.update(s, cur, text)) ?? gone(cur.path); } catch (e) {
-      if (e instanceof pb.Conflict) continue;
+      if (e instanceof Conflict) continue;
       if (!pb.unanswered(e)) throw e;
       const now = await pb.read(s, cur.path);
       if (!now) gone(cur.path);
-      if (now!.rev !== cur.rev && pb.landed(cur.text, text, now!.text)) return now!;
+      if (now!.rev !== cur.rev && landed(cur.text, text, now!.text)) return now!;
     }
   }
   throw new Error("the note keeps changing under this edit; try again");
@@ -116,7 +118,7 @@ async function change(s: pb.Server, id: string, next: (text: string) => string):
 
 /** `tefnotes draw`: the scene and the server's PNG of it uploaded as the note's drawing (core/photos.ts: the scene linked, the
  *  PNG found beside it by name), then a line linking it appended; or, with --replace, an existing drawing's two files swapped. */
-async function draw(s: pb.Server, a: string[]) {
+async function draw(s: Server, a: string[]) {
   const usage = "tefnotes draw <id> <file.excalidraw|-> [--label <text>] [--replace <name.excalidraw>]";
   const { words, opt } = options(a, []), [id, file] = words;
   if (!id || !file) die(usage);
@@ -136,7 +138,7 @@ async function draw(s: pb.Server, a: string[]) {
     // the old drawing is still there and linked.
     const stem = replace.replace(/\.excalidraw$/i, "").replace(/-\d+$/, ""), name = drawingName(stem, new Set(have.map((p) => p.name)));
     const up = await pb.upload(s, noteId, name, blob);
-    let pre: pb.Photo | undefined;
+    let pre: Photo | undefined;
     try {
       pre = await pb.upload(s, noteId, drawingPreview(name), png);
       await change(s, id!, (t) => t.split(linkPath(noteId, replace)).join(linkPath(noteId, name)));
@@ -160,7 +162,7 @@ async function inBatches<T, R>(items: T[], fn: (x: T) => Promise<R>, size = 8): 
 }
 
 /** Every note and the attachments its body links, written under `dir`. An existing file there is overwritten. */
-async function exportAll(s: pb.Server, dir: string) {
+async function exportAll(s: Server, dir: string) {
   const entries = (await pb.list(s)).filter((e) => isNotePath(e.path));
   const notes = (await inBatches(entries, (e) => pb.get(s, e.rec))).flatMap((n) => (n && isNotePath(n.path) ? [n] : []));   // one deleted meanwhile is skipped
   const plan = exportPlan(notes, await pb.photos(s));
@@ -168,7 +170,7 @@ async function exportAll(s: pb.Server, dir: string) {
   for (const e of plan) put(`notes/${fileNameOf(e.path)}`, e.text);
   const files = plan.flatMap((e) => e.files);
   await inBatches(files, async (f) => {
-    const r = await fetch(pb.photoUrl(s, f.photo));
+    const r = await fetch(photoUrl(s, f.photo));
     if (!r.ok) die(`${f.path}: HTTP ${r.status}`);
     put(f.path, new Uint8Array(await r.arrayBuffer()));
   });
@@ -185,7 +187,7 @@ function walk(dir: string, root = dir): string[] {
 }
 
 /** A folder of Markdown in as notes (core `importNotes`), each note's fate printed as it is decided. */
-async function importAll(s: pb.Server, dir: string, dry: boolean, update: boolean) {
+async function importAll(s: Server, dir: string, dry: boolean, update: boolean) {
   if (!existsSync(dir)) die(`no folder ${dir}`);
   const t = await write.importNotes(s, { paths: walk(dir), text: async (f) => readFileSync(join(dir, f), "utf8"), blob: async (f) => Bun.file(join(dir, f)) },
     { dry, update, today: localDay(), onLine: (l) => console.log(`${l.what.padEnd(6)}  ${l.from} -> ${l.id}${l.what === "skip" ? " (taken)" : l.files ? ` (${l.files} files)` : ""}`) });
@@ -203,11 +205,11 @@ const taskLine = (t: Task, notes: string[] = []) => [t.id, t.title, t.evening &&
   t.tags.length && `tags ${t.tags.join(", ")}`, notes.length && `about ${notes.join(", ")}`].filter(Boolean).join(" · ");
 
 /** Note record id -> its id as the commands take it (`20261005-lidl`). */
-async function noteIds(s: pb.Server): Promise<Map<string, string>> {
+async function noteIds(s: Server): Promise<Map<string, string>> {
   return new Map((await pb.list(s)).map((e) => [e.rec, idOf(e.path)]));
 }
 
-async function showTasks(s: pb.Server, view: View) {
+async function showTasks(s: Server, view: View) {
   const v = views(await pb.tasks.list(s), localDay());
   const list = view === "today" ? [...v.today, ...v.evening] : view === "upcoming" ? v.upcoming.flatMap((d) => d.tasks) : v[view];
   const [links, notes] = list.length ? [await pb.links.list(s), await noteIds(s)] : [[], new Map<string, string>()];
@@ -215,7 +217,7 @@ async function showTasks(s: pb.Server, view: View) {
 }
 
 /** What is linked to or from a note: tasks about it first, then the rest. */
-async function showLinks(s: pb.Server, id: string) {
+async function showLinks(s: Server, id: string) {
   const rec = (await need(s, id)).rec, end: LinkEnd = { type: "note", id: rec };
   const [all, notes, tasks] = [await pb.links.of(s, end), await noteIds(s), await pb.tasks.list(s)], title = new Map(tasks.map((t) => [t.id, t.title]));
   const name = (e: LinkEnd) => (e.type === "note" ? notes.get(e.id) : e.type === "task" ? [e.id, title.get(e.id)].filter(Boolean).join(" · ") : e.id) ?? e.id;
@@ -225,7 +227,7 @@ async function showLinks(s: pb.Server, id: string) {
 }
 
 /** Tasks about notes: `ids` are note ids; each is made (link) or dropped (unlink). Idempotent both ways. */
-async function linkNotes(s: pb.Server, ref: string, ids: string[], drop: boolean) {
+async function linkNotes(s: Server, ref: string, ids: string[], drop: boolean) {
   const task = await taskBy(s, ref), end: LinkEnd = { type: "task", id: task.id };
   const recs = await Promise.all(ids.map(async (id) => (await need(s, id)).rec)), had = await pb.links.from(s, end);
   for (const rec of recs) {
@@ -237,7 +239,7 @@ async function linkNotes(s: pb.Server, ref: string, ids: string[], drop: boolean
 }
 
 /** A task by id, or by the start of one that no other shares. */
-async function taskBy(s: pb.Server, ref: string): Promise<Task> {
+async function taskBy(s: Server, ref: string): Promise<Task> {
   const all = await pb.tasks.list(s), hits = all.filter((t) => t.id === ref);
   const found = hits.length ? hits : all.filter((t) => t.id.startsWith(ref));
   return found.length === 1 ? found[0] : die(found.length ? `${ref} starts several tasks: use more of the id` : `no task ${ref} (ids: tefnotes tasks)`);
@@ -276,7 +278,7 @@ function taskPatch(opt: Map<string, string>, all: Map<string, string[]>): TaskPa
 
 const day = (v: string) => (v === "today" ? localDay() : v === "tomorrow" ? localDay(Date.now() + 86_400_000) : v);
 
-async function edit(s: pb.Server, id: string) {
+async function edit(s: Server, id: string) {
   const was = await need(s, id);
   // The note's text in a folder of its own (owner-only), never a predictable name another user could read or replace; removed
   // once the text is saved, kept and named whenever it isn't.
@@ -293,14 +295,14 @@ async function edit(s: pb.Server, id: string) {
       const r = (await write.notes.update(s, was, mine)) ?? keep(`${was.path} was deleted meanwhile`);
       return done(`saved, rev ${r.rev}`);
     } catch (e) {
-      if (!(e instanceof pb.Conflict)) throw e;
+      if (!(e instanceof Conflict)) throw e;
     }
     const theirs = await need(s, id), merged = reconcile(was.text, mine, theirs.text);
     if (merged == null) keep("changed on another device meanwhile, and the edits overlap");
     const r = (await write.notes.update(s, theirs, merged!)) ?? keep(`${was.path} was deleted meanwhile`);
     done(`merged with an edit made meanwhile, saved, rev ${r.rev}`);
   } catch (e) {
-    keep(e instanceof pb.Conflict ? "changed again while it was being merged" : e instanceof Error ? e.message : String(e));
+    keep(e instanceof Conflict ? "changed again while it was being merged" : e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -308,7 +310,7 @@ async function main(argv: string[]) {
   const [cmd, ...a] = argv;
   if (!cmd || cmd === "help" || cmd === "-h" || cmd === "--help") return console.log(HELP);
   if (cmd === "server") {
-    const s = { url: pb.serverUrl(a[0] ?? die("tefnotes server <url>")) };
+    const s = { url: serverUrl(a[0] ?? die("tefnotes server <url>")) };
     await pb.list(s);                                      // reachable, and a notes server, before it's kept
     mkdirSync(DIR, { recursive: true });
     writeFileSync(SERVER, JSON.stringify(s));
@@ -366,7 +368,7 @@ async function main(argv: string[]) {
           await write.notes.create(s, rec, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""));
           return console.log(idOf(path));
         } catch (e) {
-          if (!(e instanceof pb.Conflict)) throw e;
+          if (!(e instanceof Conflict)) throw e;
           taken.add(path);
         }
       }
@@ -387,7 +389,7 @@ async function main(argv: string[]) {
         const r = (await write.notes.update(s, { ...cur, rev: Number(rev) }, text)) ?? die(`${cur.path} was deleted meanwhile`);
         return console.error(`saved, rev ${r.rev}`);
       } catch (e) {
-        if (e instanceof pb.Conflict) die(`${cur.path} is at rev ${cur.rev} now, not ${rev}: cat it again and redo the change`);
+        if (e instanceof Conflict) die(`${cur.path} is at rev ${cur.rev} now, not ${rev}: cat it again and redo the change`);
         throw e;
       }
     }
@@ -397,7 +399,7 @@ async function main(argv: string[]) {
       if (!id || !rev || !/^\d+$/.test(rev)) die("tefnotes rm <id> <rev>   (rev: from tefnotes cat)");
       const cur = await need(s, id);
       try { await pb.remove(s, { rec: cur.rec, rev: Number(rev) }); } catch (e) {
-        if (e instanceof pb.Conflict) die(`${cur.path} is at rev ${cur.rev} now, not ${rev}: it changed since you read it`);
+        if (e instanceof Conflict) die(`${cur.path} is at rev ${cur.rev} now, not ${rev}: it changed since you read it`);
         throw e;
       }
       return console.error(`deleted ${cur.path}`);
@@ -442,7 +444,7 @@ async function main(argv: string[]) {
           const r = (await write.tasks.update(s, cur.id, rev, task)) ?? die(`task ${ref} was deleted meanwhile`);
           return console.error(`done, rev ${r.rev}`);
         } catch (e) {
-          if (!(e instanceof pb.Conflict)) throw e;
+          if (!(e instanceof Conflict)) throw e;
         }
       }
       return die("the task keeps changing under this edit; try again");
@@ -462,7 +464,7 @@ async function main(argv: string[]) {
           const r = (await write.tasks.update(s, cur.id, rev, next)) ?? die(`task ${ref} was deleted meanwhile`);
           return console.error(`saved, rev ${r.rev}`);
         } catch (e) {
-          if (!(e instanceof pb.Conflict)) throw e;
+          if (!(e instanceof Conflict)) throw e;
         }
       }
       return die("the task keeps changing under this edit; try again");
@@ -470,7 +472,7 @@ async function main(argv: string[]) {
     case "drop": {
       const t = await taskBy(s, a[0] ?? die("tefnotes drop <task-id>")), cur = (await pb.tasks.get(s, t.id)) ?? die(`task ${a[0]} was deleted meanwhile`);
       try { await pb.tasks.remove(s, cur.id, cur.rev); } catch (e) {
-        if (e instanceof pb.Conflict) die(`task ${cur.id} changed just now: look at it again (tefnotes tasks) before deleting`);
+        if (e instanceof Conflict) die(`task ${cur.id} changed just now: look at it again (tefnotes tasks) before deleting`);
         throw e;
       }
       return console.error(`deleted ${cur.id} · ${cur.title}`);

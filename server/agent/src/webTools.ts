@@ -2,7 +2,7 @@
 // and pages (web.ts), offered only with an Exa key. Every result is someone else's text: it taints the turn.
 import { tool } from "ai";
 import { z } from "zod";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
 import { clip } from "./guard";
 import { parse } from "./reader";
 import { toolModule } from "./tool-policy";

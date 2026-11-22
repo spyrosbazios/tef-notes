@@ -11,7 +11,7 @@ import { createXai } from "@ai-sdk/xai";
 import type { ProviderOptions } from "@ai-sdk/provider-utils";
 import type { LanguageModel } from "ai";
 import type { AgentModels } from "@/core/agent";
-import { getJson } from "@/core/http";
+import { getJson } from "@/core/client/http";
 import { key } from "./keys";
 import { baseOf, modelOf, providerOf, PROVIDERS, type ProviderId, type ProviderInfo } from "./providers";
 

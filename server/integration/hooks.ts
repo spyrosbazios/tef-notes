@@ -1,9 +1,9 @@
 // The server's own writers (pb_hooks over lib/records.js) against a real PocketBase: each keeps the rev contract a
 // client's write is held to, and a client's next write over what they wrote meets it.
 import { expect, test } from "bun:test";
-import * as pb from "../../packages/core/src/pocketbase";
+import * as pb from "../../packages/core/src/client/pocketbase";
+import { noteColumns, Conflict, serverError } from "../../packages/core/src/record-contracts";
 import { newTask } from "../../packages/core/src/todo";
-import { serverError } from "../../packages/core/src/http";
 import { patchPrefs, prefsRemote } from "../../packages/core/src/prefs-sync";
 
 const url = process.env.TEF_CONTRACT_URL;
@@ -45,7 +45,7 @@ test("clip: a new note starts at rev 1, tainted, with its columns copied out of 
   expect(out).toMatchObject({ kind: "note", action: "created" });
   const n = await pb.read(s, out.path);
   const rec = await record("notes", n!.rec);
-  expect(rec).toMatchObject({ ...pb.noteColumns(out.path, rec.text), rev: 1, kind: "note", tags: ["clipped"], tainted: true });
+  expect(rec).toMatchObject({ ...noteColumns(out.path, rec.text), rev: 1, kind: "note", tags: ["clipped"], tainted: true });
   expect(rec.text).toContain("Words from the page");
 });
 
@@ -54,9 +54,9 @@ test("clip: an append to a note bumps rev and copies its columns; the client's s
   const out = await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
   expect(out).toMatchObject({ kind: "note", path: n.path, title: "Target", action: "appended" });
   const rec = await record("notes", n.rec);
-  expect(rec).toMatchObject({ ...pb.noteColumns(n.path, rec.text), rev: 2, tags: ["a", "b"], tainted: true });
+  expect(rec).toMatchObject({ ...noteColumns(n.path, rec.text), rev: 2, tags: ["a", "b"], tainted: true });
   expect(rec.text).toContain("Words from the page");
-  await expect(pb.update(s, n, "# Mine\n")).rejects.toBeInstanceOf(pb.Conflict);
+  await expect(pb.update(s, n, "# Mine\n")).rejects.toBeInstanceOf(Conflict);
   expect((await pb.update(s, { ...n, rev: 2 }, "# Mine\n"))?.rev).toBe(3);
 });
 
@@ -67,7 +67,7 @@ test("clip: an append to a task bumps rev; a new task starts at rev 1", async ()
   const rec = await record("tasks", t.id);
   expect(rec).toMatchObject({ rev: 2, tainted: true });
   expect(rec.notes).toContain("Words from the page");
-  await expect(pb.tasks.update(s, t.id, 1, { title: "stale" })).rejects.toBeInstanceOf(pb.Conflict);
+  await expect(pb.tasks.update(s, t.id, 1, { title: "stale" })).rejects.toBeInstanceOf(Conflict);
 
   const made = await clip({ target: { kind: "newtask", title: "Clipped task" }, tags: ["x"] });
   expect(made).toMatchObject({ kind: "task", action: "created" });
@@ -99,14 +99,14 @@ test("tags rename: every note and task carrying it is a rev write, columns copie
   const res = await pb.call(s, "tefnotes/tags/rename", pb.json("POST", { from, to }));
   expect(res).toMatchObject({ tag: to, notes: 1, tasks: 1 });
   const rec = await record("notes", n.rec);
-  expect(rec).toMatchObject({ ...pb.noteColumns(n.path, rec.text), rev: 2, tags: [to, "keep"] });
+  expect(rec).toMatchObject({ ...noteColumns(n.path, rec.text), rev: 2, tags: [to, "keep"] });
   expect(await record("tasks", t.id)).toMatchObject({ rev: 2, tags: [to] });
-  await expect(pb.update(s, n, "# stale\n")).rejects.toBeInstanceOf(pb.Conflict);
+  await expect(pb.update(s, n, "# stale\n")).rejects.toBeInstanceOf(Conflict);
 });
 
 test("tainted: a write never takes the mark off a note or a task", async () => {
   const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Web text\n", { tainted: true });
-  const patched = await pb.call(s, `collections/notes/records/${n.rec}`, pb.json("PATCH", { ...pb.noteColumns(n.path, "# Mine now\n"), rev: n.rev, tainted: false }));
+  const patched = await pb.call(s, `collections/notes/records/${n.rec}`, pb.json("PATCH", { ...noteColumns(n.path, "# Mine now\n"), rev: n.rev, tainted: false }));
   expect(patched).toMatchObject({ rev: 2, tainted: true });
   const t = await pb.tasks.create(s, newTask(id(), { title: "Web task" }), { tainted: true });
   const task = await pb.call(s, `collections/tasks/records/${t.id}`, pb.json("PATCH", { rev: t.rev, title: "Mine", tainted: false }));

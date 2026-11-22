@@ -4,7 +4,7 @@
 import { generateText, hasToolCall, isStepCount, tool } from "ai";
 import { z } from "zod";
 import { FOUND_MAX, type Found } from "@/core/find";
-import type { Server } from "@/core/pocketbase";
+import type { Server } from "@/core/urls";
 import { DEFAULT, model, Unavailable } from "./models";
 import { NoteService } from "./application/notes";
 import { today } from "./systemPrompt";

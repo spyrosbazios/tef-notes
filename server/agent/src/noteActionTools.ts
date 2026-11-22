@@ -6,7 +6,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { ACTION_ICONS, LIMITS, newActionId, promptProblem, RESULTS, type PromptAction } from "@/core/note-actions";
-import type { Server } from "@/core/pocketbase";
+import type { Server } from "@/core/urls";
 import { ownerPrefs, patchOwnerPrefs } from "./prefs";
 import { toolModule } from "./tool-policy";
 

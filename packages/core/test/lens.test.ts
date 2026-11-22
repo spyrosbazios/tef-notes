@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { activeLens, contextFilter, inheritTags, inLens, lensColumns, lensAccent, lensFilter, lensOf, lensProblem, lensTag, type Lens } from "../src/lens";
-import { lenses } from "../src/pocketbase";
+import { lenses } from "../src/client/pocketbase";
 
 const work: Lens = { rec: "w", name: "Work", tags: ["work", "Clients"], exclude: [], accent: null, theme: null };
 

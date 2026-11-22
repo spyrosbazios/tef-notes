@@ -18,7 +18,7 @@ import { EFFORT, type Effort } from "@/core/agent";
 import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
 import type { Run } from "@/core/note-actions";
 import { MEMORY, parseNote } from "@/core/notes";
-import type { Server } from "@/core/pocketbase";
+import type { Server } from "@/core/urls";
 import { allowed, policyApprovals } from "./tool-policy";
 import { screen } from "./assistant";
 import { historyFromWeb, repair, withContext } from "./guard";

@@ -5,9 +5,9 @@
 // (pdfs.ts `inlinePdfs`), a photo as a picture (`inlinePictures`), from these bytes.
 import type { UIMessage } from "ai";
 import { chatFileOf, chatFileUrl } from "@/core/assistant";
-import { HttpError } from "@/core/http";
+import { HttpError } from "@/core/client/http";
 import { PDF } from "@/core/photos";
-import * as pb from "@/core/pocketbase";
+import type { Server } from "@/core/urls";
 
 /** A data URL's bytes and type, or null when it isn't one. */
 export function dataOf(url: string): { type: string; bytes: Uint8Array } | null {
@@ -17,7 +17,7 @@ export function dataOf(url: string): { type: string; bytes: Uint8Array } | null 
 }
 
 /** A file part's bytes: a stored chat file's, fetched from the server, or an older chat's data URL's. */
-export async function fileBytes(s: pb.Server, url: string): Promise<Uint8Array> {
+export async function fileBytes(s: Server, url: string): Promise<Uint8Array> {
   const inline = dataOf(url);
   if (inline) return inline.bytes;
   const f = chatFileOf(url);
@@ -31,7 +31,7 @@ const EXT: Record<string, string> = { [PDF]: "pdf", "image/jpeg": "jpg", "image/
 
 /** The message with each file it carries inline stored under chat `chat`, its part pointing at the record. Throws with why one
  *  couldn't be (then the ones stored before it go again: nothing of the message is kept). */
-export async function storeFiles<M extends UIMessage>(s: pb.Server, chat: string, m: M): Promise<M> {
+export async function storeFiles<M extends UIMessage>(s: Server, chat: string, m: M): Promise<M> {
   const made: string[] = [];
   try {
     const parts = [];
@@ -59,7 +59,7 @@ export async function storeFiles<M extends UIMessage>(s: pb.Server, chat: string
 
 /** The history with each photo the owner attached as its bytes, a data URL: the model's provider can't reach this server.
  *  An execution copy, never saved. A photo that can't be read is left out with a line saying so. */
-export async function inlinePictures<M extends UIMessage>(s: pb.Server, ms: M[]): Promise<M[]> {
+export async function inlinePictures<M extends UIMessage>(s: Server, ms: M[]): Promise<M[]> {
   const stored = (p: M["parts"][number]) => p.type === "file" && p.mediaType.startsWith("image/") && !!chatFileOf(p.url);
   return Promise.all(ms.map(async (m) => (m.role !== "user" || !m.parts.some(stored) ? m : {
     ...m,

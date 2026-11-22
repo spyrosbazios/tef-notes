@@ -3,8 +3,8 @@
 // is someone else's text to the model (list_tags marks it `unverified`; reading one taints the turn like a web read).
 import { tool } from "ai";
 import { z } from "zod";
-import * as pb from "@/core/pocketbase";
-import { createTag, listTags, updateTag } from "@/core/tags";
+import * as pb from "@/core/client/pocketbase";
+import { createTag, listTags, updateTag } from "@/core/client/tags";
 import { COLOR } from "./notes";
 import { toolModule, EVERY_RUN } from "./tool-policy";
 import { lensFields, LENS } from "./widgetTools";

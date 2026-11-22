@@ -1,6 +1,14 @@
 // A pasted link gets readable text: the page's own title, fetched once, offered for the user to keep or
 // edit. Read-only GETs; nothing about the user is sent but the URL they pasted.
 
+/** What a page says about itself (the server's link-preview route): all strings, empty where the page is silent.
+ *  `image` is the picture's address on its own site; `picture` the copy the server keeps of it (`<record>/<file>` in
+ *  `link_previews`), empty when it couldn't be had: what a tile draws, at its two sizes. */
+export type LinkPreview = { url: string; title: string; description: string; site: string; image: string; icon: string; picture: string };
+
+/** Whether a preview has anything to draw: a card or a thumbnail needs a title or a picture. */
+export const hasPreview = (p: LinkPreview | null | undefined): p is LinkPreview => !!p && (!!p.title || !!p.image);
+
 const URL_RE = /\bhttps?:\/\/[^\s<>]+/g;
 /** A sentence's trailing punctuation isn't the URL's, nor a `)` it didn't open: "(see https://w.org/A_(b))." → https://w.org/A_(b) */
 function trimUrl(u: string) {

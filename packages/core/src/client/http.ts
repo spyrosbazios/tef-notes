@@ -2,23 +2,14 @@
 // DELETE (a repeat that finds the record gone is a 404, which every caller reads as done). A POST, PATCH or PUT is sent once:
 // a reply lost after the server acted would have it act twice (a second create, an append added twice, a claim read as taken).
 // A caller that must survive a lost reply sends a write under an id of its own and sends it again itself, where it can read what
-// a clash on that id means (pocketbase.ts `createdUnder`, `landed`).
+// a clash on that id means (pocketbase.ts `createdUnder`, record-contracts.ts `landed`).
+import { serverError } from "../record-contracts";
 
 export class HttpError extends Error {
   /** `body`: the error's JSON, when it sent some — PocketBase's names the field a validation failed on. */
   constructor(public status: number, message: string, public headers?: Headers, public body?: any) {
     super(message);
   }
-}
-
-/** What the server said went wrong, in words to show: a TEF Notes route's `{ error }` (every one answers a failure so,
- *  server/pb_hooks/lib/http.js), else PocketBase's own record API's `{ message }`; null when the body says neither. The one
- *  reader of a server's failure, for every client (web, CLI, extension). */
-export function serverError(body: unknown): string | null {
-  if (!body || typeof body !== "object") return null;
-  const { error, message } = body as { error?: unknown; message?: unknown };
-  if (typeof error === "string" && error.trim()) return error;
-  return typeof message === "string" && message.trim() ? message : null;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

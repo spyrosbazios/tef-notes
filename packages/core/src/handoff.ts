@@ -1,7 +1,7 @@
 // Notes handed to the chat agent, and notes written out as files — what the phone, the web app and the CLI do the same
 // way with a set of notes. Pure: no DOM import.
 import { ATTACHMENTS, NOTES, noteIdOf, parseNote, rewriteImagePaths, serializeNote, slugify } from "./notes";
-import type { Photo } from "./pocketbase";
+import type { Photo } from "./photos";
 
 /** A note named in a message: its path, and the title it was named by. */
 export type NoteRef = { path: string; title: string };

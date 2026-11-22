@@ -1,9 +1,12 @@
-// The notes server client (src/pocketbase.ts) against a stubbed fetch: what each call sends, and how
+// The notes server client (src/client/pocketbase.ts) against a stubbed fetch: what each call sends, and how
 // PocketBase's answers become Conflict or null. No token: the private network is the gate.
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { HttpError } from "../src/http";
-import { Conflict, Gone, Refused, Unavailable, create, hasPreview, landed, lenses, likeLit, linkPreview, photoThumbUrl, previewPictureUrl, list, read, remove, search, serverUrl, tasks, unanswered, update, uploaded, uploadTo } from "../src/pocketbase";
+import { HttpError } from "../src/client/http";
+import { create, lenses, linkPreview, list, read, remove, search, tasks, unanswered, update, uploaded, uploadTo } from "../src/client/pocketbase";
+import { hasPreview } from "../src/links";
+import { Conflict, Gone, Refused, Unavailable, landed, likeLit } from "../src/record-contracts";
 import { newTask } from "../src/todo";
+import { photoThumbUrl, previewPictureUrl, serverUrl } from "../src/urls";
 
 const S = { url: "https://n:8097" };
 const reply = (status: number, body: unknown = {}) => mock(async (_url: string, _init?: RequestInit) => new Response(status === 204 ? null : JSON.stringify(body), { status }));

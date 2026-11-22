@@ -8,7 +8,7 @@
 //   GET /agent/places/place?id=&lang=                     200 Place (`id`: N123, W123 or R123)
 //   GET /agent/places/map?lat=&lng=&w=&h=&theme=&accent=  200 image/svg+xml
 // 400 a malformed request, 502 the service refused or didn't answer.
-import { getJson } from "@/core/http";
+import { getJson } from "@/core/client/http";
 import { MAP_MAX, OSM_ID, placeOf, type Place, type Suggestion } from "@/core/places";
 import { ACCENT_NAMES, accentColor, DEFAULT_THEME, THEME_NAMES, THEMES, type AccentName, type Palette, type ThemeName } from "@/core/theme";
 

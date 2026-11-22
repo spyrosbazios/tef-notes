@@ -24,7 +24,7 @@ import { isNotePath } from "./notes";
 import { isDrawingName } from "./photos";
 import { isDay } from "./todo";
 import type { LensAccentName } from "./lens";
-import type { LinkPreview } from "./pocketbase";
+import type { LinkPreview } from "./links";
 import { ACCENT_NAMES, THEME_NAMES, type ThemeName } from "./theme";
 
 /** Task cards a widget lists at most, and how many a lens preview samples of each kind. */
@@ -62,7 +62,7 @@ export type ReviewWidget = {
  *  "…" where cut. Draw the quote with the note's title, tapping opens `path`. */
 export type QuoteWidget = { type: "quote"; path: string; title: string; quote: string; before: string; after: string };
 
-/** A page's preview as a link card (`previewPictureUrl`, `hasPreview` and the card the notes' link tiles draw are core/pocketbase's). */
+/** A page's preview as a link card (`previewPictureUrl`, `hasPreview` and the card the notes' link tiles draw are core/urls.ts' and core/links.ts'). */
 export type LinkWidget = { type: "link"; preview: LinkPreview };
 
 /** What a lens would show, from the tags alone, before anything is saved: how many notes and (open) tasks pass `inLens`, and up

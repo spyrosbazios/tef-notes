@@ -1,5 +1,5 @@
 // Shared record and error contracts. No transport or platform dependencies.
-import { parseNote, type NoteKind } from "./notes";
+import { parseNote, reconcile, type NoteKind } from "./notes";
 export type Entry = { rec: string; path: string; rev: number };
 export type Remote = Entry & { text: string; kind: NoteKind };
 export type Listed = Entry & { kind: NoteKind };
@@ -37,3 +37,18 @@ export function noteColumns(path: string, text: string) {
     archived: n.archived, color: n.color ?? "", tags: n.tags };
 }
 
+
+/** What the server said went wrong, in words to show: a TEF Notes route's `{ error }` (every one answers a failure so,
+ *  server/pb_hooks/lib/http.js), else PocketBase's own record API's `{ message }`; null when the body says neither. The one
+ *  reader of a server's failure, for every client (web, CLI, extension). */
+export function serverError(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const { error, message } = body as { error?: unknown; message?: unknown };
+  if (typeof error === "string" && error.trim()) return error;
+  return typeof message === "string" && message.trim() ? message : null;
+}
+
+/** Whether a write of `mine` over the text `base`, whose answer was lost and which the note has moved on from (a newer rev),
+ *  landed: the note now (`now`) is `mine`, or already holds `mine`'s change (folding it in changes nothing). Called only once the
+ *  rev has moved: at the rev the write was based on, the write did not land. */
+export const landed = (base: string, mine: string, now: string): boolean => now === mine || reconcile(base, mine, now) === now;

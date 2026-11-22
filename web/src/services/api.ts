@@ -1,9 +1,8 @@
 // The one HTTP client of the web app: axios on the page's own origin, with failures as the core client names them
-// (packages/core/src/pocketbase.ts), so the UI handles a stale rev the same way the phone and the CLI do. No sign-in:
+// (packages/core/src/client/pocketbase.ts), so the UI handles a stale rev the same way the phone and the CLI do. No sign-in:
 // the private network is the gate (server/pb_migrations/1792400000_open.js).
 import axios, { AxiosError } from "axios";
-import { serverError } from "@/core/http";
-import { conflictOf } from "@/core/record-contracts";
+import { conflictOf, serverError } from "@/core/record-contracts";
 export { lit } from "@/core/record-contracts";
 import { getNet, note } from "@/lib/net";
 

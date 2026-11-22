@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { lensProblem, LENS_NAME_MAX, type Lens, type LensAccentName } from "@/core/lens";
 import { fold } from "@/core/notes";
+import { Conflict } from "@/core/record-contracts";
 import { ACCENT_NAMES, ACCENTS, accentColor, THEME_NAMES, THEMES, type ThemeName } from "@/core/theme";
 import { useAppearance } from "@/hooks/appearance";
 import { Mark } from "@/components/brand";
@@ -24,7 +25,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { useShake } from "@/hooks/shake";
 import { setActiveLens, useActiveLens, useCreateLens, useLenses, useRemoveLens, useUpdateLens } from "@/hooks/lens";
-import { Conflict } from "@/core/pocketbase";
 import { message } from "@/services/api";
 import { cn } from "@/lib/utils";
 

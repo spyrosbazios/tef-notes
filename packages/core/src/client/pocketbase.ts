@@ -1,5 +1,6 @@
-// The notes server: PocketBase on the owner's host, reached over a private network. One client for the phone, the CLI
-// (cli/). Records are keyed by `path` (notes/<id>.md, agent/memory.md); `text` is the
+// The notes server over fetch: PocketBase on the owner's host, reached over a private network. The client of the CLI (cli/),
+// the agent (server/agent/) and the integration contract; the web app speaks the same protocols over its own axios
+// (web/src/services/). Records are keyed by `path` (notes/<id>.md, agent/memory.md); `text` is the
 // whole markdown file and the rest of a note's columns are copied out of it here, so every writer sends the same
 // ones. Writes are compare-and-swap on `rev` (server/pb_hooks/rev.pb.js): a stale one is a Conflict. No sign-in:
 // the private network is the gate (server/pb_migrations/1792400000_open.js). The server tags notes itself: `autotagged`
@@ -7,38 +8,20 @@
 // every listing. Tasks are records of their own under the same compare-and-swap
 // (`tasks` below; their shape: core/todo.ts); links between records are records too, outside it (`links`
 // below; their shape: core/record-links.ts).
-import { SEARCH_PATH, searchHitsOf, type SearchHit } from "./find";
-import { CHAT_FIELDS, chatOf, type StoredChat } from "./chat-history";
+import { SEARCH_PATH, searchHitsOf, type SearchHit } from "../find";
+import { CHAT_FIELDS, chatOf, type StoredChat } from "../chat-history";
+import { lensColumns, lensOf, type Lens, type LensFields } from "../lens";
+import type { LinkPreview } from "../links";
+import { noteKindOf, type NoteKind } from "../notes";
+import type { Photo } from "../photos";
+import type { Link, LinkEnd } from "../record-links";
+import { Conflict, Gone, Refused, Unavailable, conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "../record-contracts";
+import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "../record-protocol";
+import { taskOf, type Task } from "../todo";
+import { agentUrl, type Server } from "../urls";
 import { getJson, HttpError } from "./http";
-import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
-import { noteKindOf, reconcile, type NoteKind } from "./notes";
-import type { Link, LinkEnd } from "./record-links";
-import { Conflict, Gone, Refused, Unavailable, conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "./record-contracts";
-export { Conflict, Gone, Refused, Unavailable, likeLit, lit, noteColumns, type Entry, type Remote, type Listed, type Mark, type Versioned, type RevEntry } from "./record-contracts";
-import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "./record-protocol";
-export { linkFilter } from "./record-protocol";
-import { taskOf, type Task } from "./todo";
-
-export type Server = { url: string };                      // https://host[:port], no trailing slash
-export type Photo = { rec: string; note: string; name: string; file: string; size?: number };
-
-/** What a page says about itself (the server's link-preview route): all strings, empty where the page is silent.
- *  `image` is the picture's address on its own site; `picture` the copy the server keeps of it (`<record>/<file>` in
- *  `link_previews`), empty when it couldn't be had: what a tile draws, at its two sizes. */
-export type LinkPreview = { url: string; title: string; description: string; site: string; image: string; icon: string; picture: string };
-
-/** A tile picture's two sizes, PocketBase thumbs (declared on the fields in pb_migrations/1794200000_thumbs.js) and the
- *  agent's PDF pages alike: `blur` a few hundred bytes, shown blurred at once; `sharp` the one that fades in over it. */
-export type ThumbSize = "blur" | "sharp";
-export const THUMB_SIZES: Record<ThumbSize, string> = { blur: "32x32f", sharp: "640x640f" };
 
 const PAGE = 500;
-
-/** `https://host:port` out of whatever was pasted: a trailing slash, `/_/`, `/api`, a missing scheme. */
-export const serverUrl = (s: string) => {
-  const t = s.trim().replace(/\/(_|api)?\/?$/, "").replace(/\/+$/, "");
-  return !t || /^https?:\/\//.test(t) ? t : `https://${t}`;
-};
 
 const api = (s: Server, p: string) => `${s.url}/api/${p}`;
 export const json = (method: string, body: unknown): RequestInit => ({
@@ -85,11 +68,6 @@ export async function createdUnder<T>(make: () => Promise<T>, there: () => Promi
     }
   }
 }
-
-/** Whether a write of `mine` over the text `base`, whose answer was lost and which the note has moved on from (a newer rev),
- *  landed: the note now (`now`) is `mine`, or already holds `mine`'s change (folding it in changes nothing). Called only once the
- *  rev has moved: at the rev the write was based on, the write did not land. */
-export const landed = (base: string, mine: string, now: string): boolean => now === mine || reconcile(base, mine, now) === now;
 
 /** The record protocols (core/record-protocol.ts) over `s`: the agent's and the CLI's fetch. */
 export const transport = (s: Server): RecordTransport => ({
@@ -195,12 +173,6 @@ export async function photos(s: Server, note?: string): Promise<Photo[]> {
   }
 }
 
-/** Where a photo's bytes are. */
-export const photoUrl = (s: Server, p: Pick<Photo, "rec" | "file">) => `${s.url}/api/files/attachments/${p.rec}/${encodeURIComponent(p.file)}`;
-
-/** A photo at one of a tile's sizes, drawn and kept by the server. */
-export const photoThumbUrl = (s: Server, p: Pick<Photo, "rec" | "file">, size: ThumbSize) => `${photoUrl(s, p)}?thumb=${THUMB_SIZES[size]}`;
-
 /** Where a photo goes up, as a multipart POST: the file under `file`, these fields beside it (`upload` sends it). */
 export const uploadTo = (s: Server, note: string, name: string) =>
   ({ url: api(s, "collections/attachments/records"), fields: { note, name } });
@@ -246,21 +218,11 @@ export const pageHtml = (s: Server, url: string): Promise<{ url: string; html: s
 export const pageSummary = async (s: Server, url: string): Promise<string> =>
   (await getJson(api(s, "tefnotes/summary"), json("POST", { url }), 1, 60_000)).summary as string;
 
-/** Whether a preview has anything to draw: a card or a thumbnail needs a title or a picture. */
-export const hasPreview = (p: LinkPreview | null | undefined): p is LinkPreview => !!p && (!!p.title || !!p.image);
-
-/** A preview's picture at one of a tile's sizes from the server's copy; undefined when it kept none (the site's
- *  own address is no tile picture: it can't be blurred in, and it would be fetched from the site by every client). */
-export const previewPictureUrl = (s: Server, p: Pick<LinkPreview, "picture"> | null | undefined, size: ThumbSize) =>
-  p?.picture ? `${s.url}/api/files/link_previews/${p.picture}?thumb=${THUMB_SIZES[size]}` : undefined;
-
 // ---- the agent
 
 // The agent runs on the server (the sidecar under /agent, same origin): it holds the model keys, the tools and the
 // prompt. A chat is a `chats` record the client makes empty before its first send and names in the request; the
 // server writes the messages and the title back.
-
-export const agentUrl = (s: Server, p: string) => `${s.url}/agent/${p}`;
 
 /** A drawing's PNG drawn by the server from its scene (server/agent/src/drawing-picture.ts): for a scene made outside the
  *  web's editor, which exports its own. Throws with the server's reason when it isn't a scene. */
@@ -273,10 +235,6 @@ export async function drawingPicture(s: Server, scene: string): Promise<Blob> {
 /** Notes by their words and meaning (`find.ts` `SEARCH_PATH`): the agent's own search, best first. */
 export const searchByMeaning = async (s: Server, q: string, limit = 10): Promise<SearchHit[]> =>
   searchHitsOf(await getJson(agentUrl(s, `${SEARCH_PATH}?q=${encodeURIComponent(q)}&limit=${limit}`), {}, 2));
-/** A note's PDF's first page as a JPEG at one of a tile's sizes, rendered by the agent: a tile's picture. */
-export const pdfThumbUrl = (s: Server, note: string, name: string, size: ThumbSize) =>
-  agentUrl(s, `pdf-thumb?note=${encodeURIComponent(note)}&name=${encodeURIComponent(name)}&size=${size}`);
-
 /** How many pages a note's PDF has, counted by the agent; null when the note has no such PDF. */
 export const pdfPages = async (s: Server, note: string, name: string): Promise<number | null> => {
   try {

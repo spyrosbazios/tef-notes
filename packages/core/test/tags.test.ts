@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
-import { absorbTags, allTagNames, dropTyping, GUESS_DELAY, guessTags, liveTags, tagGuesser, matchesTask, parseTagQuery, suggestTags, typingTag, undefinedTags, type TagDef } from "../src/tags";
+import { guessTags } from "../src/client/tags";
+import { absorbTags, allTagNames, dropTyping, GUESS_DELAY, liveTags, tagGuesser, matchesTask, parseTagQuery, suggestTags, typingTag, undefinedTags, type TagDef } from "../src/tags";
 import { newTask } from "../src/todo";
 
 const def = (name: string): TagDef => ({ rec: name, name, description: "" });

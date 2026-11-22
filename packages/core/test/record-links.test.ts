@@ -1,12 +1,13 @@
 // Links between records (src/record-links.ts): the wire columns both ways, what a link may not be, and the questions a
-// client asks of a list of them (a task's notes, a note's backlinks). The calls (src/pocketbase.ts `links`) against a
+// client asks of a list of them (a task's notes, a note's backlinks). The calls (src/client/pocketbase.ts `links`) against a
 // stubbed fetch: idempotent make and delete.
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import {
   backlinks, LINK_COLUMNS, linksForNextRound, linkOf, linkProblem, linkRecord, linksFrom, linksOf, linksTo, newLink, notesOfTask, sameLink, tasksAbout, type Link,
 } from "../src/record-links";
-import { linkFilter, links } from "../src/pocketbase";
+import { links } from "../src/client/pocketbase";
 import { noteKindOf } from "../src/notes";
+import { linkFilter } from "../src/record-protocol";
 
 const T = { type: "task", id: "t1" } as const, N = { type: "note", id: "n1" } as const, N2 = { type: "note", id: "n2" } as const;
 const N3 = { type: "note", id: "n3" } as const, T3 = { type: "task", id: "t3" } as const;

@@ -1,8 +1,8 @@
 // A linked page's summary, for a note's Summary button (src/editor/link-tools.ts): the server reads the page and asks its
 // model (server/pb_hooks/summary.pb.js). The editor puts the block in the note.
 import { AxiosError } from "axios";
-import { serverError } from "@/core/http";
 import { api } from "./api";
+import { serverError } from "@/core/record-contracts";
 
 /** The summary block of the page at `url`. Throws with the server's reason when it couldn't be written. */
 export async function summarize(url: string): Promise<string> {

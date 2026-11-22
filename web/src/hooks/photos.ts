@@ -3,7 +3,7 @@ import { queryOptions, useQuery, useQueryClient, type QueryClient } from "@tanst
 import { useCallback, useMemo } from "react";
 import { noteIdOf, rewriteImagePaths } from "@/core/notes";
 import { drawingName, drawingPreview, fileMarkdown, MAX_PDF, PDF, pdfName, photoMarkdown, photoName } from "@/core/photos";
-import { Conflict } from "@/core/pocketbase";
+import { Conflict } from "@/core/record-contracts";
 import { downscale } from "@/lib/picture";
 import * as photos from "@/services/photos";
 import { landed } from "./notes";

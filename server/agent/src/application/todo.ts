@@ -2,10 +2,12 @@
 // Listings and links are cached until a write. Writes carry the revision read and retry the edit
 // on a fresh record after a conflict. Taint is persisted in the same write and never cleared.
 // Completion and recurrence use core/todo; links are idempotent and have no revision.
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
+import { Conflict } from "@/core/record-contracts";
 import { addItem, complete, nextOrder, newTask, patchTask, removeItem, reopen, retagTask, setItem, taskOf, type Task, type TaskPatch } from "@/core/todo";
 import { localDay } from "@/core/time";
 import { linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
+import type { Server } from "@/core/urls";
 import { time, type Stamp } from "./metadata";
 
 /** What a write hands back: the kind of record (a task), its id, the rev it is at now, and its current record (none for a delete). `next`: the id of a repeating task's next round. `unchanged`: nothing had to be written. */
@@ -42,7 +44,7 @@ export class TaskService {
   private rows?: Promise<Task[]>;
   private linkRows?: Promise<Link[]>;
   private times?: Promise<Map<string, Stamp>>;
-  constructor(readonly server: pb.Server) {}
+  constructor(readonly server: Server) {}
 
   private reload() { this.rows = undefined; this.linkRows = undefined; this.times = undefined; }
 
@@ -95,7 +97,7 @@ export class TaskService {
         this.reload();
         return r ? { saved: "task", id, rev: r.rev, ...(await this.snapshot(id)) } : { error: `No task ${id}: it was deleted meanwhile.` };
       } catch (e) {
-        if (!(e instanceof pb.Conflict)) throw e;
+        if (!(e instanceof Conflict)) throw e;
       }
     }
     return { error: "The task keeps changing under this edit; try again in a moment." };
@@ -110,7 +112,7 @@ export class TaskService {
       const saved = await pb.tasks.create(this.server, r);
       return { id: saved.id, rev: saved.rev };
     } catch (e) {
-      if (e instanceof pb.Conflict) return { error: "Couldn't save the new task: its id is taken. Try again." };
+      if (e instanceof Conflict) return { error: "Couldn't save the new task: its id is taken. Try again." };
       throw e;
     }
   }
@@ -211,7 +213,7 @@ export class TaskService {
         this.reload();
         return { saved: "task", id, rev: cur.rev };
       } catch (e) {
-        if (!(e instanceof pb.Conflict)) throw e;
+        if (!(e instanceof Conflict)) throw e;
       }
     }
     return { error: "The task keeps changing; try again in a moment." };

@@ -5,14 +5,15 @@ import { tool, type UIMessage } from "ai";
 import { z } from "zod";
 import { DIAGRAM_KINDS, diagramGuide, diagramKindsText } from "@/core/diagram-guides";
 import { DRAWING_LIMITS, shapesOf, type Shape } from "@/core/drawing";
-import { isDrawing, isDrawingName } from "@/core/photos";
+import { isDrawing, isDrawingName, type Photo } from "@/core/photos";
 import { isNotePath, parseNote } from "@/core/notes";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
+import { type Server, photoUrl } from "@/core/urls";
 import type { DrawingWidget } from "@/core/widgets";
 import type { NoteService } from "./application/notes";
 import { EVERY_RUN, toolModule } from "./tool-policy";
 
-export type Drawing = Pick<pb.Photo, "rec" | "name" | "file">;
+export type Drawing = Pick<Photo, "rec" | "name" | "file">;
 
 /** The messages with every `draw` answer's picture taken out (core/assistant.ts `DrawOutput`): what a chat is saved as, so a
  *  saved chat holds no image bytes, and what a model that takes no images is sent. The same messages when there is none. */
@@ -30,13 +31,13 @@ export function withoutPictures<M extends UIMessage>(ms: M[]): M[] {
 }
 
 /** The note's drawings (`note`: its own id, parseNote's). */
-export async function drawingsOf(server: pb.Server, note: string): Promise<Drawing[]> {
+export async function drawingsOf(server: Server, note: string): Promise<Drawing[]> {
   return (await pb.photos(server, note)).filter((p) => isDrawing(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
 }
 
 /** A drawing's shapes, read from its file. */
-export async function shapesIn(server: pb.Server, d: Drawing): Promise<Shape[]> {
-  const res = await fetch(pb.photoUrl(server, d));
+export async function shapesIn(server: Server, d: Drawing): Promise<Shape[]> {
+  const res = await fetch(photoUrl(server, d));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const scene: unknown = await res.json();
   return shapesOf(scene && typeof scene === "object" ? (scene as { elements?: unknown }).elements : []);

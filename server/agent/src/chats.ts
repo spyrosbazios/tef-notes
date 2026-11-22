@@ -5,8 +5,9 @@
 // 1795700000_chats_rev.js), and one turn holds a chat at a time (`hold`): a chat's turn, or a whole Talk conversation.
 import type { Experimental_Steering as Steering, UIMessage } from "ai";
 import { serializeChatHistory } from "@/core/chat-history";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
 import { chatTitle } from "@/core/share";
+import type { Server } from "@/core/urls";
 import type { AgentMessage } from "./turn";
 
 /** What the history calls a chat: its first user message, as the phone named it. */
@@ -29,14 +30,14 @@ function serial<T>(id: string, job: () => Promise<T>): Promise<T> {
 
 /** The chat's history and the rev its next save names, read after any save of it still on its way; null when there is no
  *  such record. Throws on one it can't read: never let an older agent replace a future format. */
-export const load = async (s: pb.Server, id: string): Promise<{ rev: number; messages: AgentMessage[] } | null> => {
+export const load = async (s: Server, id: string): Promise<{ rev: number; messages: AgentMessage[] } | null> => {
   const c = await serial(id, () => pb.chat(s, id));
   return c && { rev: c.rev, messages: c.messages as AgentMessage[] };
 };
 
 /** Saves of chat `id`, read at `rev`: in order with every other save of it, each naming the rev the one before left.
  *  Rejects with why one failed (the chat deleted meanwhile, a write it didn't expect); the caller tells the owner. */
-export function saver(s: pb.Server, id: string, rev: number, model: string) {
+export function saver(s: Server, id: string, rev: number, model: string) {
   return (messages: UIMessage[]) => serial(id, async () => {
     try {
       rev = (await pb.call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=rev`,

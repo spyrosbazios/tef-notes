@@ -3,7 +3,7 @@ import { Check, Pencil, Plus, Sparkles, Tag as TagIcon, Trash2 } from "lucide-re
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { COLORS, fold, type Color } from "@/core/notes";
-import { Conflict } from "@/core/pocketbase";
+import { Conflict } from "@/core/record-contracts";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";

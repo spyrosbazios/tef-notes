@@ -50,7 +50,7 @@ export type StoredChat = { rev: number; messages: HistoryMessage[] };
 /** The columns `chatOf` reads. */
 export const CHAT_FIELDS = "id,rev,messages,historyVersion";
 
-/** The one reader of a chat record (core/pocketbase.ts `chat`). */
+/** The one reader of a chat record (core/client/pocketbase.ts `chat`). */
 export function chatOf(record: unknown): StoredChat {
   const messages = readChatHistory(record), rev = (record as { rev?: unknown }).rev;
   return { rev: typeof rev === "number" && Number.isInteger(rev) && rev > 0 ? rev : 0, messages };

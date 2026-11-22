@@ -13,13 +13,15 @@
 //
 // `remind` is a wall-clock time with no zone: the agent reads it in its own TZ (docker-compose sets it from `TZ`), which must
 // be the owner's, or every reminder rings hours off.
-import { HttpError } from "@/core/http";
+import { HttpError } from "@/core/client/http";
 import { taskUrl, type PushPayload } from "@/core/push";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
+import { lit, Conflict } from "@/core/record-contracts";
 import { remindAt } from "@/core/things";
 import { taskOf, type Task } from "@/core/todo";
 import { addDays } from "@/core/dates";
 import { localDay } from "@/core/time";
+import type { Server } from "@/core/urls";
 import { time } from "./application/metadata";
 import { deliver, subscriptions, vapid, type Outcome, type Sub, type Vapid } from "./push";
 
@@ -106,12 +108,12 @@ export async function scan(ports: Ports, now: number, armed = new Set<string>())
 
 const SENT = "collections/push_sent/records";
 
-export const pbPorts = (server: pb.Server): Ports => ({
+export const pbPorts = (server: Server): Ports => ({
   vapid,
   subscriptions: () => subscriptions(server),
   async candidates(now) {
     // yesterday on, since a reminder just after midnight may be for the day before the one it rings on
-    const filter = `done = "" && when >= ${pb.lit(addDays(localDay(now), -1))} && when <= ${pb.lit(localDay(now))} && remind != ""`;
+    const filter = `done = "" && when >= ${lit(addDays(localDay(now), -1))} && when <= ${lit(localDay(now))} && remind != ""`;
     const out: Candidate[] = [];
     for (let page = 1; ; page++) {
       const j = await pb.call(server, `collections/tasks/records?perPage=200&page=${page}&skipTotal=1&filter=${encodeURIComponent(filter)}`);
@@ -138,26 +140,26 @@ export const pbPorts = (server: pb.Server): Ports => ({
       });
       return true;
     } catch (e) {
-      if (e instanceof pb.Conflict || (e instanceof HttpError && e.status === 400 && e.body?.data?.key?.code === "validation_not_unique")) return false;   // the unique key is taken
+      if (e instanceof Conflict || (e instanceof HttpError && e.status === 400 && e.body?.data?.key?.code === "validation_not_unique")) return false;   // the unique key is taken
       throw e;
     }
   },
   async release(key) {
-    const j = await pb.call(server, `${SENT}?fields=id&perPage=1&skipTotal=1&filter=${encodeURIComponent(`key = ${pb.lit(key)}`)}`);
+    const j = await pb.call(server, `${SENT}?fields=id&perPage=1&skipTotal=1&filter=${encodeURIComponent(`key = ${lit(key)}`)}`);
     for (const r of j.items) await pb.call(server, `${SENT}/${r.id}`, { method: "DELETE" });
   },
   deliver: (v, sub, payload) => deliver(server, v, sub, payload),
 });
 
 /** Claims older than `SENT_KEPT` deleted: a reminder is never due that long after its time. */
-export async function prune(server: pb.Server, now: number): Promise<void> {
+export async function prune(server: Server, now: number): Promise<void> {
   const before = new Date(now - SENT_KEPT).toISOString().replace("T", " ");
-  const j = await pb.call(server, `${SENT}?fields=id&perPage=200&skipTotal=1&filter=${encodeURIComponent(`created < ${pb.lit(before)}`)}`);
+  const j = await pb.call(server, `${SENT}?fields=id&perPage=200&skipTotal=1&filter=${encodeURIComponent(`created < ${lit(before)}`)}`);
   for (const r of j.items) await pb.call(server, `${SENT}/${r.id}`, { method: "DELETE" });
 }
 
 /** Scans every minute (and once now), and prunes hourly. A failed scan is logged and the next one tries again. */
-export function startReminders(server: pb.Server): void {
+export function startReminders(server: Server): void {
   void vapid().then((v) => { if (v && !process.env.TZ) console.error("agent: TZ is not set: reminders are read in the container's zone (UTC), which must be the owner's; set TZ in .env"); });
   const ports = pbPorts(server), armed = new Set<string>();
   let running: Promise<void> | undefined, last = 0;

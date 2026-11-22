@@ -6,10 +6,11 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { noteCardOf, taskCardOf, type NoteCard, type TaskCard } from "@/core/agent";
-import { HttpError } from "@/core/http";
+import { HttpError } from "@/core/client/http";
 import { inLens, lensProblem, type Lens, type LensAccentName } from "@/core/lens";
+import { hasPreview } from "@/core/links";
 import { isNotePath, NOTES, parseNote } from "@/core/notes";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
 import { isDay, REMIND } from "@/core/todo";
 import { THEME_NAMES } from "@/core/theme";
 import { localDay } from "@/core/time";
@@ -115,7 +116,7 @@ export const widgetModule = toolModule(({ notes, todo, fromPage }) => ({
       if (await fromPage(messages)) return { error: "This chat has read the web or a PDF, so a link from it isn't fetched for a card: give the link as text." };
       try {
         const preview = await pb.linkPreview(notes.server, url);
-        return pb.hasPreview(preview) ? { widget: { type: "link", preview } } : { error: "That page has no title or picture to show: give the link as text." };
+        return hasPreview(preview) ? { widget: { type: "link", preview } } : { error: "That page has no title or picture to show: give the link as text." };
       } catch (e) {
         return { error: e instanceof HttpError && e.status === 400 ? "The server won't fetch that address (only public http(s) pages): give the link as text." : "The server couldn't reach that page: give the link as text." };
       }

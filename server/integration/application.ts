@@ -1,6 +1,6 @@
 // Opt-in real HTTP coverage for application services and their companion adapters.
 import { expect, test } from "bun:test";
-import * as pb from "../../packages/core/src/pocketbase";
+import * as pb from "../../packages/core/src/client/pocketbase";
 import { NoteService } from "../agent/src/application/notes";
 import { TaskService, taskEdit } from "../agent/src/application/todo";
 import { addTaskRoute, tickRoute } from "../agent/src/companion";

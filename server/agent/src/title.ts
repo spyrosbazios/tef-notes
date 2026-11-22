@@ -8,8 +8,9 @@
 import { generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { isPdf } from "@/core/photos";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
 import { cleanTitle, TITLE_MAX } from "@/core/share";
+import type { Server } from "@/core/urls";
 import { imageData, imageType } from "./images";
 import { DEFAULT, model, sees } from "./models";
 import { pages, readNow } from "./pdfs";
@@ -24,7 +25,7 @@ const INSTRUCTIONS = `You title notes. Answer with only the title: at most ${TIT
 const Body = z.object({ note: z.string().min(1).max(200) });
 
 /** The question for the note's files, or null when there is nothing a model could title it from. */
-async function question(server: pb.Server, note: string): Promise<ModelMessage[] | null> {
+async function question(server: Server, note: string): Promise<ModelMessage[] | null> {
   const files = await pb.photos(server, note);
   const pdf = files.find((f) => isPdf(f.name)), image = files.find((f) => imageType(f.name));
   if (pdf) {
@@ -48,7 +49,7 @@ async function question(server: pb.Server, note: string): Promise<ModelMessage[]
 }
 
 /** The title for the note `note` (its own id), or null. `pick`: the model; the tests hand in a mock. */
-export async function titleOf(server: pb.Server, note: string, pick: typeof model = model): Promise<string | null> {
+export async function titleOf(server: Server, note: string, pick: typeof model = model): Promise<string | null> {
   try {
     const messages = await question(server, note);
     if (!messages) return null;
@@ -68,7 +69,7 @@ export async function titleOf(server: pb.Server, note: string, pick: typeof mode
   }
 }
 
-export async function titleRoute(req: Request, server: pb.Server, pick: typeof model = model): Promise<Response> {
+export async function titleRoute(req: Request, server: Server, pick: typeof model = model): Promise<Response> {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ message: "Bad request: note" }, { status: 400 });
   return Response.json({ title: await titleOf(server, parsed.data.note, pick) });

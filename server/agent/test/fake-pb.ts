@@ -9,7 +9,7 @@
 // `chat_files`: a chat's attached files, their bytes at /api/files/chat_files/<rec>/<file>.
 // `before`: a hook run ahead of each PATCH and note DELETE, so a test can slip in a write made meanwhile.
 
-import { noteColumns } from "@/core/pocketbase";
+import { noteColumns } from "@/core/record-contracts";
 import { LINK_COLUMNS } from "@/core/record-links";
 
 type Rec = Record<string, any> & { id: string };

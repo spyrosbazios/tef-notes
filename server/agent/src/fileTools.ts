@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { Attached } from "@/core/assistant";
 import { parseNote, serializeNote, withBody } from "@/core/notes";
 import { fileMarkdown, PDF, pdfName, photoMarkdown, photoName } from "@/core/photos";
-import * as pb from "@/core/pocketbase";
+import * as pb from "@/core/client/pocketbase";
 import { localDay } from "@/core/time";
 import { definedTags, type NoteService } from "./application/notes";
 import { fileBytes } from "./chat-files";

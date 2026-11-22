@@ -1,7 +1,8 @@
 // A note's photos, PDFs and drawings: records in `attachments` under the note's id, the body pointing at them as
 // `../attachments/<id>/<name>`. The bytes are at photoUrl, on this page's own origin.
-import { photoUrl, type Photo } from "@/core/pocketbase";
 import { api, lit, orNull } from "./api";
+import type { Photo } from "@/core/photos";
+import { photoUrl } from "@/core/urls";
 
 const photo = (r: any): Photo => ({ rec: r.id, note: r.note, name: r.name, file: r.file });
 

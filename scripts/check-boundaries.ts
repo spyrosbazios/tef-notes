@@ -33,14 +33,19 @@ const filesUnder = (dir: string): string[] =>
   readdirSync(resolve(root, dir), { recursive: true, encoding: "utf8" }).filter((name) => /\.tsx?$/.test(name)).map((name) => `${dir}${name}`);
 /** What only the records module (web/src/lib/records.ts) loads: the local copy, the sync and its edit helpers. */
 const copy = new Set(["web/src/lib/local.ts", "web/src/lib/sync.ts", "web/src/lib/local-records.ts", "web/src/lib/sync-controller.ts", "web/src/lib/tab-sync.ts", `${core}sync.ts`, `${core}changes.ts`, `${core}rows.ts`]);
-const pure = ["notes", "todo", "sync", "changes", "rows", "prefs", "prefs-sync", "record-contracts", "record-protocol", "chat-history"];
+const client = `${core}client/`;
 
 function rules(): Boundary[] {
   return [
     {
-      name: "Core domain and sync must not load HTTP adapters or external packages",
-      roots: pure.map((name) => `${core}${name}.ts`),
-      forbidden: (name) => !name.startsWith(core) || ["pocketbase", "http", "tags", "import"].some((part) => name === `${core}${part}.ts`),
+      name: "Core is dependency-free: it loads nothing outside packages/core/src, no package at all",
+      roots: filesUnder(core),
+      forbidden: (name) => !name.startsWith(core),
+    },
+    {
+      name: "Core outside client/ does no I/O: it never loads the fetch client",
+      roots: filesUnder(core).filter((name) => !name.startsWith(client)),
+      forbidden: (name) => name.startsWith(client),
     },
     {
       name: "Application services must not load assistant adapters, cards or AI SDK",
@@ -61,6 +66,11 @@ function rules(): Boundary[] {
       name: "Sync controller and tabs receive storage, transport, lock and channel; they must not load UI or services",
       roots: ["web/src/lib/sync-controller.ts", "web/src/lib/tab-sync.ts"],
       forbidden: (name) => /^web\/src\/(hooks|services|components)\//.test(name) || name.startsWith("external:"),
+    },
+    {
+      name: "The copy's projections are read from the copy; they must not load UI or services",
+      roots: ["web/src/lib/local-records.ts"],
+      forbidden: (name) => /^web\/src\/(hooks|services|components)\//.test(name),
     },
     {
       name: "Hooks read and write records through lib/records.ts, never the copy or the sync themselves",

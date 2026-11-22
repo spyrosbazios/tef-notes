@@ -5,7 +5,7 @@ import "./storage";
 import "./locks";
 import { QueryClient } from "@tanstack/react-query";
 import { parseNote } from "@/core/notes";
-import { Conflict, Unavailable } from "@/core/pocketbase";
+import { Conflict, Unavailable } from "@/core/record-contracts";
 import { sameLink, type Link } from "@/core/record-links";
 import { retagTask, taskOf, type Task } from "@/core/todo";
 import type { StreamHandlers } from "@/lib/tab-sync";

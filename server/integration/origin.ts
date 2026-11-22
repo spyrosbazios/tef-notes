@@ -1,7 +1,8 @@
 // Requests from other sites (pb_hooks/origin.pb.js) against a real PocketBase: the headers a browser would send, set by
 // hand. The server serves no signed extension here, so any extension origin is taken.
 import { expect, test } from "bun:test";
-import * as pb from "../../packages/core/src/pocketbase";
+import * as pb from "../../packages/core/src/client/pocketbase";
+import { noteColumns } from "../../packages/core/src/record-contracts";
 
 const url = process.env.TEF_CONTRACT_URL;
 if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun --no-env-file server/integration/run.ts");
@@ -14,7 +15,7 @@ const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop
 /** A note create as a page could send it without a preflight: a form POST. */
 function formCreate(path: string, headers: Record<string, string>) {
   const form = new FormData();
-  for (const [k, v] of Object.entries(pb.noteColumns(path, "# From a form\n"))) form.append(k, Array.isArray(v) ? JSON.stringify(v) : String(v));
+  for (const [k, v] of Object.entries(noteColumns(path, "# From a form\n"))) form.append(k, Array.isArray(v) ? JSON.stringify(v) : String(v));
   return fetch(`${url}/api/collections/notes/records`, { method: "POST", body: form, headers });
 }
 
