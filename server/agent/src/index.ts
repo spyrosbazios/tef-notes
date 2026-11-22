@@ -24,6 +24,7 @@ import { talkRoute, talkSocket, talkVoicesRoute, type Fish } from "./talk";
 import { semantic } from "./semantic";
 import { titleRoute } from "./title";
 import { transcribe } from "./transcribe";
+import { fishUsageRoute } from "./fish-usage";
 
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
 const fish: Fish = { speak: connectFishVoice, hear: connectFishEar(), voices: fishVoices, fallback: fallbackVoice };
@@ -52,6 +53,7 @@ Bun.serve({
     "/agent/talk": { GET: (req, srv) => talkRoute(req, srv, server, fish) },
     "/agent/talk/voices": { GET: (req) => talkVoicesRoute(req, fish) },
     "/agent/title": { POST: own("json", (req) => titleRoute(req, server)) },
+    "/agent/fish/usage": { GET: (req) => fishUsageRoute(req) },
     "/agent/transcribe": { POST: own("bytes", (req) => transcribe(req)) },
     "/agent/version": { GET: () => release.version() },
     "/agent/update": { POST: own("json", (req) => release.update(req)) },

@@ -1,5 +1,9 @@
 // Settings → Voice: dictation, and the voice Talk speaks in.
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { periodStarts, type FishSpend } from "@/core/fish-usage";
+import { clock, money } from "@/lib/talk";
+import { fishUsage } from "@/services/talk";
 import { TALK_MODEL_LABEL, TALK_MODELS } from "@/core/talk";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { SUB, TITLE } from "@/components/settings/style";
@@ -22,6 +26,7 @@ export function Voice() {
         <Line title="Try it" detail={heard || "Tap the mic and say something."} trailing={<MicButton onText={setHeard} />} />
       </div>
       <TalkVoice />
+      <Spending />
     </section>
   );
 }
@@ -59,6 +64,30 @@ function TalkVoice() {
           <ModelMenu choice={talkChoice} align="end" />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** What Fish Audio has cost this week and this month (core/fish-usage.ts), from the agent's own record, and the credit left. */
+function Spending() {
+  const starts = periodStarts(new Date());
+  const usage = useQuery({ queryKey: ["fish-usage", starts.week, starts.month], queryFn: () => fishUsage(starts), staleTime: 60_000 });
+  const u = usage.data;
+  if (!u) return null;
+  const partly = (from: number) => u.since != null && u.since > from;
+  const row = (title: string, s: FishSpend, from: number) => (
+    <Line title={title} detail={`Talk ${money(s.talk)} · dictation ${money(s.dictation)} · ${clock(s.seconds)} listened${partly(from) ? " · counted since " + new Date(u.since ?? 0).toLocaleDateString() : ""}`}
+      trailing={<span className="text-sm font-semibold tabular-nums">{money(s.total)}</span>} />
+  );
+  return (
+    <div className="space-y-3 pt-4">
+      <h3 className={SUB}>Fish Audio spending</h3>
+      <div className="divide-y divide-line rounded-xl border border-line">
+        {row("This week", u.week, starts.week)}
+        {row("This month", u.month, starts.month)}
+        <Line title="Credit left" detail="Fish's own balance." trailing={<span className="text-sm font-semibold tabular-nums">{u.balance == null ? "Unknown" : money(u.balance)}</span>} />
+      </div>
+      <p className="text-[13px] leading-snug text-faint">At Fish's list prices, worked out by this server from what it sent, so a few cents off Fish's own bill. The free voice costs nothing; listening is always paid.</p>
     </div>
   );
 }

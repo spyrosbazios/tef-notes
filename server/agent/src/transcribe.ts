@@ -3,7 +3,9 @@
 // does leave the server, for Fish, for as long as the request takes — the one thing dictation used to keep at home (the stt
 // container it replaced). Without a Fish key voice input is off: the route answers 404 and the clients hide their mic.
 import { MAX_SECONDS, RATE, transcriptOf } from "@/core/voice";
+import { dictationCostOf } from "@/core/fish-usage";
 import { hear, why } from "./fish";
+import { fishLedger } from "./fish-usage";
 import { key } from "./keys";
 
 const MAX_BYTES = MAX_SECONDS * RATE * 4;
@@ -21,7 +23,11 @@ export async function transcribe(req: Request): Promise<Response> {
   if (body.byteLength > MAX_BYTES) return new Response("The recording is longer than ten minutes", { status: 413 });
   if (body.byteLength % 4) return new Response("The body is not float32 samples", { status: 400 });
   try {
-    return Response.json(transcriptOf({ text: await hear(new Float32Array(body)) }));
+    const samples = new Float32Array(body);
+    const text = await hear(samples);
+    const seconds = samples.length / RATE;
+    fishLedger().record({ kind: "dictation", seconds, bytes: 0, cost: dictationCostOf(seconds) });
+    return Response.json(transcriptOf({ text }));
   } catch (e) {
     return down(e);
   }

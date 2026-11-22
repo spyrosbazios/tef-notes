@@ -12,6 +12,7 @@
 //     final), `turn_resumed` (it was not), and `committed` (the final text, and whether it was the owner's turn at all: a
 //     backchannel over the voice or a noise in the room is not). It decides what a turn is, so nothing here guesses.
 //   the file reader (`hear`): POST /v1/asr, `model: transcribe-1-pro`, multipart WAV — what dictation sends each piece to.
+//   the balance (`credit`): GET /wallet/self/api-credit, the API credit left (a string of US dollars), for Settings' spend.
 // Billing is the text's: Fish charges the bytes of what is spoken (TTS) and the session's seconds (the ear), both far below a
 // speech-to-speech model's per-turn price. The key is read on every connection (keys.ts `fish`), so a new one needs no restart.
 import { decode, encode } from "@msgpack/msgpack";
@@ -23,6 +24,7 @@ const TTS_URL = "wss://api.fish.audio/v1/tts/live";
 const ASR_URL = "wss://api.fish.audio/v1/asr/realtime";
 const ASR_FILE = "https://api.fish.audio/v1/asr";
 const MODELS = "https://api.fish.audio/model";
+const CREDIT = "https://api.fish.audio/wallet/self/api-credit";
 /** The file reader: 60 minutes is its limit, and a dictation piece is seconds. */
 const FILE_TIMEOUT = 120_000;
 const SETUP_TIMEOUT = 20_000;
@@ -318,3 +320,14 @@ async function reason(r: Response): Promise<string> {
 }
 
 export { why };
+
+/** Fish's API credit left, in US dollars. */
+export async function credit(): Promise<number> {
+  const apiKey = await key("fish");
+  if (!apiKey) throw new Error("no Fish Audio key");
+  const r = await fetch(CREDIT, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10_000) });
+  if (!r.ok) throw new Error(`Fish did not give the balance (${r.status}${await reason(r)})`);
+  const value = Number(((await r.json()) as { credit?: unknown }).credit);
+  if (!Number.isFinite(value)) throw new Error("Fish's balance is not a number");
+  return value;
+}

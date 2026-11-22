@@ -21,7 +21,9 @@
 import { generateId, isTextUIPart } from "ai";
 import type { Effort } from "@/core/agent";
 import { talkThinking } from "@/core/prefs";
-import { bytesOf, costOf, talkClientEventOf, TALK_LIMITS, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
+import type { FishUse } from "@/core/fish-usage";
+import { fishLedger } from "./fish-usage";
+import { bytesOf, costOf, earCostOf, talkClientEventOf, TALK_LIMITS, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
 import type { Server } from "@/core/server-urls";
 import { hold, load, saver } from "./chats";
 import { ownerPrefs } from "./prefs";
@@ -101,6 +103,8 @@ export type Deps = {
   /** Fish, in production; fakes in the tests. */
   connectVoice: ConnectVoice;
   connectEar: ConnectEar;
+  /** Where the conversation's cost is recorded when it ends (fish-usage.ts); none in the tests. */
+  spend?: (u: FishUse) => void;
 };
 
 /** A reply under way: its own abort, what it waits on from the app (a card's tap, an app tool's answer), and the answers that
@@ -386,6 +390,9 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     generation++;
     voice?.stop();
     voice = undefined;
+    // What Fish bills: the ear's open seconds (the app's own count, Readout) and the voice's bytes
+    const seconds = (Date.now() - began) / 1000;
+    d.spend?.({ kind: "talk", seconds, bytes: saidBytes, cost: earCostOf(seconds) + costOf(saidBytes, d.sea.model) });
     // The last save: nobody is left to tell when it fails
     await save(withoutPictures(settle(messages, true))).catch((e: Error) => console.error(`agent: talk: ${e.message}`)).finally(letGo);
   }
@@ -451,7 +458,7 @@ export async function talkRoute(req: Request, srv: Bun.Server<Sock>, server: Ser
   const thinking = talkThinking(prefs);
   if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") return Response.json({ model: sea.model, voice: sea.voice, speed: sea.speed } satisfies TalkStatus);
   if (!sameOrigin(req.headers)) return new Response("Talk answers only the app on this server", { status: 403 });
-  const deps: Deps = { server, sea, model: thinking.model || DEFAULT_MODEL, effort: thinking.effort, connectVoice: fish.speak(sea), connectEar: fish.hear };
+  const deps: Deps = { server, sea, model: thinking.model || DEFAULT_MODEL, effort: thinking.effort, connectVoice: fish.speak(sea), connectEar: fish.hear, spend: (u) => fishLedger().record(u) };
   return srv.upgrade(req, { data: { deps, first: false, closed: false } }) ? undefined : new Response("Not a WebSocket upgrade", { status: 400 });
 }
 
