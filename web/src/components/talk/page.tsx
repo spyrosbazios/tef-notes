@@ -6,6 +6,7 @@
 // then the transcript, then the controls (over the tab bar, on a phone); on a phone the orb steps back to a small one as soon as there is
 // something said or a card, so what the agent shows has the room. Where the page itself is wide (a container query, not the window's width, which the dock takes from): the orb and
 // controls on the left, the transcript and tray on the right. The time and cost so far are a quiet readout, since whether Talk is worth keeping is what it is here to find out.
+import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AudioLines, History, Mic, MicOff, PhoneOff, Plus, RotateCw, TriangleAlert } from "lucide-react";
@@ -43,7 +44,7 @@ function Readout() {
   const detail = `Fish: listening ${money(ear)}, voice ${money(voice)}${usage ? ` (${usage.said.toLocaleString()} characters said)` : ""}. The model's tokens are not included.`;
   return (
     <p className="min-w-0 shrink-0 whitespace-nowrap text-xs tabular-nums text-faint" title={detail}>
-      {clock(seconds)} · {money(ear + voice)}
+      {clock(seconds)} · $<SlidingNumber number={ear + voice} decimalPlaces={ear + voice < 0.1 ? 3 : 2} initiallyStable />
     </p>
   );
 }
