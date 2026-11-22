@@ -164,6 +164,6 @@ export const uiModule = toolModule(() => uiTools, {
   ask_choice: { approval: "none", result: "plain" },
   replace_selection: { approval: "none", result: "plain", unavailableWhenTainted: true, unavailableInTalk: true },
   insert_after_selection: { approval: "none", result: "plain", unavailableWhenTainted: true, unavailableInTalk: true },
-  draw: { approval: "none", result: "plain", unavailableInTalk: true },
-  save_drawing: { approval: "none", result: "plain", unavailableWhenTainted: true, unavailableInTalk: true },
+  draw: { approval: "none", result: "plain" },
+  save_drawing: { approval: "none", result: "plain", unavailableWhenTainted: true },
 });

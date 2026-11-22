@@ -35,9 +35,9 @@ describe("colocated tool policies", () => {
     expect(names((n) => policyFor(n)?.approval !== "none")).toEqual([...WRITE_TOOLS].sort());
   });
 
-  it("offers Talk all but what needs a screen, a selection or a chat's file", () => {
+  it("offers Talk all but what needs a selection or a chat's file", () => {
     expect(names((n) => policyFor(n)?.unavailableInTalk === true))
-      .toEqual(["attach_file", "diagram_guide", "draw", "insert_after_selection", "read_drawing", "replace_selection", "save_drawing", "show_drawing"]);
+      .toEqual(["attach_file", "insert_after_selection", "replace_selection"]);
   });
 
   it("offers a note action's run only the tools its result needs, and narrows its writes to its note", () => {

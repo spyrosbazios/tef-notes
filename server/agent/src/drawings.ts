@@ -88,8 +88,8 @@ export const drawingModule = toolModule(({ notes }) => ({
     toModelOutput: ({ output }) => ({ type: "json", value: "widget" in output ? { shown: "drawing", path: output.widget.path, name: output.widget.name } : output }),
   }),
 }), {
-  diagram_guide: { approval: "none", result: "plain", unavailableInTalk: true },
-  read_drawing: { approval: "none", result: "records", unavailableInTalk: true, run: { results: EVERY_RUN } },
-  show_drawing: { approval: "none", result: "records", unavailableInTalk: true },
+  diagram_guide: { approval: "none", result: "plain" },
+  read_drawing: { approval: "none", result: "records", run: { results: EVERY_RUN } },
+  show_drawing: { approval: "none", result: "records" },
 });
 

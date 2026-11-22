@@ -43,7 +43,7 @@ function Readout() {
   const ear = earCostOf(seconds), voice = usage?.cost ?? 0;
   const detail = `Fish: listening ${money(ear)}, voice ${money(voice)}${usage ? ` (${usage.said.toLocaleString()} characters said)` : ""}. The model's tokens are not included.`;
   return (
-    <p className="min-w-0 shrink-0 whitespace-nowrap text-xs tabular-nums text-faint" title={detail}>
+    <p className="min-w-0 truncate text-xs tabular-nums text-faint" title={detail}>
       {clock(seconds)} · $<SlidingNumber number={ear + voice} decimalPlaces={ear + voice < 0.1 ? 3 : 2} initiallyStable />
     </p>
   );
@@ -59,7 +59,7 @@ function About() {
 }
 
 /** Which model Talk thinks with (Ask's unless set here), and the conversation's chat in Ask's history once there is one. */
-function Thinking({ compact }: { compact?: boolean }) {
+function Thinking({ compact }: { compact?: "narrow" | "always" }) {
   const { phase, chat } = useTalk();
   const { openChat } = useAssistant();
   const live = phase === "connecting" || phase === "live";
@@ -187,11 +187,11 @@ export function Conversation({ panel }: { panel?: { onExpand: () => void; onClos
               <span className="font-semibold">Talk</span>
               <Readout />
             </div>
-            <Thinking compact />
+            <Thinking compact="always" />
             <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Open Talk's page" title="Expand" onClick={panel.onExpand}><Maximize2 className="size-4" /></Button>
             <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Close the panel" title="Close" onClick={panel.onClose}><X className="size-4" /></Button>
           </div>
-        ) : <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking compact /></>} className="md:hidden" />}
+        ) : <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking compact="narrow" /></>} className="md:hidden" />}
         <Stage state={t.state} muted={t.muted} compact={phone && (waiting || rows.length > 0)} />
         <div className="flex min-h-0 flex-1 flex-col @3xl:col-start-2 @3xl:row-start-1 @3xl:border-l @3xl:border-line">
           <Transcript rows={rows} live={live} state={t.state} newest={tail?.id} empty={<About />} />

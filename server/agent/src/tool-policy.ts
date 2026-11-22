@@ -30,7 +30,7 @@ export type Policy<I = never> = {
   taints?: (output: unknown) => boolean;
   unavailableWhenTainted?: true;
   requiresExa?: true;
-  /** Left out of Talk, the spoken conversation (turn.ts): it needs what Talk hasn't, the screen's canvas, a selection made
+  /** Left out of Talk, the spoken conversation (turn.ts): it needs what Talk hasn't, a selection made
    *  with the mouse, or a file attached to a chat message. */
   unavailableInTalk?: true;
   /** Offered to a note action's run whose action ends in one of `results` (note-action.ts); absent, never. `scope`: why a call
