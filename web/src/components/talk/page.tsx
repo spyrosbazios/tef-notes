@@ -181,10 +181,12 @@ export function Conversation({ panel }: { panel?: { onExpand: () => void; onClos
       </>}
       <div className="flex h-full flex-col @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] @3xl:grid-rows-[minmax(0,1fr)_auto] @5xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]">
         {panel ? (
-          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
             <AudioLines className="size-4 shrink-0 text-brand" />
-            <span className="font-semibold">Talk</span>
-            <span className="min-w-0 flex-1"><Readout /></span>
+            <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
+              <span className="font-semibold">Talk</span>
+              <Readout />
+            </div>
             <Thinking compact />
             <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Open Talk's page" title="Expand" onClick={panel.onExpand}><Maximize2 className="size-4" /></Button>
             <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Close the panel" title="Close" onClick={panel.onClose}><X className="size-4" /></Button>
