@@ -163,6 +163,26 @@ export function uiWords(name: AppTool, input: unknown, title: string | undefined
   }
 }
 
+/** The UI tools that move the screen themselves: after one of them, the app doesn't move it again unasked. */
+const MOVES: readonly string[] = ["open_note", "open_task", "go_view", "draw"] satisfies AppTool[];
+
+/** The note a reply just made, for the app to open (as `open_note` would): the path its newest `create_note` saved, null when
+ *  there is none new or the assistant moved the screen itself after it. `seen` holds the calls already looked at, and is added
+ *  to: a call is answered for once, however often the reply is read (every part of a spoken turn, every resumed step). */
+export function createdNote(parts: UIMessage["parts"], seen: Set<string>): string | null {
+  let path: string | null = null;
+  for (const p of parts) {
+    if (!isToolUIPart(p)) continue;
+    const name = getToolName(p);
+    if (MOVES.includes(name)) path = null;
+    if (name !== "create_note" || p.state !== "output-available" || seen.has(p.toolCallId)) continue;
+    seen.add(p.toolCallId);
+    const saved = (p.output as { saved?: unknown } | null)?.saved;
+    if (typeof saved === "string" && isNotePath(saved)) path = saved;
+  }
+  return path;
+}
+
 /** When the turn goes on without the owner sending anything (`sendAutomaticallyWhen`): a card was answered, or every call
  *  of the last step is done and one of them was ours, a UI tool. Not merely "the step's calls are done": a reply that stopped
  *  at the server's step limit ends on finished server calls too, and resending that would start another round unasked. */

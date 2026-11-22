@@ -195,6 +195,18 @@ describe("the app's own tools", () => {
     await tick();
     expect(r.events().at(-1)).toEqual({ type: "output", toolCallId: "t1", output: { error: "no such note" } });
   });
+  test("a note the assistant made is opened, once and with no answer sent", async () => {
+    const { r } = await live();
+    const made = { type: "part", message: "a1", role: "assistant", index: 0, part: { type: "tool-create_note", toolCallId: "c1", state: "output-available", input: { title: "Garage" }, output: { saved: "notes/garage.md", rev: 1 } } } as const;
+    r.hear({ ...made, part: { ...made.part, state: "input-available", output: undefined } });
+    await tick();
+    expect(r.tools).toEqual([]);                   // not before it is saved
+    r.hear(made);
+    r.hear(made);
+    await tick();
+    expect(r.tools).toEqual([["open_note", { path: "notes/garage.md" }]]);
+    expect(r.events().filter((e) => e.type === "output")).toEqual([]);
+  });
   test("a server tool is none of the app's business", async () => {
     const { r } = await live();
     r.hear({ type: "part", message: "a1", role: "assistant", index: 0, part: { type: "tool-search_notes", toolCallId: "s1", state: "input-available", input: {} } });

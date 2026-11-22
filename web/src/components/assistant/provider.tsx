@@ -6,6 +6,7 @@
 //    an answered card sees the screen as it is then), from the URL's nav, the query cache and the selected text;
 //  - the UI tools (core/assistant.ts): a call to open a note, a task or a view is done in the app through the nav
 //    and answered with `addToolOutput`, always, even when it fails;
+//  - a note the dock's chat just made is opened (`createdNote`), as the assistant's own `open_note` would;
 //  - `sendAutomaticallyWhen` (`resumes`): the turn resumes after a card's answer and after a UI tool's answer;
 //  - chats of their own beside the dock's (`transient`, hooks/transient-chat.ts), saved and listed like any: an ask from the
 //    selection bar, whose context is the words it holds in the note (the selection tools change them), and a note action's run
@@ -35,7 +36,7 @@ import { NOTES } from "@/hooks/notes";
 import { persisted } from "@/hooks/store";
 import { TASKS } from "@/hooks/todo";
 import type { Held } from "@/editor";
-import { closeUnfinished, notOffered, pageContext, resumes, runUiTool } from "@/lib/assistant";
+import { closeUnfinished, createdNote, notOffered, pageContext, resumes, runUiTool } from "@/lib/assistant";
 import { isTool } from "@/lib/ask";
 import { added, requeued, type ChatQueue, type Queues } from "@/lib/chat-queue";
 import { STORAGE } from "@/lib/storage-keys";
@@ -86,6 +87,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null, scope?: () => ActionRun | null): Chat<UIMessage> => {
     // The UI tools the request in flight offered (what its `context` allows): a call to any other is refused, not run
     let offered: readonly UiToolName[] = [];
+    // The `create_note` calls already answered for: a saved chat's own are none of this page's doing
+    const created = new Set<string>();
+    for (const m of messages) createdNote(m.parts, created);
     const chat: Chat<UIMessage> = new Chat<UIMessage>({
       id, messages,
       transport: new DefaultChatTransport<UIMessage>({
@@ -123,6 +127,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       onFinish: ({ message: m, isAbort, isError, isDisconnect }) => {
         void qc.invalidateQueries({ queryKey: CHATS });
         if (docked.current !== chat) return;
+        // The note it made is what the owner asked for: shown, not left as a card to click
+        const path = createdNote(m.parts, created);
+        if (path) void runUiTool("open_note", { path }, host).catch(() => undefined);
         if (!isAbort) answered();
         // A card waits for its answer: a closed dock would leave the write waiting with nobody to see it
         if (!isAbort && !isError && !isDisconnect && m.parts.some((p) => isTool(p) && p.state === "approval-requested")) setDock({ open: true });
