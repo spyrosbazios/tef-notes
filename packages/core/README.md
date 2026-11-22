@@ -16,7 +16,7 @@ TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECT
 | `record-protocol.ts` | Every collection's requests (notes, tasks, links, lenses, tags and their routes, attachments, chats), pagination and idempotency over an injected transport; no I/O of its own |
 | `tags.ts` | Tag definitions' shapes, a note's tags, a search box's `#tag`s and the debounced guess for a draft task |
 | `server-urls.ts` | The server's address and where a photo, a thumb, a preview's picture and the agent's routes are |
-| `client/` (`pocketbase.ts`, `http.ts`, `tags.ts`, `import.ts`) | The fetch client (the CLI, the agent): the core's one I/O. Nothing outside `client/` loads it (`scripts/check-boundaries.ts`) |
+| `client/` (`pocketbase.ts`, `http.ts`, `import.ts`, `ids.ts`) | The fetch client (the CLI, the agent) and new record ids: the core's one I/O and randomness. Nothing outside `client/` loads it (`scripts/check-boundaries.ts`), draws a random number, and none of it reads the clock (`test/purity.test.ts`) |
 | `assistant.ts` | The always-on assistant's contract: the page context a client sends with each message, and the UI tools (`open_note`, `open_task`, `go_view`) the client does itself |
 | `chat-history.ts` | Versioned chat persistence, legacy reading and opaque historical parts; independent of SDK tool schemas |
 | `agent.ts`, `clip.ts`, `share.ts`, `handoff.ts` | The chat agent's card shapes and wording, the clip contract, share-to-agent, "Ask about this" |

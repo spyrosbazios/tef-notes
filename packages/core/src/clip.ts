@@ -71,23 +71,18 @@ export const saveBody = (page: ClipPage, line: string | undefined, target: Targe
   return { id, url, title, selection, line, target, note: note || undefined, images, pdfs, tags: tags.length ? tags : undefined, ...(summary && { summary: true, text: page.text }) };
 };
 
-/** A save's id: 15 of a-z0-9, as a record id is (server/pb_hooks/lib/clip.js `clipId` takes exactly these). */
-export const clipId = (): string => {
-  const bytes = crypto.getRandomValues(new Uint8Array(15));
-  return Array.from(bytes, (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
-};
-
 /** `saveBody` with the id the save carries, for a client that sends a save again by hand (the owner presses Save once more after
  *  a failure). The server records every save under its id and answers one it has already done with the first's answer, so a save
  *  whose answer was lost lands once: `body` for the very same save as the last call's (the same page, target, note, tags...) keeps
  *  that call's id, any other save gets a new one; `landed` once a save has been answered, so the next of the same words is a new
- *  save. One per client. */
-export function saveBodies() {
+ *  save. One per client; `newId` makes a save's id: 15 of a-z0-9, as a record id is (client/ids.ts `recordId`; server/pb_hooks/lib/clip.js
+ *  `clipId` takes exactly these). */
+export function saveBodies(newId: () => string) {
   let last: { key: string; id: string } | undefined;
   return {
     body(page: ClipPage, line: string | undefined, target: Target, note: string, summary: boolean, tags: string[]) {
       const key = JSON.stringify(saveBody(page, line, target, note, summary, tags, ""));
-      if (last?.key !== key) last = { key, id: clipId() };
+      if (last?.key !== key) last = { key, id: newId() };
       return saveBody(page, line, target, note, summary, tags, last.id);
     },
     landed() { last = undefined; },

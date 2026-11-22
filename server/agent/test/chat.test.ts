@@ -120,7 +120,7 @@ describe("POST /agent/chat", () => {
   it("refuses a write its check fails, so a call later in the same step can't run past its card", async () => {
     // The append names the note the create beside it is about to make: checked before either runs, it fails. Skipping its card
     // then would let it run after the create, under "Ask first", with no card at all
-    const path = newNotePath("Garage");
+    const path = newNotePath("Garage", Date.now());
     replies = [toolCalls(["create_note", { title: "Garage", body: "- oil" }], ["append_to_note", { path, text: "tyres" }]), text("Done.")];
     const done = await send([{ id: "u1", role: "user", parts: [{ type: "text", text: "garage: oil, then tyres" }] }], { createNote: "auto", editNote: "ask" });
     const [made, added] = done.parts.filter(isToolUIPart);

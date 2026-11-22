@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { recordId } from "../../packages/core/src/client/ids";
 import * as pb from "../../packages/core/src/client/pocketbase";
 import { DEFAULT_PREFS } from "../../packages/core/src/prefs";
 import { patchPrefs, prefsRemote } from "../../packages/core/src/prefs-sync";
@@ -13,7 +14,7 @@ if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun -
 const s = { url };
 let serial = 0;
 const id = () => `contract${String(++serial).padStart(7, "0")}`;
-const note = () => pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Contract\n");
+const note = () => pb.create(s, recordId(), `notes/${id()}.md`, "# Contract\n");
 const task = () => pb.tasks.create(s, newTask(id(), { title: "Contract task" }));
 const record = (collection: string, id: string) => `collections/${collection}/records/${id}`;
 const raw = (path: string, method: string, body?: unknown) => fetch(`${url}/api/${path}`, body === undefined ? { method } : pb.json(method, body));
@@ -83,12 +84,12 @@ test("keyset paging's filter: `id > last` sorted by id, beside a listing's own f
 test("noteColumns survive HTTP create/update; path and kind are immutable", async () => {
   const path = `notes/${id()}.md`;
   const text = '---\ntitle: "Δοκιμή"\ncreated: 2026-11-14\npinned: true\narchived: true\ncolor: blue\ntags: [work, home]\n---\nBody\n';
-  const rec = pb.recordId(), n = await pb.create(s, rec, path, text);
+  const rec = recordId(), n = await pb.create(s, rec, path, text);
   expect(n.rec).toBe(rec);                                   // the client's own record id, as tasks have theirs
   expect(await pb.call(s, record("notes", n.rec))).toMatchObject({ ...noteColumns(path, text), rev: 1, kind: "note" });
   await expect(pb.create(s, rec, `notes/${id()}.md`, text)).rejects.toBeInstanceOf(Conflict);   // its id taken: it landed before
   expect(noteColumns(path, text)).toMatchObject({ title: "Δοκιμή", day: "2026-11-14", pinned: true, archived: true, color: "blue", tags: ["work", "home"] });
-  await expect(pb.create(s, pb.recordId(), path, text)).rejects.toBeInstanceOf(Conflict);
+  await expect(pb.create(s, recordId(), path, text)).rejects.toBeInstanceOf(Conflict);
   for (const patch of [{ path: "notes/moved.md" }, { kind: "capture" }]) {
     expect((await raw(record("notes", n.rec), "PATCH", { rev: n.rev, ...patch })).status).toBe(400);
   }
@@ -164,10 +165,10 @@ test("attachments: multipart, exact download, name uniqueness and note deletion 
 });
 
 test("search: a typed % or _ matches itself, not any text (PocketBase reads a bare % as a pattern)", async () => {
-  const percent = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Hit\nzqprice 100% sure\n");
-  const wild = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Miss\nzqprice 100 sure\n");
-  const under = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Hit\nzq_name\n");
-  const other = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Miss\nzqXname\n");
+  const percent = await pb.create(s, recordId(), `notes/${id()}.md`, "# Hit\nzqprice 100% sure\n");
+  const wild = await pb.create(s, recordId(), `notes/${id()}.md`, "# Miss\nzqprice 100 sure\n");
+  const under = await pb.create(s, recordId(), `notes/${id()}.md`, "# Hit\nzq_name\n");
+  const other = await pb.create(s, recordId(), `notes/${id()}.md`, "# Miss\nzqXname\n");
   const found = async (q: string) => (await pb.search(s, q)).map((n) => n.rec).sort();
   expect(await found("100%")).toEqual([percent.rec]);
   expect(await found("zqprice 100")).toEqual([percent.rec, wild.rec].sort());

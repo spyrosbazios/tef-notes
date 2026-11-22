@@ -3,7 +3,6 @@ import {
   appendToNote, appended, attachmentOf, isNotePath, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
   pastedNote, picturesOf, mosaicCells, slugify, snippetOf, undoEdit, withBody, withFlags,
 } from "../src/notes";
-import { localDay } from "../src/days";
 
 const P = "notes/20261005-garage-door-codes.md";
 const DOC = "---\ntitle: Garage door codes\ncreated: 2026-10-05\npinned: false\ncolor: yellow\ntags: [home]\n---\nBody in GitHub-flavored markdown.\n";
@@ -93,8 +92,8 @@ describe("withFlags", () => {
     expect(withFlags(P, "# Codes\n\n1234\n", { color: "yellow" })).toBe("---\ntitle: Codes\ncreated: 2026-10-05\ncolor: yellow\n---\n# Codes\n\n1234\n");
   });
 
-  it("dates a plain file with no date in its name today, never `created: \"\"`", () => {
-    expect(withFlags("notes/scratch.md", "x\n", { pinned: true })).toBe(`---\ntitle: Scratch\ncreated: ${localDay()}\npinned: true\n---\nx\n`);
+  it("gives a plain file with no date of its own none: never `created: \"\"`, nor the day a flag was set", () => {
+    expect(withFlags("notes/scratch.md", "x\n", { pinned: true })).toBe(`---\ntitle: Scratch\npinned: true\n---\nx\n`);
   });
 });
 

@@ -55,7 +55,7 @@ tags: [home]
 Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, code, images.
 ```
 
-- `title` and `created` are always present. `pinned`, `archived`, `color` and `tags` appear only when set. Notes have no place: only tasks do (`where`, below).
+- `title` is always present, and `created` whenever the note has a day: a new note is given its own, and a file without one in its frontmatter or its name (`YYYYMMDD-…`) gets none rather than the day it was edited. `pinned`, `archived`, `color` and `tags` appear only when set. Notes have no place: only tasks do (`where`, below).
 - `archived: true` puts a note away: out of the notes lists (the list's archive button shows them, `?archived=1`), the agent's
   notes index and a clip's choice of where to file, but still found by search, its links and the agent's tools
   (`list_notes "archived"`). Archiving unpins it (`archivePatch`, `packages/core/src/bulk.ts`).

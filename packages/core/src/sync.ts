@@ -29,6 +29,7 @@ import { Conflict, Gone, Refused, Unavailable, type Entry, type Listed, type Mar
 import { isNotePath, newNotePath, parseNote, reconcile, type NoteKind } from "./notes";
 import { newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "./record-links";
 import { mergeRecord, normalizeTask, taskOf, type Task } from "./todo";
+import { equal } from "./equal";
 
 // ---- rows
 
@@ -55,8 +56,9 @@ export type LinkRow = { link: Link; pushed: number | null; deleted: boolean; ref
 /** One kind of row, by key. The engine reads and writes rows whole; `patch` below is the partial write. */
 export type Table<R> = { get: (key: string) => R | undefined; all: () => R[]; put: (row: R) => void; delete: (key: string) => void };
 
-/** The client's copy. A `put` must be visible to the next `get`: the engine reads its own writes. */
-export type Store = { notes: Table<NoteRow>; tasks: Table<TaskRow>; links: Table<LinkRow> };
+/** The client's copy, and the client's clock (ms since the epoch: the engine reads no clock of its own). A `put` must be
+ *  visible to the next `get`: the engine reads its own writes. */
+export type Store = { notes: Table<NoteRow>; tasks: Table<TaskRow>; links: Table<LinkRow>; now: () => number };
 
 /** A note as fetched; `at`: the server's last change to it in ms, when the transport knows it (the phone orders a first pull by the
  *  note's `created` day instead). It is the row's `updated` when the note is first seen or taken, so the list's order is the server's. */
@@ -91,8 +93,8 @@ export type Transport = {
 
 // ---- small things
 
-/** The next `updated` of a row: it only moves forward. */
-export const tick = (n?: { updated: number } | null) => Math.max(Date.now(), (n?.updated ?? 0) + 1);
+/** The next `updated` of a row, by the store's clock: it only moves forward. */
+const tick = (s: Store, n?: { updated: number } | null) => Math.max(s.now(), (n?.updated ?? 0) + 1);
 
 /** `n` at a time, in order. */
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
@@ -109,7 +111,6 @@ export function patch<R>(t: Table<R>, key: string, p: Partial<R>): R | undefined
   return n;
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Whether a note has edits not sent. */
 const unsent = (n: NoteRow) => n.updated !== n.pushed;
@@ -151,10 +152,10 @@ export type Run = {
 const unreachable = (e: unknown) => e instanceof Unavailable;
 
 /** The note's `created` day (days.ts dayDate), so a first pull lists notes by age, not all at "now". */
-function createdAt(path: string, text: string) {
+function createdAt(path: string, text: string, now: number) {
   const d = /^\d{4}-\d{2}-\d{2}/.exec(parseNote(path, text).created);
   const t = d ? dayDate(d[0]).getTime() : NaN;
-  return t > 0 && t < Date.now() ? t : Date.now();
+  return t > 0 && t < now ? t : now;
 }
 
 // ---- notes: local edits
@@ -168,7 +169,7 @@ export const freshNote = (rec: string, path: string, text: string, updated: numb
 /** A note made here, under its own record id (`recordId`), at a path this copy doesn't hold: unsent until the next push. */
 export function addNote(s: Store, rec: string, path: string, text: string, mark: Mark = {}): void {
   if (s.notes.get(path)) throw new Error(`${path} is taken`);
-  s.notes.put({ ...freshNote(rec, path, text, tick()), ...(mark.tainted ? { tainted: true as const } : {}) });
+  s.notes.put({ ...freshNote(rec, path, text, tick(s)), ...(mark.tainted ? { tainted: true as const } : {}) });
 }
 
 /** `text` written to the note at `path`: unsent until the next push, with `mark` (a row once tainted stays so until sent).
@@ -176,7 +177,7 @@ export function addNote(s: Store, rec: string, path: string, text: string, mark:
 export function writeNote(s: Store, path: string, text: string, mark: Mark = {}): boolean {
   const n = s.notes.get(path);
   if (!n || (!n.deleted && n.text === text)) return false;
-  s.notes.put({ ...n, text, updated: tick(n), deleted: false, refused: undefined, ...(mark.tainted ? { tainted: true as const } : {}) });
+  s.notes.put({ ...n, text, updated: tick(s, n), deleted: false, refused: undefined, ...(mark.tainted ? { tainted: true as const } : {}) });
   return true;
 }
 
@@ -202,7 +203,7 @@ export function keepMine(s: Store, path: string): boolean {
 export function takeTheirs(s: Store, path: string): boolean {
   const n = s.notes.get(path);
   if (n?.conflict_rev == null || n.conflict_text == null) return false;
-  const t = tick(n);
+  const t = tick(s, n);
   s.notes.put({ ...n, text: n.conflict_text, rev: n.conflict_rev, base: n.conflict_text, updated: t, pushed: t, conflict_text: null, conflict_rev: null, lost: n.text });
   return true;
 }
@@ -211,7 +212,7 @@ export function takeTheirs(s: Store, path: string): boolean {
 export function restoreMine(s: Store, path: string): boolean {
   const n = s.notes.get(path);
   if (n?.lost == null) return false;
-  s.notes.put({ ...n, text: n.lost, updated: tick(n), lost: null });
+  s.notes.put({ ...n, text: n.lost, updated: tick(s, n), lost: null });
   return true;
 }
 
@@ -232,8 +233,8 @@ function takeNote(s: Store, r: Fetched): boolean {
   const { path, text, rec, rev, kind, at } = r, n = s.notes.get(path);
   if (n && (unsent(n) || n.deleted || n.conflict_rev != null)) return false;
   if (n && n.text === text) { s.notes.put({ ...n, rec, rev, base: text, kind }); return false; }
-  if (n) { const t = Math.max(at ?? Date.now(), n.updated + 1); s.notes.put({ ...n, text, rec, rev, base: text, kind, updated: t, pushed: t }); }
-  else { const t = at ?? createdAt(path, text); s.notes.put({ ...freshNote(rec, path, text, t), rev, base: text, kind, pushed: t }); }
+  if (n) { const t = Math.max(at ?? s.now(), n.updated + 1); s.notes.put({ ...n, text, rec, rev, base: text, kind, updated: t, pushed: t }); }
+  else { const t = at ?? createdAt(path, text, s.now()); s.notes.put({ ...freshNote(rec, path, text, t), rev, base: text, kind, pushed: t }); }
   return true;
 }
 
@@ -276,8 +277,8 @@ async function pullNotes(c: Run): Promise<boolean> {
  *  `landed`), and a path the server holds never changes. */
 function moveAside(c: Run, path: string, n: NoteRow, taken: Set<string>): string {
   taken.add(path);
-  const to = newNotePath(parseNote(path, n.text).title, createdAt(path, n.text), new Set([...c.store.notes.all().map((r) => r.path), ...taken]));
-  c.store.notes.put({ ...n, path: to, updated: tick(n) });
+  const to = newNotePath(parseNote(path, n.text).title, createdAt(path, n.text, c.store.now()), new Set([...c.store.notes.all().map((r) => r.path), ...taken]));
+  c.store.notes.put({ ...n, path: to, updated: tick(c.store, n) });
   c.store.notes.delete(path);
   c.moved?.(path, to);
   return to;
@@ -340,7 +341,7 @@ async function dropNote(c: Run, t: NoteRow): Promise<void> {
   const rem = await api.notes.get(t.rec);
   if (!rem) return gone();
   if (!store.notes.get(t.path)?.deleted) return;
-  const u = tick(t);
+  const u = tick(store, t);
   store.notes.put({ ...t, text: rem.text, rev: rem.rev, base: rem.text, updated: u, pushed: u, deleted: false });
 }
 
@@ -356,9 +357,9 @@ async function pushNotes(c: Run) {
 /** One task's fields written here: unsent until the next push. */
 export function saveTask(s: Store, data: Task): void {
   const r = s.tasks.get(data.id);
-  if (r && !r.deleted && same(r.data, data)) return;
-  if (r) s.tasks.put({ ...r, data, updated: tick(r), deleted: false, refused: undefined });
-  else s.tasks.put({ id: data.id, data, base: null, rev: null, updated: tick(), pushed: null, deleted: false });
+  if (r && !r.deleted && equal(r.data, data)) return;
+  if (r) s.tasks.put({ ...r, data, updated: tick(s, r), deleted: false, refused: undefined });
+  else s.tasks.put({ id: data.id, data, base: null, rev: null, updated: tick(s), pushed: null, deleted: false });
 }
 
 /** A tombstone for the push, or gone at once when the server never had it, unless a sync is out. */
@@ -374,7 +375,7 @@ export function removeTask(s: Store, id: string, syncing: boolean): void {
 function takeTask(s: Store, r: Versioned<Task>) {
   const { rev, ...fields } = r, data = taskOf(fields), n = s.tasks.get(data.id);
   if (n && (taskUnsent(n) || n.deleted)) return;
-  const t = tick(n);
+  const t = tick(s, n);
   s.tasks.put({ id: data.id, data, base: data, rev, updated: t, pushed: t, deleted: false });
 }
 
@@ -398,7 +399,7 @@ async function sendTask(c: Run, id: string, retry = true): Promise<void> {
   const n = store.tasks.get(id);
   if (!n || n.deleted || !taskUnsent(n)) return;
   const at = n.updated, out = normalizeTask(taskOf(n.data));
-  if (!same(out, n.data)) store.tasks.put({ ...n, data: out });
+  if (!equal(out, n.data)) store.tasks.put({ ...n, data: out });
   const done = async (r: Versioned<Task>) => {
     const now = store.tasks.get(id), { rev, ...fields } = r, base = taskOf(fields);
     if (!now) return api.tasks.remove(id, rev);                    // dropped here while it went up
@@ -418,7 +419,7 @@ async function sendTask(c: Run, id: string, retry = true): Promise<void> {
   if (!cur || cur.deleted) return;
   const { rev, ...rest } = rem, theirs = taskOf(rest);
   const merged = normalizeTask(mergeRecord(cur.base == null ? null : taskOf(cur.base), taskOf(cur.data), theirs).merged);
-  const clean = same(merged, theirs);
+  const clean = equal(merged, theirs);
   store.tasks.put({ ...cur, data: merged, base: theirs, rev, ...(clean ? { pushed: cur.updated } : {}) });
   if (!clean && retry) await sendTask(c, id, false);
 }
@@ -437,7 +438,7 @@ async function dropTask(c: Run, t: TaskRow): Promise<void> {
   const rem = await api.tasks.get(t.id);
   if (!rem) return gone();
   if (!store.tasks.get(t.id)?.deleted) return;
-  const { rev, ...fields } = rem, data = taskOf(fields), u = tick(t);
+  const { rev, ...fields } = rem, data = taskOf(fields), u = tick(store, t);
   store.tasks.put({ id: t.id, data, base: data, rev, updated: u, pushed: u, deleted: false });
 }
 
@@ -495,11 +496,11 @@ async function pullLinks(c: Run): Promise<"ok" | "failed" | "down"> {
   const missing = ids.filter((id) => !rows.has(id));
   try {
     for (let i = 0; i < missing.length; i += LINK_BATCH) {
-      for (const link of await api.links.byIds(missing.slice(i, i + LINK_BATCH))) if (!store.links.get(link.id)) store.links.put({ link, pushed: Date.now(), deleted: false });
+      for (const link of await api.links.byIds(missing.slice(i, i + LINK_BATCH))) if (!store.links.get(link.id)) store.links.put({ link, pushed: store.now(), deleted: false });
     }
   } catch (e) { c.fail("links", e); return unreachable(e) ? "down" : "failed"; }
   for (const r of rows.values()) {
-    if (remote.has(r.link.id)) { if (r.pushed == null) store.links.put({ ...r, pushed: Date.now() }); }   // an add that landed before the page closed
+    if (remote.has(r.link.id)) { if (r.pushed == null) store.links.put({ ...r, pushed: store.now() }); }   // an add that landed before the page closed
     else if (r.pushed != null) store.links.delete(r.link.id);       // gone from the server; a tombstone's delete is done
   }
   return "ok";
@@ -534,7 +535,7 @@ async function pushLinks(c: Run) {
       const got = await api.links.add(l), now = store.links.get(id);
       if (!now) { await api.links.remove(got.id); continue; }
       if (got.id !== id) store.links.delete(id);                       // the server had this relation under its own id
-      store.links.put({ link: got, pushed: Date.now(), deleted: now.deleted });
+      store.links.put({ link: got, pushed: store.now(), deleted: now.deleted });
     } catch (e) {
       if (e instanceof Gone && !r.deleted) store.links.delete(id);       // an end is gone from the server (deleted elsewhere)
       else if (e instanceof Refused) patch(store.links, id, { refused: e.message });
@@ -588,7 +589,7 @@ export function takeHeard(s: Store, h: Heard): boolean {
   }
   const l = s.links.get(h.link.id);
   if (l && l.pushed != null) return false;
-  s.links.put(l ? { ...l, pushed: Date.now() } : { link: h.link, pushed: Date.now(), deleted: false });   // an add of ours that landed
+  s.links.put(l ? { ...l, pushed: s.now() } : { link: h.link, pushed: s.now(), deleted: false });   // an add of ours that landed
   return true;
 }
 
@@ -665,12 +666,12 @@ export function discardRefused(s: Store, kind: Refusal["kind"], key: string): bo
     const n = s.notes.get(key);
     if (n?.refused == null) return false;
     if (n.rev == null || n.base == null) s.notes.delete(key);
-    else { const t = tick(n); s.notes.put({ ...n, text: n.base, updated: t, pushed: t, deleted: false, refused: undefined, tainted: undefined }); }
+    else { const t = tick(s, n); s.notes.put({ ...n, text: n.base, updated: t, pushed: t, deleted: false, refused: undefined, tainted: undefined }); }
   } else if (kind === "task") {
     const r = s.tasks.get(key);
     if (r?.refused == null) return false;
     if (r.rev == null || r.base == null) s.tasks.delete(key);
-    else { const t = tick(r); s.tasks.put({ ...r, data: r.base, updated: t, pushed: t, deleted: false, refused: undefined }); }
+    else { const t = tick(s, r); s.tasks.put({ ...r, data: r.base, updated: t, pushed: t, deleted: false, refused: undefined }); }
   } else {
     const l = s.links.get(key);
     if (l?.refused == null) return false;

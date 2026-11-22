@@ -4,7 +4,6 @@
 
 import { firstUrl } from "./hyperlinks";
 import { drawingPreview, isDrawing } from "./photos";
-import { localDay } from "./days";
 
 export const NOTES = "notes/";
 export const ATTACHMENTS = "attachments/";
@@ -19,7 +18,7 @@ type Flags = { pinned: boolean; archived: boolean; color?: Color; tags: string[]
 /** A one-tap edit of the flags: only what is passed changes; `null` takes a colour off. */
 export type FlagEdit = Partial<Omit<Flags, "color">> & { color?: Color | null };
 export type Note = { id: string; title: string; created: string; body: string } & Flags;
-/** What serializeNote writes: title and created always, the flags only when set. */
+/** What serializeNote writes: the title always, `created` when known (a new note's maker gives it), the flags only when set. */
 type Meta = { title: string; created: string } & Partial<Flags>;
 
 /** What a note is: its record's `kind` column (server/pb_migrations/1793300000_note_kind.js), set when it is made and never
@@ -148,8 +147,9 @@ export function parseNote(path: string, text: string): Note {
 function lineFor(k: (typeof KEYS)[number], m: Meta): string | null {
   switch (k) {
     case "title": return `title: ${scalar(m.title.replace(/\s*\n\s*/g, " "))}`;
-    // Always there (root CLAUDE.md): a file with no date of its own, in its frontmatter or its name, gets today's
-    case "created": { const c = m.created || localDay(); return `created: ${/^\d{4}-\d{2}-\d{2}/.test(c) ? c : scalar(c)}`; }
+    // Whenever it is known: a new note's maker gives it (its day), a file read back has it from its frontmatter or its name;
+    // one with neither gets none rather than the day it happened to be edited
+    case "created": { const c = m.created; return c ? `created: ${/^\d{4}-\d{2}-\d{2}/.test(c) ? c : scalar(c)}` : null; }
     case "pinned": return m.pinned ? "pinned: true" : null;
     case "archived": return m.archived ? "archived: true" : null;
     case "color": return m.color ? `color: ${m.color}` : null;
@@ -229,8 +229,8 @@ export function slugify(title: string): string {
 
 const two = (n: number) => String(n).padStart(2, "0");
 
-/** `notes/YYYYMMDD-<slug>.md` for a new note, local date; `-2`, `-3` when the path is taken. */
-export function newNotePath(title: string, now = Date.now(), taken: Set<string> = new Set()): string {
+/** `notes/YYYYMMDD-<slug>.md` for a new note made at `now` (ms), its local day; `-2`, `-3` when the path is taken. */
+export function newNotePath(title: string, now: number, taken: Set<string> = new Set()): string {
   const d = new Date(now), stem = `${NOTES}${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${slugify(title)}`;
   let p = `${stem}.md`;
   for (let i = 2; taken.has(p); i++) p = `${stem}-${i}.md`;

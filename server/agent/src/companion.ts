@@ -30,7 +30,7 @@ export async function helloRoute(server: Server): Promise<Response> {
 
 export async function tasksRoute(req: Request, server: Server): Promise<Response> {
   const [{ prefs, lenses, lens }, tasks] = await Promise.all([owner(server), new TaskService(server).tasks()]);
-  return Response.json(tasksFeed(tasks, taskListOf(new URL(req.url).searchParams.get("list")), localDay(), lenses, lens, ownerLook(prefs, lens)));
+  return Response.json(tasksFeed(tasks, taskListOf(new URL(req.url).searchParams.get("list")), localDay(Date.now()), lenses, lens, ownerLook(prefs, lens)));
 }
 
 export async function notesRoute(server: Server): Promise<Response> {
@@ -45,7 +45,7 @@ export async function addTaskRoute(req: Request, server: Server): Promise<Respon
   const task = newTaskOf(await req.json().catch(() => null));
   if (!task) return refuse(400, "A task needs a title and an id of its own.");
   const { lens } = await owner(server);
-  const r = await new TaskService(server).addTask({ title: task.title, when: task.list === "today" ? localDay() : "", tags: inheritTags(lens) }, [], false, [], task.id);
+  const r = await new TaskService(server).addTask({ title: task.title, when: task.list === "today" ? localDay(Date.now()) : "", tags: inheritTags(lens) }, [], false, [], task.id);
   return "error" in r ? refuse(409, r.error) : Response.json({ id: r.id });
 }
 

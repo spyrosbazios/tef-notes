@@ -367,7 +367,7 @@ describe("web taint", () => {
 });
 
 describe("tasks", () => {
-  const TODAY = localDay(), tomorrow = localDay(Date.now() + 86_400_000);
+  const TODAY = localDay(Date.now()), tomorrow = localDay(Date.now() + 86_400_000);
   let n = 0;
   /** A task as a client would have written it. */
   const task = (title: string, o: Partial<Task> = {}): Task => {
@@ -633,7 +633,7 @@ describe("cards", () => {
     const added = await run(T.add_task, { title: "Book flights", due: "2999-12-31", checklist: ["a", "b"] } as never) as { id: string };
     expect(out(added)).toEqual([{ kind: "task", id: added.id, title: "Book flights", due: "2999-12-31", checklist: [0, 2] }]);
     expect(out(await run(T.update_task, { id: added.id, when: "2026-11-02", evening: true } as never))[0]).toMatchObject({ when: "2026-11-02", evening: true });
-    expect(out(await run(T.complete_task, { id: added.id } as never))[0]).toMatchObject({ id: added.id, done: localDay() });
+    expect(out(await run(T.complete_task, { id: added.id } as never))[0]).toMatchObject({ id: added.id, done: localDay(Date.now()) });
     expect(out(await run(T.delete_task, { id: added.id } as never))).toEqual([]);
   });
 

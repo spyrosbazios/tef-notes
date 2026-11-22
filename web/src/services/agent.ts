@@ -21,9 +21,6 @@ export async function chat(id: string): Promise<(ChatLine & { messages: UIMessag
   return c && { id: c.id, title: c.title, updated: c.updated, messages: c.messages as UIMessage[] };
 }
 
-/** A new chat's id: PocketBase's own shape (15 of a-z0-9), picked here so the conversation has its id before it has a record. */
-export const newChatId = () => Array.from(crypto.getRandomValues(new Uint8Array(15)), (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
-
 /** An empty chat under `id`, so the first send has a record to name. */
 export const createChat = (id: string, title: string): Promise<ChatLine> => chatRecords.create(directTransport, id, title);
 

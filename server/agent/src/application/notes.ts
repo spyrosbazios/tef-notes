@@ -3,6 +3,7 @@
 // Listings are invalidated after writes; taint is persisted in the same write and never cleared.
 import { fold, newNotePath, noteKindOf, parseNote, snippetOf, type NoteKind } from "@/core/notes";
 import { mergedWrite } from "@/core/note-read";
+import { recordId } from "@/core/client/ids";
 import * as pb from "@/core/client/pocketbase";
 import { HttpError } from "@/core/client/http";
 import { noteColumns, Conflict, landed } from "@/core/record-contracts";
@@ -99,7 +100,7 @@ export class NoteService {
   /** A new note at a free path, under a record id made once: a path taken meanwhile moves the note aside to the next free one
    *  (the id is unused until a create lands), and a create whose answer was lost is sent again under the same id, so it lands once. */
   async create(title: string, text: (path: string) => string, taint: boolean): Promise<NoteSaved> {
-    const rec = pb.recordId();
+    const rec = recordId();
     for (let i = 0; i < TRIES; i++) {
       const path = newNotePath(title, Date.now(), new Set((await this.all()).keys())), body = text(path);
       try {
@@ -140,7 +141,7 @@ export class NoteService {
   async change(path: string, edit: (text: string) => string, o: { taint?: boolean; base?: { rev: number; text: string | null }; create?: boolean } = {}): Promise<NoteSaved> {
     const { base } = o;
     let baseText = base ? (base.rev === 0 ? "" : base.text) : null, mine: string | undefined;
-    const made = pb.recordId();                          // a missing file is created under this one id, however many tries it takes
+    const made = recordId();                          // a missing file is created under this one id, however many tries it takes
     for (let i = 0; i < TRIES; i++) {
       const cur = await this.read(path);
       if (!cur) {

@@ -15,6 +15,7 @@
 // be the owner's, or every reminder rings hours off.
 import { HttpError } from "@/core/client/http";
 import { taskUrl, type PushPayload } from "@/core/push";
+import { recordId } from "@/core/client/ids";
 import * as pb from "@/core/client/pocketbase";
 import { lit, Conflict } from "@/core/record-contracts";
 import { createdUnder } from "@/core/record-protocol";
@@ -134,7 +135,7 @@ export const pbPorts = (server: Server): Ports => ({
    *  it taken, reads the record back: it is ours (the first landed: the claim is held), never "taken by another scan", which would
    *  leave the reminder claimed and never sent. A taken key under another id is another scan's. */
   async claim(key) {
-    const id = pb.recordId();
+    const id = recordId();
     try {
       await createdUnder(() => pb.call(server, SENT, pb.json("POST", { id, key })), async () => {
         try { return await pb.call(server, `${SENT}/${id}`); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; }

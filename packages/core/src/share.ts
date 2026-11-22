@@ -5,7 +5,6 @@ import type { ClipPage } from "./clip";
 import { askedAbout } from "./handoff";
 import { firstUrl, hostOf, linkify } from "./hyperlinks";
 import { isPdf, PDF } from "./photos";
-import { localDay } from "./days";
 
 type SharedImage = { uri: string; width: number | null; height: number | null };
 type SharedPdf = { uri: string; name: string };
@@ -68,13 +67,13 @@ export function cleanTitle(raw: string): string {
   return cut(t);
 }
 
-/** A title to save it under: the page's, else the text's first line (cut short), else the site, else a PDF's name, else the day. */
-export function titleFor(s: Shared, pageTitle: string | null): string {
+/** A title to save it under: the page's, else the text's first line (cut short), else the site, else a PDF's name, else `today`'s photos. */
+export function titleFor(s: Shared, pageTitle: string | null, today: string): string {
   const t = pageTitle?.trim() || s.title || firstLine(s.text);
   if (t) return cut(t);
   if (s.url) return host(s.url);
   if (s.pdfs.length) return s.pdfs[0].name.replace(/\.pdf$/i, "");
-  return `Photos ${localDay()}`;
+  return `Photos ${today}`;
 }
 
 /** The body: the link as [title](url) — in the text where it was pasted, else on a line of its own above

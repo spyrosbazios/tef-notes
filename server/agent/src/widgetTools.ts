@@ -58,7 +58,7 @@ export const widgetModule = toolModule(({ notes, todo, fromPage }) => ({
   show_day: tool({
     description: "Show the owner one day as a timeline in the chat: the tasks booked at an hour (a task holds its hour; two in one hour are flagged as a clash), then the others planned for the day or due on it. Default today. You get the same list back; answer in a line, don't list it again.",
     inputSchema: z.object({ date: DATE.optional().describe("Default today") }),
-    execute: async ({ date = localDay() }): Promise<Shown<DayWidget>> =>
+    execute: async ({ date = localDay(Date.now()) }): Promise<Shown<DayWidget>> =>
       isDay(date) ? { widget: dayOfTasks(await todo.tasks(), date) } : bad(date),
     toModelOutput: ({ output }) => ({
       type: "json",
@@ -74,7 +74,7 @@ export const widgetModule = toolModule(({ notes, todo, fromPage }) => ({
     description: "Show the owner a week at a glance: seven days, each with how many open tasks it holds, how many are booked at an hour, how many are overdue and its first few titles. From `start` (any day) or, by default, this week's Monday.",
     inputSchema: z.object({ start: DATE.optional().describe("The first of the seven days; default this week's Monday") }),
     execute: async ({ start }): Promise<Shown<WeekWidget>> => {
-      const today = localDay(), first = start ?? weekOf(today, 0);
+      const today = localDay(Date.now()), first = start ?? weekOf(today, 0);
       return isDay(first) ? { widget: weekOfTasks(await todo.tasks(), first, today) } : bad(first);
     },
     toModelOutput: ({ output }) => ({ type: "json", value: "widget" in output ? { shown: "week", start: output.widget.start, days: output.widget.days } : output }),

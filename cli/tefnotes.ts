@@ -8,6 +8,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { exportPlan, fileNameOf } from "@/core/handoff";
 import { appendToNote, COLORS, isNotePath, MEMORY, newNotePath, parseNote, reconcile, serializeNote, type Color } from "@/core/notes";
+import { recordId } from "@/core/client/ids";
 import * as pb from "@/core/client/pocketbase";
 import { type Remote, Conflict, landed } from "@/core/record-contracts";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
@@ -189,7 +190,7 @@ function walk(dir: string, root = dir): string[] {
 async function importAll(s: Server, dir: string, dry: boolean, update: boolean) {
   if (!existsSync(dir)) die(`no folder ${dir}`);
   const t = await write.importNotes(s, { paths: walk(dir), text: async (f) => readFileSync(join(dir, f), "utf8"), blob: async (f) => Bun.file(join(dir, f)) },
-    { dry, update, today: localDay(), onLine: (l) => console.log(`${l.what.padEnd(6)}  ${l.from} -> ${l.id}${l.what === "skip" ? " (taken)" : l.files ? ` (${l.files} files)` : ""}`) });
+    { dry, update, today: localDay(Date.now()), onLine: (l) => console.log(`${l.what.padEnd(6)}  ${l.from} -> ${l.id}${l.what === "skip" ? " (taken)" : l.files ? ` (${l.files} files)` : ""}`) });
   console.error(dry ? `${t.found} notes found, ${t.taken} already there; nothing written (--dry-run)`
     : `${t.made} new, ${t.updated} updated, ${t.same} unchanged, ${t.skipped} skipped; ${t.files} attachments`);
 }
@@ -209,7 +210,7 @@ async function noteIds(s: Server): Promise<Map<string, string>> {
 }
 
 async function showTasks(s: Server, view: View) {
-  const v = views(await pb.tasks.list(s), localDay());
+  const v = views(await pb.tasks.list(s), localDay(Date.now()));
   const list = view === "today" ? [...v.today, ...v.evening] : view === "upcoming" ? v.upcoming.flatMap((d) => d.tasks) : v[view];
   const [links, notes] = list.length ? [await pb.links.list(s), await noteIds(s)] : [[], new Map<string, string>()];
   for (const t of list) console.log(taskLine(t, notesOfTask(links, t.id).flatMap((n) => notes.get(n) ?? [])));
@@ -231,7 +232,7 @@ async function linkNotes(s: Server, ref: string, ids: string[], drop: boolean) {
   const recs = await Promise.all(ids.map(async (id) => (await need(s, id)).rec)), had = await pb.links.from(s, end);
   for (const rec of recs) {
     const to: LinkEnd = { type: "note", id: rec };
-    if (!drop) { await pb.links.add(s, newLink(pb.recordId(), end, to, "about")); continue; }
+    if (!drop) { await pb.links.add(s, newLink(recordId(), end, to, "about")); continue; }
     for (const l of had.filter((x) => x.role === "about" && x.to.type === "note" && x.to.id === rec)) await pb.links.remove(s, l.id);
   }
   console.error(`${drop ? "unlinked" : "linked"} ${recs.length} note${recs.length === 1 ? "" : "s"}`);
@@ -275,7 +276,7 @@ function taskPatch(opt: Map<string, string>, all: Map<string, string[]>): TaskPa
   };
 }
 
-const day = (v: string) => (v === "today" ? localDay() : v === "tomorrow" ? localDay(Date.now() + 86_400_000) : v);
+const day = (v: string) => (v === "today" ? localDay(Date.now()) : v === "tomorrow" ? localDay(Date.now() + 86_400_000) : v);
 
 async function edit(s: Server, id: string) {
   const was = await need(s, id);
@@ -360,11 +361,11 @@ async function main(argv: string[]) {
       // One record id for the note, whatever path it ends up at. A path taken meanwhile (made on the phone this very moment)
       // is a Conflict that made nothing under the id, so the next free path goes under the same one; and a create whose answer
       // was lost is sent again by `write.notes.create` under it, never as a second note.
-      const rec = pb.recordId();
+      const rec = recordId();
       for (;;) {
         const path = newNotePath(title, Date.now(), taken);
         try {
-          await write.notes.create(s, rec, path, serializeNote({ title, created: localDay() }, body ? `${body}\n` : ""));
+          await write.notes.create(s, rec, path, serializeNote({ title, created: localDay(Date.now()) }, body ? `${body}\n` : ""));
           return console.log(idOf(path));
         } catch (e) {
           if (!(e instanceof Conflict)) throw e;
@@ -421,8 +422,8 @@ async function main(argv: string[]) {
       if (fields.evening && !fields.when) die("--evening needs --when");
       fields.order = nextOrder(await pb.tasks.list(s));
       // One id for the task: a create sent again after a lost answer finds it taken and is the same task (`write.tasks.create`).
-      const task = (await write.tasks.create(s, newTask(pb.recordId(), fields))).id;
-      for (const rec of notes) await pb.links.add(s, newLink(pb.recordId(), { type: "task", id: task }, { type: "note", id: rec }, "about"));
+      const task = (await write.tasks.create(s, newTask(recordId(), fields))).id;
+      for (const rec of notes) await pb.links.add(s, newLink(recordId(), { type: "task", id: task }, { type: "note", id: rec }, "about"));
       return console.log(task);
     }
     case "done": {
@@ -430,13 +431,13 @@ async function main(argv: string[]) {
       for (let tries = 0; tries < 3; tries++) {
         const cur = await pb.tasks.get(s, (await taskBy(s, ref)).id);
         if (!cur) return die(`task ${ref} was deleted meanwhile`);
-        const { rev, ...was } = cur, { task, next } = complete(was, localDay(), () => nextRoundId(cur.id));
+        const { rev, ...was } = cur, { task, next } = complete(was, localDay(Date.now()), () => nextRoundId(cur.id));
         if (task === was) return console.error("already done");
         // The next round first, then the tick: a run that dies between the two leaves the task open with its next round made,
         // and the run again finds that round (its id is the task's) and ticks. Ticking first would lose the round.
         if (next) {
           const made = await write.tasks.create(s, next);
-          for (const l of linksForNextRound(await pb.links.from(s, { type: "task", id: cur.id }), cur.id, made.id, pb.recordId)) await pb.links.add(s, l);
+          for (const l of linksForNextRound(await pb.links.from(s, { type: "task", id: cur.id }), cur.id, made.id, recordId)) await pb.links.add(s, l);
           console.error(`next round ${made.id}`);
         }
         try {

@@ -16,7 +16,7 @@ export function useShell(): ShellActions {
 }
 
 /** A task added from Today starts on Today. */
-export const startOf = (kind: View["kind"]): Start => ({ schedule: kind === "today" ? { when: localDay(), evening: false } : null });
+export const startOf = (kind: View["kind"]): Start => ({ schedule: kind === "today" ? { when: localDay(Date.now()), evening: false } : null });
 
 /** The screen is the whole window (an installed app): clear of a notch, the gesture bar and rounded corners. */
 export const INSETS = "pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]";

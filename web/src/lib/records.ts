@@ -14,7 +14,7 @@
 // Nothing typed is dropped but by the owner deleting the note here.
 import { tickChanges, type Change } from "@/core/changes";
 import { NOTES as NOTE_DIR, newNotePath, noteIdOf, parseNote, serializeNote, withBody, withFlags, type FlagEdit } from "@/core/notes";
-import { recordId } from "@/core/client/pocketbase";
+import { recordId } from "@/core/client/ids";
 import type { Mark } from "@/core/record-contracts";
 import { newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "@/core/record-links";
 import { liveLinks, type NoteRow, type Refusal, type Store } from "@/core/sync";
@@ -75,7 +75,7 @@ export function createRecords({ store, sync, serverHas }: { store: Store; sync: 
     for (;;) {
       const path = newNotePath(title, Date.now(), taken);
       if (await serverHas(path) || store.notes.get(path)) { taken.add(path); continue; }   // (or made here while the server was asked)
-      sync.apply([{ kind: "note.add", rec: recordId(), path, text: serializeNote({ title: title.trim(), created: localDay(), tags }, body) }]);
+      sync.apply([{ kind: "note.add", rec: recordId(), path, text: serializeNote({ title: title.trim(), created: localDay(Date.now()), tags }, body) }]);
       return noteOf(store.notes.get(path)!);
     }
   }
@@ -205,7 +205,7 @@ export function createRecords({ store, sync, serverHas }: { store: Store; sync: 
 
   /** Tick or untick (core/changes.ts `tickChanges`: a repeating task's next round, about what the round done was about). */
   async function tickTask(id: string, done: boolean): Promise<void> {
-    sync.apply(tickChanges(held(id), done, { today: localDay(), newId: recordId, open: open(), links: liveLinks(store) }));
+    sync.apply(tickChanges(held(id), done, { today: localDay(Date.now()), newId: recordId, open: open(), links: liveLinks(store) }));
   }
 
   // ---- links

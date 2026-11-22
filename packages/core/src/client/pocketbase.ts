@@ -19,6 +19,7 @@ import type { TagFields, TagMark } from "../tags";
 import { taskOf, type Task } from "../todo";
 import { agentUrl, type Server } from "../server-urls";
 import { getJson, HttpError } from "./http";
+import { recordId } from "./ids";
 
 const PAGE = 500;
 
@@ -176,7 +177,3 @@ export const pdfPages = async (s: Server, note: string, name: string): Promise<n
     throw e;
   }
 };
-
-/** A record id as PocketBase makes them (15 of [a-z0-9]): a client names a new chat or task before it exists
- *  on the server. */
-export const recordId = () => Array.from({ length: 15 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");

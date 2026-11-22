@@ -1,6 +1,7 @@
 // The server's own writers (pb_hooks over lib/records.js) against a real PocketBase: each keeps the rev contract a
 // client's write is held to, and a client's next write over what they wrote meets it.
 import { expect, test } from "bun:test";
+import { recordId } from "../../packages/core/src/client/ids";
 import * as pb from "../../packages/core/src/client/pocketbase";
 import { noteColumns, Conflict, serverError } from "../../packages/core/src/record-contracts";
 import { newTask } from "../../packages/core/src/todo";
@@ -16,7 +17,7 @@ const record = (collection: string, rec: string) => pb.call(s, `collections/${co
 /** The clip route's save, as the extension sends it: a multipart `@jsonPayload` under a save id of its own, no files. */
 async function clipRaw(payload: Record<string, unknown>) {
   const form = new FormData();
-  form.append("@jsonPayload", JSON.stringify({ id: pb.recordId(), title: "Clipped page", selection: "Words from the page", ...payload }));
+  form.append("@jsonPayload", JSON.stringify({ id: recordId(), title: "Clipped page", selection: "Words from the page", ...payload }));
   return fetch(`${url}/api/tefnotes/clip`, { method: "POST", body: form });
 }
 async function clip(payload: Record<string, unknown>) {
@@ -26,10 +27,10 @@ async function clip(payload: Record<string, unknown>) {
 }
 
 test("clip: a save sent again under its id is answered as the first was and writes nothing more", async () => {
-  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Target\n");
+  const n = await pb.create(s, recordId(), `notes/${id()}.md`, "# Target\n");
   const t = await pb.tasks.create(s, newTask(id(), { title: "T" }));
   for (const target of [{ kind: "new" }, { kind: "newtask" }, { kind: "note", path: n.path }, { kind: "task", id: t.id }]) {
-    const save = pb.recordId(), notesBefore = (await pb.list(s)).length, tasksBefore = (await pb.tasks.revs(s)).length;
+    const save = recordId(), notesBefore = (await pb.list(s)).length, tasksBefore = (await pb.tasks.revs(s)).length;
     const first = await (await clipRaw({ id: save, target })).json(), again = await (await clipRaw({ id: save, target })).json();
     expect(again, JSON.stringify(target)).toEqual(first);
     expect((await pb.list(s)).length).toBe(notesBefore + (target.kind === "new" ? 1 : 0));
@@ -50,7 +51,7 @@ test("clip: a new note starts at rev 1, tainted, with its columns copied out of 
 });
 
 test("clip: an append to a note bumps rev and copies its columns; the client's stale write is refused", async () => {
-  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, '---\ntitle: "Target"\ntags: [a]\n---\nFirst\n');
+  const n = await pb.create(s, recordId(), `notes/${id()}.md`, '---\ntitle: "Target"\ntags: [a]\n---\nFirst\n');
   const out = await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
   expect(out).toMatchObject({ kind: "note", path: n.path, title: "Target", action: "appended" });
   const rec = await record("notes", n.rec);
@@ -84,7 +85,7 @@ test("clip: under the owner's lens, a new note or task takes its tag on the serv
     expect((await record("notes", (await pb.read(s, note.path))!.rec)).tags).toEqual(["ideas", "Work"]);
     const task = await clip({ target: { kind: "newtask", title: "Under the lens" }, tags: ["work"] });
     expect((await record("tasks", task.id)).tags).toEqual(["work"]);             // picked already, ignoring case
-    const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, '---\ntitle: "Mine"\ntags: [a]\n---\nFirst\n');
+    const n = await pb.create(s, recordId(), `notes/${id()}.md`, '---\ntitle: "Mine"\ntags: [a]\n---\nFirst\n');
     await clip({ target: { kind: "note", path: n.path }, tags: ["b"] });
     expect((await record("notes", n.rec)).tags).toEqual(["a", "b"]);
   } finally {
@@ -94,7 +95,7 @@ test("clip: under the owner's lens, a new note or task takes its tag on the serv
 
 test("tags rename: every note and task carrying it is a rev write, columns copied out of the text", async () => {
   const from = `old${id()}`, to = `new${id()}`;
-  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, `---\ntitle: "Tagged"\ntags: [${from}, keep]\n---\nBody\n`);
+  const n = await pb.create(s, recordId(), `notes/${id()}.md`, `---\ntitle: "Tagged"\ntags: [${from}, keep]\n---\nBody\n`);
   const t = await pb.tasks.create(s, newTask(id(), { title: "Tagged task", tags: [from] }));
   const res = await pb.call(s, "tefnotes/tags/rename", pb.json("POST", { from, to }));
   expect(res).toMatchObject({ tag: to, notes: 1, tasks: 1 });
@@ -105,13 +106,13 @@ test("tags rename: every note and task carrying it is a rev write, columns copie
 });
 
 test("tainted: a write never takes the mark off a note or a task", async () => {
-  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Web text\n", { tainted: true });
+  const n = await pb.create(s, recordId(), `notes/${id()}.md`, "# Web text\n", { tainted: true });
   const patched = await pb.call(s, `collections/notes/records/${n.rec}`, pb.json("PATCH", { ...noteColumns(n.path, "# Mine now\n"), rev: n.rev, tainted: false }));
   expect(patched).toMatchObject({ rev: 2, tainted: true });
   const t = await pb.tasks.create(s, newTask(id(), { title: "Web task" }), { tainted: true });
   const task = await pb.call(s, `collections/tasks/records/${t.id}`, pb.json("PATCH", { rev: t.rev, title: "Mine", tainted: false }));
   expect(task).toMatchObject({ rev: 2, title: "Mine", tainted: true });
-  const plain = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Mine\n");
+  const plain = await pb.create(s, recordId(), `notes/${id()}.md`, "# Mine\n");
   expect((await record("notes", plain.rec)).tainted).toBe(false);
 });
 

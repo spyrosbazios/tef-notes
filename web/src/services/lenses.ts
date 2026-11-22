@@ -1,6 +1,6 @@
 // Lens definitions on the server (core/lens.ts) through the shared protocol (core/record-protocol.ts `lenses`). Which lens is on
 // is a preference (hooks/lens.ts).
-import { recordId } from "@/core/client/pocketbase";
+import { recordId } from "@/core/client/ids";
 import type { LensFields } from "@/core/lens";
 import { lenses } from "@/core/record-protocol";
 import { directTransport } from "./records";

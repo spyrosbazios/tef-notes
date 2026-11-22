@@ -1,6 +1,7 @@
 // Requests from other sites (pb_hooks/origin.pb.js) against a real PocketBase: the headers a browser would send, set by
 // hand. The server serves no signed extension here, so any extension origin is taken.
 import { expect, test } from "bun:test";
+import { recordId } from "../../packages/core/src/client/ids";
 import * as pb from "../../packages/core/src/client/pocketbase";
 import { noteColumns } from "../../packages/core/src/record-contracts";
 
@@ -25,7 +26,7 @@ test("a page on another site can't create, change or delete a note, nor clip", a
   expect(refused.status).toBe(403);
   expect(await pb.read(s, path)).toBeNull();
 
-  const n = await pb.create(s, pb.recordId(), `notes/${id()}.md`, "# Mine\n");
+  const n = await pb.create(s, recordId(), `notes/${id()}.md`, "# Mine\n");
   const record = `${url}/api/collections/notes/records/${n.rec}`;
   const patch = await fetch(record, { method: "PATCH", body: JSON.stringify({ rev: n.rev, text: "gone" }), headers: { ...EVIL, "Content-Type": "text/plain" } });
   expect(patch.status).toBe(403);

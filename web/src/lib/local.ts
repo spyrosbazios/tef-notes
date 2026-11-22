@@ -16,7 +16,7 @@
 // open, and unsent ones are lost with it. The same trade the query cache's persister makes (lib/persist.ts).
 import { clear, createStore, entries, promisifyRequest } from "idb-keyval";
 import type { Topic } from "@/core/changes";
-import { recordId } from "@/core/client/pocketbase";
+import { recordId } from "@/core/client/ids";
 import { linkRowOf, noteRowOf, ROWS_VERSION, taskRowOf } from "@/core/rows";
 import type { LinkRow, NoteRow, Store, Table, TaskRow } from "@/core/sync";
 import type { Rows } from "./tab-sync";
@@ -44,7 +44,7 @@ export function tables(write: (topic: Topic, key: string, row: unknown) => void)
     tasks: make<TaskRow>("tasks", (r) => r.id),
     links: make<LinkRow>("links", (r) => r.link.id),
   };
-  const store: Store = { notes: all.notes, tasks: all.tasks, links: all.links };
+  const store: Store = { notes: all.notes, tasks: all.tasks, links: all.links, now: Date.now };
   return { store, all };
 }
 

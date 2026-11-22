@@ -8,7 +8,7 @@ import { make } from "../pb_hooks/lib/llm.js";
 const ds = make("deepseek", () => "");
 import { bodyFor, titleFor } from "../../packages/core/src/share";
 import { CLIP_FILES, CLIP_TEXT } from "../../packages/core/src/clip";
-import { localDay } from "../../packages/core/src/days";
+const DAY = "2026-11-22";
 import { fileMarkdown, linkPath, pdfName, photoMarkdown, photoName } from "../../packages/core/src/photos";
 
 const U = "https://www.example.com/a?b=1";
@@ -20,13 +20,13 @@ describe("the share text", () => {
     const clip = lib.input({ url: U, title: "Page", selection: "  clipped\ntext " });
     expect(lib.bodyOf(clip, "What it is.")).toBe(`[Page](${U})\n\nWhat it is.\n\nclipped\ntext\n`);
     expect(lib.bodyOf({ ...clip, selection: "" }, "")).toBe(`[Page](${U})\n`);
-    expect(lib.titleOf(clip, "")).toBe("Page");
-    expect(lib.titleOf({ ...clip, title: "" }, "")).toBe("clipped");
-    expect(lib.titleOf({ ...clip, title: "", selection: "" }, "")).toBe("example.com");
+    expect(lib.titleOf(clip, "", DAY)).toBe("Page");
+    expect(lib.titleOf({ ...clip, title: "" }, "", DAY)).toBe("clipped");
+    expect(lib.titleOf({ ...clip, title: "", selection: "" }, "", DAY)).toBe("example.com");
     const named = lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: "  My\n title " } });
     expect(named.target).toEqual({ kind: "new", title: "My title" });
-    expect(lib.titleOf(named, "")).toBe("My title");
-    expect(lib.titleOf(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "newtask", title: "Call them" } }), "")).toBe("Call them");   // a new task's too
+    expect(lib.titleOf(named, "", DAY)).toBe("My title");
+    expect(lib.titleOf(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "newtask", title: "Call them" } }), "", DAY)).toBe("Call them");   // a new task's too
     expect(lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: " " } }).target).toEqual({ kind: "new" });
     expect(() => lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: 5 } })).toThrow(lib.Bad);
     expect(() => lib.saveInput({ id: ID, url: U, title: "Page", target: { kind: "new", title: "x".repeat(201) } })).toThrow(lib.Bad);
@@ -34,12 +34,12 @@ describe("the share text", () => {
   test("no link (the phone's shared text or photo): the words, else the day, as the phone titles them", () => {
     const text = lib.input({ url: "", title: "", selection: "just words" });
     expect(lib.bodyOf(text, "")).toBe(bodyFor(S({ url: null, text: "just words" }), null));
-    expect(lib.titleOf(text, "")).toBe(titleFor(S({ url: null, text: "just words" }), null));
+    expect(lib.titleOf(text, "", DAY)).toBe(titleFor(S({ url: null, text: "just words" }), null, DAY));
     const photo = lib.saveInput({ id: ID, title: "", target: { kind: "new" }, images: [{ src: "" }] });
-    expect(lib.titleOf(photo, "")).toBe(`Photos ${localDay()}`);
+    expect(lib.titleOf(photo, "", DAY)).toBe(`Photos ${DAY}`);
     expect(lib.bodyOf(photo, "", "", "![](../attachments/n/p.jpg)")).toBe("![](../attachments/n/p.jpg)\n\n");
     const pdf = lib.saveInput({ id: ID, title: "", target: { kind: "new" }, images: [{ src: "" }], pdfs: [{ name: "Lease 2026.pdf" }] });
-    expect(lib.titleOf(pdf, "")).toBe("Lease 2026");
+    expect(lib.titleOf(pdf, "", DAY)).toBe("Lease 2026");
   });
   test("several pictures and PDFs: stored under free names, the pictures' lines then the PDFs' links, as the web app attaches them", () => {
     const clip = lib.saveInput({ id: ID, title: "", target: { kind: "new" }, images: [{ src: "" }, { src: "" }], pdfs: [{ name: "Μίσθωση [v2].pdf" }, { name: "?.pdf" }] });
@@ -389,7 +389,7 @@ describe("the summary", () => {
     expect(lib.bodyOf(clip, "What it is.", "My note.", "", block)).toBe(`[Page](${U})\n\n${block}\n\nMy note.\n\nclipped\n`);
     expect(lib.bodyOf(clip, "What it is.", "My note.", "", "")).toBe(`[Page](${U})\n\nMy note.\n\nWhat it is.\n\nclipped\n`);
     expect(lib.bodyOf(clip, "", "", "![](../attachments/n/p.jpg)", block)).toBe(`![](../attachments/n/p.jpg)\n\n[Page](${U})\n\n${block}\n\nclipped\n`);
-    expect(lib.titleOf(clip, "What it is.")).toBe("Page");
+    expect(lib.titleOf(clip, "What it is.", DAY)).toBe("Page");
   });
 });
 

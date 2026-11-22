@@ -258,9 +258,9 @@ function filesUnder(clip, noteId, taken, now) {
 /** What a clip writes: a new note's title and body, or the entry appended to an existing note (the same text).
  *  `note` the owner's note as it goes in (written up, or as typed); `embed` the files' lines, first; `summary`
  *  the summary's block (summaryBlock), right under the link. A clip of files alone (no url, no words) is titled by its
- *  first PDF's name, else as the phone titles photos, by the day (core titleFor). A title the owner gave the new note
+ *  first PDF's name, else as the phone titles photos, by `today` (core titleFor). A title the owner gave the new note
  *  (`target.title`) wins over all of it. */
-const titleOf = (clip, line) => (clip.target && clip.target.title) || titleFor(shared(clip, line, ""), null);
+const titleOf = (clip, line, today) => (clip.target && clip.target.title) || titleFor(shared(clip, line, ""), null, today);
 function bodyOf(clip, line, note = "", embed = "", summary = "") {
   const b = bodyFor(shared(clip, line, note, summary), null);
   return embed ? `${embed}\n\n${b}` : b;

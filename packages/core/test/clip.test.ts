@@ -1,6 +1,7 @@
 // The clip routes' shapes shared with the extension (src/clip.ts), a share as a clip, the picture JEV looks at.
 import { describe, expect, it } from "bun:test";
-import { choices, clipId, describe as said, NEW, NEW_TASK, saveBodies, saveBody, sendsFiles, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
+import { recordId } from "../src/client/ids";
+import { choices, describe as said, NEW, NEW_TASK, saveBodies, saveBody, sendsFiles, suggestBody, summaryNotice, targetOf, titled, type ClipResult, type Suggestions } from "../src/clip";
 import { LOOK_MAX, LOOK_MIN, lookSize } from "../src/photos";
 import { clipOf, type Shared } from "../src/share";
 
@@ -80,13 +81,13 @@ describe("the requests", () => {
     // no page text (a share of a link): the flag alone (the server fetches the page)
     expect(JSON.parse(JSON.stringify(saveBody({ url: U, title: "Page" }, undefined, NEW, "", true, [], "saveidsaveidsav")))).toEqual({ id: "saveidsaveidsav", url: U, title: "Page", target: { kind: "new" }, summary: true });
   });
-  it("a save's id is a record id's shape, and a new one every time", () => {
-    const ids = new Set(Array.from({ length: 50 }, clipId));
+  it("a save's id is a record id's shape (client/ids.ts), and a new one every time", () => {
+    const ids = new Set(Array.from({ length: 50 }, recordId));
     expect(ids.size).toBe(50);
     for (const id of ids) expect(id).toMatch(/^[a-z0-9]{15}$/);
   });
   it("the same save sent again keeps its id, any other save and one already landed get a new one", () => {
-    const saves = saveBodies(), args: Parameters<ReturnType<typeof saveBodies>["body"]> = [page, undefined, NEW, "note", false, ["a"]];
+    const saves = saveBodies(recordId), args: Parameters<ReturnType<typeof saveBodies>["body"]> = [page, undefined, NEW, "note", false, ["a"]];
     const first = saves.body(...args).id;
     expect(saves.body(...args).id).toBe(first);                                       // pressed again after a failure
     expect(saves.body(page, undefined, NEW, "note", false, ["b"]).id).not.toBe(first); // another save

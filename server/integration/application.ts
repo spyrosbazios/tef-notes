@@ -1,5 +1,6 @@
 // Opt-in real HTTP coverage for application services and their companion adapters.
 import { expect, test } from "bun:test";
+import { recordId } from "../../packages/core/src/client/ids";
 import * as pb from "../../packages/core/src/client/pocketbase";
 import { NoteService } from "../agent/src/application/notes";
 import { TaskService, taskEdit } from "../agent/src/application/todo";
@@ -76,7 +77,7 @@ test("application writes expose domain results and recurrence carries links over
 });
 
 test("companion add and tick execute the application service against real PocketBase", async () => {
-  const made = pb.recordId();
+  const made = recordId();
   const send = () => addTaskRoute(new Request(`${url}/agent/companion/tasks`, {
     method: "POST", body: JSON.stringify({ id: made, title: "From companion", list: "today" }),
     headers: { "Content-Type": "application/json" },

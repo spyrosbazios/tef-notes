@@ -26,13 +26,13 @@ export function ImportExport() {
   const download = async () => {
     if (!data) return;
     setExporting(true);
-    try { toast(`Downloaded ${await downloadZip(data, `tefnotes-notes-${localDay()}.zip`)} notes`); } catch (e) { toast.error(message(e)); } finally { setExporting(false); }
+    try { toast(`Downloaded ${await downloadZip(data, `tefnotes-notes-${localDay(Date.now())}.zip`)} notes`); } catch (e) { toast.error(message(e)); } finally { setExporting(false); }
   };
   const pick = async (name: string, make: () => Promise<Source> | Source) => {
     setBusy(true);
     try {
       const source = await make();
-      const seen = await importNotes(here, source, { dry: true, update: false, today: localDay() });
+      const seen = await importNotes(here, source, { dry: true, update: false, today: localDay(Date.now()) });
       if (!seen.found) { toast.error(`No markdown files in ${name}`); setSrc(null); } else { setUpdate(false); setSrc({ name, source, seen }); }
     } catch (e) { toast.error(message(e)); } finally { setBusy(false); }
   };
@@ -40,7 +40,7 @@ export function ImportExport() {
     if (!src) return;
     setBusy(true);
     try {
-      const t = await importNotes(here, src.source, { dry: false, update, today: localDay() });
+      const t = await importNotes(here, src.source, { dry: false, update, today: localDay(Date.now()) });
       toast(`${t.made} new, ${t.updated} updated, ${t.same} unchanged, ${t.skipped} skipped; ${t.files} attachments`);
       setSrc(null);
     } catch (e) { toast.error(message(e)); } finally { setBusy(false); }

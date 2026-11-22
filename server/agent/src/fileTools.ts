@@ -48,7 +48,7 @@ export const fileModule = toolModule(({ notes, files }) => ({
       // A new note is made first, with the line, so the file has an id to go under
       let path = i.path!;
       if (i.title) {
-        const meta = { title: i.title.trim(), created: localDay(), ...(t ? { tags: t.tags } : {}) };
+        const meta = { title: i.title.trim(), created: localDay(Date.now()), ...(t ? { tags: t.tags } : {}) };
         const made = noteSaved(await notes.create(meta.title, () => serializeNote(meta, text ? `${text}\n` : ""), true));
         if ("error" in made) return made;
         path = made.saved;

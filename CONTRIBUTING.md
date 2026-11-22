@@ -30,7 +30,8 @@ Clone the whole repository: every module imports `packages/core`.
 ## Rules
 
 - **`packages/core` stays dependency-free and shared.** No runtime dependencies, no platform APIs; its one I/O, the fetch
-  client, is under `src/client/`, which nothing else in it loads. If two clients need the
+  client, and its randomness (new ids) are under `src/client/`, which nothing else in it loads, and nothing in it reads the clock
+  (`scripts/check-boundaries.ts`, `test/purity.test.ts`): it is handed `today`, `now` and ids. If two clients need the
   same logic, it goes there; never copy it into a client. (The server's hooks run in PocketBase's JS VM, so they get the
   core as a bundle, never a copy: export what they need from `server/pb_hooks/bundle/core.ts`, which builds `lib/core.js`.
   Only pure code goes in it. One deliberate copy, kept in step by a test: the few rules in `android/`'s `Contract.kt`,

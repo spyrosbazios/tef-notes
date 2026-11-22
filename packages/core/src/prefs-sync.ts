@@ -13,6 +13,7 @@
 import { DEFAULT_PREFS, everyPath, patchPaths, prefAt, prefsOf, PREFS_KEY, rebased, withPatch, type Prefs, type PrefsPatch } from "./prefs";
 import { Conflict, lit } from "./record-contracts";
 import type { RecordTransport } from "./record-protocol";
+import { equal } from "./equal";
 
 /** A device's copy: the preferences as it shows them, and the paths changed here and not yet saved. */
 export type PrefsCopy = { prefs: Prefs; dirty: string[] };
@@ -70,7 +71,6 @@ export const patchPrefs = (remote: PrefsRemote, patch: PrefsPatch | ((current: P
     return withPatch(current, typeof patch === "function" ? patch(current) : patch);
   });
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const union = (a: readonly string[], b: readonly string[]) => [...new Set([...a, ...b])];
 
 export function prefsSync(store: CopyStore, remote: PrefsRemote) {
@@ -90,7 +90,7 @@ export function prefsSync(store: CopyStore, remote: PrefsRemote) {
     const saved = await changePrefs(remote, (theirs) => (theirs ? rebased(theirs, sent.prefs, sent.dirty) : sent.prefs));
     // A path changed again while this was out stays dirty, for the next push
     const now = store.read();
-    const dirty = now.dirty.filter((p) => !sent.dirty.includes(p) || !same(prefAt(sent.prefs, p), prefAt(now.prefs, p)));
+    const dirty = now.dirty.filter((p) => !sent.dirty.includes(p) || !equal(prefAt(sent.prefs, p), prefAt(now.prefs, p)));
     store.write({ prefs: rebased(saved.prefs, now.prefs, dirty), dirty });
   });
 

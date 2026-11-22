@@ -9,7 +9,7 @@
 const two = (n: number) => String(n).padStart(2, "0");
 
 /** The day the moment `t` (ms since the epoch) falls on, in local time. */
-export const localDay = (t = Date.now()) => {
+export const localDay = (t: number) => {
   const d = new Date(t);
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 };
@@ -31,7 +31,7 @@ export const weekdayOf = (day: string) => (new Date(Date.UTC(+day.slice(0, 4), +
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** `now`, `5m`, `3h`, `6d`, then `3 Oct`, then `2025-10-03` for another year. `t` in ms. */
-export function ago(t: number, now = Date.now()) {
+export function ago(t: number, now: number) {
   const s = Math.max(0, (now - t) / 1000);
   if (s < 45) return "now";
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;

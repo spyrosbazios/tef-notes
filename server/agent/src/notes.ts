@@ -187,7 +187,7 @@ export const noteModule = toolModule(({ notes, todo, fromPage }) => ({
     execute: async ({ title, body, tags, ...flags }, { messages }) => {
       const t = tags && await definedTags(notes, tags);
       if (t && "error" in t) return t;
-      const meta = { title: title.trim(), created: localDay(), ...flags, ...(t ? { tags: t.tags } : {}) };
+      const meta = { title: title.trim(), created: localDay(Date.now()), ...flags, ...(t ? { tags: t.tags } : {}) };
       return noteSaved(await notes.create(meta.title, () => serializeNote(meta, body.trimEnd() + "\n"), await fromPage(messages)));
     },
   }),

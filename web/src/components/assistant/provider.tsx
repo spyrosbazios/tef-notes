@@ -40,9 +40,10 @@ import { isTool } from "@/lib/ask";
 import { added, requeued, type ChatQueue, type Queues } from "@/lib/chat-queue";
 import { STORAGE } from "@/lib/storage-keys";
 import { message } from "@/services/api";
-import { chat as loadChat, createChat, newChatId, removeChat } from "@/services/agent";
+import { chat as loadChat, createChat, removeChat } from "@/services/agent";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
+import { recordId } from "@/core/client/ids";
 
 /** Stop the reply, and close the calls it left open (lib/assistant.ts `closeUnfinished` says why). */
 async function halt(chat: Chat<UIMessage>) {
@@ -138,7 +139,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   // The current chat comes back on a reload; one that is gone (deleted on another device) starts a new one
   useEffect(() => {
     let current = true;
-    const id = dockNow().chat, fresh = () => { if (current) setChat(build(newChatId(), [])); };
+    const id = dockNow().chat, fresh = () => { if (current) setChat(build(recordId(), [])); };
     if (!id) { fresh(); return () => { current = false; }; }
     loadChat(id).then((c) => {
       if (!current) return;
@@ -155,7 +156,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const newChat = useCallback(() => {
     opening.current++;
     setDock({ chat: undefined });
-    setChat(build(newChatId(), []));
+    setChat(build(recordId(), []));
     setFocusKey((k) => k + 1);
   }, [build]);
 
@@ -225,7 +226,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const stop = useCallback(async () => { if (chat) await halt(chat); }, [chat]);
 
   const transient = useCallback(async (title: string, { held, scope }: Binding, wanted: () => boolean) => {
-    const id = newChatId();
+    const id = recordId();
     try { await createChat(id, chatTitle(title)); } catch (e) { toast.error(message(e)); return null; }
     // Its panel closed while the record was being made: nothing goes, and the empty record goes again
     if (!wanted()) { void removeChat(id).finally(() => qc.invalidateQueries({ queryKey: CHATS })); return null; }

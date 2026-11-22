@@ -15,10 +15,11 @@ import { openMic } from "@/lib/mic";
 import { createSession } from "@/lib/talk-session";
 import { openVoice } from "@/lib/talk-voice";
 import { keepAwake } from "@/lib/wake";
-import { createChat, newChatId } from "@/services/agent";
+import { createChat } from "@/services/agent";
 import * as talk from "@/services/talk";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
+import { recordId } from "@/core/client/ids";
 
 export function TalkProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
@@ -29,7 +30,7 @@ export function TalkProvider({ children }: { children: ReactNode }) {
     mic: (onFrame) => openMic({ rate: TALK_RATE.mic, frame: MIC_FRAME, onFrame }),
     voice: openVoice,
     chat: async () => {
-      const id = newChatId();
+      const id = recordId();
       await createChat(id, `Talk ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
       void qc.invalidateQueries({ queryKey: CHATS });
       return id;

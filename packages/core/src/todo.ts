@@ -6,6 +6,7 @@
 import { addDays, daysBetween, everyAt, everyOn, nextOccurrence, type Every } from "./dates";
 import { fold } from "./notes";
 import { placeOf, type Place } from "./places";
+import { equal } from "./equal";
 
 const two = (n: number) => String(n).padStart(2, "0");
 /** `YYYY-MM-DD`, and a day the calendar has. */
@@ -157,20 +158,14 @@ export const reopen = (t: Task): Task => ({ ...t, done: "" });
 
 // ---- the checklist
 
-const ALNUM = "abcdefghijklmnopqrstuvwxyz0123456789";
-
-/** Four random characters no item of the checklist carries yet. */
-function itemId(list: ChecklistItem[]): string {
-  const taken = new Set(list.map((i) => i.id));
-  for (;;) {
-    let id = "";
-    for (let i = 0; i < 4; i++) id += ALNUM[Math.floor(Math.random() * ALNUM.length)];
-    if (!taken.has(id)) return id;
-  }
+/** A new open item at the end of the checklist, under an id `newId` makes (client/ids.ts `itemId`) that no item carries yet: a
+ *  merge matches items by id. */
+export function addItem(t: Task, text: string, newId: () => string): Task {
+  const taken = new Set(t.checklist.map((i) => i.id));
+  let id = newId();
+  while (taken.has(id)) id = newId();
+  return { ...t, checklist: [...t.checklist, { id, text: oneLine(text), done: false }] };
 }
-
-/** A new open item at the end of the checklist. */
-export const addItem = (t: Task, text: string): Task => ({ ...t, checklist: [...t.checklist, { id: itemId(t.checklist), text: oneLine(text), done: false }] });
 
 /** An item's text or tick changed; the task as it was when there is no such item. */
 export const setItem = (t: Task, id: string, p: Partial<Omit<ChecklistItem, "id">>): Task =>
@@ -214,14 +209,6 @@ export function views(tasks: Task[], today: string): Views {
 
 // ---- merging
 
-/** Equal as JSON values, whatever the key order (the server sends an object's keys sorted). */
-function equal(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => equal(x, b[i]));
-  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
-  const ka = Object.keys(a), kb = Object.keys(b);
-  return ka.length === kb.length && ka.every((k) => equal((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
-}
 
 /** One value three ways: theirs where only they changed it, mine where only I did or we agree; both changed it
  *  differently is a conflict, mine kept. */

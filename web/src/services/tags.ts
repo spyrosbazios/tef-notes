@@ -1,7 +1,7 @@
 // Tag definitions and the tag routes on the server through the shared protocol (core/record-protocol.ts `tags`): name, badge
 // colour and the hint the AI reads. A note's own tags live in its text; deleting a definition leaves notes alone, renaming one
 // renames it on them too. Conflict: the name is taken, ignoring case.
-import { recordId } from "@/core/client/pocketbase";
+import { recordId } from "@/core/client/ids";
 import { tags } from "@/core/record-protocol";
 import type { TagFields } from "@/core/tags";
 import { directTransport } from "./records";

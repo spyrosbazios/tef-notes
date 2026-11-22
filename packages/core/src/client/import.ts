@@ -3,6 +3,7 @@
 // hands it a `Source` over its own files.
 import { importPlan } from "../handoff";
 import { noteIdOf } from "../notes";
+import { recordId } from "./ids";
 import * as pb from "./pocketbase";
 import { Conflict, type Mark } from "../record-contracts";
 import type { Server } from "../server-urls";
@@ -34,7 +35,7 @@ export async function importNotes(s: Server, src: Source, o: { dry: boolean; upd
     if (same) t.same++;
     line(!cur ? "new" : same ? "same" : "update");
     if (o.dry) return;
-    if (!cur) { await pb.create(s, pb.recordId(), e.path, e.text, o.mark); t.made++; }
+    if (!cur) { await pb.create(s, recordId(), e.path, e.text, o.mark); t.made++; }
     else if (!same) {
       if (!(await pb.update(s, cur, e.text, o.mark))) throw new Error(`${e.path} was deleted meanwhile`);
       t.updated++;

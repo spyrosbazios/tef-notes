@@ -18,12 +18,13 @@ describe("a model's title", () => {
 
 describe("a note of its own", () => {
   it("titles by the page, the first line, the site, or the day", () => {
-    expect(titleFor(S({ url: U }), "Example Domain")).toBe("Example Domain");
-    expect(titleFor(S({ text: "\n first line \nsecond" }), null)).toBe("first line");
-    expect(titleFor(S({ text: "x".repeat(80) }), null)).toMatch(/^x{57}…$/);
-    expect(titleFor(S({ url: "https://www.example.com/x" }), null)).toBe("example.com");
-    expect(titleFor(S({ pdfs: [{ uri: "f", name: "Tax form.pdf" }] }), null)).toBe("Tax form");
-    expect(titleFor(S({ images: [{ uri: "f", width: null, height: null }] }), null)).toMatch(/^Photos \d{4}-\d{2}-\d{2}$/);
+    const today = "2026-11-22";
+    expect(titleFor(S({ url: U }), "Example Domain", today)).toBe("Example Domain");
+    expect(titleFor(S({ text: "\n first line \nsecond" }), null, today)).toBe("first line");
+    expect(titleFor(S({ text: "x".repeat(80) }), null, today)).toMatch(/^x{57}…$/);
+    expect(titleFor(S({ url: "https://www.example.com/x" }), null, today)).toBe("example.com");
+    expect(titleFor(S({ pdfs: [{ uri: "f", name: "Tax form.pdf" }] }), null, today)).toBe("Tax form");
+    expect(titleFor(S({ images: [{ uri: "f", width: null, height: null }] }), null, today)).toBe("Photos 2026-11-22");
   });
 
   it("links the URL where it sits in the text, else above it; bare when no title", () => {

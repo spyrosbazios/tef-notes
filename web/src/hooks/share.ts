@@ -33,7 +33,7 @@ const withLines = (path: string, text: string, lines: string): string => {
  *  are filed under the path it keeps. Resolves to the note's path. */
 export async function saveSharedFiles(qc: QueryClient, s: Shared, files: File[]): Promise<string> {
   const d = new Date();
-  const rec = await createNote(qc, `Photos ${localDay()} ${two(d.getHours())}:${two(d.getMinutes())}`);
+  const rec = await createNote(qc, `Photos ${localDay(Date.now())} ${two(d.getHours())}:${two(d.getMinutes())}`);
   const mine = [...s.images, ...s.pdfs].map((f) => Number(f.uri)).sort((a, b) => a - b).map((i) => files[i]);
   const { path, lines } = await addFiles(qc, rec.path, mine);
   if (lines) await write(rec, (text, at) => withLines(at, text, lines));

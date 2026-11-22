@@ -315,7 +315,7 @@ export function taskReadTools(notes: Pick<NoteService, "list">, todo: Pick<TaskS
       }),
       execute: async ({ view, query, tag, limit = 30 }) => {
         const [tasks, all] = [await todo.tasks(), await notes.list()];
-        const today = localDay(), v = views(tasks, today);
+        const today = localDay(Date.now()), v = views(tasks, today);
         const inView = view === "today" ? [...v.today, ...v.evening] : view === "upcoming" ? v.upcoming.flatMap((d) => d.tasks)
           : view === "open" ? tasks.filter((t) => !t.done) : view === "all" ? tasks : v[view];
         const list = ranked(inView, query, tag);

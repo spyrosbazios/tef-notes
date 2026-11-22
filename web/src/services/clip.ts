@@ -2,11 +2,12 @@
 // where JEV would put it, then save where the owner chose. A model is behind each, so they wait longer than a read, and
 // neither is retried by the client; a save carries an id, so one the owner presses again after a lost answer lands once (the
 // server answers it as the first). Failures are the server's `{error}` (api.ts `message`).
+import { recordId } from "@/core/client/ids";
 import { saveBodies, sendsFiles, suggestBody, type ClipPage, type ClipResult, type Suggestions, type Target } from "@/core/clip";
 import { api } from "./api";
 
 const CLIP_MS = 120_000;
-const saves = saveBodies();
+const saves = saveBodies(recordId);
 
 /** Where the share fits among the notes and open tasks; writes nothing. `look`: the first picture as JEV sees it (base64 JPEG). */
 export async function suggest(page: ClipPage, note: string, look: string | undefined, signal: AbortSignal): Promise<Suggestions> {

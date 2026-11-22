@@ -8,7 +8,7 @@ import { outcomeOf } from "../src/record-protocol";
 import { sameLink, type Link } from "../src/record-links";
 import {
   addLink, addNote, coalesced, conflicted, discardRefused, dismissLost, freshNote, keepMine, patch, refusals, removeLink, removeNote, removeTask,
-  restoreMine, retryRefused, saveTask, syncRound, takeHeard, takeTheirs, tick, visibleLinks, waiting, writeNote,
+  restoreMine, retryRefused, saveTask, syncRound, takeHeard, takeTheirs, visibleLinks, waiting, writeNote,
   type LinkRow, type NoteRow, type Run, type Store, type TaskRow, type Transport,
 } from "../src/sync";
 import { newTask, taskOf, type Task } from "../src/todo";
@@ -17,7 +17,7 @@ const table = <R>(key: (r: R) => string) => {
   const m = new Map<string, R>();
   return { get: (k: string) => m.get(k), all: () => [...m.values()], put: (r: R) => void m.set(key(r), r), delete: (k: string) => void m.delete(k) };
 };
-const store = (): Store => ({ notes: table<NoteRow>((r) => r.path), tasks: table<TaskRow>((r) => r.id), links: table<LinkRow>((r) => r.link.id) });
+const store = (): Store => ({ notes: table<NoteRow>((r) => r.path), tasks: table<TaskRow>((r) => r.id), links: table<LinkRow>((r) => r.link.id), now: Date.now });
 
 type NoteRec = { rec: string; path: string; text: string; rev: number };
 
@@ -436,7 +436,15 @@ describe("notes", () => {
     s.notes.put({ ...freshNote("r", P, note("A"), 1), rev: 1, base: note("A"), pushed: 1 });
     writeNote(s, P, note("A", "x"));
     expect(s.notes.get(P)!.updated).toBeGreaterThan(s.notes.get(P)!.pushed!);
-    expect(tick({ updated: Date.now() + 1000 })).toBeGreaterThan(Date.now() + 1000);
+  });
+
+  test("a row's `updated` is the store's clock, and only moves forward when that clock is behind it", () => {
+    const s = { ...store(), now: () => 5_000 };
+    addNote(s, "r", P, note("A"));
+    expect(s.notes.get(P)!.updated).toBe(5_000);
+    s.notes.put({ ...s.notes.get(P)!, updated: 9_000 });
+    writeNote(s, P, note("A", "x"));
+    expect(s.notes.get(P)!.updated).toBe(9_001);
   });
 });
 

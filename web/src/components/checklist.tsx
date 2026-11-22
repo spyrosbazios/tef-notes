@@ -5,6 +5,7 @@ import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/
 import { Plus, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
+import { itemId } from "@/core/client/ids";
 import { addItem, removeItem, setItem } from "@/core/todo";
 import { DraftInput } from "@/components/draft-field";
 import { TickBox } from "@/components/tick-box";
@@ -23,7 +24,7 @@ export function Checklist({ task }: { task: TaskRec }) {
   const add = () => {
     const t = text.trim();
     setText("");
-    if (t) report(changeTask(task.id, (cur) => addItem(cur, t)));
+    if (t) report(changeTask(task.id, (cur) => addItem(cur, t, itemId)));
   };
   return (
     <ul className="relative flex flex-col gap-0.5" aria-label="Checklist">

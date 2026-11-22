@@ -11,7 +11,7 @@ import { newTask, type Task } from "@/core/todo";
 import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "../src/companion";
 import { fakePb } from "./fake-pb";
 
-const TODAY = localDay();
+const TODAY = localDay(Date.now());
 const ID = "abcdefghij01234";
 let pb: ReturnType<typeof fakePb>;
 beforeEach(() => { pb = fakePb(); });

@@ -137,7 +137,7 @@ describe("the tools", () => {
   /** What the model is told of a result. */
   const told = async (name: keyof ReturnType<typeof tools>, input: object, output: unknown) =>
     ((T[name] as { toModelOutput: (o: unknown) => Promise<{ value: unknown }> | { value: unknown } }).toModelOutput({ toolCallId: "c", input, output })) as { type: string; value: unknown };
-  const TODAY = localDay();
+  const TODAY = localDay(Date.now());
 
   it("show_day: defaults to today; the widget reads back; the model gets titles, ids and times, no cards", async () => {
     const a = put(task("Dentist", { when: TODAY, remind: "10:00" })), b = put(task("Call", { when: TODAY, remind: "10:20" })), c = put(task("Laundry", { when: TODAY }));

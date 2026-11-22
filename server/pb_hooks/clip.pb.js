@@ -321,7 +321,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
       // the task is `about` (lib/links.js). Note, task and link in one transaction: all or none.
       const text = lib.taskNotes("", lib.bodyOf(clip, clip.line, note, "", summary));
       if (text == null) return e.json(413, { error: "The clip is too long for a task's notes." });
-      const first = lib.titleOf(clip, clip.line), made = files.length ? newNote(first) : null;
+      const first = lib.titleOf(clip, clip.line, core.localDay(now)), made = files.length ? newNote(first) : null;
       const title = retitle(made, first);
       e.app.runInTransaction((tx) => {
         const saved = made ? saveNote(tx, made) : null;
@@ -345,7 +345,7 @@ routerAdd("POST", "/api/tefnotes/clip", (e) => require(`${__hooks}/lib/http.js`)
         remember(tx, out);
       });
     } else {
-      const first = lib.titleOf(clip, clip.line), made = newNote(first), title = retitle(made, first);
+      const first = lib.titleOf(clip, clip.line, core.localDay(now)), made = newNote(first), title = retitle(made, first);
       out = { kind: "note", path: made.path, title, action: "created" };
       e.app.runInTransaction((tx) => { saveNote(tx, made); remember(tx, out); });
     }

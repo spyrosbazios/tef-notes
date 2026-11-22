@@ -252,9 +252,9 @@ describe("tasks", () => {
   test("a checklist item added meanwhile survives an item added here", async () => {
     const t = await addTask(qc, { title: "a" });
     await syncNow();
-    const theirs = addItem(taskOf(server.tasks.get(t.id)), "theirs");
+    const theirs = addItem(taskOf(server.tasks.get(t.id)), "theirs", () => "thr1");
     server.tasks.set(t.id, { ...server.tasks.get(t.id)!, checklist: theirs.checklist, rev: 2 });
-    await changeTask(t.id, (cur) => addItem(cur, "mine"));
+    await changeTask(t.id, (cur) => addItem(cur, "mine", () => "min1"));
     await syncNow();
     expect((server.tasks.get(t.id)!.checklist as { text: string }[]).map((i) => i.text)).toEqual(["theirs", "mine"]);
   });

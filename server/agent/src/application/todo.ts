@@ -2,6 +2,7 @@
 // Listings and links are cached until a write. Writes carry the revision read and retry the edit
 // on a fresh record after a conflict. Taint is persisted in the same write and never cleared.
 // Completion and recurrence use core/todo; links are idempotent and have no revision.
+import { itemId, recordId } from "@/core/client/ids";
 import * as pb from "@/core/client/pocketbase";
 import { Conflict } from "@/core/record-contracts";
 import { addItem, complete, nextOrder, newTask, patchTask, removeItem, reopen, retagTask, setItem, taskOf, type Task, type TaskPatch } from "@/core/todo";
@@ -34,7 +35,7 @@ export function checklistEdit(t: Task, ops: ChecklistOps): Task {
     if (!n.checklist.some((i) => i.id === id)) throw new Error(`No checklist item ${id} in “${t.title}”. list_tasks has the ids.`);
   for (const id of ops.remove ?? []) n = removeItem(n, id);
   for (const { id, ...p } of ops.set ?? []) n = setItem(n, id, p);
-  for (const text of ops.add ?? []) n = addItem(n, text);
+  for (const text of ops.add ?? []) n = addItem(n, text, itemId);
   return n;
 }
 
@@ -105,7 +106,7 @@ export class TaskService {
 
   /** A new record under an id of its own (`id`, made here when not given), sent again when no answer came back (pb.tasks.create:
    *  the id is held once, so a repeat that finds it taken is the earlier send having landed). Its id and the rev it is at. */
-  private async insert(make: (id: string) => Task, taint: boolean, id = pb.recordId()): Promise<{ id: string; rev: number } | { error: string }> {
+  private async insert(make: (id: string) => Task, taint: boolean, id = recordId()): Promise<{ id: string; rev: number } | { error: string }> {
     let r: Task & { tainted?: true };
     try { r = make(id); if (taint) r = { ...r, tainted: true }; } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
     try {
@@ -130,7 +131,7 @@ export class TaskService {
   private async relink(id: string, link: string[], unlink: string[]): Promise<string | null> {
     try {
       const had = linksFrom(await this.links(), taskEnd(id), "about");
-      for (const rec of link) await pb.links.add(this.server, newLink(pb.recordId(), taskEnd(id), { type: "note", id: rec }, "about"));
+      for (const rec of link) await pb.links.add(this.server, newLink(recordId(), taskEnd(id), { type: "note", id: rec }, "about"));
       for (const l of had) if (l.to.type === "note" && unlink.includes(l.to.id)) await pb.links.remove(this.server, l.id);
       return null;
     } catch (e) {
@@ -186,7 +187,7 @@ export class TaskService {
     const r = await this.change(id, (t) => {
       next = undefined;
       if (!done) return t.done ? reopen(t) : t;
-      const c = complete(t, localDay(), pb.recordId);
+      const c = complete(t, localDay(Date.now()), recordId);
       next = c.next;
       return c.task;
     }, taint);
@@ -194,7 +195,7 @@ export class TaskService {
     const made = await this.create((nid) => ({ ...next!, id: nid }), taint);
     if ("error" in made) return { error: `Ticked, but its next round wasn't made: ${made.error}` };
     try {
-      for (const l of linksForNextRound(await this.links(), id, made.id, pb.recordId)) await pb.links.add(this.server, l);
+      for (const l of linksForNextRound(await this.links(), id, made.id, recordId)) await pb.links.add(this.server, l);
     } catch (e) {
       return { error: `Ticked, and its next round made (${made.id}), but not linked to its notes: ${e instanceof Error ? e.message : String(e)}` };
     } finally {

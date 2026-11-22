@@ -8,7 +8,7 @@ const table = <R>(key: (r: R) => string) => {
   const m = new Map<string, R>();
   return { get: (k: string) => m.get(k), all: () => [...m.values()], put: (r: R) => void m.set(key(r), r), delete: (k: string) => void m.delete(k) };
 };
-const store = (): Store => ({ notes: table<NoteRow>((r) => r.path), tasks: table<TaskRow>((r) => r.id), links: table<LinkRow>((r) => r.link.id) });
+const store = (): Store => ({ notes: table<NoteRow>((r) => r.path), tasks: table<TaskRow>((r) => r.id), links: table<LinkRow>((r) => r.link.id), now: Date.now });
 const P = "notes/20261101-a.md";
 
 describe("applying a change", () => {

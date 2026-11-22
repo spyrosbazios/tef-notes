@@ -154,7 +154,8 @@ describe("ticking", () => {
 
 describe("checklist", () => {
   it("adds, ticks, renames and removes items by id", () => {
-    let t = addItem(addItem(task("x"), "one"), "two\nlines");
+    const ids = ["aaaa", "aaaa", "bbbb"];
+    let t = addItem(addItem(task("x"), "one", () => ids.shift()!), "two\nlines", () => ids.shift()!);   // a taken id is drawn again
     const [a, b] = t.checklist;
     expect(a.id).not.toBe(b.id);
     expect(b.text).toBe("two lines");

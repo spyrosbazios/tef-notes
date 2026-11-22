@@ -9,6 +9,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 - The chat list shows every saved chat, not only the newest 200; a lens, a tag or a chat made again after its answer was lost
   is not made twice; a tag route's failure shows the server's reason.
+- A note file with no day of its own (none in its frontmatter or its name) is no longer given the day a flag was set as the
+  day it was created.
 - Two tabs of the app open at once no longer overwrite each other's unsent edits: one tab keeps the offline copy and syncs
   for all, the others hand it their changes and show its copy. When it closes, or a phone freezes it in the background,
   another tab takes over.
