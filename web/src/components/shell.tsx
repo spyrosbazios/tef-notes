@@ -27,6 +27,7 @@ import { SyncNotice } from "@/components/sync-notice";
 import { TaskDrawer } from "@/components/task-drawer";
 import { TalkPanel } from "@/components/talk/panel";
 import { TalkPill } from "@/components/talk/pill";
+import { useSelecting } from "@/lib/selecting";
 import { useTalkPanel } from "@/lib/talk-panel";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -79,6 +80,7 @@ export function Shell() {
   const newNote = useNewNote();
   const [dock] = useDock();
   const talkPanel = useTalkPanel();
+  const selecting = useSelecting();      // a list's selection: its actions sit where the pill is (note-actions.tsx `BulkDock`)
   const [rail] = useRail(), reduce = useShouldReduceMotion(), railMove = useTempoTransition(spring.reflow);
   const keyboard = useKeyboard();
   const [palette, setPalette] = useState(false), [menu, setMenu] = useState(false), [adding, setAdding] = useState<Start | null>(null);
@@ -166,7 +168,7 @@ export function Shell() {
           <TaskDrawer />
         </div>
         {/* The pill inside is what a route change names (`data-vt="tabs"`, tab-bar.tsx), not this strip */}
-        {bar ? <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", onNote && "invisible")} inert={onNote}><TabBar /></div> : null}
+        {bar ? <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden", (onNote || selecting) && "invisible")} inert={onNote || selecting}><TabBar /></div> : null}
         {/* The spoken conversation while the owner is on another screen (Talk's own page has all of it) */}
         <TalkPill />
       </div>

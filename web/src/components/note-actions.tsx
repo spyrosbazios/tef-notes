@@ -1,8 +1,12 @@
 // What the list does to notes without opening them: a tile's ⋮ menu and the bar a selection turns the header into.
 // Both act on `paths` (one note, or the selection) through useBulk, so one note and many go the same way. The
 // tags and delete dialogs are the list's, opened from either; asking the agent and downloading need none.
-import { Archive, ArchiveRestore, Download, EllipsisVertical, Palette, Pin, Sparkles, Tag, Trash2, X } from "lucide-react";
-import { useMemo } from "react";
+import { spring, useTempoTransition } from "@animate-ui/react/utils/motion";
+import { Archive, ArchiveRestore, Download, EllipsisVertical, Palette, Pin, Sparkles, Tag, Trash2, X, type LucideIcon } from "lucide-react";
+import { motion } from "motion/react";
+import { LiquidGlass } from "quick-liquid/react";
+import { useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { colorPatch, pinPatch, tagState, tagUnion } from "@/core/bulk";
 import { COLORS, type Color } from "@/core/notes";
 import { TagEditor } from "@/components/tag-editor";
@@ -15,8 +19,12 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useBulk } from "@/hooks/bulk";
+import { useGlass } from "@/hooks/glass";
+import { useNarrow } from "@/hooks/media";
 import { useNotes } from "@/hooks/notes";
 import { useNoteOut } from "@/hooks/note-out";
+import { setSelecting } from "@/lib/selecting";
+import { TAB_BAR } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import type { NoteRec } from "@/services/notes";
 
@@ -114,15 +122,25 @@ function MenuItems({ paths, onTags, onDelete }: { paths: string[]; onTags: () =>
   );
 }
 
-/** The list's header while notes are selected: a count, select all, and the same actions for every one of them. */
+/** The list's header while notes are selected: a count, select all, and the same actions for every one of them. On a phone the
+ *  header keeps only the count and select all, and the actions take the tab pill's place at the bottom (`BulkDock`). */
 export function BulkBar({ paths, onClear, onAll, onTags, onDelete }: { paths: string[]; onClear: () => void; onAll: () => void; onTags: () => void; onDelete: () => void }) {
+  const narrow = useNarrow();
+  return (
+    <div className="flex min-h-8 items-center gap-0.5 max-md:min-h-10" role="toolbar" aria-label="Selected notes">
+      <Button variant="ghost" size="icon-sm" aria-label="Clear selection" title="Clear selection (Esc)" onClick={onClear}><X /></Button>
+      <span className="mr-auto px-1.5 font-semibold text-sm whitespace-nowrap tabular-nums">{paths.length} selected</span>
+      <Button variant="ghost" size="sm" className="text-brand hover:text-brand" title="Select every note in the list" onClick={onAll}>Select all</Button>
+      {narrow ? <BulkDock paths={paths} onTags={onTags} onDelete={onDelete} /> : <BulkTools paths={paths} onTags={onTags} onDelete={onDelete} />}
+    </div>
+  );
+}
+
+/** The laptop's actions: icons in the header. */
+function BulkTools({ paths, onTags, onDelete }: { paths: string[]; onTags: () => void; onDelete: () => void }) {
   const f = useFlagActions(paths);
   return (
-    <div className="flex min-h-8 items-center gap-0.5" role="toolbar" aria-label="Selected notes">
-      <Button variant="ghost" size="icon-sm" aria-label="Clear selection" title="Clear selection (Esc)" onClick={onClear}><X /></Button>
-      <button type="button" onClick={onAll} title="Select every note in the list" className="mr-auto rounded px-1.5 font-semibold text-sm hover:bg-muted">
-        {paths.length} selected
-      </button>
+    <>
       <Button variant="ghost" size="icon-sm" aria-label={f.pinned ? "Unpin" : "Pin to top"} aria-pressed={f.pinned} title={f.pinned ? "Unpin" : "Pin to top"} onClick={f.pin}>
         <Pin className={f.pinned ? "fill-fg" : "text-dim"} />
       </Button>
@@ -139,8 +157,48 @@ export function BulkBar({ paths, onClear, onAll, onTags, onDelete }: { paths: st
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="More" title="More"><EllipsisVertical className="text-dim" /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end"><OutItems paths={paths} /></DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </>
   );
+}
+
+/** One of the dock's actions: its icon over its word, a thumb's width. */
+function DockButton({ icon: Icon, label, danger, on, className, ...rest }: React.ComponentProps<"button"> & { icon: LucideIcon; label: string; danger?: boolean; on?: boolean }) {
+    return (
+      <button type="button" aria-label={label} {...rest}
+        className={cn("flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full text-dim outline-none transition-[color,scale] active:scale-95 focus-visible:ring-2 focus-visible:ring-ring",
+          danger && "text-down", on && "text-brand", className)}>
+        <Icon className={cn("size-5", on && "fill-current")} />
+        <span className="truncate text-[11px] font-semibold leading-none">{label}</span>
+      </button>
+    );
+}
+
+/** The phone's actions for a selection: a pill where the tabs are (the shell hides them meanwhile, lib/selecting.ts), labelled, in
+ *  thumb's reach, rising in as the selection starts. On the body, so no scroller's transform carries it. */
+function BulkDock({ paths, onTags, onDelete }: { paths: string[]; onTags: () => void; onDelete: () => void }) {
+  const f = useFlagActions(paths), glass = useGlass(), rise = useTempoTransition(spring.slide);
+  useEffect(() => { setSelecting(true); return () => setSelecting(false); }, []);
+  return createPortal(
+    <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={rise}
+      className="fixed inset-x-0 bottom-0 z-50 px-4 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden" style={{ height: `calc(${TAB_BAR} + env(safe-area-inset-bottom))` }}>
+      <LiquidGlass config={glass} className="h-full rounded-full [&>.ql-content]:h-full">
+        <div role="toolbar" aria-label="Actions on the selected notes" className="flex h-full items-center gap-0.5 px-2 py-1.5">
+          <DockButton icon={Pin} label={f.pinned ? "Unpin" : "Pin"} on={f.pinned} aria-pressed={f.pinned} onClick={f.pin} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><DockButton icon={Palette} label="Colour" /></DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-44"><Swatches value={f.color} onPick={f.paint} /></DropdownMenuContent>
+          </DropdownMenu>
+          <DockButton icon={Tag} label="Tags" onClick={onTags} />
+          <DockButton icon={f.archived ? ArchiveRestore : Archive} label={f.archived ? "Unarchive" : "Archive"} onClick={f.archive} />
+          <DockButton icon={Trash2} label="Delete" danger onClick={onDelete} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><DockButton icon={EllipsisVertical} label="More" /></DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="end"><OutItems paths={paths} /></DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </LiquidGlass>
+    </motion.div>,
+    document.body);
 }
 
 /** Tags for the notes at `paths`: the union of theirs (dashed where only some carry it), adding to and removing from all. */
