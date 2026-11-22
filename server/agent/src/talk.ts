@@ -80,10 +80,13 @@ export function turnsOf(act: { start(text: string, confirmed: boolean): void; co
   };
 }
 
-/** How long a reply still being written may be silent and count as speaking, for the ear: Fish's rule for `agent_speaking`
- *  (docs.fish.audio, "Tell the server when your agent speaks": the gaps between sentences are speaking, a pause of more than
- *  about two seconds is not). Told it had stopped in every gap, the ear took a "mm-hm" there for a turn. */
+/** How long a reply with more to come may be silent and count as speaking, for the ear: Fish's rule for `agent_speaking`
+ *  (docs.fish.audio, "Tell the server when your agent speaks": the wait for the voice and the gaps between sentences are
+ *  speaking, a pause of more than about two seconds is not). Told it had stopped in every gap, the ear took a "mm-hm"
+ *  there for a turn. */
 const PAUSE = 2000;
+/** How long after its audio has played out a voice is taken to have no more of it to send. */
+const SETTLE = 1500;
 
 /** Where a conversation's two sides go: JSON events and voice frames to the app, and hanging up on it. */
 export type Out = { json(e: TalkServerEvent): void; voice(pcm: Uint8Array): void; close(): void };
@@ -136,7 +139,11 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
 
   let ended = false, dirty = false, strikes = 0, saidBytes = 0;
   let ear: EarSession | undefined, voice: Voice | undefined, opening: Promise<Voice> | undefined, generation = 0;
-  let speaking = false, endsAt = 0, backlog: Uint8Array[] = [], backlogBytes = 0;
+  let speaking = false, backlog: Uint8Array[] = [], backlogBytes = 0;
+  /** The voice's clock: when it was last given words, when audio last came from it, and when what came will have played
+   *  in the app. Fish sends a whole passage as one frame, seconds of it at once, so the clock is the audio's length, never
+   *  how recently a frame came. */
+  let givenAt = 0, heardAt = 0, playsUntil = 0;
   let current: Reply | undefined;
   /** When the owner last did something (a turn of theirs, a tap) or the voice last stopped, and when it began: the ear's caps. */
   const began = Date.now();
@@ -177,7 +184,6 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     if (on === speaking) return;
     speaking = on;
     lastActive = Date.now();
-    if (on) endsAt = Date.now() + PLAY_LEAD;
     ear?.speaking(on);
   }
 
@@ -189,7 +195,9 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
       audio: (pcm) => {
         if (ended) return;
         out.voice(pcm);
-        endsAt = Math.max(endsAt, Date.now()) + (pcm.length / 2 / TALK_RATE.voice) * 1000;
+        const now = Date.now();
+        heardAt = now;
+        playsUntil = Math.max(playsUntil, now + PLAY_LEAD) + (pcm.length / 2 / TALK_RATE.voice) * 1000;
         markSpeaking(true);
       },
       ended: (error) => { voice = undefined; markSpeaking(false); if (error && !ended) void fail(error); },
@@ -216,6 +224,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
       const line = `${clean} `;                                // Fish joins what it is given: the space keeps two sentences apart
       v.say(line);
       if (now) v.flush();
+      givenAt = Date.now();
       saidBytes += bytesOf(line);
       // What it has cost is what went to the voice, so it is counted there: a reply held until the ear confirms it lands here
       // in a later tick than the turn's end, and a total sent before it would be a cent short every time
@@ -328,16 +337,21 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     closeOpen();
   }
 
-  /** The owner spoke over the voice: the reply stops where it is, and what it had not said is dropped. */
+  /** Whether the voice may still send audio, or the app still be playing it: it was given words since its last audio came,
+   *  or what came has not long played out. */
+  const owes = () => givenAt > heardAt || Date.now() < playsUntil + SETTLE;
+
+  /** The owner took the turn: the reply stops where it is, and what it had not said is dropped. The app is always told to
+   *  drop what it has not played, whatever this side's clock says of it: the clock once ran out a moment into a passage,
+   *  nothing was cut, and the voice read the old reply out over the owner and on into the next one. Fish has no cancel, so
+   *  a voice that may still send audio is closed; one that has said all it was given is kept for the next reply. */
   function interrupt() {
-    if (!speaking && !current) return;
     stopReply();
-    voice?.stop();
-    voice = undefined;
+    if (owes()) { voice?.stop(); voice = undefined; }
     generation++;                                  // a socket still opening, or a sentence on its way, belongs to the reply that ended
     speak.drop(); held = []; confirmed = true;
+    givenAt = heardAt = playsUntil = 0;
     markSpeaking(false);
-    endsAt = 0;
     if (!ended) out.json({ type: "interrupted" });
   }
 
@@ -350,13 +364,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     // when the ear never reported speech over it. Two replies at once was the voice talking over the owner.
     start(text, sure) { interrupt(); confirmed = sure; if (sure) held = []; startTurn(text); },
     confirm,
-    cancel() {
-      // It was not the owner's turn after all. A reply that had already spoken (it paused for the app before `committed`)
-      // is cut like any other the owner speaks over
-      if (speaking) return interrupt();
-      stopReply();
-      speak.drop(); confirmed = true; held = [];
-    },
+    cancel: interrupt,                             // it was not the end of the owner's turn after all: they are still speaking
   });
 
   const hear = (e: EarEvent) => {
@@ -373,6 +381,8 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
       // the reply was still being thought, was once let pass, and the voice then went on over the owner until their turn
       // was committed
       case "taken": strikes = 0; lastActive = Date.now(); interrupt(); break;
+      // Only a "mm-hm" over the voice: the app, which lowered the voice when the sound began, raises it again
+      case "nod": out.json({ type: "hearing", speaking: false }); break;
       case "eager": turns.eager(e.text); break;
       case "resumed": turns.resumed(); break;
       case "turn": if (e.yours) { strikes = 0; turns.turn(e.text); } break;
@@ -435,12 +445,13 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
 
   try { ear = await openEar(); } catch (e) { letGo(); throw e; }   // nothing else is open yet: the timers start below
   timer = setInterval(() => { if (dirty) { dirty = false; void keep(withoutPictures(settle(messages))); } }, SAVE_EVERY);
-  /** The speaking clock (the voice stops counting when the last frame it sent has played, or, while the reply is still being
-   *  written and waits on nothing, a `PAUSE` after it: the next sentence is on its way), and the ear's caps. */
+  /** The speaking clock, and the ear's caps. The voice is speaking while what it sent is still playing, and through a
+   *  pause of up to `PAUSE` in a reply that has more to come: audio Fish owes for words it was given, or words still being
+   *  written (a reply waiting on the owner's tap is not). */
   beat = setInterval(() => {
     const now = Date.now();
-    const writing = !!current && current.waits.size === 0;
-    if (speaking && now > endsAt + (writing ? PAUSE : 0)) markSpeaking(false);
+    const more = givenAt > heardAt || (!!current && current.waits.size === 0);
+    if (speaking && now > playsUntil && !(more && now < Math.max(playsUntil, givenAt) + PAUSE)) markSpeaking(false);
     if (now - began > TALK_LIMITS.maxMs) void hangUp(`Talk ends after ${TALK_LIMITS.maxMs / 60_000} minutes. Start again to go on.`);
     // A reply waiting on a tap is not busy: a card left unanswered doesn't keep the ear open
     else if (!speaking && (!current || current.waits.size > 0) && now - lastActive > TALK_LIMITS.idleMs)

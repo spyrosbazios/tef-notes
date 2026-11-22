@@ -3,7 +3,7 @@
 // the voice played and dropped on `interrupted`, UI tools done and answered once, an approval sent only by a tap, and everything
 // closed again on every way out.
 import { describe, expect, test } from "bun:test";
-import { talkClientEventOf, TALK_RATE, type TalkClientEvent, type TalkServerEvent } from "@/core/talk";
+import { talkClientEventOf, TALK_DUCK, TALK_RATE, type TalkClientEvent, type TalkServerEvent } from "@/core/talk";
 import type { AssistantContext } from "@/core/assistant";
 import { pcm16 } from "@/lib/pcm";
 import { createSession, MIC_FRAME, type Deps } from "@/lib/talk-session";
@@ -12,7 +12,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 
 function rig(over: Partial<Deps> = {}) {
   const r = {
-    sent: [] as (string | ArrayBuffer)[], pushed: 0, flushed: 0, closed: { link: 0, mic: 0, voice: 0, awake: 0 }, muted: [] as boolean[], tools: [] as unknown[],
+    sent: [] as (string | ArrayBuffer)[], pushed: 0, flushed: 0, ducked: [] as boolean[], closed: { link: 0, mic: 0, voice: 0, awake: 0 }, muted: [] as boolean[], tools: [] as unknown[],
     on: null as null | Parameters<Deps["open"]>[0], onFrame: null as null | ((s: Float32Array) => void), playing: null as null | ((p: boolean) => void), chats: 0,
     // What the agent does
     hear: (e: TalkServerEvent | ArrayBuffer) => r.on?.message(e instanceof ArrayBuffer ? e : JSON.stringify(e)),
@@ -24,7 +24,7 @@ function rig(over: Partial<Deps> = {}) {
   const deps: Deps = {
     open: (on) => { r.on = on; return { send: (d) => r.sent.push(d), close: () => { r.closed.link++; } }; },
     mic: async (onFrame) => { r.onFrame = onFrame; return { mute: (on) => r.muted.push(on), close: () => { r.closed.mic++; } }; },
-    voice: (on) => { r.playing = on; return { push: () => { r.pushed++; on(true); }, flush: () => { r.flushed++; }, level: () => 0.5, close: () => { r.closed.voice++; } }; },
+    voice: (on) => { r.playing = on; return { push: () => { r.pushed++; on(true); }, flush: () => { r.flushed++; }, duck: (d) => { r.ducked.push(d); }, level: () => 0.5, close: () => { r.closed.voice++; } }; },
     chat: async () => { r.chats++; return "chat1"; },
     context: () => context,
     tool: async (name, input) => { r.tools.push([name, input]); return { ok: true }; },
@@ -62,7 +62,7 @@ describe("starting", () => {
   });
   test("both audio paths open inside the tap, before anything is awaited", () => {
     let mic = 0, voice = 0;
-    const { session } = rig({ mic: async () => { mic++; return { mute() {}, close() {} }; }, voice: () => { voice++; return { push() {}, flush() {}, level: () => 0, close() {} }; } });
+    const { session } = rig({ mic: async () => { mic++; return { mute() {}, close() {} }; }, voice: () => { voice++; return { push() {}, flush() {}, duck() {}, level: () => 0, close() {} }; } });
     session.start();
     expect([mic, voice]).toEqual([1, 1]);
   });
@@ -117,6 +117,29 @@ describe("the voice", () => {
     r.hear({ type: "interrupted" });
     expect(r.flushed).toBe(1);
     expect(session.snapshot().state).toBe("listening");
+  });
+
+  test("the voice is lowered while the ear hears something over it, and raised again when that was no turn", async () => {
+    const { r } = await live();
+    r.hear({ type: "hearing", speaking: true });                           // nothing is playing: nothing to lower
+    expect(r.ducked).toEqual([false]);
+    r.hear(new ArrayBuffer(960));
+    r.hear({ type: "hearing", speaking: true });
+    r.hear({ type: "hearing", speaking: false });                          // a noise, or a "mm-hm"
+    expect(r.ducked).toEqual([false, true, false]);
+    r.hear({ type: "hearing", speaking: true });
+    r.hear({ type: "interrupted" });                                       // the owner's turn: cut, and the next reply is at full volume
+    expect(r.ducked).toEqual([false, true, false, true, false]);
+    expect(r.flushed).toBe(1);
+  });
+
+  test("a sound that stays heard doesn't keep the voice down: it is raised again after TALK_DUCK.maxMs", async () => {
+    const { r } = await live();
+    r.hear(new ArrayBuffer(960));
+    r.hear({ type: "hearing", speaking: true });
+    expect(r.ducked).toEqual([true]);
+    await new Promise((done) => setTimeout(done, TALK_DUCK.maxMs + 100));
+    expect(r.ducked).toEqual([true, false]);
   });
   test("audio before `ready` is not played", async () => {
     const { r, session } = rig();

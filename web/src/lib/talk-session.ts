@@ -9,7 +9,7 @@
 // End, an error, the socket closing, a failed start.
 import type { UIMessage } from "ai";
 import { choiceFrom, isAskTool, isUiTool, uiError, type AssistantContext, type ChoiceOutput } from "@/core/assistant";
-import { MIC_FRAME, talkServerEventOf, type TalkClientEvent } from "@/core/talk";
+import { MIC_FRAME, TALK_DUCK, talkServerEventOf, type TalkClientEvent } from "@/core/talk";
 import { createdNote, isAppTool, type AppTool } from "@/lib/assistant";
 import { isTool, toolName } from "@/lib/ask";
 import { loudness, micTrouble, type Mic } from "@/lib/mic";
@@ -89,6 +89,7 @@ export function createSession(deps: Deps): TalkSession {
   // What a run holds open; all of it is let go by `teardown`
   let run = 0, link: ReturnType<Deps["open"]> | null = null, mic: Mic | null = null, voice: Voice | null = null;
   let release: (() => void) | null = null, giveUp: ReturnType<typeof setTimeout> | undefined, hush: ReturnType<typeof setTimeout> | undefined;
+  let unduck: ReturnType<typeof setTimeout> | undefined;
   let ready = false, playing = false, micLevel = 0;
   const done = new Set<string>(), answered = new Set<string>(), created = new Set<string>();
 
@@ -105,6 +106,7 @@ export function createSession(deps: Deps): TalkSession {
     run++;
     clearTimeout(giveUp);
     clearTimeout(hush);
+    clearTimeout(unduck);
     ready = false;
     playing = false;
     micLevel = 0;
@@ -125,6 +127,14 @@ export function createSession(deps: Deps): TalkSession {
     clearTimeout(hush);
     if (on) { playing = true; set({}); return; }
     hush = setTimeout(() => { playing = false; set({}); }, SPEAK_HOLD_MS);
+  };
+
+  /** The voice lowered while the ear hears something over it, and raised again: the sound ended or was no turn, the owner
+   *  took the turn (the voice is cut), or `TALK_DUCK.maxMs` passed. */
+  const duck = (on: boolean) => {
+    clearTimeout(unduck);
+    voice?.duck(on && playing);
+    if (on && playing) unduck = setTimeout(() => voice?.duck(false), TALK_DUCK.maxMs);
   };
 
   /** A tool the app does itself comes down asked for, with its input complete: do it once, answer once. */
@@ -164,7 +174,10 @@ export function createSession(deps: Deps): TalkSession {
       tool(m);
       const path = createdNote(m.parts, created);
       if (path) void deps.tool("open_note", { path }).catch(() => undefined);
+    } else if (e.type === "hearing") {
+      duck(e.speaking);
     } else if (e.type === "interrupted") {
+      duck(false);
       voice?.flush();
       clearTimeout(hush);
       playing = false;

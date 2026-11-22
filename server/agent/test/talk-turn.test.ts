@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it, setSystemTime } from "bun:t
 import { isToolUIPart, type UIMessage } from "ai";
 import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test";
 import type { Actions } from "@/core/actions";
-import { TALK_LIMITS, type TalkServerEvent } from "@/core/talk";
+import { TALK_LIMITS, TALK_RATE, type TalkServerEvent } from "@/core/talk";
 import { parseNote } from "@/core/notes";
 import type { EarEvent, EarSession, Voice } from "../src/fish";
 import type { model } from "../src/models";
@@ -54,14 +54,17 @@ async function talking(saved: UIMessage[] = []) {
   /** What Fish was given, and `flushed`: the passages it was told to speak, each the sentences given since the last. */
   const flushed: string[][] = [];
   let kept: string[] = [];
+  /** The voices opened, and how many were closed: Fish has no cancel, so a reply is cut by closing its voice. */
+  const voices = { opened: 0, stopped: 0 };
+  let sound: ((pcm: Uint8Array) => void) | undefined;
   const voice: Voice = {
     say: (t) => { spoken.push(t.trim()); kept.push(t.trim()); },
     flush() { if (kept.length) flushed.push(kept); kept = []; },
-    stop() {},
+    stop() { voices.stopped++; },
   };
   const deps: Deps = {
     server: { url: pb.url }, sea: { model: "s2.1-pro", voice: "v", speed: 1 }, model: "m", effort: "normal", pick,
-    connectVoice: async () => voice, connectEar: async () => ear,
+    connectVoice: async (o) => { voices.opened++; sound = o.audio; return voice; }, connectEar: async () => ear,
   };
   const talk = await startTalk({ type: "start", chat: "chat1" }, { json: (e) => events.push(e), voice() {}, close: () => { closed = true; } }, deps);
   /** The latest of each message's parts, as the app built them from `part` events. */
@@ -72,7 +75,9 @@ async function talking(saved: UIMessage[] = []) {
   };
   const tool = (name: string) => parts().filter((p) => p.type === `tool-${name}`).at(-1);
   return {
-    talk, events, spoken, told, flushed, parts, tool,
+    talk, events, spoken, told, flushed, voices, parts, tool,
+    /** Fish's audio for what it was given: one frame, `seconds` long, as it sends a whole passage. */
+    sounds: (seconds: number) => sound!(new Uint8Array(Math.round(seconds * TALK_RATE.voice) * 2)),
     said: (t: string) => hear!({ type: "turn", text: t, yours: true, degraded: false }),
     hear: (e: EarEvent) => hear!(e),
     closed: () => closed,
@@ -305,6 +310,58 @@ describe("taking the turn before the reply has said a word", () => {
   });
 });
 
+describe("a passage Fish sent as one frame, seconds of it at once", () => {
+  it("is still playing long after the frame came: taking the turn cuts it and closes the voice", async () => {
+    const c = await talking();
+    replies = [text("Here is a long answer to what you asked.")];
+    c.said("tell me");
+    await until(() => c.spoken.length === 1, "the reply's words");
+    c.sounds(9);
+    await Bun.sleep(400);                                                  // the reply is written and the frame long delivered; the app is a moment into it
+    expect(c.told).toEqual([true]);
+    const before = c.events.filter((e) => e.type === "interrupted").length;
+    c.hear({ type: "taken" });
+    expect(c.events.filter((e) => e.type === "interrupted").length).toBe(before + 1);
+    expect(c.voices.stopped).toBe(1);
+    expect(c.told).toEqual([true, false]);
+    await c.talk.end();
+  });
+
+  it("has played out a while later: the next turn still tells the app to drop what it holds, and keeps the voice for its reply", async () => {
+    const c = await talking();
+    replies = [text("Short answer."), text("Another one.")];
+    c.said("tell me");
+    await until(() => c.spoken.length === 1, "the reply's words");
+    c.sounds(0.2);
+    await until(() => c.told.at(-1) === false, "the voice's end");
+    await Bun.sleep(1600);
+    const before = c.events.filter((e) => e.type === "interrupted").length;
+    c.hear({ type: "taken" });
+    expect(c.events.filter((e) => e.type === "interrupted").length).toBe(before + 1);
+    c.said("and again");
+    await until(() => c.spoken.length === 2, "the next reply's words");
+    expect(c.voices).toEqual({ opened: 1, stopped: 0 });
+    await c.talk.end();
+  });
+});
+
+describe("a \"mm-hm\" over the voice", () => {
+  it("is no turn: the app is told the sound is over, and nothing is cut", async () => {
+    const c = await talking();
+    replies = [text("Here is a long answer to what you asked.")];
+    c.said("tell me");
+    await until(() => c.spoken.length === 1, "the reply's words");
+    c.sounds(9);
+    const before = c.events.filter((e) => e.type === "interrupted").length;
+    c.hear({ type: "speech", on: true });
+    c.hear({ type: "nod" });
+    expect(c.events.filter((e) => e.type === "hearing").map((e) => e.speaking)).toEqual([true, false]);
+    expect(c.events.filter((e) => e.type === "interrupted").length).toBe(before);
+    expect(c.voices.stopped).toBe(0);
+    await c.talk.end();
+  });
+});
+
 describe("what the ear is told of the voice", () => {
   it("is speaking through the quiet between a reply's sentences, and not once the reply has ended", async () => {
     const c = await talking();
@@ -315,7 +372,7 @@ describe("what the ear is told of the voice", () => {
     await Bun.sleep(500);                                                  // long played out; the next sentence is still being written
     expect(c.told).toEqual([true]);
     g.release();
-    await until(() => c.told.at(-1) === false, "the voice's end");
+    await until(() => c.told.at(-1) === false, "the voice's end", 5000);
     expect(c.told).toEqual([true, false]);
     await c.talk.end();
   });

@@ -16,8 +16,9 @@
 // the socket ends it.
 //
 // The owner's words are the ear's business: they arrive once, in `part` as the chat holds them, when the ear has settled
-// the turn. `hearing` is only whether they are talking right now (the page draws it, and the voice stops when they
-// start). What the voice is saying is the agent's own text, streamed to the ear as `context_add` so a follow-up is heard
+// the turn. `hearing` is only whether something is being heard right now, the owner or a noise: the app lowers the voice
+// while it is (`TALK_DUCK`), and the voice stops only when the ear says the owner took the turn (`interrupted`). What the
+// voice is saying is the agent's own text, streamed to the ear as `context_add` so a follow-up is heard
 // in context. Pure types and defensive readers, no I/O.
 import { contextOf, type AssistantContext } from "./assistant";
 
@@ -29,6 +30,12 @@ export const TALK_RATE = { mic: 16_000, voice: 24_000 } as const;
  *  as it is: the agent ends it, with an `error` saying why, after `idleMs` in which the owner neither took a turn nor tapped
  *  anything while nothing was being said or thought, and after `maxMs` in all. Starting again is one tap. */
 export const TALK_LIMITS = { idleMs: 5 * 60_000, maxMs: 60 * 60_000 } as const;
+
+/** The voice while the ear hears something over it. Fish takes about a second to say a sound is the owner taking the turn
+ *  (`interrupted`), so the app lowers the voice to `level` as soon as the sound begins, and raises it again when the sound
+ *  was not a turn, or after `maxMs` whatever the ear says: a noise, or an echo of the voice itself, can stay "heard" for as
+ *  long as the reply (docs.fish.audio, "Handle interruptions and backchannels"). */
+export const TALK_DUCK = { level: 0.25, maxMs: 2000 } as const;
 
 /** Samples of microphone in each frame the app sends: 40 ms, the ear's own upper pace. */
 export const MIC_FRAME = (TALK_RATE.mic * 40) / 1000;
@@ -98,10 +105,10 @@ export type TalkServerEvent =
   /** Part `index` of message `message` is now `part` (the message is new, and goes last, when the id is). Sent again as a
    *  part grows: words as they are said, a tool as it moves from asked to done. */
   | { type: "part"; message: string; role: "user" | "assistant"; index: number; part: TalkPart }
-  /** The owner started talking, or stopped: what the page draws, and what stops the voice (`interrupted` follows when it
-   *  was still speaking). */
+  /** The ear began to hear something, the owner or a noise, or stopped (the sound ended, or was only a "mm-hm" over the
+   *  voice): the voice is lowered meanwhile (`TALK_DUCK`), and `interrupted` follows if it was the owner taking the turn. */
   | { type: "hearing"; speaking: boolean }
-  /** The owner spoke over the voice: drop the audio not yet played. */
+  /** The owner took the turn: drop the audio not yet played. Sent for every turn they take, with a reply playing or not. */
   | { type: "interrupted" }
   /** What the conversation has used so far: bytes of text spoken, and their cost in US dollars at the model's list price. */
   | { type: "usage"; said: number; cost: number }

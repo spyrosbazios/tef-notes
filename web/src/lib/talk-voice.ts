@@ -3,9 +3,12 @@
 // can leave a gap but a busy page can't. `flush` drops everything not yet played at once: the owner spoke over it. The context is
 // made inside the tap that starts the conversation (the browser's autoplay rule) and is its own, at the voice's rate: the
 // microphone's runs at 16 kHz, and the browser's echo cancellation hears what this one plays.
-import { TALK_RATE } from "@/core/talk";
+import { TALK_DUCK, TALK_RATE } from "@/core/talk";
 import { floats, rms } from "@/lib/pcm";
 
+/** The time constant, in seconds, of a change in the voice's volume (it is nearly there after three of them): quick enough
+ *  to be felt at once, slow enough not to click. */
+const FADE = 0.015;
 /** Seconds of lead before the first frame after a silence: room for the next to arrive before the last has ended. */
 const LEAD = 0.06;
 
@@ -14,6 +17,8 @@ export type Voice = {
   push: (pcm: ArrayBuffer) => void;
   /** Stop what is playing and forget what is queued. */
   flush: () => void;
+  /** Lower the voice (the owner may be speaking over it), or raise it again. */
+  duck: (on: boolean) => void;
   /** How loud it is now, 0..1. */
   level: () => number;
   /** Stop everything and close the context. */
@@ -26,7 +31,8 @@ export function openVoice(on: (playing: boolean) => void): Voice {
   void ctx.resume();
   const meter = ctx.createAnalyser();
   meter.fftSize = 512;
-  meter.connect(ctx.destination);
+  const volume = ctx.createGain();
+  meter.connect(volume).connect(ctx.destination);
   const wave = new Float32Array(meter.fftSize);
   const queued = new Set<AudioBufferSourceNode>();
   let end = 0;
@@ -54,6 +60,7 @@ export function openVoice(on: (playing: boolean) => void): Voice {
       end = 0;
       on(false);
     },
+    duck(on) { volume.gain.setTargetAtTime(on ? TALK_DUCK.level : 1, ctx.currentTime, FADE); },
     level() {
       if (!queued.size) return 0;
       meter.getFloatTimeDomainData(wave);

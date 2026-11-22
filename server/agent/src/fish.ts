@@ -8,7 +8,8 @@
 //   the ear (`connectEar`): wss://api.fish.audio/v1/asr/realtime, one socket per conversation, also MessagePack: a `config`
 //     (16 kHz mono s16le, `turn_detection: {mode:"auto", eager:true}`), then `audio` frames as the microphone arrives,
 //     `agent_speaking` as the voice starts and stops, `context_add` for each line said, and `audio_done` at the end. Back, in
-//     order: `speech_start`, `user_turn_taken` (this really is the owner), `eager_end_of_turn` (the turn's text, before it is
+//     order: `speech_start`, `user_turn_taken` (this really is the owner) or `user_backchannel` (only a "mm-hm" over the
+//     voice), `eager_end_of_turn` (the turn's text, before it is
 //     final), `turn_resumed` (it was not), and `committed` (the final text, and whether it was the owner's turn at all: a
 //     backchannel over the voice or a noise in the room is not). It decides what a turn is, so nothing here guesses.
 //   the file reader (`hear`): POST /v1/asr, `model: transcribe-1-pro`, multipart WAV — what dictation sends each piece to.
@@ -184,6 +185,8 @@ export type EarEvent =
   | { type: "speech"; on: boolean }
   /** This is the owner's turn (`user_turn_taken`). */
   | { type: "taken" }
+  /** The owner only acknowledged the voice, a "mm-hm" over it (`user_backchannel`): it goes on speaking. */
+  | { type: "nod" }
   /** The turn has probably ended, with its text: what `committed` will say unless `resumed` follows. */
   | { type: "eager"; text: string }
   /** The owner went on after `eager`: that text is to be dropped. */
@@ -255,6 +258,7 @@ export const connectFishEar = (): ConnectEar => async (terms) => {
       case "session_started": clearTimeout(setup); opened.resolve(); tell({ type: "started" }); break;
       case "speech_start": turns = Number(f.turn_index ?? turns); tell({ type: "speech", on: true }); break;
       case "user_turn_taken": tell({ type: "taken" }); break;
+      case "user_backchannel": tell({ type: "nod" }); break;
       case "eager_end_of_turn": tell({ type: "eager", text }); break;
       case "turn_resumed": tell({ type: "resumed" }); break;
       case "committed": {
