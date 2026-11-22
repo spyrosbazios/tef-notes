@@ -5,7 +5,7 @@
 //     to change or delete like any they wrote.
 // Where an action sits is a layout's own (prefs `phone.noteHeader`, `desktop.noteHeader`): a `Slot` each, in order, a button in
 // the header, a row in its menu, or off. A header holds `HEADER_MAX` buttons; Delete and the colour are the menu's, always.
-// A run (`runMessage`, `Run`): the client sends the message naming the note and the prompt as a chat of its own, with the
+// A run (`runMessage`, `ActionRun`): the client sends the message naming the note and the prompt as a chat of its own, with the
 // action's id beside it; the agent's server reads the action from the preferences and offers only the tools its `result`
 // needs (server/agent/src/note-action.ts), so a summary can't delete and a tidy can't touch another note. Its writes are the
 // chat's: the same cards, the owner's rules (actions.ts) and the taint checks.
@@ -41,7 +41,7 @@ export type ActionIcon = (typeof ACTION_ICONS)[number];
 /** An assistant action: a saved prompt, run on the open note. */
 export type PromptAction = { id: string; label: string; icon: ActionIcon; prompt: string; result: Result };
 
-export const LIMITS = { actions: 24, label: 40, prompt: 2000 } as const;
+export const ACTION_LIMITS = { actions: 24, label: 40, prompt: 2000 } as const;
 
 /** The two the app comes with. */
 export const DEFAULT_PROMPTS: readonly PromptAction[] = [
@@ -62,8 +62,8 @@ const one = <T extends string>(of: readonly T[], v: unknown, fallback: T): T => 
 /** One action as stored, or null when it has no usable id, name or prompt. */
 export function promptOf(raw: unknown): PromptAction | null {
   const a = obj(raw);
-  const label = typeof a.label === "string" ? a.label.replace(/\s+/g, " ").trim().slice(0, LIMITS.label) : "";
-  const prompt = typeof a.prompt === "string" ? a.prompt.trim().slice(0, LIMITS.prompt) : "";
+  const label = typeof a.label === "string" ? a.label.replace(/\s+/g, " ").trim().slice(0, ACTION_LIMITS.label) : "";
+  const prompt = typeof a.prompt === "string" ? a.prompt.trim().slice(0, ACTION_LIMITS.prompt) : "";
   if (typeof a.id !== "string" || !ID.test(a.id) || isBuiltin(a.id) || !label || !prompt) return null;
   return { id: a.id, label, icon: one(ACTION_ICONS, a.icon, "sparkles"), prompt, result: one(RESULTS, a.result, "answer") };
 }
@@ -74,7 +74,7 @@ export function promptsOf(raw: unknown): PromptAction[] {
   const out: PromptAction[] = [];
   for (const r of raw) {
     const p = promptOf(r);
-    if (p && !out.some((o) => o.id === p.id) && out.length < LIMITS.actions) out.push(p);
+    if (p && !out.some((o) => o.id === p.id) && out.length < ACTION_LIMITS.actions) out.push(p);
   }
   return out;
 }
@@ -90,20 +90,20 @@ export function newActionId(label: string, taken: readonly string[]): string {
 /** Why `a` can't be saved, or null: what a form and the agent's tools check alike. */
 export function promptProblem(a: Pick<PromptAction, "label" | "prompt">): string | null {
   if (!a.label.trim()) return "It needs a name.";
-  if (a.label.trim().length > LIMITS.label) return `The name is too long: up to ${LIMITS.label} characters.`;
+  if (a.label.trim().length > ACTION_LIMITS.label) return `The name is too long: up to ${ACTION_LIMITS.label} characters.`;
   if (!a.prompt.trim()) return "It needs a prompt: what the assistant should do with the note.";
-  if (a.prompt.trim().length > LIMITS.prompt) return `The prompt is too long: up to ${LIMITS.prompt} characters.`;
+  if (a.prompt.trim().length > ACTION_LIMITS.prompt) return `The prompt is too long: up to ${ACTION_LIMITS.prompt} characters.`;
   return null;
 }
 
 // ---- where each sits
 
-export const PLACES = ["header", "menu", "off"] as const;
-export type Place = (typeof PLACES)[number];
-export const PLACE_LABEL: Record<Place, string> = { header: "Header", menu: "Menu", off: "Off" };
+export const SLOT_PLACES = ["header", "menu", "off"] as const;
+type SlotPlace = (typeof SLOT_PLACES)[number];
+export const SLOT_PLACE_LABEL: Record<SlotPlace, string> = { header: "Header", menu: "Menu", off: "Off" };
 
 /** An action's place in one layout's note header: a built-in's name or a prompt's id. */
-export type Slot = { id: string; place: Place };
+export type Slot = { id: string; place: SlotPlace };
 
 type LayoutName = "phone" | "desktop";
 
@@ -129,20 +129,20 @@ export function slotsOf(raw: unknown, layout: LayoutName, prompts: readonly Prom
   for (const r of raw) {
     const s = obj(r), id = typeof s.id === "string" ? s.id : "";
     if (!known.includes(id) || out.some((o) => o.id === id)) continue;
-    const want = one(PLACES, s.place, "menu"), place = want === "header" && room-- <= 0 ? "menu" : want;
+    const want = one(SLOT_PLACES, s.place, "menu"), place = want === "header" && room-- <= 0 ? "menu" : want;
     out.push({ id, place });
   }
   return [...out, ...known.filter((id) => !out.some((o) => o.id === id)).map((id) => ({ id, place: "menu" as const }))];
 }
 
 /** The ids at `place`, in order. */
-export const idsAt = (slots: readonly Slot[], place: Place): string[] => slots.filter((s) => s.place === place).map((s) => s.id);
+export const idsAt = (slots: readonly Slot[], place: SlotPlace): string[] => slots.filter((s) => s.place === place).map((s) => s.id);
 
 /** Whether the header has room for one more button. */
 export const headerRoom = (slots: readonly Slot[], layout: LayoutName): boolean => idsAt(slots, "header").length < HEADER_MAX[layout];
 
 /** `slots` with `id` put at `place`; a header that is full keeps it where it was. */
-export function placedAt(slots: readonly Slot[], layout: LayoutName, id: string, place: Place): Slot[] {
+export function placedAt(slots: readonly Slot[], layout: LayoutName, id: string, place: SlotPlace): Slot[] {
   const now = slots.find((s) => s.id === id);
   if (!now || now.place === place || (place === "header" && !headerRoom(slots, layout))) return [...slots];
   return slots.map((s) => (s.id === id ? { id, place } : s));
@@ -160,10 +160,10 @@ export function movedSlot(slots: readonly Slot[], id: string, over: string, afte
 
 /** What a client sends beside a run's chat request: which action, on which note. The prompt and what it may do are read from
  *  the owner's preferences by the server, never from here. */
-export type Run = { id: string; note: string };
+export type ActionRun = { id: string; note: string };
 
-/** Whatever arrived as a `Run`, or undefined. */
-export function runOf(raw: unknown): Run | undefined {
+/** Whatever arrived as an `ActionRun`, or undefined. */
+export function runOf(raw: unknown): ActionRun | undefined {
   const r = obj(raw);
   return typeof r.id === "string" && ID.test(r.id) && typeof r.note === "string" && /^notes\/[^/]+\.md$/.test(r.note) ? { id: r.id, note: r.note } : undefined;
 }

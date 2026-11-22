@@ -1,17 +1,17 @@
 // A note action's run (@/core/note-actions): a chat turn the owner started with a button on a note rather than a message.
-// The request names the action and the note (`Run`); what the action is comes from the owner's preferences, never the
+// The request names the action and the note (`ActionRun`); what the action is comes from the owner's preferences, never the
 // request, and it narrows the turn: only the tools its `result` needs are offered, and a write to any other note, or a task
 // not linked to this one, is refused before it can ask. Everything else is the chat's own: the cards, the owner's rules for
 // each write (@/core/actions) and the taint checks.
 import type { ModelMessage } from "ai";
-import type { PromptAction, Result, Run } from "@/core/note-actions";
+import type { PromptAction, Result, ActionRun } from "@/core/note-actions";
 import type { Policy, PolicyLookup } from "./tool-policy";
 
 /** A run as the turn is built with it: the owner's action and the note it was pressed on. */
 export type Scope = { action: PromptAction; note: string };
 
 /** The action a request names, from the owner's list; undefined when it is gone (deleted on another device). */
-export const scopeOf = (run: Run, actions: readonly PromptAction[]): Scope | undefined => {
+export const scopeOf = (run: ActionRun, actions: readonly PromptAction[]): Scope | undefined => {
   const action = actions.find((a) => a.id === run.id);
   return action && { action, note: run.note };
 };

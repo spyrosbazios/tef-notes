@@ -10,14 +10,14 @@
 // below; their shape: core/record-links.ts).
 import { SEARCH_PATH, searchHitsOf, type SearchHit } from "../find";
 import type { LensFields } from "../lens";
-import type { LinkPreview } from "../links";
+import type { LinkPreview } from "../hyperlinks";
 import { noteKindOf, type NoteKind } from "../notes";
 import type { Link, LinkEnd } from "../record-links";
 import { Conflict, Gone, Refused, Unavailable, conflictOf, likeLit, type Entry, type Remote, type Listed, type Mark } from "../record-contracts";
 import { attachments as attachmentProtocol, chats as chatProtocol, createdUnder, lenses as lensProtocol, links as linkProtocol, noteCollection, revCollection, tags as tagProtocol, type RecordTransport } from "../record-protocol";
 import type { TagFields, TagMark } from "../tags";
 import { taskOf, type Task } from "../todo";
-import { agentUrl, type Server } from "../urls";
+import { agentUrl, type Server } from "../server-urls";
 import { getJson, HttpError } from "./http";
 
 const PAGE = 500;
@@ -60,11 +60,11 @@ export const list = (s: Server): Promise<Listed[]> => notes(s).list();
 export const get = (s: Server, rec: string): Promise<Remote | null> => notes(s).get(rec);
 export const read = (s: Server, path: string): Promise<Remote | null> => notes(s).read(path);
 
-export type Card = { path: string; kind: NoteKind; title: string; tags: string[]; pinned: boolean; archived: boolean; updated: string };
+type NoteLine = { path: string; kind: NoteKind; title: string; tags: string[]; pinned: boolean; archived: boolean; updated: string };
 
 /** Every note's list line, pinned first then newest edit: the CLI's `ls`. */
-export async function index(s: Server): Promise<Card[]> {
-  const out: Card[] = [];
+export async function index(s: Server): Promise<NoteLine[]> {
+  const out: NoteLine[] = [];
   for (let page = 1; ; page++) {
     const j = await call(s, `collections/notes/records?fields=path,kind,title,tags,pinned,archived,updated&filter=${encodeURIComponent('path ~ "notes/%"')}&sort=-pinned,-updated&perPage=${PAGE}&page=${page}&skipTotal=1`);
     out.push(...j.items.map((r: any) => ({ path: r.path, kind: noteKindOf(r.kind), title: r.title, tags: r.tags ?? [], pinned: r.pinned, archived: !!r.archived, updated: r.updated })));

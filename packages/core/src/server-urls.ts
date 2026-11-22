@@ -1,7 +1,7 @@
 // Where things are on the notes server: its address out of whatever was pasted, and the addresses of a photo, a tile's
 // thumb, a link preview's picture and the agent's routes. Addresses only; the requests are client/pocketbase.ts's (or a
 // client's own transport).
-import type { LinkPreview } from "./links";
+import type { LinkPreview } from "./hyperlinks";
 import type { Photo } from "./photos";
 
 export type Server = { url: string };                      // https://host[:port], no trailing slash
@@ -9,7 +9,7 @@ export type Server = { url: string };                      // https://host[:port
 /** A tile picture's two sizes, PocketBase thumbs (declared on the fields in pb_migrations/1794200000_thumbs.js) and the
  *  agent's PDF pages alike: `blur` a few hundred bytes, shown blurred at once; `sharp` the one that fades in over it. */
 export type ThumbSize = "blur" | "sharp";
-export const THUMB_SIZES: Record<ThumbSize, string> = { blur: "32x32f", sharp: "640x640f" };
+const THUMB_SIZES: Record<ThumbSize, string> = { blur: "32x32f", sharp: "640x640f" };
 
 /** `https://host:port` out of whatever was pasted: a trailing slash, `/_/`, `/api`, a missing scheme. */
 export const serverUrl = (s: string) => {

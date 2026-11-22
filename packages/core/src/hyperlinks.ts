@@ -1,4 +1,4 @@
-// A pasted link gets readable text: the page's own title, fetched once, offered for the user to keep or
+// The URLs in a note's text (not links between records: record-links.ts). A pasted link gets readable text: the page's own title, fetched once, offered for the user to keep or
 // edit. Read-only GETs; nothing about the user is sent but the URL they pasted.
 
 /** What a page says about itself (the server's link-preview route): all strings, empty where the page is silent.

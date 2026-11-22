@@ -6,7 +6,7 @@
 export { appended, fold, MEMORY, newNotePath, noteIdOf, parseNote, serializeNote, withBody, withFlags } from "../../../packages/core/src/notes";
 export { noteColumns } from "../../../packages/core/src/record-contracts";
 export { fileMarkdown, linkPath, pdfName, photoName } from "../../../packages/core/src/photos";
-export { localDay } from "../../../packages/core/src/time";
+export { localDay } from "../../../packages/core/src/days";
 export { bodyFor, titleFor } from "../../../packages/core/src/share";
 export { CLIP_FILES, CLIP_TEXT } from "../../../packages/core/src/clip";
 export { LINK_TYPES, linkColumn, linkProblem } from "../../../packages/core/src/record-links";

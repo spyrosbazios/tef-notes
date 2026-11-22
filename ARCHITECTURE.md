@@ -89,7 +89,7 @@ Body in GitHub-flavored markdown: links, `- [ ]` checkboxes, bullets, tables, co
 - `kind` says what the note is: `note`, the only kind today; a select that grows as kinds are added
   (`server/pb_migrations/1793300000_note_kind.js`). It is set when the note is made and never changes (`notes.pb.js`: a
   create without one is a `note`). It is the only test of what a note is: nothing reads a kind out of a path. Clients get it
-  with every listing (`Listed`, `Remote` in `packages/core/src/record-contracts.ts`, `Card` in `packages/core/src/client/pocketbase.ts`; `noteKindOf`). The removed screenshot
+  with every listing (`Listed`, `Remote` in `packages/core/src/record-contracts.ts`, `NoteLine` in `packages/core/src/client/pocketbase.ts`; `noteKindOf`). The removed screenshot
   captures' `capture` is still in old data and reads as `note`.
 - A `- [ ]` box in a note is only a box, ticked in the note's editor. Tasks are
   records (below), never lines in a note.

@@ -8,8 +8,8 @@ import { activeLens, inheritTags, type Lens } from "@/core/lens";
 import * as pb from "@/core/client/pocketbase";
 import type { Prefs } from "@/core/prefs";
 import { ownerPrefs, patchOwnerPrefs } from "./prefs";
-import { localDay } from "@/core/time";
-import type { Server } from "@/core/urls";
+import { localDay } from "@/core/days";
+import type { Server } from "@/core/server-urls";
 import { NoteService } from "./application/notes";
 import { TaskService } from "./application/todo";
 

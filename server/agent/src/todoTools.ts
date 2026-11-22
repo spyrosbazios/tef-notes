@@ -7,7 +7,7 @@ import { z } from "zod";
 import { taskCardOf, type TaskCard } from "@/core/agent";
 import { views, newTask, type Task, type TaskPatch } from "@/core/todo";
 import { fold, NOTES as NOTE_DIR, parseNote, snippetOf } from "@/core/notes";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { capList, clip } from "./guard";
 import { definedTags, type NoteService } from "./application/notes";
 import { checklistEdit, taskEdit, type Edit, type TagOps, type TaskBatch, type TaskSaved, type TaskService } from "./application/todo";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ASK, choiceFrom, choiceOutput, chosenOf, contextOf, goView, isAskTool, isSelectionTool, isUiTool, LIMITS, SELECTION_TOOL_NAMES, UI_TOOL_NAMES, uiToolsFor, viewFrom } from "../src/assistant";
+import { ASK, choiceFrom, choiceOutput, chosenOf, contextOf, goView, isAskTool, isSelectionTool, isUiTool, CONTEXT_LIMITS, SELECTION_TOOL_NAMES, UI_TOOL_NAMES, uiToolsFor, viewFrom } from "../src/assistant";
 import { label } from "../src/agent";
 
 describe("viewFrom", () => {
@@ -37,11 +37,11 @@ describe("contextOf", () => {
     expect(contextOf({ view: { kind: "notes" }, note: { path: "notes/a.md", rev: 1.5 } })?.note).toEqual({ path: "notes/a.md", title: "" });
   });
   it("bounds every text, and keeps the selection's newlines", () => {
-    const c = contextOf({ view: { kind: "notes" }, selection: `a\nb${"x".repeat(LIMITS.selection)}`, filter: "y".repeat(500), task: { id: "t", title: "z".repeat(500) } })!;
-    expect(c.selection!.length).toBe(LIMITS.selection);
+    const c = contextOf({ view: { kind: "notes" }, selection: `a\nb${"x".repeat(CONTEXT_LIMITS.selection)}`, filter: "y".repeat(500), task: { id: "t", title: "z".repeat(500) } })!;
+    expect(c.selection!.length).toBe(CONTEXT_LIMITS.selection);
     expect(c.selection!.startsWith("a\nb")).toBe(true);
-    expect(c.filter!.length).toBe(LIMITS.filter);
-    expect(c.task!.title.length).toBe(LIMITS.title);
+    expect(c.filter!.length).toBe(CONTEXT_LIMITS.filter);
+    expect(c.task!.title.length).toBe(CONTEXT_LIMITS.title);
   });
 });
 

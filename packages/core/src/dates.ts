@@ -1,6 +1,7 @@
 // Days for the task views: their arithmetic (addDays, addMonths, a repeat's nextOccurrence), what "fri", "in 3d" or
 // "nov 12" mean (parseWhen), and how a stored day reads back (dayLabel, dayParts, everyLabel). Pure and local-day:
-// `today` is the caller's `YYYY-MM-DD` (localDay()), never read here.
+// `today` is the caller's `YYYY-MM-DD` (days.ts localDay), never read here.
+import { WEEKDAYS, weekdayOf } from "./days";
 
 /** `1d 2w 1m 1y` (fixed: from the scheduled date), `+3d` (from the day it was done), `mon,thu` (those weekdays). A monthly
  *  or yearly one may end `@29`, `@30` or `@31`: the day of the month it is meant for, kept once a short month clamped it
@@ -59,16 +60,17 @@ export function everyAt(every: Every, base: string): Every {
   return clamped ? every : core;
 }
 
-const DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+/** A repeat's weekdays as they are stored: `mon` … `sun`. */
+const REPEAT_DAYS = WEEKDAYS.map((w) => w.slice(0, 3));
 
 /** The next day a repeating task falls on, done `today`. Fixed (`1w`, `mon,thu`): the schedule's next day after both
  *  `base` (its scheduled day) and today, so a late tick never leaves a backlog. `+3d`: three days after today. */
 export function nextOccurrence(every: Every, base: string, today: string): string {
   if (every.startsWith("+")) return step(today, every.slice(1), dayOf(today));
   if (/^[a-z]/.test(every)) {
-    const days = new Set(every.split(",").map((d) => DAY_NAMES.indexOf(d)));
+    const days = new Set(every.split(",").map((d) => REPEAT_DAYS.indexOf(d)));
     let d = addDays(base > today ? base : today, 1);
-    while (!days.has(new Date(ms(d)).getUTCDay())) d = addDays(d, 1);
+    while (!days.has(weekdayOf(d))) d = addDays(d, 1);
     return d;
   }
   const { core, anchor } = everyParts(every), a = anchor ?? dayOf(base);
@@ -82,11 +84,9 @@ export function nextOccurrence(every: Every, base: string, today: string): strin
 /** What a When choice sets: a day, This Evening or not. Fits setTaskMeta/addTask's patch. */
 export type Schedule = { when: string; evening: boolean };
 
-const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-const dow = (day: string) => new Date(`${day}T00:00:00Z`).getUTCDay();
 const short = (day: string) => `${cap(MONTHS[+day.slice(5, 7) - 1]).slice(0, 3)} ${+day.slice(8, 10)}`;
 
 /** `y-m-d` when it is a real day (Feb 30 is not), else null. */
@@ -96,11 +96,11 @@ function make(y: number, m0: number, d: number): string | null {
 }
 
 /** The index of the name `w` starts (three letters at least: `sep`, `sept`, `tues`), else -1. */
-const nameIn = (names: string[], w: string) => (w.length >= 3 ? names.findIndex((n) => n.startsWith(w)) : -1);
+const nameIn = (names: readonly string[], w: string) => (w.length >= 3 ? names.findIndex((n) => n.startsWith(w)) : -1);
 
-/** The next `weekday` strictly after `today`. */
+/** The next `weekday` (0 Monday … 6 Sunday) strictly after `today`. */
 function nextWeekday(weekday: number, today: string): string {
-  const gap = (weekday - dow(today) + 7) % 7;
+  const gap = (weekday - weekdayOf(today) + 7) % 7;
   return addDays(today, gap === 0 ? 7 : gap);
 }
 
@@ -135,7 +135,7 @@ export function parseWhen(input: string, today: string): Schedule | null {
     const n = COUNT[rel[1]] ?? +rel[1], unit = rel[2][0];
     return at(unit === "d" ? addDays(today, n) : unit === "w" ? addDays(today, 7 * n) : addMonths(today, unit === "m" ? n : 12 * n));
   }
-  if (s === "next week") return at(nextWeekday(1, today));
+  if (s === "next week") return at(nextWeekday(0, today));
   if (s === "next month") return at(addMonths(today, 1));
 
   const wd = /^(?:(?:next|on|this)\s+)?([a-z]+)$/.exec(s);
@@ -154,7 +154,7 @@ export function dayLabel(day: string, today: string): string {
   if (day === today) return "Today";
   if (day === addDays(today, 1)) return "Tomorrow";
   if (day === addDays(today, -1)) return "Yesterday";
-  if (day > today && day < addDays(today, 7)) return cap(WEEKDAYS[dow(day)]);
+  if (day > today && day < addDays(today, 7)) return cap(WEEKDAYS[weekdayOf(day)]);
   return day.slice(0, 4) === today.slice(0, 4) ? short(day) : `${short(day)} ${day.slice(0, 4)}`;
 }
 
@@ -166,7 +166,7 @@ export function whenLabel(s: { when?: string | null; evening?: boolean }, today:
 
 /** A day as a group heading in Upcoming: its label and what goes beside it (the date for a weekday, the weekday for a date). */
 export function dayParts(day: string, today: string): { label: string; detail: string } {
-  const label = dayLabel(day, today), name = cap(WEEKDAYS[dow(day)]);
+  const label = dayLabel(day, today), name = cap(WEEKDAYS[weekdayOf(day)]);
   return label === name || label === "Tomorrow" ? { label, detail: short(day) } : { label, detail: name };
 }
 

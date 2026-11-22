@@ -4,12 +4,12 @@
 // drawn here as an SVG in the app's theme. Their usage policies ask for an identifying User-Agent, light use and the
 // tiles credited; the tiles are cached in memory, the picture by the browser.
 //
-//   GET /agent/places/suggest?q=&lang=                   200 Suggestions (each a whole place: no second request)
+//   GET /agent/places/suggest?q=&lang=                   200 PlaceSuggestions (each a whole place: no second request)
 //   GET /agent/places/place?id=&lang=                     200 Place (`id`: N123, W123 or R123)
 //   GET /agent/places/map?lat=&lng=&w=&h=&theme=&accent=  200 image/svg+xml
 // 400 a malformed request, 502 the service refused or didn't answer.
 import { getJson } from "@/core/client/http";
-import { MAP_MAX, OSM_ID, placeOf, type Place, type Suggestion } from "@/core/places";
+import { MAP_MAX, OSM_ID, placeOf, type Place, type PlaceSuggestion, type PlaceSuggestions } from "@/core/places";
 import { ACCENT_NAMES, accentColor, DEFAULT_THEME, THEME_NAMES, THEMES, type AccentName, type Palette, type ThemeName } from "@/core/theme";
 
 const PHOTON = "https://photon.komoot.io/api/";
@@ -67,7 +67,7 @@ async function photon(q: string, limit: number, l: string | undefined, signal?: 
   return placesFrom(await ask(u, "OpenStreetMap search", signal));
 }
 
-export async function suggest(input: string, o: { lang?: string } = {}, signal?: AbortSignal): Promise<Suggestion[]> {
+export async function suggest(input: string, o: { lang?: string } = {}, signal?: AbortSignal): Promise<PlaceSuggestion[]> {
   return (await photon(input, SUGGESTED, o.lang, signal)).map((p) => ({ ...p, detail: p.address ?? "" }));
 }
 
@@ -165,7 +165,7 @@ const failed = (e: unknown) => fail(e instanceof PlacesError ? 502 : 500, (e as 
 export async function suggestRoute(req: Request): Promise<Response> {
   const p = new URL(req.url).searchParams, q = (p.get("q") ?? "").trim();
   if (!q || q.length > 200) return fail(400, "Type a place to look for.");
-  try { return Response.json({ suggestions: await suggest(q, { lang: lang(p.get("lang")) }, req.signal) }); }
+  try { return Response.json({ suggestions: await suggest(q, { lang: lang(p.get("lang")) }, req.signal) } satisfies PlaceSuggestions); }
   catch (e) { return failed(e); }
 }
 

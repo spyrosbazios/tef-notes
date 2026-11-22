@@ -6,7 +6,7 @@
 import type { Experimental_Steering as Steering, UIMessage } from "ai";
 import * as pb from "@/core/client/pocketbase";
 import { chatTitle } from "@/core/share";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import type { AgentMessage } from "./turn";
 
 /** What the history calls a chat: its first user message, as the phone named it. */

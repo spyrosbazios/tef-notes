@@ -9,7 +9,7 @@ import { noteReadOf } from "@/core/note-read";
 import { appendToNote, COLORS, isNotePath, MEMORY, NOTES, parseNote, serializeNote, snippetOf, withBody, withFlags } from "@/core/notes";
 import { cardLines, withSummaries } from "@/core/link-summary";
 import * as pb from "@/core/client/pocketbase";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { definedTags, type Meta, type NoteSaved, type NoteService } from "./application/notes";
 import { capList, clip } from "./guard";
 import { imageData, imagesOf, imageType } from "./images";

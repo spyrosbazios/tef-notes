@@ -9,13 +9,13 @@
 export type Place = { name: string; address?: string; lat?: number; lng?: number; place_id?: string };
 
 /** One suggestion while typing: the place itself, and the line shown under its name. */
-export type Suggestion = Place & { detail: string };
+export type PlaceSuggestion = Place & { detail: string };
 
 /** An OpenStreetMap id: a node, a way or a relation. */
 export const OSM_ID = /^[NWR]\d{1,15}$/;
 
 /** The answer of `places/suggest`. */
-export type Suggestions = { suggestions: Suggestion[] };
+export type PlaceSuggestions = { suggestions: PlaceSuggestion[] };
 
 /** The longest a name or an address may be in a note: a frontmatter line, not a paragraph. */
 const MAX = 200;
@@ -37,7 +37,7 @@ export function placeOf(x: unknown): Place | null {
 }
 
 /** The suggest route's answer, defensively: malformed rows dropped. */
-export function suggestionsOf(x: unknown): Suggestion[] {
+export function suggestionsOf(x: unknown): PlaceSuggestion[] {
   const list = x && typeof x === "object" ? (x as Record<string, unknown>).suggestions : null;
   if (!Array.isArray(list)) return [];
   return list.flatMap((s) => {

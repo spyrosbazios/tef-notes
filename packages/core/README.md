@@ -9,13 +9,13 @@ TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECT
 
 | Files | Hold |
 |---|---|
-| `notes.ts`, `note-groups.ts`, `links.ts`, `photos.ts`, `task-notes.ts` | The note file format (parse, serialize, ids, paths), 3-way merge, grouping, pasted links' titles and photos |
+| `notes.ts`, `note-groups.ts`, `hyperlinks.ts`, `photos.ts`, `task-notes.ts` | The note file format (parse, serialize, ids, paths), 3-way merge, grouping, the URLs in a note (a pasted link's title, its preview) and photos |
 | `record-links.ts` | Links between records (`links`): types, wire columns, a task's notes, a note's backlinks |
-| `todo.ts`, `things.ts`, `bulk.ts`, `dates.ts`, `time.ts` | Tasks: types, patches, ticking and repeats, the field-level merge, the smart views |
+| `todo.ts`, `things.ts`, `bulk.ts`, `dates.ts`, `days.ts` | Tasks: types, patches, ticking and repeats, the field-level merge, the smart views and the task lists; days: their arithmetic and words (`dates.ts`), a day as a Date (local noon), the weekdays and how long ago (`days.ts`) |
 | `record-contracts.ts` | Pure record types, conflict classification, filter literals and the columns derived from note text |
 | `record-protocol.ts` | Every collection's requests (notes, tasks, links, lenses, tags and their routes, attachments, chats), pagination and idempotency over an injected transport; no I/O of its own |
 | `tags.ts` | Tag definitions' shapes, a note's tags, a search box's `#tag`s and the debounced guess for a draft task |
-| `urls.ts` | The server's address and where a photo, a thumb, a preview's picture and the agent's routes are |
+| `server-urls.ts` | The server's address and where a photo, a thumb, a preview's picture and the agent's routes are |
 | `client/` (`pocketbase.ts`, `http.ts`, `tags.ts`, `import.ts`) | The fetch client (the CLI, the agent): the core's one I/O. Nothing outside `client/` loads it (`scripts/check-boundaries.ts`) |
 | `assistant.ts` | The always-on assistant's contract: the page context a client sends with each message, and the UI tools (`open_note`, `open_task`, `go_view`) the client does itself |
 | `chat-history.ts` | Versioned chat persistence, legacy reading and opaque historical parts; independent of SDK tool schemas |

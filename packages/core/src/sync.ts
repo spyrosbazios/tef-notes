@@ -24,6 +24,7 @@
 // the row (`refused`, its reason): it is not sent again until it is edited or the owner asks (`retryRefused`, `discardRefused`).
 // A note written with text the owner didn't write (a model's summary) carries the `tainted` mark (`Mark`) on the row until a
 // push has sent it; the server never takes the mark off (server/pb_hooks/tainted.pb.js), so it is sent once.
+import { dayDate } from "./days";
 import { Conflict, Gone, Refused, Unavailable, type Entry, type Listed, type Mark, type Remote, type Versioned } from "./record-contracts";
 import { isNotePath, newNotePath, parseNote, reconcile, type NoteKind } from "./notes";
 import { newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "./record-links";
@@ -59,7 +60,7 @@ export type Store = { notes: Table<NoteRow>; tasks: Table<TaskRow>; links: Table
 
 /** A note as fetched; `at`: the server's last change to it in ms, when the transport knows it (the phone orders a first pull by the
  *  note's `created` day instead). It is the row's `updated` when the note is first seen or taken, so the list's order is the server's. */
-export type Fetched = Remote & { at?: number };
+type Fetched = Remote & { at?: number };
 
 /** What the engine asks of the server, the core client's calls (`client/pocketbase.ts`) with the server bound (the web wraps its axios services
  *  the same way). Every call rejects with a typed outcome of record-contracts (record-protocol maps PocketBase's answers to
@@ -94,7 +95,7 @@ export type Transport = {
 export const tick = (n?: { updated: number } | null) => Math.max(Date.now(), (n?.updated ?? 0) + 1);
 
 /** `n` at a time, in order. */
-export async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
+async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]!); }));
 }
@@ -111,9 +112,9 @@ export function patch<R>(t: Table<R>, key: string, p: Partial<R>): R | undefined
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Whether a note has edits not sent. */
-export const unsent = (n: NoteRow) => n.updated !== n.pushed;
+const unsent = (n: NoteRow) => n.updated !== n.pushed;
 /** Whether a task has edits not sent. */
-export const taskUnsent = (r: TaskRow) => r.updated !== r.pushed;
+const taskUnsent = (r: TaskRow) => r.updated !== r.pushed;
 
 // ---- one sync at a time
 
@@ -149,10 +150,10 @@ export type Run = {
 
 const unreachable = (e: unknown) => e instanceof Unavailable;
 
-/** Local midnight of the note's `created`, so a first pull lists notes by age, not all at "now". */
+/** The note's `created` day (days.ts dayDate), so a first pull lists notes by age, not all at "now". */
 function createdAt(path: string, text: string) {
-  const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(parseNote(path, text).created);
-  const t = d ? new Date(+d[1]!, +d[2]! - 1, +d[3]!).getTime() : NaN;
+  const d = /^\d{4}-\d{2}-\d{2}/.exec(parseNote(path, text).created);
+  const t = d ? dayDate(d[0]).getTime() : NaN;
   return t > 0 && t < Date.now() ? t : Date.now();
 }
 

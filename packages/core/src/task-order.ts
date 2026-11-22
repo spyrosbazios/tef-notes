@@ -1,7 +1,7 @@
 // Dragging a task to a new place in a list, as writes to `order` (todo.ts): the list's own `order` values dealt
 // out again, in the new sequence, so a task outside the list keeps its place relative to the list as a whole and only
 // the tasks that actually moved are written. Values stay whole and strictly rising, whatever ties the list held.
-export type Ordered = { id: string; order: number };
+type Ordered = { id: string; order: number };
 
 /** `list` as shown (by `order`); the one at `from` dropped at `to`. The `{ id, order }` to write; none when it didn't move. */
 export function reorder(list: Ordered[], from: number, to: number): Ordered[] {

@@ -8,7 +8,8 @@
 import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { addDays, daysBetween } from "@/core/dates";
-import { dayDate, dayRange, plannedByDay, shadeOf, WEEKDAYS } from "@/core/planner";
+import { dayDate, WEEKDAY_HEADS, weekdayOf } from "@/core/days";
+import { dayRange, plannedByDay, shadeOf } from "@/core/planner";
 import { useLongPress } from "@/hooks/long-press";
 import { calm } from "@/hooks/media";
 import { useLensTasks } from "@/hooks/todo";
@@ -35,7 +36,7 @@ const Day = memo(function Day({ day, n, near, today, picked, onPick, onAdd }: {
       <button type="button" {...press} disabled={past} onClick={() => onPick(day)} aria-current={picked ? "date" : undefined}
         aria-label={`${dayDate(day).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}, ${n} planned`}
         className={cn("flex size-full flex-col items-center justify-center rounded-[10px] select-none active:opacity-70", SHADE[shadeOf(n)], n >= 3 ? "text-primary-foreground" : on ? "text-brand" : "text-dim")}>
-        <span className="text-[11px] leading-none font-medium opacity-80">{WEEKDAYS[(dayDate(day).getDay() + 6) % 7]}</span>
+        <span className="text-[11px] leading-none font-medium opacity-80">{WEEKDAY_HEADS[weekdayOf(day)]}</span>
         <span className={cn("text-[17px] leading-tight tabular-nums", on ? "font-bold" : "font-medium")}>{Number(day.slice(8))}</span>
       </button>
     </div>

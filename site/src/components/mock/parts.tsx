@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Color } from "@/core/notes";
-import { WEEKDAYS } from "@/core/planner";
+import { WEEKDAY_HEADS } from "@/core/days";
 import { cn } from "@/lib";
 import { Brand, Mark } from "../ui";
 
@@ -263,7 +263,7 @@ export function Planner() {
         <span className="flex size-8 items-center justify-center text-dim"><ChevronRight className="size-4" /></span>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-7 gap-1.5" style={{ gridTemplateRows: "auto repeat(6, minmax(0, 1fr))" }}>
-        {WEEKDAYS.map((w) => <span key={w} className="pb-0.5 text-center text-[11px] font-medium text-faint">{w}</span>)}
+        {WEEKDAY_HEADS.map((w) => <span key={w} className="pb-0.5 text-center text-[11px] font-medium text-faint">{w}</span>)}
         {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
         {Array.from({ length: 30 }, (_, i) => {
           const d = i + 1;

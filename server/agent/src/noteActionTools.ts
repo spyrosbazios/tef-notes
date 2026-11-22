@@ -5,8 +5,8 @@
 // the owner's to arrange.
 import { tool } from "ai";
 import { z } from "zod";
-import { ACTION_ICONS, LIMITS, newActionId, promptProblem, RESULTS, type PromptAction } from "@/core/note-actions";
-import type { Server } from "@/core/urls";
+import { ACTION_ICONS, ACTION_LIMITS, newActionId, promptProblem, RESULTS, type PromptAction } from "@/core/note-actions";
+import type { Server } from "@/core/server-urls";
 import { ownerPrefs, patchOwnerPrefs } from "./prefs";
 import { toolModule } from "./tool-policy";
 
@@ -18,7 +18,7 @@ function problem(i: SaveInput, noteActions: readonly PromptAction[]): string | n
   const bad = promptProblem(i);
   if (bad) return bad;
   if (i.id && !noteActions.some((a) => a.id === i.id)) return `No note action ${i.id}. Take the id from list_note_actions, or leave it out to add a new one.`;
-  if (!i.id && noteActions.length >= LIMITS.actions) return `There are ${LIMITS.actions} note actions already, the most there can be. Change one, or the owner deletes one in Settings.`;
+  if (!i.id && noteActions.length >= ACTION_LIMITS.actions) return `There are ${ACTION_LIMITS.actions} note actions already, the most there can be. Change one, or the owner deletes one in Settings.`;
   return null;
 }
 
@@ -41,8 +41,8 @@ export const noteActionModule = toolModule(({ notes: { server } }) => ({
     description: "Save a note action: a button on every note that runs this prompt on the open note. Only when the owner asks for such a button or shortcut; list_note_actions first. Without `id` it adds one, with an `id` it changes that one. The owner sees it and must confirm.",
     inputSchema: z.object({
       id: z.string().optional().describe("An existing action's id, to change it; omit to add a new one"),
-      label: z.string().trim().min(1).max(LIMITS.label).describe("The button's name, two or three words: \"Summarise\", \"Checklist it\""),
-      prompt: z.string().trim().min(1).max(LIMITS.prompt).describe("The instruction run on the open note, written to the assistant and about \"this note\", with the limits the owner gave (\"invent nothing\")"),
+      label: z.string().trim().min(1).max(ACTION_LIMITS.label).describe("The button's name, two or three words: \"Summarise\", \"Checklist it\""),
+      prompt: z.string().trim().min(1).max(ACTION_LIMITS.prompt).describe("The instruction run on the open note, written to the assistant and about \"this note\", with the limits the owner gave (\"invent nothing\")"),
       result: z.enum(RESULTS).describe("What it does: edit rewrites this note (shown as a diff first), task makes a task from it, answer only replies"),
       icon: z.enum(ACTION_ICONS).optional().describe("The button's icon"),
     }),

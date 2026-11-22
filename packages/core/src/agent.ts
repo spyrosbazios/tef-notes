@@ -23,7 +23,7 @@ export function pickModel(models: AgentModels | undefined, chosen: string | null
  *  the step limit still holds). */
 export const EFFORTS = ["quick", "normal", "deep"] as const;
 export type Effort = (typeof EFFORTS)[number];
-export const DEFAULT_EFFORT: Effort = "normal";
+const DEFAULT_EFFORT: Effort = "normal";
 
 export const EFFORT: Record<Effort, { steps: number; reasoning: "minimal" | "low" | "high"; about: string }> = {
   quick: { steps: 6, reasoning: "minimal", about: "Short answers, a few lookups" },
@@ -209,7 +209,7 @@ export type WriteInput = {
 };
 
 /** One task of add_tasks, as its card line says it: its title, then what it sets (dates, boxes) in brackets. */
-export type TaskInput = {
+type TaskInput = {
   title: string; notes?: string; checklist?: string[]; tags?: string[];
   when?: string; evening?: boolean; due?: string; every?: string; remind?: string;
 };
@@ -248,7 +248,7 @@ export function diffLines(a: string[], b: string[]): Line[] {
     ...B.slice(j).map((text) => ({ op: "+" as const, text })), ...same(a.slice(a.length - q))];
 }
 
-export type Row = { l: Line } | { fold: number };
+type Row = { l: Line } | { fold: number };
 
 /** The lines as rows: the changes with `context` unchanged lines around each, every longer unchanged run folded to a count. */
 export function rowsOf(lines: Line[], context: number, all: boolean): Row[] {

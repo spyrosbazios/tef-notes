@@ -44,7 +44,7 @@ export function cutOf(pcm: Float32Array): number {
 /** The pieces' texts as one: in order, the empty ones dropped. */
 export const joined = (texts: string[]) => texts.map((t) => t.trim()).filter(Boolean).join(" ");
 
-export type Transcript = { text: string };
+type Transcript = { text: string };
 
 /** The server's answer as a Transcript: its text trimmed, "" when it heard nothing. */
 export function transcriptOf(x: unknown): Transcript {

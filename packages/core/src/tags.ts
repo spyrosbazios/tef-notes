@@ -48,7 +48,7 @@ export function liveTags(tags: string[], before: string[], guessed: string[], di
   return [...hand, ...guessed.filter((g) => !hand.some((h) => same(h, g)) && !dismissed.some((d) => same(d, g)))];
 }
 
-export type Guess = (draft: { title: string; notes: string }, signal: AbortSignal) => Promise<string[]>;
+type Guess = (draft: { title: string; notes: string }, signal: AbortSignal) => Promise<string[]>;
 
 /** A debounced guesser for one form, over `guess` (the phone's is guessTags, the web app's its own transport):
  *  `update(title, notes)` on every keystroke asks GUESS_DELAY after the last one, skips a draft already asked about or

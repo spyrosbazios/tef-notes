@@ -2,7 +2,7 @@
 // held, from holding them to letting them go.
 import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { LIMITS } from "@/core/assistant";
+import { CONTEXT_LIMITS } from "@/core/assistant";
 import type { Editor, Held } from "@/editor";
 import { useTransientChat, type TransientSession } from "@/hooks/transient-chat";
 import { asking } from "@/lib/ask";
@@ -21,9 +21,9 @@ export function useAskSession(editor: Editor) {
   const start = useCallback(() => {
     const held = editor.hold();
     if (!held) return false;
-    if (held.markdown().length > LIMITS.selection) {
+    if (held.markdown().length > CONTEXT_LIMITS.selection) {
       held.release();
-      toast.error(`Select less to ask about it: up to ${LIMITS.selection.toLocaleString()} characters.`);
+      toast.error(`Select less to ask about it: up to ${CONTEXT_LIMITS.selection.toLocaleString()} characters.`);
       return false;
     }
     open(held);

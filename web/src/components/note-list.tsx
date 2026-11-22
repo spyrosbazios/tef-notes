@@ -16,7 +16,7 @@ import { NOTE_SORT_LABEL, NOTE_SORTS, sortNotes, type NoteSort } from "@/core/no
 import { previewOf } from "@/core/agent";
 import { fold } from "@/core/notes";
 import { matchesTags } from "@/core/tags";
-import { ago } from "@/core/time";
+import { ago } from "@/core/days";
 import { BulkBar, DeleteDialog, TagsDialog, TileMenu } from "@/components/note-actions";
 import { NoteGroup } from "@/components/note-groups";
 import { Loaded } from "@/components/loaded";

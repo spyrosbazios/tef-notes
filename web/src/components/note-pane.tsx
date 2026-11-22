@@ -20,7 +20,7 @@ import { Turns } from "@/components/swap";
 import { archivePatch } from "@/core/bulk";
 import { UNTITLED, pastedNote, type FlagEdit } from "@/core/notes";
 import { applyTags } from "@/core/tags";
-import { ago } from "@/core/time";
+import { ago } from "@/core/days";
 import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
 import { SelectionBar } from "@/components/selection-bar";
 import { TagEditor } from "@/components/tag-editor";

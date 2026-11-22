@@ -3,7 +3,7 @@
 // whose own button sits below it, so a URL never gets two. The button is a widget decoration, not part of the document:
 // the markdown, the cursor and a copy are untouched by it.
 import type { Mark, Node } from "prosemirror-model";
-import { hostOf } from "@/core/links";
+import { hostOf } from "@/core/hyperlinks";
 import { Decoration } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import { blockDecorations, eachTextblock } from "./incremental";

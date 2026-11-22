@@ -9,7 +9,7 @@ import * as pb from "@/core/client/pocketbase";
 import type { Mark, Entry } from "@/core/record-contracts";
 import type { TagDef, TagFields, TagMark } from "@/core/tags";
 import type { Task } from "@/core/todo";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 
 /** What the environment says every write carries. */
 export const markOf = (env: Record<string, string | undefined>): Mark => (env.TEF_NOTES_AGENT === "1" ? { tainted: true } : {});

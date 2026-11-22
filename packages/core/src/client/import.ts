@@ -5,7 +5,7 @@ import { importPlan } from "../handoff";
 import { noteIdOf } from "../notes";
 import * as pb from "./pocketbase";
 import { Conflict, type Mark } from "../record-contracts";
-import type { Server } from "../urls";
+import type { Server } from "../server-urls";
 
 /** The files to import: every path, relative with `/`, and how to read one. */
 export type Source = { paths: string[]; text: (path: string) => Promise<string>; blob: (path: string) => Promise<Blob> };

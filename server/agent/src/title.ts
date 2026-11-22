@@ -10,7 +10,7 @@ import { z } from "zod";
 import { isPdf } from "@/core/photos";
 import * as pb from "@/core/client/pocketbase";
 import { cleanTitle, TITLE_MAX } from "@/core/share";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { imageData, imageType } from "./images";
 import { DEFAULT, model, sees } from "./models";
 import { pages, readNow } from "./pdfs";

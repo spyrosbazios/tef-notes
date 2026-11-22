@@ -6,7 +6,7 @@ import { COMPANION_CONTRACT, DEFAULT_LOOK, type Hello, type NotesFeed, type Task
 import { serializeNote } from "@/core/notes";
 import { DEFAULT_PREFS } from "@/core/prefs";
 import { ACCENTS, THEMES } from "@/core/theme";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { newTask, type Task } from "@/core/todo";
 import { addTaskRoute, helloRoute, lensRoute, notesRoute, tasksRoute, tickRoute } from "../src/companion";
 import { fakePb } from "./fake-pb";

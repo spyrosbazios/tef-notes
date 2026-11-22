@@ -9,14 +9,14 @@
 // sent at and its JPEG qualities (photos.ts `storedSize`, `lookSize`, `QUALITY`, `LOOK_QUALITY`), how many files a clip takes and how
 // large a PDF (clip.ts `CLIP_FILES`, photos.ts `MAX_PDF`), the choices a clip offers, its tags and what its save says (clip.ts
 // `filesWord`, `choices`, `unpickedTags`, `describe`, `summaryNotice`; the tags a save sends are the owner's picks, and the server adds the lens's), the contract number (`COMPANION_CONTRACT`), the task
-// lists and their names (prefs.ts `TASK_LISTS`), the server's address as typed (no core copy: held to the URL standard's origin), and
+// lists and their names (prefs.ts `OPENING_LISTS`, their names things.ts `TASK_LIST_LABEL`), the server's address as typed (no core copy: held to the URL standard's origin), and
 // the feed a widget shows from a tick until the server has it (held to `tasksFeed` of the tasks without it). They run before the
 // server is reached, or beside its answer. test/companion-cases.json holds the cases; this core's tests and each companion's run the
 // same file.
 //
 // Routes, all under /agent/companion (server/agent/src/companion.ts), errors `{error}`:
 //   GET  hello                 -> Hello: is this a TEF Notes server, at which contract, in which colours
-//   GET  tasks?list=           -> TasksFeed: one of the task lists (TASK_LISTS), under the lens on
+//   GET  tasks?list=           -> TasksFeed: one of the task lists (OPENING_LISTS), under the lens on
 //   POST tasks  {id, title, list?} -> {id}: a new open task under the companion's own `id` (a record id's shape, made once and
 //        kept for every send of it: a repeat is the same task, never a second); in `today`: planned for today; tagged as the lens tags one
 //   POST tasks/:id/done        -> {ok: true}: ticked, a repeating one rolled over (404 when it is gone)
@@ -27,7 +27,8 @@ import type { ClipPage } from "./clip";
 import { dayLabel, dayParts } from "./dates";
 import { inLens, lensAccent, lensTheme, type Lens } from "./lens";
 import { isNotePath, parseNote, snippetOf } from "./notes";
-import { DEFAULT_PREFS, TASK_LISTS, TASK_LIST_LABEL, type Prefs, type TaskList } from "./prefs";
+import { DEFAULT_PREFS, OPENING_LISTS, type OpeningList, type Prefs } from "./prefs";
+import { TASK_LIST_LABEL } from "./things";
 import { taskUrl } from "./push";
 import { THEMES, withAccent, type Palette, type Theme } from "./theme";
 import { PDF } from "./photos";
@@ -39,14 +40,14 @@ import { views, type Task } from "./todo";
 export const COMPANION_CONTRACT = 4;
 
 /** The app's name in `Hello`: what tells a companion the address it was given is a TEF Notes server. */
-export const COMPANION_APP = "tefnotes";
+const COMPANION_APP = "tefnotes";
 
 // ---- the look
 
 /** The owner's colours: the palette of their theme with their accent, or the lens's when one is on (#rrggbb each), and
  *  the three washes a companion's own sheets are drawn with (theme.ts's tints, as #rrggbbaa): `muted` a quiet fill,
  *  `soft` the brand's wash under something chosen, `scrim` what dims the screen under a sheet. */
-export type Look = Palette & { scheme: Theme["scheme"]; muted: string; soft: string; scrim: string };
+type Look = Palette & { scheme: Theme["scheme"]; muted: string; soft: string; scrim: string };
 
 /** `rgba(r, g, b, a)`, as theme.ts writes a tint, as #rrggbbaa: a form every platform reads. */
 export function hex8(rgba: string): string {
@@ -55,7 +56,7 @@ export function hex8(rgba: string): string {
   return `#${[+m[1], +m[2], +m[3], Math.round(+m[4] * 255)].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export const lookOf = (t: Theme): Look =>
+const lookOf = (t: Theme): Look =>
   ({ scheme: t.scheme, ...t.C, muted: hex8(t.TINT.muted), soft: hex8(t.TINT["brand-soft"]), scrim: hex8(t.TINT.scrim) });
 
 /** The look the web app has now: the lens's theme and accent over the owner's own. */
@@ -74,17 +75,17 @@ export const helloOf = (prefs: Prefs, lens: Lens | null): Hello =>
 // ---- what every feed carries
 
 /** A lens to turn on from a widget. `id`: its record, "" for none. `on`: the one on now. */
-export type LensChoice = { id: string; name: string; on: boolean };
+type LensChoice = { id: string; name: string; on: boolean };
 
 /** What a widget's heading offers beside its rows. `lenses`: the choices, none first; empty when no lens is defined, and
  *  then there is nothing to switch. `ask`: where the web app opens with the assistant ready for a message. */
-export type Switches = { lenses: LensChoice[]; ask: string };
+type Switches = { lenses: LensChoice[]; ask: string };
 
 /** No lens, as the web app's own switcher names it (web/src/components/lens-switcher.tsx). */
-export const NO_LENS = "No lens";
+const NO_LENS = "No lens";
 
 /** The web app with the assistant open (web/src/lib/route-search.ts `shellSearch`). */
-export const ASK_URL = "/?ask=1";
+const ASK_URL = "/?ask=1";
 
 export const switchesOf = (lenses: readonly Lens[], on: Lens | null): Switches => ({
   lenses: lenses.length ? [{ id: "", name: NO_LENS, on: !on }, ...lenses.map((l) => ({ id: l.rec, name: l.name, on: l.rec === on?.rec }))] : [],
@@ -101,23 +102,23 @@ export function lensPickOf(raw: unknown): string | null {
 
 /** A task's row. `detail`: the line under its title (its hour, when it is due, its checklist's count), "" when there is
  *  nothing to say. `late`: due before today. `url`: where the web app opens it. */
-export type FeedTask = { id: string; title: string; detail: string; late: boolean; url: string };
-export type TaskSection = { label: string; tasks: FeedTask[] };
+type FeedTask = { id: string; title: string; detail: string; late: boolean; url: string };
+type TaskSection = { label: string; tasks: FeedTask[] };
 
 /** One task list. `title`: its heading, the lens on named beside it. `sections`: Today's tasks then This Evening's; the
  *  Inbox whole; Upcoming a section a day. A section with no `label` has no heading. `more`: the tasks past
  *  `FEED_LIMITS.tasks`. */
-export type TasksFeed = Switches & { contract: number; list: TaskList; title: string; url: string; sections: TaskSection[]; more: number; look: Look };
+export type TasksFeed = Switches & { contract: number; list: OpeningList; title: string; url: string; sections: TaskSection[]; more: number; look: Look };
 
 /** A feed's heading: what it lists, and the lens it is seen through. */
 const heading = (what: string, lens: Lens | null) => (lens ? `${what} · ${lens.name}` : what);
 
 export const FEED_LIMITS = { tasks: 40, notes: 20, peek: 140 } as const;
 
-export const taskListOf = (v: unknown): TaskList => TASK_LISTS.find((l) => l === v) ?? "today";
+export const taskListOf = (v: unknown): OpeningList => OPENING_LISTS.find((l) => l === v) ?? "today";
 
 /** Where the web app shows a list (web/src/routes/_app/). */
-export const listUrl = (list: TaskList) => `/${list}`;
+const listUrl = (list: OpeningList) => `/${list}`;
 
 const feedTask = (t: Task, today: string): FeedTask => {
   const count = progress(t);
@@ -130,7 +131,7 @@ const feedTask = (t: Task, today: string): FeedTask => {
 };
 
 /** `list` as a feed: the web app's own lists (todo.ts `views`) under `lens`, cut to the limit from the top. */
-export function tasksFeed(tasks: readonly Task[], list: TaskList, today: string, lenses: readonly Lens[], lens: Lens | null, look: Look): TasksFeed {
+export function tasksFeed(tasks: readonly Task[], list: OpeningList, today: string, lenses: readonly Lens[], lens: Lens | null, look: Look): TasksFeed {
   const v = views(tasks.filter((t) => inLens(lens, t)), today);
   const groups: { label: string; tasks: Task[] }[] =
     list === "today" ? [{ label: "", tasks: v.today }, { label: "This Evening", tasks: v.evening }]
@@ -149,9 +150,9 @@ export function tasksFeed(tasks: readonly Task[], list: TaskList, today: string,
 
 /** A new task from a companion: the `id` it made for it (15 of a-z0-9, kept across re-sends), its title, and the list it was
  *  added from (`today` plans it for today). */
-export type NewTask = { id: string; title: string; list: TaskList };
+type NewTask = { id: string; title: string; list: OpeningList };
 
-export const TASK_TITLE_MAX = 500;
+const TASK_TITLE_MAX = 500;
 
 /** The body of `POST tasks`, read defensively; null without a title or a record id's worth of `id`. */
 export function newTaskOf(raw: unknown): NewTask | null {
@@ -164,17 +165,17 @@ export function newTaskOf(raw: unknown): NewTask | null {
 // ---- notes
 
 /** A note's row. `peek`: the opening of its body as plain text. `color`: its own, when it has one, in the look's theme. */
-export type FeedNote = { id: string; title: string; peek: string; pinned: boolean; url: string; color?: { bg: string; fg: string; line: string } };
+type FeedNote = { id: string; title: string; peek: string; pinned: boolean; url: string; color?: { bg: string; fg: string; line: string } };
 export type NotesFeed = Switches & { contract: number; title: string; url: string; notes: FeedNote[]; more: number; look: Look };
 
 /** What a note's row is made from: the record's columns (server/agent/src/notes.ts `Meta`). */
-export type NoteRow = { path: string; text: string; tags: readonly string[]; pinned: boolean; archived: boolean; updated: number };
+export type FeedNoteSource = { path: string; text: string; tags: readonly string[]; pinned: boolean; archived: boolean; updated: number };
 
 /** A note's address as it is handed out (web/src/routes/note.$id.tsx). */
-export const noteUrl = (id: string) => `/note/${encodeURIComponent(id)}`;
+const noteUrl = (id: string) => `/note/${encodeURIComponent(id)}`;
 
 /** The notes as a feed: pinned first, then the latest changed, under `lens`; no archived note, nor the memory file. */
-export function notesFeed(rows: readonly NoteRow[], lenses: readonly Lens[], lens: Lens | null, prefs: Pick<Prefs, "theme" | "accent">): NotesFeed {
+export function notesFeed(rows: readonly FeedNoteSource[], lenses: readonly Lens[], lens: Lens | null, prefs: Pick<Prefs, "theme" | "accent">): NotesFeed {
   const theme = THEMES[lensTheme(lens, prefs.theme)];
   const all = rows.filter((r) => isNotePath(r.path) && !r.archived && inLens(lens, r))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updated - a.updated);

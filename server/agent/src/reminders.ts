@@ -21,8 +21,8 @@ import { createdUnder } from "@/core/record-protocol";
 import { remindAt } from "@/core/things";
 import { taskOf, type Task } from "@/core/todo";
 import { addDays } from "@/core/dates";
-import { localDay } from "@/core/time";
-import type { Server } from "@/core/urls";
+import { localDay } from "@/core/days";
+import type { Server } from "@/core/server-urls";
 import { time } from "./application/metadata";
 import { deliver, subscriptions, vapid, type Outcome, type Sub, type Vapid } from "./push";
 

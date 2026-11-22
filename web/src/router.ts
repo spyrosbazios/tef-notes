@@ -6,7 +6,7 @@ import { createRouter } from "@tanstack/react-router";
 import { MAX_AGE } from "@/lib/persist";
 import { parseSearch, stringifySearch } from "@/lib/route-search";
 import { typedTransitions } from "@/hooks/media";
-import { TASK_VIEWS } from "@/lib/nav";
+import { TASK_LISTS } from "@/core/things";
 import { grows, shrinks } from "@/lib/morph";
 import { SCROLL_KEY, SCROLL_TOP } from "@/lib/scroll";
 import { Pending } from "@/components/pending";
@@ -31,7 +31,7 @@ const param = (l: Where, key: string): string | undefined => {
  *  - the same list under other tags, or a task opened or closed (`?t=`: the task's drawer has its own
  *    motion): none, the tiles move in place. */
 /** Where a path's task list sits in the tabs' order, or -1 for any other screen. */
-const listAt = (pathname: string): number => TASK_VIEWS.findIndex((k) => pathname === `/${k}`);
+const listAt = (pathname: string): number => TASK_LISTS.findIndex((k) => pathname === `/${k}`);
 
 function transitionOf({ fromLocation: from, toLocation: to, pathChanged }: { fromLocation?: Where; toLocation: Where; pathChanged: boolean }): string[] | false {
   if (!from) return false;

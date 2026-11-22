@@ -1,7 +1,8 @@
 // Settings → Layout: each layout's own preferences (core/prefs.ts): where the app opens, Home's list, the phone's tabs, the desktop's sidebar.
 import { ChevronDown, Monitor, Smartphone } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, TASK_LIST_LABEL, TASK_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
+import { HIDEABLE, LAYOUT_LABEL, movedTab, RAIL, RAIL_LABEL, START_LABEL, STARTS, TAB_LABELS, TAB_LABELS_LABEL, TAB_LABEL, OPENING_LISTS, type Layout, type LayoutPrefs, type Tab } from "@/core/prefs";
+import { TASK_LIST_LABEL } from "@/core/things";
 import { Choice } from "@/components/settings/choice";
 import { TITLE } from "@/components/settings/style";
 import { Switch } from "@/components/ui/switch";
@@ -19,11 +20,11 @@ function TabOptions({ tab }: { tab: Tab }) {
   const { homeList, tasksList } = usePrefs().phone;
   if (tab === "home") return (
     <div className="space-y-2 pb-1"><p className="text-[13px] text-dim">Home's task box opens on</p>
-      <Choice label="Home's task box opens on" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ phone: { homeList: v } })} /></div>
+      <Choice label="Home's task box opens on" value={homeList} options={OPENING_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ phone: { homeList: v } })} /></div>
   );
   if (tab === "tasks") return (
     <div className="space-y-2 pb-1"><p className="text-[13px] text-dim">The Tasks tab opens on</p>
-      <Choice label="The Tasks tab opens on" value={tasksList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ phone: { tasksList: v } })} /></div>
+      <Choice label="The Tasks tab opens on" value={tasksList} options={OPENING_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ phone: { tasksList: v } })} /></div>
   );
   return null;
 }
@@ -102,7 +103,7 @@ function DesktopLayout() {
     <LayoutCard layout="desktop">
       <div className="space-y-2.5 px-3 py-2.5">
         <p className="text-sm font-semibold">Home's task box opens on</p>
-        <Choice label="Home's task box opens on, Desktop" value={homeList} options={TASK_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ desktop: { homeList: v } })} />
+        <Choice label="Home's task box opens on, Desktop" value={homeList} options={OPENING_LISTS} names={TASK_LIST_LABEL} onPick={(v) => setPrefs({ desktop: { homeList: v } })} />
       </div>
       <div className="px-3 py-2.5">
         <p className="text-sm font-semibold">Sidebar</p>

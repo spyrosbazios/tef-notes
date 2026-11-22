@@ -6,7 +6,7 @@ import { parseNote } from "@/core/notes";
 import { SHARE_CACHE } from "@/core/share-target";
 import { takePost, type Posted } from "@/core/share-stash";
 import type { Shared } from "@/core/share";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { addFiles } from "./photos";
 import { createNote, write } from "./notes";
 

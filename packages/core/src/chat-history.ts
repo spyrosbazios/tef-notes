@@ -1,7 +1,7 @@
 // Persistence contract, independent of the SDK and today's tool schemas. Parts and metadata
 // are opaque JSON: an old tool's input/output must remain available for display and export.
-export const CHAT_HISTORY_VERSION = 1;
-export type HistoryMessage = {
+const CHAT_HISTORY_VERSION = 1;
+type HistoryMessage = {
   id: string;
   role: "system" | "user" | "assistant";
   parts: { type: string; [key: string]: unknown }[];

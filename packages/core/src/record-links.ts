@@ -11,11 +11,11 @@
 
 /** What a link's end can be: a note or a task. */
 export const LINK_TYPES = ["note", "task"] as const;
-export type LinkType = (typeof LINK_TYPES)[number];
+type LinkType = (typeof LINK_TYPES)[number];
 
 /** `about`: from is about to (a task about a note; a task made from a clipped picture, about the note holding it).
  *  `source`: from was made from to (a note or task made from another note). */
-export const LINK_ROLES = ["about", "source"] as const;
+const LINK_ROLES = ["about", "source"] as const;
 export type LinkRole = (typeof LINK_ROLES)[number];
 
 /** One end: the kind of record and its record id. */
@@ -38,7 +38,7 @@ function endOf(r: any, side: LinkSide): LinkEnd | null {
   return set.length === 1 ? { type: set[0], id: r[linkColumn(side, set[0])] } : null;
 }
 
-export const sameEnd = (a: LinkEnd, b: LinkEnd) => a.type === b.type && a.id === b.id;
+const sameEnd = (a: LinkEnd, b: LinkEnd) => a.type === b.type && a.id === b.id;
 
 /** Why a link can't be: one to itself, or a role there is none of; null when it can. The server refuses the same
  *  (server/pb_hooks/lib/links.js). */

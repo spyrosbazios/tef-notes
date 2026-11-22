@@ -7,10 +7,11 @@ import { ATTACHMENTS, slugify } from "./notes";
 /** A file's record in `attachments`: which note, its name in the body, the stored file. */
 export type Photo = { rec: string; note: string; name: string; file: string; size?: number };
 
-export const MAX = 1600, QUALITY = 0.82;
+const MAX = 1600;
+export const QUALITY = 0.82;
 
 /** The resize that brings the long edge down to `max`, ratio kept; null when it's within already (or unknown, 0). */
-export function fit(width: number, height: number, max = MAX): { width: number } | { height: number } | null {
+function fit(width: number, height: number, max = MAX): { width: number } | { height: number } | null {
   if (Math.max(width, height) <= max) return null;
   return width >= height ? { width: max } : { height: max };
 }
@@ -25,7 +26,8 @@ export function storedSize(width: number, height: number): { width: number; heig
 
 /** The picture JEV looks at (TypeSafe takes 280 to 1568 px a side): long edge 768 as JPEG 0.8, a smaller one made up to
  *  280 on its short side. Every client draws it at `lookSize`. */
-export const LOOK = 768, LOOK_MIN = 280, LOOK_MAX = 1568, LOOK_QUALITY = 0.8;
+const LOOK = 768;
+export const LOOK_MIN = 280, LOOK_MAX = 1568, LOOK_QUALITY = 0.8;
 
 /** The size of that picture for one of `width` x `height`: ratio kept, never a short side under LOOK_MIN nor a long one
  *  over LOOK_MAX. */
@@ -87,7 +89,6 @@ export function attachmentLink(href: string): { noteId: string; name: string } |
 
 // ---- Drawings
 
-export const DRAWING = "application/json";
 const DRAWING_EXT = /\.excalidraw$/i;
 
 export const isDrawing = (name: string) => DRAWING_EXT.test(name);

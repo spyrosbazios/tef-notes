@@ -3,7 +3,7 @@
 import type { Chat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
 import type { NoteRef } from "@/core/handoff";
-import type { Run } from "@/core/note-actions";
+import type { ActionRun } from "@/core/note-actions";
 import type { Held } from "@/editor";
 import type { ChatQueue, Queues } from "@/lib/chat-queue";
 import { createContext, useContext } from "react";
@@ -11,7 +11,7 @@ import { createContext, useContext } from "react";
 /** What a transient chat's requests carry while its panel holds it: an ask's words (`held`, its context, which the selection
  *  tools change), or a note action's run (`scope`, which the server narrows the turn to). Each returns null once let go: a plain
  *  chat from then on. */
-export type Binding = { held?: () => Held | null; scope?: () => Run | null };
+export type Binding = { held?: () => Held | null; scope?: () => ActionRun | null };
 
 export type Assistant = {
   /** The conversation; null until the saved one named in the browser's settings has loaded. */

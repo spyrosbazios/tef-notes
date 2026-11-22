@@ -6,9 +6,9 @@
 // Pure and import-free, so the extension bundles it as it is.
 
 /** A picture a clip carries: its address ("" for one shared from another app) and the page's words for it. */
-export type ClipImage = { src: string; alt?: string; caption?: string };
+type ClipImage = { src: string; alt?: string; caption?: string };
 /** A PDF a clip carries, by its name as shared. */
-export type ClipPdf = { name: string };
+type ClipPdf = { name: string };
 
 /** What is clipped. `url` is "" for what the phone shares as text or files (a selection, pictures or PDFs then). The
  *  files' bytes are the save's `file` parts, the pictures' JPEGs then the PDFs, in order (`clipFiles`). */
@@ -41,7 +41,7 @@ export const titled = (target: Target, title: string): Target =>
   (target.kind === "new" || target.kind === "newtask") && title.trim() ? { kind: target.kind, title: title.trim() } : target;
 
 /** A note or task JEV rates at least a 1 in 20 chance (`p`). */
-export type Suggestion = { kind: "note"; path: string; title: string; p: number } | { kind: "task"; id: string; title: string; p: number };
+type Suggestion = { kind: "note"; path: string; title: string; p: number } | { kind: "task"; id: string; title: string; p: number };
 
 /** `pick`: the top option, a suggestion's target or new. `line`: the page's own line on what it is, sent back to save. */
 export type Suggestions = { suggestions: Suggestion[]; pick: Target; line?: string };
@@ -49,7 +49,7 @@ export type Suggestions = { suggestions: Suggestion[]; pick: Target; line?: stri
 /** What became of the summary the owner asked for ("Add a summary"): written into the clip; skipped, there being nothing to
  *  summarise it from (a picture with no words of its own, a page with no text); or failed (no key, or the model did). The
  *  clip is saved in every case. */
-export type Summary = "added" | "skipped" | "failed";
+type Summary = "added" | "skipped" | "failed";
 
 /** `summary` is there only when one was asked for. A task `created` from a picture's clip has `note`: the path of the new
  *  note holding the picture, which the task links to (`about`, core/record-links.ts). */
@@ -99,7 +99,7 @@ export function saveBodies() {
 export type ClipTags = { tags: { name: string; p: number }[]; picked: string[] };
 
 /** Offered beside the picked tags: one JEV gives at least this chance. */
-export const TAG_OFFER = 0.3;
+const TAG_OFFER = 0.3;
 
 /** The tags not picked, as the owner is shown them: `offered` the likely ones, best first as the route sent them, to add
  *  with a tap; `more` every other defined tag by name, for a list. */
@@ -111,7 +111,7 @@ export function unpickedTags(all: ClipTags["tags"], picked: readonly string[]): 
 /** Whether a save sends the files' bytes: a clip with files to a note, a new note or a new task, never to an existing task. */
 export const sendsFiles = (page: ClipPage, target: Target) => clipFiles(page) > 0 && target.kind !== "task";
 
-export const sameTarget = (a: Target, b: Target) =>
+const sameTarget = (a: Target, b: Target) =>
   a.kind === b.kind && (a.kind === "note" ? a.path === (b as typeof a).path : a.kind === "task" ? a.id === (b as typeof a).id : true);
 
 export const targetOf = (s: Suggestion): Target => (s.kind === "note" ? { kind: "note", path: s.path } : { kind: "task", id: s.id });

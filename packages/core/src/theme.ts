@@ -9,7 +9,7 @@ export type Palette = {
   brand: string; up: string; down: string; warn: string;
 };
 
-export type NoteColors = Record<Color, { bg: string; fg: string; line: string }>;
+type NoteColors = Record<Color, { bg: string; fg: string; line: string }>;
 
 /** The red, green and blue of `hex` (#rrggbb), 0..255 each. */
 export function channels(hex: string): [number, number, number] {
@@ -42,7 +42,7 @@ function tints(C: Palette) {
   };
 }
 
-export type Tint = ReturnType<typeof tints>;
+type Tint = ReturnType<typeof tints>;
 
 export type Theme = {
   name: ThemeName;

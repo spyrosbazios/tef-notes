@@ -7,7 +7,7 @@ import { taskCardOf, type TaskCard } from "@/core/agent";
 import { addDays } from "@/core/dates";
 import { fold, parseNote } from "@/core/notes";
 import { plannedByDay } from "@/core/planner";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { dedupeTags, type Task } from "@/core/todo";
 import { WIDGET_LIMITS, type BookedTask, type DayWidget, type ReviewWidget, type TimelineDay, type WeekWidget } from "@/core/widgets";
 import type { Meta } from "./application/notes";

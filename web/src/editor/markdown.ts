@@ -8,7 +8,7 @@
 // `__x__` becomes `**x**`, indented code becomes a fence, reference links become inline links (an unused
 // `[ref]: url` definition vanishes), ordered lists are renumbered from their first number, trailing spaces go.
 // A second pass changes nothing: serialize(parse(serialize(parse(x)))) === serialize(parse(x)).
-import { noteLinkPath, safeHref } from "@/core/links";
+import { noteLinkPath, safeHref } from "@/core/hyperlinks";
 import MarkdownIt from "markdown-it";
 import type { Token } from "markdown-it";
 import { MarkdownParser, MarkdownSerializerState } from "prosemirror-markdown";

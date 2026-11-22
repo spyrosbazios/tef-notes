@@ -55,10 +55,10 @@ export type Preview = { kind: "text"; text: string } | { kind: "markdown"; body:
 
 /** A confirm card: its question, the button, what the answered line says was done or left undone and of what, its body, and
  *  small lines above the body (`notes`) and a warning. */
-export type Confirmation = { head: string; yes: string; done: string; skipped: string; subject: string; preview: Preview; notes?: string[]; warning?: string };
+type Confirmation = { head: string; yes: string; done: string; skipped: string; subject: string; preview: Preview; notes?: string[]; warning?: string };
 
 /** The records a card names, as the client holds them: the note's title (`note`), the task set_place names (`task`). */
-export type Named = { note: string; task: string };
+type Named = { note: string; task: string };
 
 const quoted = (s: string | undefined, or: string) => (s?.trim() ? `“${s.trim()}”` : or);
 const text = (t: string): Preview => ({ kind: "text", text: t });

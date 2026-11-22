@@ -44,7 +44,7 @@ export function editNote(note: NoteRef, instruction: string): string {
 export const fileNameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** A note written out whole, with the photos and PDFs its body points at. */
-export type ExportEntry = { path: string; text: string; files: { photo: Photo; path: string }[] };
+type ExportEntry = { path: string; text: string; files: { photo: Photo; path: string }[] };
 
 /** Where each note and attachment goes in an export: `notes/<file>.md` and `attachments/<note-id>/<name>`, the layout
  *  the notes' own links (`../attachments/<note-id>/<name>`) expect, so the files read the same outside the app. Only
@@ -65,7 +65,7 @@ export function exportPlan(notes: { path: string; text: string }[], photos: Phot
 
 /** A note to make from a folder of Markdown: its path here, its text with links to files beside it pointed at its own
  *  attachments, and those files (`from`: where it is in the folder; `name`: what it is called under the note). */
-export type ImportEntry = { from: string; path: string; text: string; files: { from: string; name: string }[] };
+type ImportEntry = { from: string; path: string; text: string; files: { from: string; name: string }[] };
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const LINK = /(!?\[(?:\\.|[^\]\\])*\]\()(<[^>]+>|[^)\s]+)((?:\s+"[^"]*")?\))/g;

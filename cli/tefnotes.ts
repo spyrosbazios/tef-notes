@@ -14,8 +14,8 @@ import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Lin
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
 import { sceneProblem } from "@/core/drawing";
 import { drawingName, drawingPreview, fileMarkdown, isDrawingName, linkPath, type Photo } from "@/core/photos";
-import { localDay } from "@/core/time";
-import { type Server, photoUrl, serverUrl } from "@/core/urls";
+import { localDay } from "@/core/days";
+import { type Server, photoUrl, serverUrl } from "@/core/server-urls";
 import { markOf, writer } from "./writes";
 
 const HELP = `tefnotes — the notes on the server

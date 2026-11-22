@@ -6,7 +6,7 @@ import { fold } from "./notes";
 /** The filter's and a group's key for the notes that carry no tag (no tag can be named ""). */
 export const NO_TAG = "";
 
-export type Group<N> = { tag: string; notes: N[] };
+type Group<N> = { tag: string; notes: N[] };
 
 const has = (tags: string[], name: string) => tags.some((t) => fold(t) === fold(name));
 

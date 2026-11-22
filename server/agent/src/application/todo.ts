@@ -5,9 +5,9 @@
 import * as pb from "@/core/client/pocketbase";
 import { Conflict } from "@/core/record-contracts";
 import { addItem, complete, nextOrder, newTask, patchTask, removeItem, reopen, retagTask, setItem, taskOf, type Task, type TaskPatch } from "@/core/todo";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { time, type Stamp } from "./metadata";
 
 /** What a write hands back: the kind of record (a task), its id, the rev it is at now, and its current record (none for a delete). `next`: the id of a repeating task's next round. `unchanged`: nothing had to be written. */

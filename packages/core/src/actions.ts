@@ -15,7 +15,7 @@ export const ACTIONS = [
 export type Action = (typeof ACTIONS)[number];
 
 export const RULES = ["ask", "auto", "never"] as const;
-export type Rule = (typeof RULES)[number];
+type Rule = (typeof RULES)[number];
 export const RULE_LABEL: Record<Rule, string> = { ask: "Ask first", auto: "Just do it", never: "Never" };
 
 /** What Settings shows of each action: its name, and the writes it covers. */

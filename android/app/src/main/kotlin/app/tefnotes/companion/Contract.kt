@@ -358,6 +358,6 @@ fun serverAddress(input: String): String? {
 
 // ---- the task lists
 
-/** The lists a widget can show and a new task can go to (prefs.ts TASK_LISTS), named for the moments no feed has said it. */
+/** The lists a widget can show and a new task can go to (prefs.ts OPENING_LISTS, named by things.ts TASK_LIST_LABEL), named for the moments no feed has said it. */
 val TASK_LISTS = listOf("today" to "Today", "inbox" to "Inbox", "upcoming" to "Upcoming")
 fun listLabel(list: String) = TASK_LISTS.firstOrNull { it.first == list }?.second ?: "Today"

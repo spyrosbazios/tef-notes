@@ -13,9 +13,9 @@
 
 /** What a shape can be. The agent adds the first six; `freedraw` (a pen stroke), `image` and `frame` are only read. */
 export const DRAW_KINDS = ["rectangle", "ellipse", "diamond", "text", "arrow", "line"] as const;
-export type DrawKind = (typeof DRAW_KINDS)[number];
-export const SHAPE_KINDS = [...DRAW_KINDS, "freedraw", "image", "frame"] as const;
-export type ShapeKind = (typeof SHAPE_KINDS)[number];
+type DrawKind = (typeof DRAW_KINDS)[number];
+const SHAPE_KINDS = [...DRAW_KINDS, "freedraw", "image", "frame"] as const;
+type ShapeKind = (typeof SHAPE_KINDS)[number];
 
 /** The colours a shape may have, by name: Excalidraw's palette, a strong shade for lines and text, a light one for fills. */
 export const DRAW_COLORS = {
@@ -58,8 +58,8 @@ const FILLS = new Map<string, DrawColor>(DRAW_COLOR_NAMES.map((n) => [DRAW_COLOR
 const SIZES = new Map<number, FontSize>((Object.keys(FONT_SIZES) as FontSize[]).map((k) => [FONT_SIZES[k], k]));
 
 /** A colour's name, by its stroke or fill shade: one of another shade has none (left out, the shape reads as plain). */
-export const strokeName = (hex: unknown): DrawColor | undefined => STROKES.get(str(hex).toLowerCase());
-export const fillName = (hex: unknown): DrawColor | undefined => FILLS.get(str(hex).toLowerCase());
+const strokeName = (hex: unknown): DrawColor | undefined => STROKES.get(str(hex).toLowerCase());
+const fillName = (hex: unknown): DrawColor | undefined => FILLS.get(str(hex).toLowerCase());
 
 /** The text an element shows: a text element's words (its original, unwrapped ones). */
 const wordsOf = (e: Record<string, unknown>) => str(e.originalText) || str(e.text);
@@ -152,8 +152,8 @@ export type DrawEdit = { add?: DrawAdd[]; update?: DrawUpdate[]; remove?: string
 
 const ID = /^[\w-]+$/;
 const idOf = (v: unknown) => (typeof v === "string" && v.length >= 1 && v.length <= DRAWING_LIMITS.id && ID.test(v) ? v : "");
-export const isColor = (v: unknown): v is DrawColor => typeof v === "string" && v in DRAW_COLORS;
-export const isSize = (v: unknown): v is FontSize => typeof v === "string" && v in FONT_SIZES;
+const isColor = (v: unknown): v is DrawColor => typeof v === "string" && v in DRAW_COLORS;
+const isSize = (v: unknown): v is FontSize => typeof v === "string" && v in FONT_SIZES;
 const coord = (v: unknown) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= DRAWING_LIMITS.coord;
 const extent = (v: unknown) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= DRAWING_LIMITS.size;
 

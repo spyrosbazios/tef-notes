@@ -22,7 +22,7 @@ export const EVERY = /^(\+?[1-9]\d{0,2}[dwmy]|[1-9]\d{0,2}[my]@(29|30|31)|(mon|t
 export const REMIND = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** A box of a task's checklist. `id`: unique within the task, what a merge matches items by. */
-export type ChecklistItem = { id: string; text: string; done: boolean };
+type ChecklistItem = { id: string; text: string; done: boolean };
 
 export type Task = {
   /** The record id (15 of [a-z0-9], core/client/pocketbase.ts recordId), made by the client that adds it. */
@@ -62,7 +62,7 @@ const TASK: Omit<Task, "id" | "title"> = {
 };
 
 /** The longest tag name the server's definitions take (pb_migrations/1792500000_tags.js). */
-export const TAG_MAX = 40;
+const TAG_MAX = 40;
 
 // ---- the wire
 

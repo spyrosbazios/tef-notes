@@ -20,19 +20,20 @@ import { EFFORTS, effortOf, type Effort } from "./agent";
 import { DEFAULT_PROMPTS, promptsOf, slotsOf, type PromptAction, type Slot } from "./note-actions";
 import { isNoteSort, type NoteSort } from "./note-sort";
 import { DEFAULT_TALK_MODEL, TALK_MODELS, TALK_SPEED, speedOf, type TalkModel } from "./talk";
+import { TASK_LIST_LABEL, type TaskList } from "./things";
 import { ACCENT_NAMES, DEFAULT_ACCENT, DEFAULT_THEME, THEME_NAMES, type AccentName, type ThemeName } from "./theme";
 
 // ---- layouts
 
 /** The layouts the app draws, each with preferences of its own. */
-export const LAYOUTS = ["phone", "desktop"] as const;
+const LAYOUTS = ["phone", "desktop"] as const;
 export type Layout = (typeof LAYOUTS)[number];
 export const LAYOUT_LABEL: Record<Layout, string> = { phone: "Phone", desktop: "Desktop" };
 
 // ---- the choices
 
 /** The phone's bottom bar: its tabs, in the order the owner put them. Settings is always shown (it is where the bar is set). */
-export const TABS = ["home", "tasks", "notes", "ask", "talk", "settings"] as const;
+const TABS = ["home", "tasks", "notes", "ask", "talk", "settings"] as const;
 export type Tab = (typeof TABS)[number];
 export const TAB_LABEL: Record<Tab, string> = { home: "Home", tasks: "Tasks", notes: "Notes", ask: "Ask", talk: "Talk", settings: "Settings" };
 export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask", "talk"];
@@ -43,29 +44,28 @@ const OFF: readonly Tab[] = ["notes"];
  *  lens and Settings are always there (Settings is where the sidebar is set). */
 export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes", "talk"] as const;
 export type RailItem = (typeof RAIL)[number];
-export const RAIL_LABEL: Record<RailItem, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook", notes: "Notes", talk: "Talk" };
+export const RAIL_LABEL: Record<RailItem, string> = { ...TASK_LIST_LABEL, notes: "Notes", talk: "Talk" };
 /** Off until turned on: Notes, as on the phone. */
 const RAIL_OFF: readonly RailItem[] = ["notes"];
 
-/** The task lists Home's box and the Tasks tab open on. */
-export const TASK_LISTS = ["today", "inbox", "upcoming"] as const;
-export type TaskList = (typeof TASK_LISTS)[number];
-export const TASK_LIST_LABEL: Record<TaskList, string> = { today: "Today", inbox: "Inbox", upcoming: "Upcoming" };
+/** The task lists Home's box and the Tasks tab open on: every one but the Logbook (things.ts `TASK_LISTS`, names and all). */
+export const OPENING_LISTS = ["today", "inbox", "upcoming"] as const satisfies readonly TaskList[];
+export type OpeningList = (typeof OPENING_LISTS)[number];
 
 /** Which tabs in the bar show their name. */
 export const TAB_LABELS = ["active", "always", "never"] as const;
-export type TabLabels = (typeof TAB_LABELS)[number];
+type TabLabels = (typeof TAB_LABELS)[number];
 export const TAB_LABELS_LABEL: Record<TabLabels, string> = { active: "Active tab", always: "Every tab", never: "None" };
 
 /** Where the app opens. */
 export const STARTS = ["home", "inbox", "today", "upcoming", "notes"] as const;
-export type Start = (typeof STARTS)[number];
+type Start = (typeof STARTS)[number];
 export const START_LABEL: Record<Start, string> = { home: "Home", inbox: "Inbox", today: "Today", upcoming: "Upcoming", notes: "Notes" };
 
 /** When the assistant opens on a new chat rather than the last one: each time it is opened, once the app has been left,
  *  once it has been off screen for `NEW_CHAT_IDLE_MS`, or only from the New chat button. */
 export const NEW_CHATS = ["open", "app", "idle", "never"] as const;
-export type NewChat = (typeof NEW_CHATS)[number];
+type NewChat = (typeof NEW_CHATS)[number];
 export const NEW_CHAT_LABEL: Record<NewChat, string> = { open: "Every time", app: "After leaving the app", idle: "After 30 minutes away", never: "Never" };
 export const NEW_CHAT_IDLE_MS = 30 * 60_000;
 
@@ -84,24 +84,24 @@ export type LayoutPrefs = {
   /** The screen the app opens on. */
   start: Start;
   /** The list Home's task box shows first. */
-  homeList: TaskList;
+  homeList: OpeningList;
   /** A note's header: every action in order, each a button there, a row in its menu, or off (note-actions.ts). */
   noteHeader: Slot[];
 };
 
 /** The phone's, with its bottom bar. */
-export type PhonePrefs = LayoutPrefs & {
+type PhonePrefs = LayoutPrefs & {
   /** Every tab in order, hidden ones included, so one shown again comes back where it was. */
   tabs: Tab[];
   hidden: Tab[];
   /** The bar's labels: the tab in front shows its name, every tab does, or none (icons alone). */
   tabLabels: TabLabels;
   /** The list the Tasks tab opens on. */
-  tasksList: TaskList;
+  tasksList: OpeningList;
 };
 
 /** The desktop's, with its sidebar. */
-export type DesktopPrefs = LayoutPrefs & {
+type DesktopPrefs = LayoutPrefs & {
   /** The sidebar's screens it doesn't list (a hidden one is still reached by its link, the palette or the start screen). */
   hidden: RailItem[];
 };
@@ -131,7 +131,7 @@ export type Prefs = {
 
 /** The chat model and effort Talk thinks with, each unset to follow the assistant's own (`agent`): a spoken reply is
  *  waited for, so a faster model or less effort can suit it better than it suits a typed one. */
-export type TalkAgent = { model?: string; effort?: Effort };
+type TalkAgent = { model?: string; effort?: Effort };
 
 const talkAgentOf = (raw: unknown): TalkAgent => {
   const a = obj(raw);
@@ -172,7 +172,7 @@ const railIn = (v: unknown): RailItem[] => RAIL.filter((r) => strings(v).include
 
 const layoutOf = (l: Record<string, unknown>, layout: Layout, prompts: readonly PromptAction[]): LayoutPrefs => ({
   start: one(STARTS, l.start, "home"),
-  homeList: one(TASK_LISTS, l.homeList, "today"),
+  homeList: one(OPENING_LISTS, l.homeList, "today"),
   noteHeader: slotsOf(l.noteHeader, layout, prompts),
 });
 
@@ -210,7 +210,7 @@ export function prefsOf(raw: unknown): Prefs {
       // A tab the stored order doesn't know yet is new to this record: it starts as a new record's would
       hidden: [...new Set([...tabsIn(phone.hidden).filter((t) => HIDEABLE.includes(t)), ...OFF.filter((t) => !tabs.includes(t))])],
       tabLabels: one(TAB_LABELS, phone.tabLabels, "active"),
-      tasksList: one(TASK_LISTS, phone.tasksList, "today"),
+      tasksList: one(OPENING_LISTS, phone.tasksList, "today"),
     },
     desktop: { ...layoutOf(desktop, "desktop", noteActions), hidden: Array.isArray(desktop.hidden) ? railIn(desktop.hidden) : [...RAIL_OFF] },
   };

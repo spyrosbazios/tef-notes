@@ -1,24 +1,22 @@
-// What the task screens do with core/todo.ts's records, pure: the calendar's days, the repeats and reminder times on
+// What the task screens do with core/todo.ts's records, pure: the lists and their names, the repeats and reminder times on
 // offer, the lists laid out in sections, the checklist's count, the reminders due. `now` is a Date.
 
-import type { TaskList } from "./assistant";
 import { views, type Task, type Views } from "./todo";
 
-// ---- days, repeats, reminder times
+// ---- the lists
 
-/** `Date` (the calendar's pick, local midnight) as a day. */
-export const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** The task lists, as the web's `/inbox` … `/logbook` and the phone's tabs show them. */
+export const TASK_LISTS = ["inbox", "today", "upcoming", "logbook"] as const;
+export type TaskList = (typeof TASK_LISTS)[number];
+export const TASK_LIST_LABEL: Record<TaskList, string> = { inbox: "Inbox", today: "Today", upcoming: "Upcoming", logbook: "Logbook" };
 
-/** A day as the `Date` the calendar draws (local midnight). */
-export const dateOf = (day: string) => new Date(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10));
+// ---- repeats, reminder times
 
 /** The repeats on offer as they are stored; anything else a task carries is "Custom". */
 export const REPEATS: { every: string; label: string }[] = [
   { every: "1d", label: "Every day" }, { every: "1w", label: "Every week" }, { every: "1m", label: "Every month" }, { every: "1y", label: "Every year" },
   { every: "mon,tue,wed,thu,fri", label: "Every weekday" },
 ];
-
-export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 /** The reminder times a task can have: on its `when` day. */
 export const REMIND_TIMES = ["08:00", "09:00", "12:00", "15:00", "18:00", "20:00"];
@@ -46,7 +44,7 @@ export const listOfDay = (day: string, today: string): "today" | "upcoming" => (
 export const sectionOf = (kind: TaskList, t: Task): string =>
   kind === "today" ? (t.evening ? "evening" : "today") : kind === "upcoming" ? t.when : kind === "logbook" ? t.done : "";
 
-export type Section = { key: string; rows: Task[] };
+type Section = { key: string; rows: Task[] };
 
 /** A list in its sections, Today's before This Evening, with each of `lingering` (a task just ticked or unticked, as it was) that
  *  the list would have shown and no longer does slipped back in where it was: in its section, by `order` (the Logbook by the day
@@ -74,7 +72,7 @@ export const progress = (t: Pick<Task, "checklist">): [number, number] | null =>
 
 // ---- reminders
 
-export type Reminder = { id: string; at: number; title: string; task: string };
+type Reminder = { id: string; at: number; title: string; task: string };
 
 /** When a task's reminder rings, in the clock's own zone (the phone's, or the server's TZ): its `when` day at its `remind`
  *  time; null for a task without both. */

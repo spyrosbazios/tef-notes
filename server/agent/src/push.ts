@@ -11,7 +11,7 @@ import * as pb from "@/core/client/pocketbase";
 import { isPublicIp } from "@/core/net";
 import { endpointOf, subscriptionOf, type PushKey, type PushPayload, type PushSubscribeBody } from "@/core/push";
 import { lit } from "@/core/record-contracts";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { key } from "./keys";
 
 export type Vapid = { subject: string; publicKey: string; privateKey: string };

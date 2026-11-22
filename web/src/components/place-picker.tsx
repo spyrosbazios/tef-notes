@@ -6,7 +6,7 @@ import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/h
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Loader2, MapPin, PenLine, Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import { placeOf, type Place, type Suggestion } from "@/core/places";
+import { placeOf, type Place, type PlaceSuggestion } from "@/core/places";
 import { Input } from "@/components/ui/input";
 import { useHovers } from "@/hooks/hover";
 import { answered, MIN_QUERY } from "@/lib/place-query";
@@ -43,14 +43,14 @@ export function PlacePicker({ start = "", onPick }: { start?: string; onPick: (p
     queryKey: ["places", asked], queryFn: ({ signal }) => suggest(asked, signal),
     enabled: asked.length >= MIN_QUERY, placeholderData: keepPreviousData, staleTime: 5 * 60_000, retry: false,
   });
-  const list: Suggestion[] = asked.length >= MIN_QUERY ? (found.data ?? []) : [];
+  const list: PlaceSuggestion[] = asked.length >= MIN_QUERY ? (found.data ?? []) : [];
   const name = typed.trim();
   // The rows in order: the map's suggestions, then the typed words as a name
   const rows = [...list.map((s, i) => ({ key: s.place_id ?? `${i}`, s })), ...(name ? [{ key: "typed", s: null }] : [])];
   const active = Math.min(at, rows.length - 1);
   const settled = answered(name, asked, found);
 
-  const choose = (s: Suggestion | null) => {
+  const choose = (s: PlaceSuggestion | null) => {
     const p = s && placeOf(s);
     if (p) onPick(p);
     else if (name) onPick({ name });

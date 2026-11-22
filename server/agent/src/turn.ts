@@ -16,9 +16,9 @@ import {
 import type { Actions } from "@/core/actions";
 import { EFFORT, type Effort } from "@/core/agent";
 import { attachedBlock, attachedFiles, hasAttachment, type Attached, uiToolsFor, UI_TOOL_NAMES, type AssistantContext } from "@/core/assistant";
-import type { Run } from "@/core/note-actions";
+import type { ActionRun } from "@/core/note-actions";
 import { MEMORY, parseNote } from "@/core/notes";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { allowed, policyApprovals } from "./tool-policy";
 import { screen } from "./assistant";
 import { historyFromWeb, repair, withContext } from "./guard";
@@ -89,7 +89,7 @@ export type TurnRequest = {
    *  answer continues. */
   history: AgentMessage[];
   /** A note action's run (note-action.ts): the turn is narrowed to what that action may do. */
-  action?: Run;
+  action?: ActionRun;
   /** A spoken conversation (Talk): its instructions after the chat's, and none of the tools it has no screen for. */
   spoken?: boolean;
   abortSignal: AbortSignal;

@@ -8,7 +8,7 @@ import { DRAWING_LIMITS, shapesOf, type Shape } from "@/core/drawing";
 import { isDrawing, isDrawingName, type Photo } from "@/core/photos";
 import { isNotePath, parseNote } from "@/core/notes";
 import * as pb from "@/core/client/pocketbase";
-import { type Server, photoUrl } from "@/core/urls";
+import { type Server, photoUrl } from "@/core/server-urls";
 import type { DrawingWidget } from "@/core/widgets";
 import type { NoteService } from "./application/notes";
 import { EVERY_RUN, toolModule } from "./tool-policy";

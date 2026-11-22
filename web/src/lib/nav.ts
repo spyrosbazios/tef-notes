@@ -6,6 +6,7 @@
 // without the open note or task: what the assistant, the palette and the rail speak. Navigation goes through the router only;
 // `useNav` is its verbs, typed against the route tree.
 import { fold } from "@/core/notes";
+import { TASK_LISTS, type TaskList } from "@/core/things";
 import type { SettingsSection } from "@/lib/route-search";
 import { linkOptions, useCanGoBack, useLocation, useMatch, useNavigate, useRouter, useSearch, type HistoryState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
@@ -19,11 +20,8 @@ declare module "@tanstack/react-router" {
   }
 }
 
-export const TASK_VIEWS = ["inbox", "today", "upcoming", "logbook"] as const;
-export type TaskView = (typeof TASK_VIEWS)[number];
-
 export type View =
-  | { kind: "home"; tags?: string[]; archived?: true } | { kind: TaskView } | { kind: "notes"; tags?: string[]; archived?: true }
+  | { kind: "home"; tags?: string[]; archived?: true } | { kind: TaskList } | { kind: "notes"; tags?: string[]; archived?: true }
   | { kind: "settings"; section?: SettingsSection } | { kind: "talk" };
 
 /** A view that lists notes under a tag filter: Home and the Notes page. */
@@ -31,7 +29,7 @@ export type NotesView = Extract<View, { kind: "home" | "notes" }>;
 export const isNotesView = (v: View): v is NotesView => v.kind === "home" || v.kind === "notes";
 
 /** A view that lists tasks, not notes: a Things list. Its list is the task list, with the open task beside it. */
-export const isTaskView = (v: View): v is { kind: TaskView } => (TASK_VIEWS as readonly string[]).includes(v.kind);
+export const isTaskView = (v: View): v is { kind: TaskList } => (TASK_LISTS as readonly string[]).includes(v.kind);
 
 /** How the open task shows: a drawer over the screen, but for a task list in a wide window with no note over it, where it is
  *  the pane beside the list (task-screen.tsx). `narrow`: the window is phone-width. */
@@ -41,7 +39,7 @@ export const taskInDrawer = (at: { view: View; note?: string }, narrow: boolean)
 export function viewOf(path: string, search: { tags?: readonly string[]; archived?: boolean; section?: SettingsSection } = {}): View {
   if (path === "/talk") return { kind: "talk" };
   if (path === "/settings") return search.section ? { kind: "settings", section: search.section } : { kind: "settings" };
-  const task = TASK_VIEWS.find((k) => path === `/${k}`);
+  const task = TASK_LISTS.find((k) => path === `/${k}`);
   if (task) return { kind: task };
   const tags = search.tags;
   return { kind: path === "/notes" ? "notes" : "home", ...(tags?.length ? { tags: [...tags] } : {}), ...(search.archived ? { archived: true as const } : {}) };

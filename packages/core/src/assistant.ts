@@ -13,19 +13,16 @@
 import { DRAWING_LIMITS, shapeOf, type DrawEdit, type Shape } from "./drawing";
 import { isNotePath } from "./notes";
 import { isDrawingName, PDF } from "./photos";
+import { TASK_LISTS } from "./things";
 
 // ---- the page
 
-/** The task lists, as the web's `/inbox` … `/logbook` and the phone's Today tab show them. */
-export const TASK_LISTS = ["inbox", "today", "upcoming", "logbook"] as const;
-export type TaskList = (typeof TASK_LISTS)[number];
-
 /** The places with nothing to name: `home` (the phone's Home tab), `notes` (all notes), `pinned`, a task list, `ask` (the full chat), `talk` (the
  *  spoken one), `memory` and `settings`. Beside them a `tag`'s notes. */
-export const PLAIN_VIEWS = ["home", "notes", "pinned", ...TASK_LISTS, "ask", "talk", "memory", "settings"] as const;
-export type PlainView = (typeof PLAIN_VIEWS)[number];
-export const VIEW_KINDS = [...PLAIN_VIEWS, "tag"] as const;
-export type ViewKind = (typeof VIEW_KINDS)[number];
+const PLAIN_VIEWS = ["home", "notes", "pinned", ...TASK_LISTS, "ask", "talk", "memory", "settings"] as const;
+type PlainView = (typeof PLAIN_VIEWS)[number];
+const VIEW_KINDS = [...PLAIN_VIEWS, "tag"] as const;
+type ViewKind = (typeof VIEW_KINDS)[number];
 
 export type AssistantView = { kind: PlainView } | { kind: "tag"; tag: string };
 
@@ -47,18 +44,18 @@ export type AssistantContext = {
 
 /** How much of each piece the server keeps; a client may send less, never more. A selection asked about may be a whole
  *  section to summarise or rewrite: a client holds back an editable one longer than this rather than send it cut. */
-export const LIMITS = { id: 64, tag: 60, title: 200, selection: 8000, filter: 400 } as const;
+export const CONTEXT_LIMITS = { id: 64, tag: 60, title: 200, selection: 8000, filter: 400 } as const;
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 /** One line, whitespace collapsed, cut at `max`; "" for anything but a string. */
 const line = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 /** A record id: short, `[A-Za-z0-9_-]` only. */
-const idOf = (v: unknown) => { const s = typeof v === "string" ? v.trim() : ""; return s.length >= 1 && s.length <= LIMITS.id && /^[\w-]+$/.test(s) ? s : ""; };
+const idOf = (v: unknown) => { const s = typeof v === "string" ? v.trim() : ""; return s.length >= 1 && s.length <= CONTEXT_LIMITS.id && /^[\w-]+$/.test(s) ? s : ""; };
 
 /** A view out of a kind and its argument, or null: the one place a view's shape is checked (context and `go_view`). */
 export function viewFrom(kind: unknown, arg?: { tag?: unknown }): AssistantView | null {
   if (typeof kind !== "string" || !(VIEW_KINDS as readonly string[]).includes(kind)) return null;
-  if (kind === "tag") { const tag = line(arg?.tag, LIMITS.tag).replace(/^#/, ""); return tag ? { kind, tag } : null; }
+  if (kind === "tag") { const tag = line(arg?.tag, CONTEXT_LIMITS.tag).replace(/^#/, ""); return tag ? { kind, tag } : null; }
   return { kind } as AssistantView;
 }
 
@@ -71,15 +68,15 @@ export function contextOf(raw: unknown): AssistantContext | undefined {
   const out: AssistantContext = { view };
   const n = obj(o.note);
   if (n && typeof n.path === "string" && isNotePath(n.path)) {
-    out.note = { path: n.path, title: line(n.title, LIMITS.title) };
+    out.note = { path: n.path, title: line(n.title, CONTEXT_LIMITS.title) };
     if (typeof n.rev === "number" && Number.isSafeInteger(n.rev) && n.rev >= 0) out.note.rev = n.rev;
   }
   const t = obj(o.task), id = t && idOf(t.id);
-  if (t && id) out.task = { id, title: line(t.title, LIMITS.title) };
-  const selection = typeof o.selection === "string" ? o.selection.trim().slice(0, LIMITS.selection) : "";
+  if (t && id) out.task = { id, title: line(t.title, CONTEXT_LIMITS.title) };
+  const selection = typeof o.selection === "string" ? o.selection.trim().slice(0, CONTEXT_LIMITS.selection) : "";
   if (selection) out.selection = selection;
   if (selection && out.note && o.editable === true) out.editable = true;
-  const filter = line(o.filter, LIMITS.filter);
+  const filter = line(o.filter, CONTEXT_LIMITS.filter);
   if (filter) out.filter = filter;
   const drawing = drawingOf(o.drawing);
   if (drawing) out.drawing = drawing;
@@ -103,7 +100,7 @@ export type UiToolInput = {
 export type UiToolName = keyof UiToolInput;
 /** Where `go_view` can go: any view. */
 export const GO_VIEWS = VIEW_KINDS;
-export type GoViewKind = ViewKind;
+type GoViewKind = ViewKind;
 
 export const UI_TOOL_NAMES = ["open_note", "open_task", "go_view", "ask_choice", "replace_selection", "insert_after_selection", "draw", "save_drawing"] as const satisfies readonly UiToolName[];
 export const isUiTool = (name: string): name is UiToolName => (UI_TOOL_NAMES as readonly string[]).includes(name);
@@ -135,7 +132,7 @@ export function uiToolsFor(context: AssistantContext | undefined): readonly UiTo
 // else's text, like memory (server/agent/src/loop.ts): a page's instructions would otherwise write with no card.
 
 export const SELECTION_TOOL_NAMES = ["replace_selection", "insert_after_selection"] as const satisfies readonly UiToolName[];
-export type SelectionToolName = (typeof SELECTION_TOOL_NAMES)[number];
+type SelectionToolName = (typeof SELECTION_TOOL_NAMES)[number];
 export const isSelectionTool = (name: string): name is SelectionToolName => (SELECTION_TOOL_NAMES as readonly string[]).includes(name);
 /** The most markdown one call may write. */
 export const SELECTION_TEXT_MAX = 20_000;
@@ -170,7 +167,7 @@ export type DrawInput = { path: string; name?: string } & DrawEdit;
 export type DrawOutput = { ok: true; picture?: string } | { error: string };
 
 /** The largest picture an answer may carry, as a data URL's length. */
-export const DRAW_PICTURE_MAX = 2_000_000;
+const DRAW_PICTURE_MAX = 2_000_000;
 
 /** The picture a `draw` answer carries, split for the model: its type and base64 data; null without a usable one. */
 export function drawPictureOf(output: unknown): { mediaType: string; data: string } | null {
@@ -205,7 +202,7 @@ function drawingOf(raw: unknown): OpenDrawing | undefined {
 // follows it is the model's own tool calls, a write among them with its confirm card as ever.
 
 /** One button: `id` is what comes back, `label` what it says, `hint` a quieter line under it. */
-export type ChoiceOption = { id: string; label: string; hint?: string };
+type ChoiceOption = { id: string; label: string; hint?: string };
 
 /** What the question allows: 2 to 6 options, and how long each piece may be (the server's schema holds to these). */
 export const ASK = { min: 2, max: 6, id: 40, question: 300, label: 60, hint: 120 } as const;
@@ -214,8 +211,6 @@ export const ASK = { min: 2, max: 6, id: 40, question: 300, label: 60, hint: 120
  *  send only with something chosen), or `{ error }` when the question can't be shown or they dismissed it. */
 export type ChoiceOutput = { chosen: string[] } | { error: string };
 
-/** The UI tools answer with `UiOutput`, but `ask_choice` with `ChoiceOutput`, `draw` with `DrawOutput`, `save_drawing` with `SaveDrawingOutput`. */
-export type UiOutputOf<N extends UiToolName> = N extends "ask_choice" ? ChoiceOutput : N extends "draw" ? DrawOutput : N extends "save_drawing" ? SaveDrawingOutput : UiOutput;
 
 /** The tool the owner answers, not the app: its call waits in the chat, drawn as buttons, until they tap. */
 export const isAskTool = (name: string): name is "ask_choice" => name === "ask_choice";

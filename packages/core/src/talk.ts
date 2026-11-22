@@ -45,7 +45,7 @@ export const TALK_MODEL_LABEL: Record<TalkModel, string> = {
 
 /** US dollars per million UTF-8 bytes of text spoken, Fish Audio's list price (docs.fish.audio, "Pricing"). A million bytes
  *  is about 180,000 English words, or twelve hours of speech. */
-export const TTS_USD_PER_MB: Record<TalkModel, number> = { "s2.1-pro-free": 0, "s2.1-pro": 15 };
+const TTS_USD_PER_MB: Record<TalkModel, number> = { "s2.1-pro-free": 0, "s2.1-pro": 15 };
 
 /** The bytes Fish bills a piece of text as. */
 export const bytesOf = (text: string) => new TextEncoder().encode(text).length;

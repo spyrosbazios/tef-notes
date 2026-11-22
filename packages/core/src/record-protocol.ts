@@ -332,7 +332,7 @@ const LISTED = "id,title,updated";
 /** A chat as the list shows it. */
 export type ChatLine = { id: string; title: string; updated: string };
 /** A chat with its history and the rev its next save names. */
-export type Chat = ChatLine & StoredChat;
+type Chat = ChatLine & StoredChat;
 const line = (r: any): ChatLine => ({ id: String(r.id), title: r.title ?? "", updated: r.updated ?? "" });
 
 /** The `chats` collection (pb_migrations/1792600000_chats.js): a client makes a chat empty before its first message and names it

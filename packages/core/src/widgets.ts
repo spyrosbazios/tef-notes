@@ -24,7 +24,7 @@ import { isNotePath } from "./notes";
 import { isDrawingName } from "./photos";
 import { isDay } from "./todo";
 import type { LensAccentName } from "./lens";
-import type { LinkPreview } from "./links";
+import type { LinkPreview } from "./hyperlinks";
 import { ACCENT_NAMES, THEME_NAMES, type ThemeName } from "./theme";
 
 /** Task cards a widget lists at most, and how many a lens preview samples of each kind. */
@@ -44,7 +44,7 @@ export type DayWidget = { type: "day"; date: string; booked: BookedTask[]; unsch
 
 /** One day of a week: `open` tasks planned for it or due on it, of which `booked` hold an hour; `overdue`: those still open on a
  *  day that has passed (all of `open` then, else 0). `top`: the first few, booked ones first. */
-export type WeekDay = { date: string; open: number; booked: number; overdue: number; top: { id: string; title: string }[] };
+type WeekDay = { date: string; open: number; booked: number; overdue: number; top: { id: string; title: string }[] };
 
 /** Seven days from `start` (the Monday of this week unless asked for another day). */
 export type WeekWidget = { type: "week"; start: string; days: WeekDay[] };
@@ -89,11 +89,10 @@ export type NotesWidget = { type: "notes"; title: string; notes: NoteCard[] };
 export type DrawingWidget = { type: "drawing"; path: string; title: string; name: string };
 
 export type Widget = DayWidget | WeekWidget | ReviewWidget | QuoteWidget | LinkWidget | LensWidget | TasksWidget | NotesWidget | DrawingWidget;
-export type WidgetType = Widget["type"];
 
 /** The tools whose output carries a widget. */
 export const WIDGET_TOOLS = ["show_day", "show_week", "show_review", "show_quote", "show_link", "show_lens", "show_tasks", "show_notes", "show_drawing"] as const;
-export type WidgetTool = (typeof WIDGET_TOOLS)[number];
+type WidgetTool = (typeof WIDGET_TOOLS)[number];
 export const isWidgetTool = (name: string): name is WidgetTool => (WIDGET_TOOLS as readonly string[]).includes(name);
 
 // ---- reading one

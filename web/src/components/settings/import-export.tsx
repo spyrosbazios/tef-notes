@@ -10,7 +10,7 @@ import { useNotes } from "@/hooks/notes";
 import { downloadZip } from "@/lib/export";
 import { importNotes, type ImportTally, type Source } from "@/core/client/import";
 import { folderSource, zipSource } from "@/lib/import";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { message } from "@/services/api";
 
 /** Notes in and out, on one card. Export: every note and the photos and PDFs they link, as one zip (`notes/<file>.md` and

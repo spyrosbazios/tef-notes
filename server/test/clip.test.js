@@ -8,7 +8,7 @@ import { make } from "../pb_hooks/lib/llm.js";
 const ds = make("deepseek", () => "");
 import { bodyFor, titleFor } from "../../packages/core/src/share";
 import { CLIP_FILES, CLIP_TEXT } from "../../packages/core/src/clip";
-import { localDay } from "../../packages/core/src/time";
+import { localDay } from "../../packages/core/src/days";
 import { fileMarkdown, linkPath, pdfName, photoMarkdown, photoName } from "../../packages/core/src/photos";
 
 const U = "https://www.example.com/a?b=1";

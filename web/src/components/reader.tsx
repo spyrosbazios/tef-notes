@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useNarrow } from "@/hooks/media";
 import { Skeleton } from "@/components/ui/skeleton";
-import { hostOf } from "@/core/links";
+import { hostOf } from "@/core/hyperlinks";
 import { readingMinutes } from "@/core/reader";
 import { message } from "@/services/api";
 import * as reader from "@/services/reader";

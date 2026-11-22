@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { decode, hostOf, linkify, noteLinkPath, safeHref, titleFromHtml, youtubeVideo } from "../src/links";
+import { decode, hostOf, linkify, noteLinkPath, safeHref, titleFromHtml, youtubeVideo } from "../src/hyperlinks";
 
 describe("hostOf", () => {
   it("the site, www. dropped", () => {
@@ -13,11 +13,11 @@ describe("hostOf", () => {
 
 describe("titleFromHtml", () => {
   it("prefers og:title, whichever order the attributes come in", () => {
-    expect(titleFromHtml(`<title>Site</title><meta content="Jito &amp; tips" property="og:title">`)).toBe("Jito & tips");
+    expect(titleFromHtml(`<title>Site</title><meta content="Tea &amp; biscuits" property="og:title">`)).toBe("Tea & biscuits");
     expect(titleFromHtml(`<meta property='og:title' content='A "quoted" title'/>`)).toBe('A "quoted" title');
   });
   it("falls back to <title>, squashing whitespace", () => {
-    expect(titleFromHtml("<head><title>\n  PumpSwap\n docs </title></head>")).toBe("PumpSwap docs");
+    expect(titleFromHtml("<head><title>\n  Garden\n notes </title></head>")).toBe("Garden notes");
     expect(titleFromHtml("<p>no head</p>")).toBeNull();
   });
   it("decodes numeric entities", () => expect(decode("it&#39;s &#x2014; ok &mdash; &bogus;")).toBe("it's — ok — &bogus;"));

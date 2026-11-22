@@ -23,7 +23,7 @@ import { choiceFrom, isAskTool, isUiTool, uiError, uiToolsFor, type UiToolName }
 import { newChatDue } from "@/core/prefs";
 import { chatTitle } from "@/core/share";
 import type { NoteRef } from "@/core/handoff";
-import type { Run } from "@/core/note-actions";
+import type { ActionRun } from "@/core/note-actions";
 import { CHATS, settingsNow } from "@/hooks/agent";
 import { AssistantContext, type Assistant, type Binding } from "@/hooks/assistant";
 import { answered } from "@/hooks/ask-badge";
@@ -82,7 +82,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   /** A chat; `held`: an ask's, the words it holds while it does (null once let go: a plain chat from then on); `scope`: a note
    *  action's run, while its panel holds it. */
-  const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null, scope?: () => Run | null): Chat<UIMessage> => {
+  const build = useCallback((id: string, messages: UIMessage[], held?: () => Held | null, scope?: () => ActionRun | null): Chat<UIMessage> => {
     // The UI tools the request in flight offered (what its `context` allows): a call to any other is refused, not run
     let offered: readonly UiToolName[] = [];
     const chat: Chat<UIMessage> = new Chat<UIMessage>({

@@ -3,7 +3,7 @@
 import { Archive, Pin, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { previewOf } from "@/core/agent";
-import { ago } from "@/core/time";
+import { ago } from "@/core/days";
 import { Mosaic } from "@/components/note-pictures";
 import { Peek } from "@/components/peek";
 import { TagBadge } from "@/components/tag-badge";

@@ -14,7 +14,8 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { dayLabel, dayParts } from "@/core/dates";
 import type { Link as RecordLink } from "@/core/record-links";
-import { dateOf, sectionsOf } from "@/core/things";
+import { dayDate } from "@/core/days";
+import { sectionsOf, TASK_LISTS, type TaskList as ListKind } from "@/core/things";
 import { landing, reorder } from "@/core/task-order";
 import type { Task } from "@/core/todo";
 import { TASK_ICON } from "@/components/task-icons";
@@ -35,13 +36,13 @@ import { useLeaving } from "@/hooks/presence";
 import { useScrollSwitch } from "@/hooks/scroll";
 import { editTask, useTasks, useViews } from "@/hooks/todo";
 import { noteSummary } from "@/lib/links";
-import { linkOf, TASK_VIEWS, titleOf, useNav, type TaskView } from "@/lib/nav";
+import { linkOf, titleOf, useNav } from "@/lib/nav";
 import { report } from "@/lib/report";
 import { scheduleOf } from "@/lib/schedule";
 import { boxScroll, listScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 
-const EMPTY: Record<TaskView, string> = {
+const EMPTY: Record<ListKind, string> = {
   inbox: "Nothing waiting. New tasks land here.",
   today: "Nothing for today.",
   upcoming: "Nothing scheduled ahead.",
@@ -58,7 +59,7 @@ const HEADING_REACH = 44;
 const FADE = 48, FADE_ROOM = 20;
 const heading = "mx-3 mt-5 mb-1 flex items-baseline gap-2 border-b border-line pb-2 transition-colors duration-700";
 
-function Heading({ kind, section, today, lit }: { kind: TaskView; section: string; today: string; lit?: boolean }) {
+function Heading({ kind, section, today, lit }: { kind: ListKind; section: string; today: string; lit?: boolean }) {
   const move = useTempoTransition(spring.reflow);
   const glide = { layout: "position", transition: move } as const;
   if (kind === "today" && section === "evening") return <motion.h3 {...glide} className={cn(heading, "items-center")}><Moon className="size-3.5 self-center text-brand" /><span className="text-[15px] font-extrabold">This Evening</span></motion.h3>;
@@ -81,13 +82,13 @@ function Section({ day, fade, lit = false, children }: { day?: string; fade: Tra
 
 /** The lists as tabs, below `md` where the rail is a drawer: Inbox and Today with their counts, as the phone's Tasks tab. A count changes
  *  once a tick has lingered: its digit rolls (Animate UI's Sliding Number), tying the row that leaves to the number that follows. */
-function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: number }) {
+function Tabs({ kind, inbox, today }: { kind: ListKind; inbox: number; today: number }) {
   const count = { inbox, today, upcoming: 0, logbook: 0 };
   return (
     <nav aria-label="Lists" data-vt="lists" className="flex gap-1 overflow-x-auto border-b border-line px-3 md:hidden">
       {/* One underline glides to the list in front, as Home's tabs do */}
       <Highlight controlledItems value={kind} className="inset-x-0 top-auto bottom-0 h-0.5 rounded-none bg-brand">
-        {TASK_VIEWS.map((k) => (
+        {TASK_LISTS.map((k) => (
           <HighlightItem key={k} value={k} className="-mb-px shrink-0">
             <Link {...linkOf({ kind: k })} aria-current={k === kind ? "page" : undefined}
               className={cn("flex h-10 items-center gap-1.5 px-2.5 text-sm font-semibold transition-colors", k === kind ? "text-fg" : "text-dim")}>
@@ -105,7 +106,7 @@ function Tabs({ kind, inbox, today }: { kind: TaskView; inbox: number; today: nu
  * `focus`: a day Home's planner picked or is hovering: scrolled to that day (or the next one with tasks), its heading lit; `magnify`: the pointer is still on the planner, the day's section stands out.
  * `onHoverDay`: the day of the row or Upcoming day under the pointer (a row's `when`, else its due), null as it leaves.
  * `onView`: Upcoming scrolled by hand: the day whose section is at the top of the list, reported as it changes (the phone's strip follows). */
-export function TaskList({ view, onAdd, embedded = false, focus = null, magnify = false, onHoverDay, onView }: { view: { kind: TaskView }; onAdd?: () => void; embedded?: boolean; focus?: { day: string; n: number } | null; magnify?: boolean; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
+export function TaskList({ view, onAdd, embedded = false, focus = null, magnify = false, onHoverDay, onView }: { view: { kind: ListKind }; onAdd?: () => void; embedded?: boolean; focus?: { day: string; n: number } | null; magnify?: boolean; onHoverDay?: (day: string | null) => void; onView?: (day: string) => void }) {
   const { views, today, isPending } = useViews();
   const notes = useNotes().data, links = useLinks().data ?? NO_LINKS;
   const { taskLink, showTask, closeTask, task: open } = useNav();
@@ -212,7 +213,7 @@ export function TaskList({ view, onAdd, embedded = false, focus = null, magnify 
           <header className="flex items-start justify-between px-4 pt-4 pb-2">
             <div className="min-w-0 flex-1">
               <h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight"><Icon className="size-5 text-brand" />{title}</h2>
-              {kind === "today" ? <p className="pl-7 text-sm text-dim">{dateOf(today).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p> : null}
+              {kind === "today" ? <p className="pl-7 text-sm text-dim">{dayDate(today).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p> : null}
             </div>
             <Button variant="ghost" size="icon-sm" aria-label="New task" title="New task (Q)" onClick={onAdd} className="mt-0.5 shrink-0 text-dim"><Plus /></Button>
           </header>

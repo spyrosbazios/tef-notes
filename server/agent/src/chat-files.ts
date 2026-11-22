@@ -7,7 +7,7 @@ import type { UIMessage } from "ai";
 import { chatFileOf, chatFileUrl } from "@/core/assistant";
 import { HttpError } from "@/core/client/http";
 import { PDF } from "@/core/photos";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 
 /** A data URL's bytes and type, or null when it isn't one. */
 export function dataOf(url: string): { type: string; bytes: Uint8Array } | null {

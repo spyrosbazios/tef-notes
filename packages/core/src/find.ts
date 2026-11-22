@@ -4,8 +4,8 @@
 // the route, and the one defensive reading of the answer.
 
 /** One hit: a note by its path or a task by its id, and why it answers the query, in the query's language. */
-export type FoundNote = { path: string; why: string };
-export type FoundTask = { id: string; why: string };
+type FoundNote = { path: string; why: string };
+type FoundTask = { id: string; why: string };
 export type Found = { notes: FoundNote[]; tasks: FoundTask[] };
 
 /** The route under the agent's `/agent/`. */

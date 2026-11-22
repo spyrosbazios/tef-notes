@@ -6,7 +6,7 @@
 import { queryOptions, useQuery, type QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { inheritTags, inLens } from "@/core/lens";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { views, type TaskPatch, type Views } from "@/core/todo";
 import * as records from "@/lib/records";
 import { LOCAL_QUERY, opened, readTasks, TASKS } from "@/lib/records";

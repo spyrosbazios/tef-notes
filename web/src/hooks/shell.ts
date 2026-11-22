@@ -2,7 +2,7 @@
 // started from where it was asked, and the narrow window's Views sheet.
 import { createContext, useContext } from "react";
 import type { Start } from "@/components/quick-add";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import type { View } from "@/lib/nav";
 
 export type ShellActions = { newNote: () => void; add: (s: Start) => void; openMenu: () => void };

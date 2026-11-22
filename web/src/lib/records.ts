@@ -18,7 +18,7 @@ import { recordId } from "@/core/client/pocketbase";
 import type { Mark } from "@/core/record-contracts";
 import { newLink, sameLink, type Link, type LinkEnd, type LinkRole } from "@/core/record-links";
 import { liveLinks, type NoteRow, type Refusal, type Store } from "@/core/sync";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { newTask, nextOrder, patchTask, taskOf, type Task, type TaskPatch } from "@/core/todo";
 import type { NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";

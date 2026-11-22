@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  BUILTINS, DEFAULT_PROMPTS, HEADER_MAX, headerRoom, idsAt, LIMITS, movedSlot, newActionId, placedAt, promptOf, promptProblem, promptsOf, ranOn,
+  BUILTINS, DEFAULT_PROMPTS, HEADER_MAX, headerRoom, idsAt, ACTION_LIMITS, movedSlot, newActionId, placedAt, promptOf, promptProblem, promptsOf, ranOn,
   runMessage, runOf, runTitle, slotsOf,
 } from "../src/note-actions";
 import { DEFAULT_PREFS, patchPaths, prefsOf, withPatch } from "../src/prefs";
@@ -19,10 +19,10 @@ describe("promptsOf", () => {
   test("an unknown icon or result falls back; the name is one line, cut to its limit", () => {
     expect(promptOf({ id: "a", label: "  Two\n words ", prompt: " do ", icon: "nope", result: "nuke" }))
       .toEqual({ id: "a", label: "Two words", prompt: "do", icon: "sparkles", result: "answer" });
-    expect(promptOf({ id: "a", label: "x".repeat(99), prompt: "p" })?.label).toHaveLength(LIMITS.label);
+    expect(promptOf({ id: "a", label: "x".repeat(99), prompt: "p" })?.label).toHaveLength(ACTION_LIMITS.label);
   });
   test("holds at most its limit", () => {
-    expect(promptsOf(Array.from({ length: 40 }, (_, i) => ({ ...mine, id: `a${i}` })))).toHaveLength(LIMITS.actions);
+    expect(promptsOf(Array.from({ length: 40 }, (_, i) => ({ ...mine, id: `a${i}` })))).toHaveLength(ACTION_LIMITS.actions);
   });
 });
 
@@ -37,7 +37,7 @@ test("promptProblem", () => {
   expect(promptProblem({ label: "A", prompt: "b" })).toBeNull();
   expect(promptProblem({ label: " ", prompt: "b" })).toMatch(/name/);
   expect(promptProblem({ label: "A", prompt: "" })).toMatch(/prompt/);
-  expect(promptProblem({ label: "A", prompt: "x".repeat(LIMITS.prompt + 1) })).toMatch(/too long/);
+  expect(promptProblem({ label: "A", prompt: "x".repeat(ACTION_LIMITS.prompt + 1) })).toMatch(/too long/);
 });
 
 describe("slotsOf", () => {

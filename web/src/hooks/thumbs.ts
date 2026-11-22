@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { picturesOf } from "@/core/notes";
 import type { Photo } from "@/core/photos";
-import { pdfThumbUrl, photoThumbUrl, previewPictureUrl, type ThumbSize } from "@/core/urls";
+import { pdfThumbUrl, photoThumbUrl, previewPictureUrl, type ThumbSize } from "@/core/server-urls";
 import * as photos from "@/services/photos";
 import { ALL_PHOTOS } from "./photos";
 import { useLinkPreview } from "./previews";

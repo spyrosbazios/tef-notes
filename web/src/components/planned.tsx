@@ -2,7 +2,8 @@
 // or due on it, inside the lens that is on. The arrows step back and ahead a month; the month's name goes back to this one.
 // A day under the mouse shows its tasks in the task box beside (Home scrolls Upcoming to it, magnified); past days stay faint. Clicking a day shows it in the task box (Today's
 // list for today, Upcoming's day for a later one); the + a tile shows on hover adds a task planned for that day (under a finger there is no hover: holding a day does). Shades are the brand at four fixed strengths: 1, 2, 3, 4 or more.
-import { dayDate as at, monthDays, monthLoad, monthOf, plannedByDay, shadeOf, WEEKDAYS } from "@/core/planner";
+import { dayDate as at, WEEKDAY_HEADS } from "@/core/days";
+import { monthDays, monthLoad, monthOf, plannedByDay, shadeOf } from "@/core/planner";
 import { useLongPress } from "@/hooks/long-press";
 import { SHADE } from "@/lib/shade";
 import { useLensTasks, useToday } from "@/hooks/todo";
@@ -47,7 +48,7 @@ export function Planned({ onPick, onAdd, lit = null, onHover }: { onPick: (day: 
 
       <div onMouseLeave={onHover ? () => onHover(null) : undefined} onBlur={onHover ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) onHover(null); } : undefined}
         className="grid min-h-0 flex-1 grid-cols-7 gap-1.5" style={{ gridTemplateRows: `auto repeat(${days.length / 7}, minmax(0, 1fr))` }}>
-        {WEEKDAYS.map((w) => <span key={w} className="pb-0.5 text-center text-[11px] font-medium text-faint">{w}</span>)}
+        {WEEKDAY_HEADS.map((w) => <span key={w} className="pb-0.5 text-center text-[11px] font-medium text-faint">{w}</span>)}
           {days.map((d, i) => {
             if (!d) return <span key={i} />;
             const list = byDay.get(d) ?? [], n = list.length, past = d < today;

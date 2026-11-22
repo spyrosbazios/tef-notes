@@ -2,9 +2,9 @@
 // edit the laptop and Claude read back unchanged. Frontmatter is the few keys the root CLAUDE.md lists,
 // parsed by hand: a YAML library would rewrite what it doesn't understand.
 
-import { firstUrl } from "./links";
+import { firstUrl } from "./hyperlinks";
 import { drawingPreview, isDrawing } from "./photos";
-import { localDay } from "./time";
+import { localDay } from "./days";
 
 export const NOTES = "notes/";
 export const ATTACHMENTS = "attachments/";
@@ -15,17 +15,17 @@ export const COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "tea
 export type Color = (typeof COLORS)[number];
 
 /** `archived`: out of the lists, still found by search, links and the agent's tools. Never pinned as well (archivePatch). */
-export type Flags = { pinned: boolean; archived: boolean; color?: Color; tags: string[] };
+type Flags = { pinned: boolean; archived: boolean; color?: Color; tags: string[] };
 /** A one-tap edit of the flags: only what is passed changes; `null` takes a colour off. */
 export type FlagEdit = Partial<Omit<Flags, "color">> & { color?: Color | null };
 export type Note = { id: string; title: string; created: string; body: string } & Flags;
 /** What serializeNote writes: title and created always, the flags only when set. */
-export type Meta = { title: string; created: string } & Partial<Flags>;
+type Meta = { title: string; created: string } & Partial<Flags>;
 
 /** What a note is: its record's `kind` column (server/pb_migrations/1793300000_note_kind.js), set when it is made and never
  *  changed. Never read off the path. The screenshot captures' old `capture` kind is no longer one: such a note reads as a
  *  note (noteKindOf). */
-export const NOTE_KINDS = ["note"] as const;
+const NOTE_KINDS = ["note"] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
 /** A record's `kind` column as a NoteKind: one this client doesn't know yet (a kind added later) is shown as a note. */
 export const noteKindOf = (v: unknown): NoteKind => ((NOTE_KINDS as readonly unknown[]).includes(v) ? (v as NoteKind) : "note");
@@ -258,7 +258,7 @@ const SKIPPED = /^(```|~~~|<!--)|^([-*_]\s*){3,}$|^\|?[\s:|-]+\|[\s:|-]*$/;     
 
 /** Markdown as the text it reads as, line by line: nothing of the syntax left, nothing dropped but fences, rules and
  *  table dividers. `prose`: only what a preview wants, so headings and code go too. The lines, blank ones left out. */
-export function plainLines(md: string, prose = false): string[] {
+function plainLines(md: string, prose = false): string[] {
   const out: string[] = [];
   let fence = false;
   for (const raw of md.split("\n")) {
@@ -289,14 +289,14 @@ export function snippetOf(body: string, max = 160): string {
 /** One picture a note's tile can show: a photo (`image`: the name in the note's attachments folder) or a PDF (`pdf`:
  *  the name; its first page, as the agent renders it). A drawing is the PNG kept beside it (photos.ts `drawingPreview`), an
  *  image like a photo, marked `drawing` so a client can show it whole rather than cropped. */
-export type TilePicture = { image: string; drawing?: true } | { pdf: string };
+type TilePicture = { image: string; drawing?: true } | { pdf: string };
 /** What stands for a note in a list: up to `max` of its photos, PDFs and drawings in the body's order, `more` how many it has
  *  past those; with none, the first web link in it (`link`: the page, whose picture the server's link preview finds).
  *  null: neither. */
-export type Pictures = { pictures: TilePicture[]; more: number } | { link: string };
+type Pictures = { pictures: TilePicture[]; more: number } | { link: string };
 
 /** How many pictures a tile shows at most: the mosaic's four cells. */
-export const MOSAIC_MAX = 4;
+const MOSAIC_MAX = 4;
 
 export function picturesOf(noteId: string, body: string, max = MOSAIC_MAX): Pictures | null {
   const all: TilePicture[] = [], seen = new Set<string>();
@@ -319,7 +319,7 @@ export function picturesOf(noteId: string, body: string, max = MOSAIC_MAX): Pict
 }
 
 /** A mosaic cell, as fractions of the picture area: left, top, width, height. */
-export type Cell = { x: number; y: number; w: number; h: number };
+type Cell = { x: number; y: number; w: number; h: number };
 
 /** The cells of a tile's mosaic for `n` pictures (1 to MOSAIC_MAX), as social apps lay them out: one fills it, two
  *  split it down the middle, three are one tall on the left and two stacked on the right, four are quarters. */

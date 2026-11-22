@@ -2,7 +2,7 @@
 // as the `context` every request carries, and the UI tools the agent drives the app with. Pure: the nav, the cache and the
 // dock come in as arguments, so this is what `test/assistant.test.ts` exercises.
 import { getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
-import { isAskTool, isUiTool, LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type DrawOutput, type OpenDrawing, type SaveDrawingOutput, type UiOutput, type UiToolName } from "@/core/assistant";
+import { isAskTool, isUiTool, CONTEXT_LIMITS, uiError, UI_OK, viewFrom, type AssistantContext, type AssistantView, type DrawInput, type DrawOutput, type OpenDrawing, type SaveDrawingOutput, type UiOutput, type UiToolName } from "@/core/assistant";
 import { editWords } from "@/core/drawing";
 import { contextFilter, type Lens } from "@/core/lens";
 import { isNotePath } from "@/core/notes";
@@ -46,10 +46,10 @@ export function pageContext(at: Where, held: Cached, selection: string, lens?: L
   if (note) out.note = { path: note.path, title: note.note.title, rev: note.rev };
   const task = at.task ? held.tasks?.find((t) => t.id === at.task) : undefined;   // over a note it is the drawer in front of it
   if (task) out.task = { id: task.id, title: task.title };
-  const words = selection.trim(), text = words.slice(0, LIMITS.selection);
+  const words = selection.trim(), text = words.slice(0, CONTEXT_LIMITS.selection);
   if (text) out.selection = text;
   // Editable only when sent whole: the agent replaces exactly what it was sent, so a cut selection would lose its tail
-  if (text && out.note && editable && words.length <= LIMITS.selection) out.editable = true;
+  if (text && out.note && editable && words.length <= CONTEXT_LIMITS.selection) out.editable = true;
   if (drawing) out.drawing = drawing;
   const filter = contextFilter(lens);
   if (filter) out.filter = filter;

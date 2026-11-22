@@ -2,7 +2,7 @@
 // the model as image parts. The chat stores only which picture was read; the bytes are fetched again each time the
 // history goes to the model. A picture is someone else's content, like a web page: reading one taints the chat (guard.ts).
 import * as pb from "@/core/client/pocketbase";
-import { type Server, photoUrl } from "@/core/urls";
+import { type Server, photoUrl } from "@/core/server-urls";
 
 export type Image = { rec: string; name: string; file: string };
 

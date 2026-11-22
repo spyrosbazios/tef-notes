@@ -10,7 +10,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { isNotePath } from "@/core/notes";
 import { isDrawingName } from "@/core/photos";
-import { ASK, contextOf, drawPictureOf, GO_VIEWS, LIMITS, SELECTION_TEXT_MAX, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
+import { ASK, contextOf, drawPictureOf, GO_VIEWS, CONTEXT_LIMITS, SELECTION_TEXT_MAX, type AssistantContext, type AssistantView, type UiToolInput, type UiToolName } from "@/core/assistant";
 import { DRAW_COLOR_NAMES, DRAW_KINDS, DRAWING_LIMITS, FONT_SIZES, type DrawColor, type FontSize } from "@/core/drawing";
 
 /** True only when A and B are assignable both ways: a schema that drifts from the contract stops compiling. */
@@ -21,7 +21,7 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 export const Context = z.unknown().transform(contextOf).optional();
 true satisfies Same<z.infer<typeof Context>, AssistantContext | undefined>;
 
-const id = z.string().min(1).max(LIMITS.id);
+const id = z.string().min(1).max(CONTEXT_LIMITS.id);
 const shapeId = z.string().min(1).max(DRAWING_LIMITS.id).regex(/^[\w-]+$/, "letters, digits, - and _");
 const color = z.enum(DRAW_COLOR_NAMES as [DrawColor, ...DrawColor[]]);
 const size = z.enum(Object.keys(FONT_SIZES) as [FontSize, ...FontSize[]]);
@@ -31,7 +31,7 @@ const input = {
   open_task: z.object({ id: id.describe("The task's id, as list_tasks or the screen gave it") }),
   go_view: z.object({
     view: z.enum(GO_VIEWS).describe("home, notes (all), pinned, a task list (inbox today upcoming logbook), ask, memory, settings, or tag"),
-    tag: z.string().min(1).max(LIMITS.tag).optional().describe("With view tag: the tag"),
+    tag: z.string().min(1).max(CONTEXT_LIMITS.tag).optional().describe("With view tag: the tag"),
   }),
   ask_choice: z.object({
     question: z.string().min(1).max(ASK.question).describe("One short question, in the owner's language"),

@@ -10,7 +10,7 @@
 export type PushKey = { publicKey: string };
 
 /** A PushSubscription as `subscription.toJSON()` gives it. */
-export type PushKeys = { p256dh: string; auth: string };
+type PushKeys = { p256dh: string; auth: string };
 
 /** The body of `POST /agent/push/subscribe`. `label`: which device or browser, for the owner's own list. */
 export type PushSubscribeBody = { endpoint: string; keys: PushKeys; label: string };
@@ -19,7 +19,7 @@ export type PushSubscribeBody = { endpoint: string; keys: PushKeys; label: strin
  *  notification of the same task instead of stacking a second. */
 export type PushPayload = { title: string; body: string; task: string; url: string; tag: string };
 
-export const PUSH_LABEL_MAX = 80;
+const PUSH_LABEL_MAX = 80;
 const ENDPOINT_MAX = 2048;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");

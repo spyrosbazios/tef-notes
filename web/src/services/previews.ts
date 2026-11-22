@@ -2,7 +2,7 @@
 // reads the page, since a browser can't (CORS), and caches it.
 import { AxiosError } from "axios";
 import { api } from "./api";
-import { hasPreview, type LinkPreview } from "@/core/links";
+import { hasPreview, type LinkPreview } from "@/core/hyperlinks";
 
 /** The preview of a URL; null when there is nothing to show or the server won't fetch it (400). Failing to ask throws. */
 export async function get(url: string): Promise<LinkPreview | null> {

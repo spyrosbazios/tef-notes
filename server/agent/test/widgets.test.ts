@@ -3,7 +3,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
 import { addDays } from "@/core/dates";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { newTask, type Task } from "@/core/todo";
 import { widgetOf } from "@/core/widgets";
 import { fromWeb } from "../src/tools";

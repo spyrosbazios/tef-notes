@@ -2,7 +2,7 @@
 // search the chat's `search_notes` runs (notes.ts, semantic.ts). Contract: packages/core/src/find.ts `SearchHit`; the
 // CLI's `tefnotes search`.
 import { SEARCH_MAX, type SearchHit } from "@/core/find";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { NoteService } from "./application/notes";
 
 export async function search(req: Request, server: Server): Promise<Response> {

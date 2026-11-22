@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ACTION_ICONS, BUILTIN_LABEL, HEADER_MAX, headerRoom, idsAt, isBuiltin, LIMITS, movedSlot, newActionId, PLACE_LABEL, PLACES, placedAt, promptProblem,
+  ACTION_ICONS, BUILTIN_LABEL, HEADER_MAX, headerRoom, idsAt, isBuiltin, ACTION_LIMITS, movedSlot, newActionId, SLOT_PLACE_LABEL, SLOT_PLACES, placedAt, promptProblem,
   RESULT_ABOUT, RESULT_LABEL, RESULTS, type ActionIcon, type PromptAction, type Result,
 } from "@/core/note-actions";
 import type { Layout } from "@/core/prefs";
@@ -51,7 +51,7 @@ function HeaderList({ layout }: { layout: Layout }) {
                 <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />
                 <Icon className={cn("size-4 shrink-0", place === "off" ? "text-faint" : prompt ? "text-brand" : "text-dim")} />
                 <span className={cn("min-w-0 flex-1 basis-32 truncate text-sm", place === "off" && "text-faint")}>{name}</span>
-                <Choice label={`Where ${name} sits`} value={place} options={PLACES} names={PLACE_LABEL} off={(o) => o === "header" && !room}
+                <Choice label={`Where ${name} sits`} value={place} options={SLOT_PLACES} names={SLOT_PLACE_LABEL} off={(o) => o === "header" && !room}
                   onPick={(v) => setHeader(layout, placedAt(prefsNow()[layout].noteHeader, layout, id, v))} />
               </div>
             </li>
@@ -94,11 +94,11 @@ function ActionDialog({ action, onClose }: { action: PromptAction | null; onClos
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="action-name">Name</Label>
-            <Input id="action-name" autoFocus value={label} maxLength={LIMITS.label} onChange={(e) => setLabel(e.target.value)} placeholder="Summarise" />
+            <Input id="action-name" autoFocus value={label} maxLength={ACTION_LIMITS.label} onChange={(e) => setLabel(e.target.value)} placeholder="Summarise" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="action-prompt">Prompt</Label>
-            <Textarea id="action-prompt" value={prompt} maxLength={LIMITS.prompt} onChange={(e) => setPrompt(e.target.value)} rows={5}
+            <Textarea id="action-prompt" value={prompt} maxLength={ACTION_LIMITS.prompt} onChange={(e) => setPrompt(e.target.value)} rows={5}
               placeholder="Add a three-line summary at the top of this note. Invent nothing." />
           </div>
           <div className="space-y-1.5">
@@ -141,7 +141,7 @@ function Actions() {
     <section className="space-y-3" aria-labelledby="note-actions-h">
       <div className="flex items-center gap-3">
         <h3 id="note-actions-h" className={cn(SUB, "min-w-0 flex-1")}>Assistant actions</h3>
-        <Button size="sm" variant="outline" className="rounded-full" disabled={actions.length >= LIMITS.actions} onClick={() => setEditing("new")}><Plus />New action</Button>
+        <Button size="sm" variant="outline" className="rounded-full" disabled={actions.length >= ACTION_LIMITS.actions} onClick={() => setEditing("new")}><Plus />New action</Button>
       </div>
       <p className="text-sm text-dim">A saved prompt, run on the open note from its button. What it writes still follows “What the agent may do”. You can also ask the assistant to make one.</p>
       {actions.length ? (

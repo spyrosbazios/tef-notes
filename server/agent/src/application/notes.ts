@@ -7,7 +7,7 @@ import * as pb from "@/core/client/pocketbase";
 import { HttpError } from "@/core/client/http";
 import { noteColumns, Conflict, landed } from "@/core/record-contracts";
 import type { TagDef } from "@/core/tags";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { allPdfs } from "../pdfs";
 import { semantic, type Near } from "../semantic";
 

@@ -12,7 +12,7 @@ import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ago } from "@/core/time";
+import { ago } from "@/core/days";
 import { useChats, useRemoveChat } from "@/hooks/agent";
 import { useAssistant } from "@/hooks/assistant";
 import { useNow } from "@/hooks/now";

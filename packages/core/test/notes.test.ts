@@ -3,7 +3,7 @@ import {
   appendToNote, appended, attachmentOf, isNotePath, merge3, mergeDraft, newNotePath, noteIdOf, parseNote, reconcile, rewriteImagePaths, serializeNote,
   pastedNote, picturesOf, mosaicCells, slugify, snippetOf, undoEdit, withBody, withFlags,
 } from "../src/notes";
-import { localDay } from "../src/time";
+import { localDay } from "../src/days";
 
 const P = "notes/20261005-garage-door-codes.md";
 const DOC = "---\ntitle: Garage door codes\ncreated: 2026-10-05\npinned: false\ncolor: yellow\ntags: [home]\n---\nBody in GitHub-flavored markdown.\n";

@@ -16,7 +16,7 @@ export const archivePatch = (ns: { archived: boolean }[]): { archived: boolean; 
 /** The same colour on every note, its card's tint in the list; null takes the tint off. */
 export const colorPatch = (color: Color | null): { color: Color | null } => ({ color });
 
-export type TagState = "all" | "some" | "none";
+type TagState = "all" | "some" | "none";
 
 /** Whether `name` is on every one of the notes (each one's tags), some, or none. Case and tonos ignored. */
 export function tagState(lists: string[][], name: string): TagState {

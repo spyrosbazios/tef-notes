@@ -19,7 +19,7 @@ import { z } from "zod";
 import { ChatHistoryError } from "@/core/chat-history";
 import { EFFORTS } from "@/core/agent";
 import { runOf } from "@/core/note-actions";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { hold, load, saver } from "./chats";
 import { storeFiles } from "./chat-files";
 import { Context } from "./assistant";

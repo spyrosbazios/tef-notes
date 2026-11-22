@@ -10,7 +10,7 @@ import type { UIMessage } from "ai";
 import { isPdf, PDF } from "@/core/photos";
 import { parseNote } from "@/core/notes";
 import * as pb from "@/core/client/pocketbase";
-import { type Server, photoUrl, type ThumbSize } from "@/core/urls";
+import { type Server, photoUrl, type ThumbSize } from "@/core/server-urls";
 import { fileBytes } from "./chat-files";
 import { ocr } from "./ocr";
 import { render, RenderError } from "./render";

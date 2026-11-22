@@ -6,7 +6,7 @@ import { type Remote, Conflict, lit, noteColumns, Refused, Gone } from "../../pa
 import { newTask } from "../../packages/core/src/todo";
 import { linkRecord, newLink } from "../../packages/core/src/record-links";
 import { readChatHistory, serializeChatHistory } from "../../packages/core/src/chat-history";
-import { photoUrl } from "../../packages/core/src/urls";
+import { photoUrl } from "../../packages/core/src/server-urls";
 
 const url = process.env.TEF_CONTRACT_URL;
 if (!url || !/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error("Run bun --no-env-file server/integration/run.ts");

@@ -7,7 +7,7 @@
 import { EllipsisVertical, Focus, Hash, House, ListTodo, Loader2, Plus, Sparkles } from "lucide-react";
 import { ShimmeringText } from "@animate-ui/react/primitives/texts/shimmering";
 import { useState, type PointerEvent } from "react";
-import { ago } from "@/core/time";
+import { ago } from "@/core/days";
 import { fold } from "@/core/notes";
 import { Markdown } from "@/components/markdown";
 import { DeleteDialog, MenuAt, TagsDialog } from "@/components/note-actions";

@@ -7,7 +7,7 @@ import { memo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { noteLinkPath } from "@/core/links";
+import { noteLinkPath } from "@/core/hyperlinks";
 import { noteIdOf } from "@/core/notes";
 import { Lightbox, type LightboxItem } from "@/components/lightbox";
 import { PdfViewer } from "@/components/pdf-viewer";

@@ -2,7 +2,7 @@
 // resumes by itself, and what a Stop leaves. The contract's own reading of the context is tested in packages/core.
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
-import { choiceOutput, LIMITS, UI_OK, uiToolsFor } from "@/core/assistant";
+import { choiceOutput, CONTEXT_LIMITS, UI_OK, uiToolsFor } from "@/core/assistant";
 import { assistantView, closeUnfinished, isAppTool, notOffered, pageContext, resumes, runUiTool, uiTrouble, uiWords, webView, type UiHost } from "@/lib/assistant";
 import type { View } from "@/lib/nav";
 import { withNote, type NoteRec } from "@/services/notes";
@@ -58,8 +58,8 @@ describe("the page context", () => {
     expect(pageContext(at, held, "words", null, true).editable).toBe(true);
     expect(pageContext(at, held, "words").editable).toBeUndefined();
     expect(pageContext({ view: { kind: "home" } }, held, "words", null, true).editable).toBeUndefined();
-    const long = pageContext(at, held, "x".repeat(LIMITS.selection + 1), null, true);
-    expect(long.selection).toHaveLength(LIMITS.selection);
+    const long = pageContext(at, held, "x".repeat(CONTEXT_LIMITS.selection + 1), null, true);
+    expect(long.selection).toHaveLength(CONTEXT_LIMITS.selection);
     expect(long.editable).toBeUndefined();
   });
 });

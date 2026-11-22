@@ -12,7 +12,7 @@ export type Clock = {
 
 const real: Clock = { set: (f, ms) => setTimeout(f, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) };
 
-export type Ticker = {
+type Ticker = {
   /** Start the wait for `id`, or take it back when one is running: "waiting" or "taken-back". */
   toggle: (id: string) => "waiting" | "taken-back";
   /** Whether `id` is waiting to be written. */

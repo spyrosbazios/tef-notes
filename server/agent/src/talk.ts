@@ -22,7 +22,7 @@ import { generateId, isTextUIPart } from "ai";
 import type { Effort } from "@/core/agent";
 import { talkThinking } from "@/core/prefs";
 import { bytesOf, costOf, talkClientEventOf, TALK_LIMITS, TALK_RATE, type TalkClientEvent, type TalkPart, type TalkServerEvent, type TalkStatus, type TalkVoice } from "@/core/talk";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 import { hold, load, saver } from "./chats";
 import { ownerPrefs } from "./prefs";
 import { settle } from "./guard";

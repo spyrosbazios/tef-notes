@@ -23,7 +23,7 @@ import { outlineOf, sameOutline, type OutlineItem } from "./outline";
 import { pending } from "./pending";
 import { slashMenu } from "./slash";
 import { ImageView, ListItemView } from "./views";
-import { noteLinkPath, safeHref } from "@/core/links";
+import { noteLinkPath, safeHref } from "@/core/hyperlinks";
 import { spliced } from "@/core/voice";
 import type { ResolveImage } from "./views";
 

@@ -16,7 +16,7 @@ import type { RecordTransport } from "./record-protocol";
 
 /** A device's copy: the preferences as it shows them, and the paths changed here and not yet saved. */
 export type PrefsCopy = { prefs: Prefs; dirty: string[] };
-export type CopyStore = { read: () => PrefsCopy; write: (c: PrefsCopy) => void };
+type CopyStore = { read: () => PrefsCopy; write: (c: PrefsCopy) => void };
 
 /** The server's record: its id, the `rev` it is at and the preferences in it. */
 export type StoredPrefs = { rec: string; rev: number; prefs: Prefs };

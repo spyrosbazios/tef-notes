@@ -8,7 +8,7 @@ import { parseNote } from "@/core/notes";
 import { approvals, guarded } from "../src/turn";
 import { NoteService } from "../src/application/notes";
 import { newTask, type Task } from "@/core/todo";
-import { localDay } from "@/core/time";
+import { localDay } from "@/core/days";
 import { linkRecord, newLink } from "@/core/record-links";
 import { TaskService } from "../src/application/todo";
 import { checkAdd, checkAddMany, checkTask, checkUpdate } from "../src/todoTools";

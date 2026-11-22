@@ -7,7 +7,7 @@
 import * as pb from "@/core/client/pocketbase";
 import { DEFAULT_PREFS, type Prefs, type PrefsPatch } from "@/core/prefs";
 import { patchPrefs, prefsRemote } from "@/core/prefs-sync";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 
 const remote = (server: Server) => prefsRemote(pb.transport(server));
 

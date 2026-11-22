@@ -2,7 +2,7 @@
 // note's id, the body pointing at them as `../attachments/<id>/<name>`. The bytes are at photoUrl, on this page's own origin.
 import type { Photo } from "@/core/photos";
 import { attachments } from "@/core/record-protocol";
-import { photoUrl } from "@/core/urls";
+import { photoUrl } from "@/core/server-urls";
 import { directTransport } from "./records";
 
 export const list = (note: string) => attachments.list(directTransport, note);

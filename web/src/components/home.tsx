@@ -17,6 +17,8 @@ import { NoteList, TOOL } from "@/components/note-list";
 import { TaskList } from "@/components/task-list";
 import { Button } from "@/components/ui/button";
 import { addDays } from "@/core/dates";
+import { OPENING_LISTS, type OpeningList } from "@/core/prefs";
+import { TASK_LIST_LABEL } from "@/core/things";
 import { useActiveLens } from "@/hooks/lens";
 import { layoutPrefsNow } from "@/hooks/prefs";
 import { useNarrow } from "@/hooks/media";
@@ -24,7 +26,7 @@ import { useNow } from "@/hooks/now";
 import { useScrollSwitch } from "@/hooks/scroll";
 import { useViews } from "@/hooks/todo";
 import { useShell } from "@/hooks/shell";
-import { usePlace, type TaskView } from "@/lib/nav";
+import { usePlace } from "@/lib/nav";
 import { homeScroll } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
 import { HEADER_ICON, PageHeader } from "@/components/page-header";
@@ -33,7 +35,7 @@ import { ReducedMotionConfig, spring, transition, useShouldReduceMotion, useTemp
 import { AnimatePresence, motion, useIsPresent, type Transition, type Variants } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 
-const TABS = [["today", "Today"], ["inbox", "Inbox"], ["upcoming", "Upcoming"]] as const satisfies readonly [TaskView, string][];
+const TABS = OPENING_LISTS.map((l) => [l, TASK_LIST_LABEL[l]] as const);
 
 /** The lists side by side, as Animate UI's Tabs' panels (`TabsContents`): the one picked pushes the one in front out of the box, both
  *  moving together on `spring.slide`, the one going blurring as an inactive panel does and the one coming clearing (`spring.selection`).
@@ -52,7 +54,7 @@ const panel = (slide: Transition, selection: Transition, fade: Transition, still
 function Panel({ children, ...props }: ComponentProps<typeof motion.div>) {
   return <motion.div {...props} inert={!useIsPresent()}>{children}</motion.div>;
 }
-const order = (k: TaskView) => TABS.findIndex(([t]) => t === k);
+const order = (k: OpeningList) => TABS.findIndex(([t]) => t === k);
 
 /** Home's task box: the list in front, kept while another screen takes Home's place. */
 type Box = { tab: (typeof TABS)[number][0] };

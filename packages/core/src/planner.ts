@@ -2,14 +2,11 @@
 // is shaded by how many open tasks are planned for it (its `when`) or due on it. The clients draw it; the days, the counts
 // and the shade are worked out here.
 import { addDays } from "./dates";
+import { dayDate, weekdayOf } from "./days";
 import type { Task } from "./todo";
 
 /** How many shades a day can take: none, then 1, 2, 3, 4 or more tasks. */
-export const SHADES = 5;
-export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-/** A day at noon, local: what a client formats it from (noon keeps a DST shift off the date). */
-export const dayDate = (day: string) => new Date(`${day}T12:00:00`);
+const SHADES = 5;
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** The first of the month `n` months from `day`'s. */
@@ -21,7 +18,7 @@ export function monthOf(day: string, n: number): string {
 }
 
 /** The Monday of the week `n` weeks from `day`'s. */
-export const weekOf = (day: string, n: number) => addDays(day, 7 * n - ((dayDate(day).getDay() + 6) % 7));
+export const weekOf = (day: string, n: number) => addDays(day, 7 * n - weekdayOf(day));
 
 /** `n` days in a row from `first`: the phone's strip. */
 export const dayRange = (first: string, n: number) => Array.from({ length: n }, (_, i) => addDays(first, i));

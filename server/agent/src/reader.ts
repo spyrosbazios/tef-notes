@@ -9,7 +9,7 @@ import { parseHTML } from "linkedom";
 import { HttpError } from "@/core/client/http";
 import * as pb from "@/core/client/pocketbase";
 import type { Article } from "@/core/reader";
-import type { Server } from "@/core/urls";
+import type { Server } from "@/core/server-urls";
 
 const fail = (status: number, message: string) => Response.json({ message }, { status });
 

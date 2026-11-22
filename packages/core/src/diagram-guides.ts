@@ -3,7 +3,7 @@
 // own terms: its shapes (`DRAW_KINDS`), colour names (`DRAW_COLORS`) and text sizes (`FONT_SIZES`), core/drawing.ts.
 
 export const DIAGRAM_KINDS = ["flowchart", "architecture", "wireframe", "mindmap", "sequence", "timeline"] as const;
-export type DiagramKind = (typeof DIAGRAM_KINDS)[number];
+type DiagramKind = (typeof DIAGRAM_KINDS)[number];
 
 /** For every kind: lay out on a grid, plan before drawing, check the picture each draw answers with. */
 const COMMON = [

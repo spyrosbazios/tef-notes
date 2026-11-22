@@ -18,7 +18,7 @@ export type LensFields = Omit<Lens, "rec">;
 
 /** The longest lens name and the most tags one takes (pb_migrations/1793600000_lenses.js). */
 export const LENS_NAME_MAX = 40;
-export const LENS_TAGS_MAX = 20;
+const LENS_TAGS_MAX = 20;
 
 // ---- the wire
 

@@ -3,10 +3,10 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { HttpError } from "../src/client/http";
 import { attachments, create, lenses, linkPreview, list, read, remove, search, tasks, unanswered, update } from "../src/client/pocketbase";
-import { hasPreview } from "../src/links";
+import { hasPreview } from "../src/hyperlinks";
 import { Conflict, Gone, Refused, Unavailable, landed, likeLit } from "../src/record-contracts";
 import { newTask } from "../src/todo";
-import { photoThumbUrl, previewPictureUrl, serverUrl } from "../src/urls";
+import { photoThumbUrl, previewPictureUrl, serverUrl } from "../src/server-urls";
 
 const S = { url: "https://n:8097" };
 const reply = (status: number, body: unknown = {}) => mock(async (_url: string, _init?: RequestInit) => new Response(status === 204 ? null : JSON.stringify(body), { status }));

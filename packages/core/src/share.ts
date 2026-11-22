@@ -3,12 +3,12 @@
 // text it becomes are tested in packages/core/test/share.test.ts; the page is web/src/components/share-page.tsx.
 import type { ClipPage } from "./clip";
 import { askedAbout } from "./handoff";
-import { firstUrl, hostOf, linkify } from "./links";
+import { firstUrl, hostOf, linkify } from "./hyperlinks";
 import { isPdf, PDF } from "./photos";
-import { localDay } from "./time";
+import { localDay } from "./days";
 
-export type SharedImage = { uri: string; width: number | null; height: number | null };
-export type SharedPdf = { uri: string; name: string };
+type SharedImage = { uri: string; width: number | null; height: number | null };
+type SharedPdf = { uri: string; name: string };
 export type Shared = { text: string; url: string | null; images: SharedImage[]; pdfs: SharedPdf[]; title: string | null };
 
 const isUrl = (s: string) => /^https?:\/\/\S+$/.test(s);
