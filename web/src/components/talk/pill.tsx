@@ -1,54 +1,132 @@
-// The conversation, while the owner is somewhere else (the assistant just opened a note, say) and Talk's panel is closed: a small pill showing what it is doing,
-// that takes them back to Talk on a tap and ends it from its own button. Not on the Talk page, which is all of this and more. The
-// level bars are moved from the frame loop, not by React. It comes and goes on a spring from the edge it sits at: the top of a phone,
-// the bottom of a window.
+// The conversation, while the owner is somewhere else (the assistant just opened a note, say) and Talk's panel is closed: a pill
+// with the orb itself, small (orb.tsx: it breathes, swells, circles and rings as on Talk's page, and follows the real levels), and in
+// words what the assistant is doing, down to which call ("Reading a note · Groceries"). A tap opens it into a small menu, the pill
+// growing into it on one spring: the last thing said, Mute, Talk's page (Answer, while a card waits for a tap) and End, which is in
+// the menu and not on the pill so a stray thumb never ends a conversation. A tap outside, Escape or a change of screen closes the
+// menu. Not on the Talk page, which is all of this and more. It comes and goes on a spring from the edge it sits at: the top of a
+// phone, the bottom of a window.
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { MicOff, X } from "lucide-react";
+import { AudioLines, ChevronDown, Mic, MicOff, PhoneOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Swap } from "@/components/swap";
+import { Orb } from "@/components/talk/orb";
+import { Button } from "@/components/ui/button";
+import { label as toolLabel } from "@/core/agent";
+import { detailOf } from "@/core/tool-words";
 import { useNarrow } from "@/hooks/media";
+import { useNotes } from "@/hooks/notes";
 import { useNow } from "@/hooks/now";
-import { useFrames, useTalk } from "@/hooks/talk";
+import { useTalk } from "@/hooks/talk";
+import { useTasks } from "@/hooks/todo";
+import { toolName } from "@/lib/ask";
 import { haptic } from "@/lib/haptics";
-import { follow } from "@/lib/orb";
 import { useNav, usePlace } from "@/lib/nav";
 import { useTalkPanel } from "@/lib/talk-panel";
-import { clock, type TalkState } from "@/lib/talk";
+import { clock, rowsOf, runningCall, type TalkState } from "@/lib/talk";
 import { cn } from "@/lib/utils";
 
-const WORDS: Partial<Record<TalkState, string>> = { connecting: "Connecting", listening: "Listening", speaking: "Speaking", working: "Working", waiting: "Waiting for you" };
-const BARS = [0.7, 1, 0.55];
+const WORDS: Partial<Record<TalkState, string>> = {
+  connecting: "Connecting", listening: "Listening", thinking: "Thinking", speaking: "Speaking", working: "Working", waiting: "Waiting for you",
+};
+
+/** What the pill says: the state in a word or, while a call runs, the call as the chat names it, and which note, task or query. */
+function useDoing(): { label: string; detail: string } {
+  const { state, muted, messages } = useTalk();
+  const { data: notes } = useNotes(), tasks = useTasks().data;
+  return useMemo(() => {
+    const call = state === "working" ? runningCall(messages) : undefined;
+    if (!call) return { label: state === "listening" && muted ? "Muted" : WORDS[state] ?? "Talk", detail: "" };
+    const name = toolName(call), input = call.input && typeof call.input === "object" ? call.input as Record<string, unknown> : {};
+    const titleOf = (path: unknown) => notes?.find((n) => n.path === path)?.note.title || (typeof path === "string" ? path : "");
+    const detail = name === "open_note" ? titleOf(input.path) : name === "open_task" ? tasks?.find((t) => t.id === input.id)?.title ?? "" : detailOf(name, input, titleOf);
+    return { label: toolLabel(name), detail };
+  }, [state, muted, messages, notes, tasks]);
+}
+
+/** The newest thing either side said, for the open pill: who, and the words. */
+function useLastSaid() {
+  const { messages } = useTalk();
+  return useMemo(() => rowsOf(messages).rows.findLast((r) => r.kind === "said"), [messages]);
+}
+
+function Menu({ id, close }: { id: string; close: () => void }) {
+  const { state, phase, muted, session } = useTalk();
+  const { goView } = useNav();
+  const said = useLastSaid();
+  const fade = useTempoTransition(transition.fade);
+  const waiting = state === "waiting";
+  return (
+    <motion.div id={id} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: fade }} exit={{ opacity: 0, transition: { duration: 0 } }} className="space-y-3 px-3 pt-1 pb-3">
+      {said?.kind === "said" ? (
+        <p className="line-clamp-2 px-1 text-[13px] leading-snug text-dim">
+          <span className="font-medium text-faint">{said.who === "you" ? "You" : "Assistant"}</span> {said.text}
+        </p>
+      ) : null}
+      <div className="flex items-center gap-2">
+        <Button variant={muted ? "secondary" : "outline"} size="icon-lg" disabled={phase !== "live"} aria-label={muted ? "Unmute" : "Mute"} aria-pressed={muted} title={muted ? "Unmute" : "Mute"}
+          className="size-11 shrink-0 rounded-full [&_svg:not([class*='size-'])]:size-5" onClick={() => { haptic("tap"); session.mute(!muted); }}>
+          <Swap id={muted ? "off" : "on"}>{muted ? <MicOff /> : <Mic />}</Swap>
+        </Button>
+        <Button variant={waiting ? "default" : "outline"} className="h-11 min-w-0 flex-1 rounded-full text-sm [&_svg:not([class*='size-'])]:size-4"
+          onClick={() => { haptic("tap"); close(); goView({ kind: "talk" }); }}>
+          <AudioLines /> {waiting ? "Answer" : "Open Talk"}
+        </Button>
+        <Button variant="destructive" className="h-11 shrink-0 rounded-full px-4 text-sm [&_svg:not([class*='size-'])]:size-4" onClick={() => { haptic("tick"); session.end(); }}>
+          <PhoneOff /> End
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
 
 function Pill() {
-  const { state, muted, startedAt, session } = useTalk();
-  const { goView } = useNav(), phone = useNarrow();
+  const { state, muted, startedAt } = useTalk();
+  const phone = useNarrow(), { view, note } = usePlace();
+  const { label, detail } = useDoing();
+  const [open, setOpen] = useState(false);
   const now = useNow(1000);
+  const box = useRef<HTMLDivElement>(null), menu = useId();
   const pop = useTempoTransition(spring.pop), fade = useTempoTransition(transition.fade), away = useTempoTransition(transition.dismiss);
-  const bars = useRef<(HTMLSpanElement | null)[]>([]), level = useRef(0);
-  useFrames((dt) => {
-    const l = session.levels();
-    level.current = follow(level.current, state === "speaking" ? l.voice : state === "listening" && !muted ? l.mic : 0, dt);
-    bars.current.forEach((b, i) => { if (b) b.style.transform = `scaleY(${0.25 + Math.min(1, level.current * BARS[i] * 1.6) * 0.75})`; });
-  });
+  const morph = useTempoTransition(spring.morph);
+
+  // The menu is the screen's it was opened on: moving on closes it
+  const place = `${view.kind}:${note ?? ""}`;
+  const [at, setAt] = useState(place);
+  if (at !== place) { setAt(place); setOpen(false); }
+
+  useEffect(() => {
+    if (!open) return;
+    const out = (e: PointerEvent) => { if (e.target instanceof Node && !box.current?.contains(e.target)) setOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", out, true);
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", out, true); document.removeEventListener("keydown", key); };
+  }, [open]);
+
   const edge = phone ? -12 : 12;
-  const label = state === "listening" && muted ? "Muted" : WORDS[state] ?? "Talk";
+  const waiting = state === "waiting";
   return (
-    <motion.div role="status" initial={{ opacity: 0, y: edge, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { ...pop, opacity: fade } }}
+    <motion.div ref={box} layout role="status" style={{ borderRadius: 24 }} transition={{ layout: morph }}
+      initial={{ opacity: 0, y: edge, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { ...pop, opacity: fade } }}
       exit={{ opacity: 0, y: edge, scale: 0.96, transition: away }}
-      className={cn("pointer-events-auto flex h-10 items-center rounded-full border bg-card pr-1 pl-1 shadow-lg", state === "waiting" ? "border-warn/60" : "border-line")}>
-      <button type="button" aria-label="Back to Talk" onClick={() => { haptic("tap"); goView({ kind: "talk" }); }}
-        className="flex h-full items-center gap-2.5 rounded-full pr-2 pl-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        {muted ? <MicOff className="size-4 text-dim" /> : (
-          <span aria-hidden className={cn("flex h-4 items-center gap-[2px]", state === "working" || state === "connecting" ? "animate-pulse" : "", state === "waiting" ? "text-warn" : "text-brand")}>
-            {BARS.map((_, i) => <span key={i} ref={(el) => { bars.current[i] = el; }} className="h-full w-[3px] origin-center rounded-full bg-current" style={{ transform: "scaleY(0.25)" }} />)}
-          </span>
-        )}
-        <span className="min-w-0"><Swap id={label}>{label}</Swap></span>
-        {startedAt != null ? <span className="text-xs tabular-nums text-faint max-md:hidden">{clock((now - startedAt) / 1000)}</span> : null}
-      </button>
-      <button type="button" aria-label="End the conversation" title="End" onClick={() => { haptic("tick"); session.end(); }}
-        className="grid size-8 place-items-center rounded-full text-dim outline-none hover:bg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" /></button>
+      className={cn("pointer-events-auto max-w-[calc(100vw-1.5rem)] overflow-hidden border bg-card/90 shadow-lg backdrop-blur-md transition-colors",
+        open ? "w-80" : "", waiting ? "border-warn/60" : "border-line")}>
+      <motion.button layout="position" type="button" aria-expanded={open} aria-controls={menu} aria-label={`Talk: ${label}${detail ? `, ${detail}` : ""}`}
+        onClick={() => { haptic("tap"); setOpen((o) => !o); }}
+        className="flex h-12 w-full items-center gap-2 pr-3.5 pl-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+        <Orb state={state} muted={muted} bare className="size-9 shrink-0" />
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          {muted ? <MicOff aria-hidden className="size-3.5 shrink-0 text-dim" /> : null}
+          <span className={cn("shrink-0 font-medium", waiting ? "text-warn" : "")}><Swap id={label}>{label}</Swap></span>
+          {detail ? <span className={cn("min-w-0 truncate text-dim", open ? "" : "max-w-40")}>{detail}</span> : null}
+        </span>
+        {open && startedAt != null ? <span className="shrink-0 text-xs tabular-nums text-faint">{clock((now - startedAt) / 1000)}</span> : null}
+        <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-faint transition-transform duration-200 motion-reduce:transition-none", open ? "rotate-180" : "")} />
+      </motion.button>
+      <AnimatePresence initial={false} mode="popLayout">
+        {open ? <Menu key="menu" id={menu} close={() => setOpen(false)} /> : null}
+      </AnimatePresence>
     </motion.div>
   );
 }

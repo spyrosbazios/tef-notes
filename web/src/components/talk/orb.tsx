@@ -20,7 +20,8 @@ const colorsOf = (el: Element): Colors => {
 /** A look held still: no wander, nothing moving but what the state itself is (a ring, an arc). */
 const stilled = (state: TalkState): Look => ({ ...LOOKS[state], wobble: 0 });
 
-export function Orb({ state, muted, className }: { state: TalkState; muted: boolean; className?: string }) {
+/** `bare`: the orb alone, without the light behind it (the pill's small one, where a blur that wide would be all there is). */
+export function Orb({ state, muted, bare, className }: { state: TalkState; muted: boolean; bare?: boolean; className?: string }) {
   const session = useTalkSession(), calm = useShouldReduceMotion();
   const canvas = useRef<HTMLCanvasElement>(null), glow = useRef<HTMLDivElement>(null);
   // What the frame loop reads: the state asked for, and what has been drawn so far
@@ -70,7 +71,7 @@ export function Orb({ state, muted, className }: { state: TalkState; muted: bool
 
   return (
     <div className={cn("relative aspect-square", className)}>
-      <div ref={glow} aria-hidden className="absolute inset-[8%] rounded-full bg-brand opacity-30 blur-3xl will-change-[transform,opacity]" />
+      {bare ? null : <div ref={glow} aria-hidden className="absolute inset-[8%] rounded-full bg-brand opacity-30 blur-3xl will-change-[transform,opacity]" />}
       <canvas ref={canvas} aria-hidden className="relative size-full" />
     </div>
   );

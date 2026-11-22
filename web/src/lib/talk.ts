@@ -94,15 +94,24 @@ export function rowsOf(messages: readonly UIMessage[]): { rows: Row[]; pending: 
 export type Phase = "idle" | "connecting" | "live" | "failed";
 
 /** What the page shows the conversation doing: while live, the voice playing, then a card or question waiting for the owner's tap,
- *  then a tool running, else it is the owner's turn to speak. Only the newest message counts: a card in an older one was passed over. */
-export type TalkState = "idle" | "connecting" | "listening" | "speaking" | "working" | "waiting" | "failed";
+ *  then a tool running, then the reply being thought out (the newest message is the owner's: the ear settled their turn and the
+ *  assistant has shown nothing yet), else it is the owner's turn to speak. Only the newest message counts: a card in an older one
+ *  was passed over. */
+export type TalkState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "working" | "waiting" | "failed";
 
 export function talkStateOf(phase: Phase, speaking: boolean, messages: readonly UIMessage[]): TalkState {
   if (phase !== "live") return phase;
   if (speaking) return "speaking";
   const last = messages.at(-1), parts = last?.role === "assistant" ? last.parts : [];
   if (parts.some(awaiting)) return "waiting";
-  return parts.some(running) ? "working" : "listening";
+  if (parts.some(running)) return "working";
+  return last?.role === "user" ? "thinking" : "listening";
+}
+
+/** The call the conversation is working on: the newest message's latest one on its way, for whoever says which (the pill). */
+export function runningCall(messages: readonly UIMessage[]): ToolPart | undefined {
+  const last = messages.at(-1);
+  return last?.role === "assistant" ? last.parts.findLast((p): p is ToolPart => running(p)) : undefined;
 }
 
 /** The seconds as a clock: 4:07, or 1:02:09 past the hour. */
