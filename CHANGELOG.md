@@ -5,6 +5,40 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Security
+
+- Talk follows the same rules as the chat, read every turn: a chat that read the web is still treated as having read it
+  when you go on talking (its writes ask and are marked, memory is off, link cards aren't fetched), a rule you change in
+  Settings mid-conversation applies from the next turn, and a card runs its write only on the tap the server asked for.
+- Other websites can no longer write to your notes or use your server to fetch pages: a request from another site is
+  refused unless it is your extension, and only the extension may read the API across origins.
+- Text the server writes for a clip or a share (a new note, an append, a new task) is marked as someone else's, like
+  a page the assistant read, so the assistant asks before it writes after reading it. Once marked, a note or task keeps
+  the mark. A tag description an outside agent saves is marked as the agent's, not yours.
+- Link previews never go through a proxy set in the server's environment, and a link that turns out to lead to a
+  private address is refused instead of kept as an empty preview.
+- A link pasted into a note from a web page keeps only an `http(s):`, `mailto:` or the app's own address; a
+  `javascript:` or `data:` link becomes plain text, and Ctrl-click never opens one.
+
+### Changed
+
+- Smaller fixes to the installed app's plumbing: an unreadable reminder push still shows a notification, renaming a tag
+  syncs the notes instead of refetching every query, link previews are kept for the full week offline, and the offline
+  cache is no longer rewritten on every note edit.
+- The agent no longer stalls chats and Talk while it reads a big PDF or draws a tile or a drawing: that work runs in a process of its own. Scanned PDFs: a language code Tesseract has no data for is reported at start and dropped, and while its data can't be downloaded OCR backs off (a minute, doubling to an hour) instead of re-reading every PDF each minute.
+- The auto-tagger learns from you. Each tag is judged against a few notes you filed under it by hand and a few you took
+  it off, a tag you keep removing needs a likelier match before it is added again, and a note gets at most three tags of
+  its own. Taking a tag off no longer sends the note back to be tagged again (only a change to its title or text does).
+  The clipper's preselected tags and a new task's guessed tags follow the same rules.
+- Tag descriptions the server writes are drawn only from notes you tagged by hand, spread over the tag's history, and
+  say what doesn't belong from the notes you took it off; they are written at 3 such notes and again each time that
+  doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
+  re-tags every note. The ones it wrote before are rewritten once this way.
+- Searching for a word with a `%` or `_` in it (the CLI's `search`, the clipper's "any note") finds that character, not any
+  text: `100%` no longer matches everything that begins "100".
+- The Android widgets say so when the server and the app are of different versions ("update the app" or "update the
+  server", as Settings does) instead of "Loading" for good.
+
 ### Fixed
 
 - The chat list shows every saved chat, not only the newest 200; a lens, a tag or a chat made again after its answer was lost
@@ -30,7 +64,6 @@ version is one semver number for the whole repository, set by the git tag (see [
 - The assistant holds each chat's history itself: the app sends only the new message or the answer to a card, a
   second message while a reply is still running is refused instead of running a second reply, and no request can
   approve a card the agent never showed or rewrite what the chat already read.
-
 - Nothing is made twice when a reply is lost on the way: writes are no longer re-sent by the transport, and every create
   (notes, tasks, lenses, tags, reminder claims, the Android companion's tasks and clips, the clipper's and share page's
   saves) carries an id of its own that the server answers a repeat of as the first. The companion contract is now 4: the
@@ -72,45 +105,6 @@ version is one semver number for the whole repository, set by the git tag (see [
 - The note editor keeps up in long notes: a keystroke or a caret move rereads only the lines it touched (links, link
   cards, PDF and drawing chips) instead of the whole note, and the body is handed to the save once per pause in
   typing, at once on leaving the field, the note or the page.
-
-### Security
-
-- Talk follows the same rules as the chat, read every turn: a chat that read the web is still treated as having read it
-  when you go on talking (its writes ask and are marked, memory is off, link cards aren't fetched), a rule you change in
-  Settings mid-conversation applies from the next turn, and a card runs its write only on the tap the server asked for.
-- Other websites can no longer write to your notes or use your server to fetch pages: a request from another site is
-  refused unless it is your extension, and only the extension may read the API across origins.
-- Text the server writes for a clip or a share (a new note, an append, a new task) is marked as someone else's, like
-  a page the assistant read, so the assistant asks before it writes after reading it. Once marked, a note or task keeps
-  the mark. A tag description an outside agent saves is marked as the agent's, not yours.
-- Link previews never go through a proxy set in the server's environment, and a link that turns out to lead to a
-  private address is refused instead of kept as an empty preview.
-
-### Changed
-
-- Smaller fixes to the installed app's plumbing: an unreadable reminder push still shows a notification, renaming a tag
-  syncs the notes instead of refetching every query, link previews are kept for the full week offline, and the offline
-  cache is no longer rewritten on every note edit.
-- The agent no longer stalls chats and Talk while it reads a big PDF or draws a tile or a drawing: that work runs in a process of its own. Scanned PDFs: a language code Tesseract has no data for is reported at start and dropped, and while its data can't be downloaded OCR backs off (a minute, doubling to an hour) instead of re-reading every PDF each minute.
-- The auto-tagger learns from you. Each tag is judged against a few notes you filed under it by hand and a few you took
-  it off, a tag you keep removing needs a likelier match before it is added again, and a note gets at most three tags of
-  its own. Taking a tag off no longer sends the note back to be tagged again (only a change to its title or text does).
-  The clipper's preselected tags and a new task's guessed tags follow the same rules.
-- Tag descriptions the server writes are drawn only from notes you tagged by hand, spread over the tag's history, and
-  say what doesn't belong from the notes you took it off; they are written at 3 such notes and again each time that
-  doubles, instead of every 10 notes. A description you wrote is never replaced, and a new server-written one no longer
-  re-tags every note. The ones it wrote before are rewritten once this way.
-- Searching for a word with a `%` or `_` in it (the CLI's `search`, the clipper's "any note") finds that character, not any
-  text: `100%` no longer matches everything that begins "100".
-- The Android widgets say so when the server and the app are of different versions ("update the app" or "update the
-  server", as Settings does) instead of "Loading" for good.
-
-### Security
-
-- A link pasted into a note from a web page keeps only an `http(s):`, `mailto:` or the app's own address; a
-  `javascript:` or `data:` link becomes plain text, and Ctrl-click never opens one.
-### Fixed
-
 - A tag description the server or the assistant wrote is treated like text from the web: when the assistant reads one it
   asks before writing, and a description the assistant writes is marked as its own. Only what you wrote is trusted.
 - The agent no longer answers another website's browser: its routes need a JSON body (raw bytes for dictation) and an
@@ -118,9 +112,6 @@ version is one semver number for the whole repository, set by the git tag (see [
   signed; one waiting while the agent updates has to be asked again).
 - The assistant's last step of a turn is sent no tools at all, and the app refuses a call to an app tool the turn did not
   offer. What an untrusted tool's error said now counts as read from the web in the turns that follow, as in its own.
-
-### Fixed
-
 - A note action's Undo takes back only what the action wrote and keeps what you wrote after it; where you changed the same
   lines it says so instead of overwriting them.
 - Merging two edits of one line no longer drops a deletion made on one side against typing on the other (it is a conflict
@@ -128,9 +119,6 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Renaming a note keeps its other frontmatter keys and its line ends.
 - The server folds tag names as the apps do, so tags with Hebrew, Devanagari, Arabic or Japanese marks no longer
   duplicate or escape a rename.
-
-### Fixed
-
 - Waiting for a sync while one is already out now waits for a fresh round: the assistant opening a note it just made, a
   note action's Undo and the Share page no longer see the notebook as it was before the write.
 - A change the server refuses (a link to a note deleted on another device, a note or task it won't take) is no longer
@@ -149,9 +137,6 @@ version is one semver number for the whole repository, set by the git tag (see [
 - The web app's offline copy is written to the device one batch at a time, each in one transaction and in order; a write
   that fails (storage full) is kept to try again with the next and is shown ("Not saved on this device") instead of being
   dropped silently.
-
-### Fixed
-
 - A task repeating monthly or yearly on the 29th, 30th or 31st no longer drifts: January 30 goes to February 28 and back to
   March 30 (it used to land on March 31), and a leap day comes back on the next leap year. A short month's round carries the
   day it is meant for (`1m@30`) until the task is moved.
@@ -163,9 +148,6 @@ version is one semver number for the whole repository, set by the git tag (see [
 - Settings no longer undo each other: the preferences record carries a `rev` like notes and tasks, a device whose save lost
   a race reads the newer record and puts only the settings it changed over it, and the assistant's own writes (the widget's
   lens, a note action it saves) go through the same path instead of saving the whole record.
-
-### Fixed
-
 - A part of the web app that fails to draw (a note, the assistant, Reader, a PDF, a drawing) says so in its own place with
   Try again, instead of blanking the whole app; a link left half typed (`[x](https://)`) no longer gets a Reader button
   that crashed the app.
