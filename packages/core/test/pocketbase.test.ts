@@ -2,7 +2,7 @@
 // PocketBase's answers become Conflict or null. No token: the private network is the gate.
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { HttpError } from "../src/client/http";
-import { create, lenses, linkPreview, list, read, remove, search, tasks, unanswered, update, uploaded, uploadTo } from "../src/client/pocketbase";
+import { attachments, create, lenses, linkPreview, list, read, remove, search, tasks, unanswered, update } from "../src/client/pocketbase";
 import { hasPreview } from "../src/links";
 import { Conflict, Gone, Refused, Unavailable, landed, likeLit } from "../src/record-contracts";
 import { newTask } from "../src/todo";
@@ -84,11 +84,14 @@ describe("pocketbase", () => {
     expect(decodeURIComponent(sent(f).url)).toContain('filter=path = "notes/say \\"hi\\".md"');
   });
 
-  it("an upload's reply: the photo, or Conflict when the note has one by that name", () => {
-    expect(uploadTo(S, "n1", "a.jpg")).toEqual({ url: "https://n:8097/api/collections/attachments/records", fields: { note: "n1", name: "a.jpg" } });
-    expect(uploaded(200, JSON.stringify({ id: "p1", note: "n1", name: "a.jpg", file: "a_x.jpg" }), "a.jpg")).toEqual({ rec: "p1", note: "n1", name: "a.jpg", file: "a_x.jpg" });
-    expect(() => uploaded(400, JSON.stringify({ data: { note: { code: "validation_not_unique" } } }), "a.jpg")).toThrow(Conflict);
-    expect(() => uploaded(500, "<html>", "a.jpg")).toThrow("HTTP 500");
+  it("an upload goes as a multipart form, without the JSON header; a name the note has already is a Conflict", async () => {
+    const f = reply(200, { id: "p1", note: "n1", name: "a.jpg", file: "a_x.jpg" });
+    stubFetch(f);
+    expect(await attachments.upload(S, "n1", "a.jpg", new Blob(["x"]))).toEqual({ rec: "p1", note: "n1", name: "a.jpg", file: "a_x.jpg" });
+    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    expect([url, init.method, init.body instanceof FormData, init.headers]).toEqual(["https://n:8097/api/collections/attachments/records", "POST", true, undefined]);
+    stubFetch(reply(400, { data: { name: { code: "validation_not_unique" } } }));
+    await expect(attachments.upload(S, "n1", "a.jpg", new Blob(["x"]))).rejects.toBeInstanceOf(Conflict);
   });
 });
 

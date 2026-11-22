@@ -1,38 +1,33 @@
 // The agent runs on the server (the sidecar at /agent, same origin): which models it offers, and the chats it keeps.
-// A chat is a PocketBase record: the client makes it empty before the first send and names it in the request; the
-// server holds its history from then on (a request carries only the newest message) and writes the messages and the title
-// back as it goes, so a chat opens the same on every device. An attached file comes back as a stored chat file's address.
+// A chat is a PocketBase record (core/record-protocol.ts `chats`): the client makes it empty before the first send and names it
+// in the request; the server holds its history from then on (a request carries only the newest message) and writes the messages
+// and the title back as it goes, so a chat opens the same on every device. An attached file comes back as a stored chat file's
+// address.
 import type { UIMessage } from "ai";
-import { readChatHistory, serializeChatHistory } from "@/core/chat-history";
 import type { AgentModels } from "@/core/agent";
 import type { SteerBody, SteerResult } from "@/core/assistant";
-import { api, orNull } from "./api";
+import { chats as chatRecords, type ChatLine } from "@/core/record-protocol";
+import { api } from "./api";
+import { directTransport } from "./records";
 
 export const models = async (): Promise<AgentModels> => (await api.get("/agent/models", { baseURL: "" })).data;
 
-export type ChatRec = { id: string; title: string; updated: string };
-export type Chat = ChatRec & { messages: UIMessage[] };
-
-const LIST = "id,title,updated";
-
 /** The saved chats, newest activity first. */
-export async function chats(): Promise<ChatRec[]> {
-  const { data } = await api.get("collections/chats/records", { params: { fields: LIST, sort: "-updated", perPage: 200, skipTotal: 1 } });
-  return data.items;
-}
+export const chats = (): Promise<ChatLine[]> => chatRecords.list(directTransport);
 
 /** One chat with its messages; null when it's gone. */
-export const chat = (id: string) =>
-  orNull(api.get(`collections/chats/records/${id}`, { params: { fields: `${LIST},messages,historyVersion` } }).then((r): Chat => ({ ...r.data, messages: readChatHistory(r.data) as UIMessage[] })));
+export async function chat(id: string): Promise<(ChatLine & { messages: UIMessage[] }) | null> {
+  const c = await chatRecords.get(directTransport, id);
+  return c && { id: c.id, title: c.title, updated: c.updated, messages: c.messages as UIMessage[] };
+}
 
 /** A new chat's id: PocketBase's own shape (15 of a-z0-9), picked here so the conversation has its id before it has a record. */
 export const newChatId = () => Array.from(crypto.getRandomValues(new Uint8Array(15)), (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
 
 /** An empty chat under `id`, so the first send has a record to name. */
-export const createChat = async (id: string, title: string): Promise<ChatRec> =>
-  (await api.post("collections/chats/records", { id, title, ...serializeChatHistory([]) }, { params: { fields: LIST } })).data;
+export const createChat = (id: string, title: string): Promise<ChatLine> => chatRecords.create(directTransport, id, title);
 
-export const removeChat = async (id: string): Promise<void> => { await orNull(api.delete(`collections/chats/records/${id}`)); };
+export const removeChat = (id: string): Promise<void> => chatRecords.remove(directTransport, id);
 
 /** Sends `text` into chat `id`'s running reply (steering); false when the reply ended first, and it goes as a message instead. */
 export const steer = async (id: string, text: string): Promise<boolean> =>

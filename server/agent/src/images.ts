@@ -13,7 +13,7 @@ export const imageType = (name: string): string | undefined => TYPES[/\.(\w+)$/.
 
 /** The note's pictures (`note`: its own id, parseNote's). */
 export async function imagesOf(server: Server, note: string): Promise<Image[]> {
-  return (await pb.photos(server, note)).filter((p) => imageType(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
+  return (await pb.attachments.list(server, note)).filter((p) => imageType(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
 }
 
 /** The picture's bytes, base64. */

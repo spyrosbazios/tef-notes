@@ -145,11 +145,11 @@ describe("tag descriptions", () => {
 
   it("only the owner's own description is trusted: any other is marked, and reading one taints the turn like a web read", async () => {
     described("owner");
-    expect(await run(T.list_tags, {})).toEqual({ tags: [{ name: "Σπίτι", id: "t1", means: "the house" }, { name: "work", id: "t2" }] });
+    expect(await run(T.list_tags, {})).toEqual({ tags: [{ name: "work", id: "t2" }, { name: "Σπίτι", id: "t1", means: "the house" }] });   // by name, as the server sorts: binary
     expect(await taints()).toBe(false);
     for (const by of ["auto", "agent", "", undefined, "something else"]) {
       described(by);
-      expect(await run(T.list_tags, {})).toMatchObject({ tags: [{ name: "Σπίτι", means: "the house", unverified: true }, { name: "work" }] });
+      expect(await run(T.list_tags, {})).toMatchObject({ tags: [{ name: "work" }, { name: "Σπίτι", means: "the house", unverified: true }] });
       expect(await taints()).toBe(true);
     }
   });
@@ -291,7 +291,7 @@ describe("writes", () => {
 
   it("set_note_flags: only existing tags, spelled as they exist", async () => {
     pb.put("notes/a.md", file("a"));
-    expect(await run(T.set_note_flags, { path: "notes/a.md", tags: ["newtag", "work"] })).toEqual({ error: "Not an existing tag: newtag. Use only: Σπίτι, work." });
+    expect(await run(T.set_note_flags, { path: "notes/a.md", tags: ["newtag", "work"] })).toEqual({ error: "Not an existing tag: newtag. Use only: work, Σπίτι." });
     expect(pb.notes.get("notes/a.md")!.rev).toBe(1);
     await run(T.set_note_flags, { path: "notes/a.md", tags: ["σπιτι", "WORK"], pinned: true });
     expect(pb.notes.get("notes/a.md")).toMatchObject({ tags: ["Σπίτι", "work"], pinned: true, rev: 2 });

@@ -144,23 +144,23 @@ test("attachments: multipart, exact download, name uniqueness and note deletion 
   const owner = n.path.slice(6, -3), otherOwner = other.path.slice(6, -3);
   const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5V8AAAAASUVORK5CYII=", "base64");
   const file = new Blob([bytes], { type: "image/png" });
-  const photo = await pb.upload(s, owner, "pixel.png", file);
-  expect(await pb.photos(s, owner)).toEqual([photo]);
+  const photo = await pb.attachments.upload(s, owner, "pixel.png", file);
+  expect(await pb.attachments.list(s, owner)).toEqual([photo]);
   const downloaded = await fetch(photoUrl(s, photo));
   expect(downloaded.status).toBe(200);
   expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(bytes);
-  await expect(pb.upload(s, owner, "pixel.png", file)).rejects.toBeInstanceOf(Conflict);
-  const survivor = await pb.upload(s, otherOwner, "pixel.png", file);
+  await expect(pb.attachments.upload(s, owner, "pixel.png", file)).rejects.toBeInstanceOf(Conflict);
+  const survivor = await pb.attachments.upload(s, otherOwner, "pixel.png", file);
   expect((await pb.get(s, n.rec))?.rev).toBe(1);
   await expect(pb.remove(s, { rec: n.rec, rev: 0 })).rejects.toBeInstanceOf(Conflict);
-  expect(await pb.photos(s, owner)).toEqual([photo]);
+  expect(await pb.attachments.list(s, owner)).toEqual([photo]);
   await pb.remove(s, n);
-  expect(await pb.photos(s, owner)).toEqual([]);
+  expect(await pb.attachments.list(s, owner)).toEqual([]);
   expect((await fetch(photoUrl(s, photo))).status).toBe(404);
-  expect(await pb.photos(s, otherOwner)).toEqual([survivor]);
-  await pb.removePhoto(s, survivor.rec);
-  await pb.removePhoto(s, survivor.rec);
-  expect(await pb.photos(s, otherOwner)).toEqual([]);
+  expect(await pb.attachments.list(s, otherOwner)).toEqual([survivor]);
+  await pb.attachments.remove(s, survivor.rec);
+  await pb.attachments.remove(s, survivor.rec);
+  expect(await pb.attachments.list(s, otherOwner)).toEqual([]);
 });
 
 test("search: a typed % or _ matches itself, not any text (PocketBase reads a bare % as a pattern)", async () => {

@@ -1,14 +1,20 @@
-// Collection protocol shared by fetch and axios. The injected transport owns I/O, retries and connectivity; this module owns
-// records, pagination, write semantics and what PocketBase's answers mean: every call here fails with one of the typed
-// outcomes of record-contracts (Conflict, Gone, Refused, Unavailable), never a transport's own error, so a caller (the sync
-// engine) switches on types, never on status codes.
+// Collection protocol shared by fetch and axios: one per collection (notes, tasks, links, lenses, tags, attachments, chats; the
+// preferences' is prefs-sync.ts) and the tag routes beside them. The injected transport owns I/O, retries and connectivity; this
+// module owns records, pagination, write semantics and what PocketBase's answers mean: every call here fails with one of the
+// typed outcomes of record-contracts (Conflict, Gone, Refused, Unavailable), never a transport's own error, so a caller (the
+// sync engine, a toast) switches on types, never on status codes.
+import { CHAT_FIELDS, chatOf, serializeChatHistory, type StoredChat } from "./chat-history";
+import { lensColumns, lensOf, type Lens, type LensFields } from "./lens";
 import { noteKindOf } from "./notes";
-import { Conflict, Gone, Refused, Unavailable, conflictOf, lit, noteColumns, type Entry, type Listed, type Mark, type RevEntry, type Versioned } from "./record-contracts";
+import type { Photo } from "./photos";
+import { Conflict, Gone, Refused, Unavailable, conflictOf, lit, noteColumns, serverError, type Entry, type Listed, type Mark, type RevEntry, type Versioned } from "./record-contracts";
 import { LINK_COLUMNS, linkOf, linkColumn, linkRecord, sameLink, type Link, type LinkEnd, type LinkSide } from "./record-links";
 import type { Heard } from "./sync";
+import { tagColumns, tagDef, type Described, type Renamed, type TagDef, type TagFields, type TagMark } from "./tags";
 import { taskOf } from "./todo";
 
-export type RecordRequest = { method?: string; body?: unknown; timeout?: number };
+/** `body` a FormData goes as a multipart form (an upload), anything else as JSON. `signal`: the caller's Stop. */
+export type RecordRequest = { method?: string; body?: unknown; timeout?: number; signal?: AbortSignal };
 export type RecordTransport = {
   request(path: string, request?: RecordRequest): Promise<any>;
   /** What the server answered to a failed request; undefined when nothing answered (a timeout, a refused or dropped connection). */
@@ -23,8 +29,8 @@ export function outcomeOf(status: number, body: unknown, what: string): Conflict
   const b = body as { message?: unknown; data?: Record<string, { code?: unknown; message?: unknown }> } | null | undefined;
   const fields = Object.entries(b?.data ?? {});
   if (status === 404 || (status === 400 && fields.some(([, f]) => f?.code === "validation_missing_rel_records"))) return new Gone(what);
-  if (status === 408 || status === 429 || status >= 500) return new Unavailable(`${what}: HTTP ${status}`);
-  const said = typeof b?.message === "string" && b.message ? b.message : `HTTP ${status}`;
+  if (status === 408 || status === 429 || status >= 500) return new Unavailable(serverError(body) ?? `${what}: HTTP ${status}`);
+  const said = serverError(body) ?? `HTTP ${status}`;
   const why = fields.map(([k, f]) => `${k}: ${typeof f?.message === "string" ? f.message : String(f?.code ?? "")}`).join("; ");
   return new Refused(why ? `${said} (${why})` : said);
 }
@@ -49,10 +55,12 @@ export function heardOf(topic: Heard["topic"], action: unknown, r: any): Heard |
   return link ? { topic, link } : null;
 }
 
-/** One request, a failure as its typed outcome. */
+const typed = (e: unknown) => e instanceof Conflict || e instanceof Gone || e instanceof Refused || e instanceof Unavailable;
+
+/** One request, a failure as its typed outcome (one the transport typed itself, a web page's Offline, as it is). */
 async function call(s: RecordTransport, path: string, request?: RecordRequest): Promise<any> {
   try { return await s.request(path, request); } catch (e) {
-    if (e instanceof Conflict) throw e;
+    if (typed(e)) throw e;
     const a = s.answer(e);
     throw a ? outcomeOf(a.status, a.body, path) : new Unavailable(`${path}: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -63,6 +71,26 @@ async function orGone<T>(run: () => Promise<T>): Promise<T | null> {
   try { return await run(); } catch (e) { if (e instanceof Gone) return null; throw e; }
 }
 const PAGE = 500;
+
+/** A create under an id the caller made, sent again when no answer came back (`unanswered`: by default an `Unavailable`). A
+ *  transport sends a write once, since a second send after a landed one acts twice; under its own id a create can be repeated:
+ *  the server holds that id once. `make` sends it; `there` reads the record by that id (null: none). A Conflict means the id is
+ *  taken, which after our own earlier try is that try having landed: the record `there` finds is the answer, and no new id is
+ *  ever made. A Conflict with nothing under the id is another record's (a path, a name): it goes back to the caller as it was. */
+export async function createdUnder<T>(make: () => Promise<T>, there: () => Promise<T | null>,
+  { tries = 3, wait = 500, unanswered = (e: unknown): boolean => e instanceof Unavailable && !e.unsent } = {}): Promise<T> {
+  for (let i = 0; ; i++) {
+    try { return await make(); } catch (e) {
+      if (e instanceof Conflict) {
+        const had = await there();
+        if (had) return had;
+        throw e;
+      }
+      if (!unanswered(e) || i >= tries - 1) throw e;
+      await new Promise((r) => setTimeout(r, wait * 2 ** i));
+    }
+  }
+}
 
 /** Every record of `records` a `filter` picks, PAGE at a time by id (`id > last`, sorted by id), with `fields` (which must
  *  name `id`). Keyset, not offsets: a record made or deleted between two pages moves no other one out of the listing, which a
@@ -204,5 +232,131 @@ export const links = {
   /** A link gone. Already gone is done. */
   async remove(s: RecordTransport, id: string): Promise<void> {
     await orGone(() => call(s, `collections/links/records/${id}`, { method: "DELETE" }));
+  },
+};
+
+// ---- lenses
+
+const LENSES = "collections/lenses/records";
+
+/** The `lenses` collection (core/lens.ts): the owner's saved filters, open rules and no `rev` (a lens is edited whole, like a
+ *  tag definition: the last save wins). */
+export const lenses = {
+  /** Every lens, oldest first (the order the switcher shows). */
+  list: async (s: RecordTransport): Promise<Lens[]> => sorted(await every(s, LENSES), "created").map(lensOf),
+  /** A new lens under the caller's id: sent again when no answer came, never twice. Conflict: a lens by that name (ignoring
+   *  case) exists. */
+  create: (s: RecordTransport, l: LensFields, id: string): Promise<Lens> => createdUnder(
+    async () => lensOf(await call(s, LENSES, json("POST", { id, ...lensColumns(l) }))),
+    () => orGone(async () => lensOf(await call(s, `${LENSES}/${id}`)))),
+  /** `rec` rewritten. Gone when it has gone. */
+  update: async (s: RecordTransport, rec: string, l: LensFields): Promise<Lens> => lensOf(await call(s, `${LENSES}/${rec}`, json("PATCH", lensColumns(l)))),
+  /** A lens gone. Already gone is done. */
+  async remove(s: RecordTransport, rec: string): Promise<void> {
+    await orGone(() => call(s, `${LENSES}/${rec}`, { method: "DELETE" }));
+  },
+};
+
+// ---- tags
+
+const TAGS = "collections/tags/records";
+// A model call is behind a rename's sweep, a description and a guess, so they wait longer than a read (being writes, they
+// are sent once).
+const RENAME_MS = 90_000, DESCRIBE_MS = 90_000, DESCRIBE_ALL_MS = 600_000, GUESS_MS = 20_000;
+
+/** The `tags` collection (core/tags.ts): definitions, open rules and no `rev` (the last save wins), and the server's tag routes
+ *  (server/pb_hooks/tags.pb.js, autotag.pb.js). */
+export const tags = {
+  /** Every definition, by name. */
+  list: async (s: RecordTransport): Promise<TagDef[]> => sorted(await every(s, TAGS), "name").map(tagDef),
+  /** A new definition under the caller's id: sent again when no answer came, never twice. Conflict: a tag by that name (ignoring
+   *  case) exists. `mark`: who wrote the description when it isn't the owner. */
+  create: (s: RecordTransport, t: TagFields, id: string, mark?: TagMark): Promise<TagDef> => createdUnder(
+    async () => tagDef(await call(s, TAGS, json("POST", { id, ...tagColumns(t, mark) }))),
+    () => orGone(async () => tagDef(await call(s, `${TAGS}/${id}`)))),
+  /** Conflict: the new name is taken. Gone: the definition has gone. */
+  update: async (s: RecordTransport, rec: string, t: TagFields, mark?: TagMark): Promise<TagDef> =>
+    tagDef(await call(s, `${TAGS}/${rec}`, json("PATCH", tagColumns(t, mark)))),
+  /** A definition gone (the notes keep the tag). Already gone is done. */
+  async remove(s: RecordTransport, rec: string): Promise<void> {
+    await orGone(() => call(s, `${TAGS}/${rec}`, { method: "DELETE" }));
+  },
+  /** Renames the tag `from` to `to` on every note, task, lens and its definition, in one transaction on the server; a `to`
+   *  already defined (case and tonos ignored) merges the two. */
+  rename: (s: RecordTransport, from: string, to: string): Promise<Renamed> =>
+    call(s, "tefnotes/tags/rename", { ...json("POST", { from, to }), timeout: RENAME_MS }),
+  /** A description written from the notes that carry the tag `name`: not saved, the editor shows it. */
+  describe: async (s: RecordTransport, name: string): Promise<string> =>
+    (await call(s, "tefnotes/tags/describe", { ...json("POST", { tag: name }), timeout: DESCRIBE_MS })).description,
+  /** A description for every tag that has a note, by name. A tag the model failed on is left out; a failure of the whole is
+   *  Refused with the server's words (no note carries a tag, no key, the model failed). */
+  describeAll: (s: RecordTransport): Promise<Described[]> =>
+    call(s, "tefnotes/tags/describe", { ...json("POST", { all: true }), timeout: DESCRIBE_ALL_MS }),
+  /** The tags JEV gives a task with this title and notes, likeliest first (core/tags.ts tagGuesser asks it). */
+  async guess(s: RecordTransport, draft: { title: string; notes: string }, signal: AbortSignal): Promise<string[]> {
+    const j = await call(s, "tefnotes/tags/guess", { ...json("POST", draft), timeout: GUESS_MS, signal });
+    return Array.isArray(j?.tags) ? j.tags.filter((t: unknown): t is string => typeof t === "string") : [];
+  },
+};
+
+// ---- attachments
+
+const ATTACHMENTS = "collections/attachments/records";
+const photo = (r: any): Photo => ({ rec: r.id, note: r.note, name: r.name, file: r.file });
+
+/** The `attachments` collection: a note's photos, PDFs and drawings, each a record under the note's id (photos.ts), made and
+ *  deleted, never edited. */
+export const attachments = {
+  /** Every attachment's record, or one note's, in the order they were added. */
+  list: async (s: RecordTransport, note?: string): Promise<Photo[]> =>
+    sorted(await every(s, ATTACHMENTS, { fields: "id,note,name,file,created", filter: note ? `note = ${lit(note)}` : undefined }), "created").map(photo),
+  /** A file up under `note` as `name`. Conflict: the note has one by that name already. */
+  async upload(s: RecordTransport, note: string, name: string, file: Blob): Promise<Photo> {
+    const form = new FormData();
+    form.append("note", note);
+    form.append("name", name);
+    form.append("file", file, name);
+    return photo(await call(s, ATTACHMENTS, { method: "POST", body: form }));
+  },
+  /** An attachment gone. Already gone is done. */
+  async remove(s: RecordTransport, rec: string): Promise<void> {
+    await orGone(() => call(s, `${ATTACHMENTS}/${rec}`, { method: "DELETE" }));
+  },
+};
+
+// ---- chats
+
+const CHATS = "collections/chats/records";
+const LISTED = "id,title,updated";
+
+/** A chat as the list shows it. */
+export type ChatLine = { id: string; title: string; updated: string };
+/** A chat with its history and the rev its next save names. */
+export type Chat = ChatLine & StoredChat;
+const line = (r: any): ChatLine => ({ id: String(r.id), title: r.title ?? "", updated: r.updated ?? "" });
+
+/** The `chats` collection (pb_migrations/1792600000_chats.js): a client makes a chat empty before its first message and names it
+ *  in the request; from then on the agent is the one writer of its history, title and model, each save naming the rev the last
+ *  one left (pb_hooks/rev.pb.js). */
+export const chats = {
+  /** The saved chats, newest activity first. */
+  list: async (s: RecordTransport): Promise<ChatLine[]> => sorted(await every(s, CHATS, { fields: LISTED }), "-updated").map(line),
+  /** One chat, its history read by chatOf (any version chat-history.ts reads); null when there is none. Throws ChatHistoryError
+   *  on a history it can't read. */
+  get: (s: RecordTransport, id: string): Promise<Chat | null> => orGone(async () => {
+    const r = await call(s, `${CHATS}/${encodeURIComponent(id)}?fields=${CHAT_FIELDS},title,updated`);
+    return { ...line(r), ...chatOf(r) };
+  }),
+  /** An empty chat under the client's `id`, so the first send has a record to name: sent again when no answer came, never twice. */
+  create: (s: RecordTransport, id: string, title: string): Promise<ChatLine> => createdUnder(
+    async () => line(await call(s, `${CHATS}?fields=${LISTED}`, json("POST", { id, title, ...serializeChatHistory([]) }))),
+    () => chats.get(s, id)),
+  /** The agent's save of chat `id`'s history, title and model over the version `rev`; the rev the save left. Conflict: another
+   *  save landed since; Gone: the chat was deleted. */
+  save: async (s: RecordTransport, id: string, rev: number, c: { messages: unknown; title: string; model: string }): Promise<number> =>
+    (await call(s, `${CHATS}/${encodeURIComponent(id)}?fields=rev`, json("PATCH", { ...serializeChatHistory(c.messages), title: c.title, model: c.model, rev }))).rev,
+  /** A chat gone (it names no rev: the owner's delete wins). Already gone is done. */
+  async remove(s: RecordTransport, id: string): Promise<void> {
+    await orGone(() => call(s, `${CHATS}/${encodeURIComponent(id)}`, { method: "DELETE" }));
   },
 };

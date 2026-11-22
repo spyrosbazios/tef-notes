@@ -6,7 +6,6 @@
 // by the write that links or replaces them) and tag renames (the server's route).
 import { importNotes, type ImportTally, type Source, type ImportLine } from "@/core/client/import";
 import * as pb from "@/core/client/pocketbase";
-import { createTag, updateTag } from "@/core/client/tags";
 import type { Mark, Entry } from "@/core/record-contracts";
 import type { TagDef, TagFields, TagMark } from "@/core/tags";
 import type { Task } from "@/core/todo";
@@ -30,8 +29,8 @@ export function writer(mark: Mark) {
     },
     tags: {
       /** The mark rides only with a description being written: a colour change leaves who wrote the description as it was. */
-      create: (s: Server, t: TagFields) => createTag(s, t, tagMark),
-      update: (s: Server, was: TagDef, t: TagFields) => updateTag(s, was.rec, t, t.description.trim() === was.description.trim() ? undefined : tagMark),
+      create: (s: Server, t: TagFields) => pb.tags.create(s, t, tagMark),
+      update: (s: Server, was: TagDef, t: TagFields) => pb.tags.update(s, was.rec, t, t.description.trim() === was.description.trim() ? undefined : tagMark),
     },
     importNotes: (s: Server, src: Source, o: { dry: boolean; update: boolean; today: string; onLine?: (l: ImportLine) => void }): Promise<ImportTally> =>
       importNotes(s, src, { ...o, mark }),

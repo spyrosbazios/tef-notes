@@ -17,6 +17,7 @@ import { HttpError } from "@/core/client/http";
 import { taskUrl, type PushPayload } from "@/core/push";
 import * as pb from "@/core/client/pocketbase";
 import { lit, Conflict } from "@/core/record-contracts";
+import { createdUnder } from "@/core/record-protocol";
 import { remindAt } from "@/core/things";
 import { taskOf, type Task } from "@/core/todo";
 import { addDays } from "@/core/dates";
@@ -135,9 +136,9 @@ export const pbPorts = (server: Server): Ports => ({
   async claim(key) {
     const id = pb.recordId();
     try {
-      await pb.createdUnder(() => pb.call(server, SENT, pb.json("POST", { id, key })), async () => {
+      await createdUnder(() => pb.call(server, SENT, pb.json("POST", { id, key })), async () => {
         try { return await pb.call(server, `${SENT}/${id}`); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; }
-      });
+      }, { unanswered: pb.unanswered });
       return true;
     } catch (e) {
       if (e instanceof Conflict || (e instanceof HttpError && e.status === 400 && e.body?.data?.key?.code === "validation_not_unique")) return false;   // the unique key is taken

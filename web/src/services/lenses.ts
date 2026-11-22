@@ -1,16 +1,13 @@
-// Lens definitions on the server (core/lens.ts): a name and its tags. The active lens is this browser's own (hooks/lens.ts).
-import { lensColumns, lensOf, type Lens, type LensFields } from "@/core/lens";
-import { api, orNull } from "./api";
+// Lens definitions on the server (core/lens.ts) through the shared protocol (core/record-protocol.ts `lenses`). Which lens is on
+// is a preference (hooks/lens.ts).
+import { recordId } from "@/core/client/pocketbase";
+import type { LensFields } from "@/core/lens";
+import { lenses } from "@/core/record-protocol";
+import { directTransport } from "./records";
 
-export const list = async (): Promise<Lens[]> =>
-  (await api.get("collections/lenses/records", { params: { perPage: 500, skipTotal: 1, sort: "created,id" } })).data.items.map(lensOf);
-
+export const list = () => lenses.list(directTransport);
 /** Conflict: a lens by that name (ignoring case) exists. */
-export const create = async (l: LensFields): Promise<Lens> => lensOf((await api.post("collections/lenses/records", lensColumns(l))).data);
-
-export const update = async (rec: string, l: LensFields): Promise<Lens> => lensOf((await api.patch(`collections/lenses/records/${rec}`, lensColumns(l))).data);
-
+export const create = (l: LensFields) => lenses.create(directTransport, l, recordId());
+export const update = (rec: string, l: LensFields) => lenses.update(directTransport, rec, l);
 /** Already gone is done. */
-export async function remove(rec: string): Promise<void> {
-  await orNull(api.delete(`collections/lenses/records/${rec}`));
-}
+export const remove = (rec: string) => lenses.remove(directTransport, rec);

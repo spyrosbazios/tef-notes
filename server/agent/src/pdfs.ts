@@ -109,7 +109,7 @@ export function readScans(server: Server): Promise<void> {
   if (sweep) return sweep;
   const run = (async () => {
     if (o.holding()) return;
-    const all = (await pb.photos(server)).filter((p) => isPdf(p.name));
+    const all = (await pb.attachments.list(server)).filter((p) => isPdf(p.name));
     o.keep(new Set(all.map((p) => sourceOf(server, p).key)));
     for (const p of all) {
       if (o.holding()) break;
@@ -130,14 +130,14 @@ export function readScans(server: Server): Promise<void> {
 
 /** The note's PDFs (`note`: the note's own id, parseNote's, which its attachments are filed under), as their records name them. */
 export async function pdfsOf(server: Server, note: string): Promise<Pdf[]> {
-  return (await pb.photos(server, note)).filter((p) => isPdf(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
+  return (await pb.attachments.list(server, note)).filter((p) => isPdf(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
 }
 
 /** Every note's PDFs for the search index (semantic.ts), from one listing of the attachments; text read on demand. A
  *  PDF's key carries how many of its scanned pages OCR has read, so its note is embedded again as they come in. */
 export async function allPdfs(server: Server, notes: { path: string; text: string }[]): Promise<Doc[]> {
   const byId = new Map(notes.map((n) => [parseNote(n.path, n.text).id, n.path])), read = ocr()?.counts();
-  return (await pb.photos(server)).flatMap((p) => {
+  return (await pb.attachments.list(server)).flatMap((p) => {
     const path = isPdf(p.name) && byId.get(p.note), key = `${p.rec}/${p.file}`, n = read?.get(key);
     return path ? [{ path, key: n ? `${key}#${n}` : key, name: p.name, pages: async () => (await pages(server, p)).map((x) => x.text) }] : [];
   });

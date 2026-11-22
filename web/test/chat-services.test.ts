@@ -13,7 +13,7 @@ test("web reads legacy/current history intact and creates the current format", a
   let data: unknown = { id: "c", messages };
   const sent: unknown[] = [];
   api.defaults.adapter = async (config) => {
-    if (config.method === "get") expect(config.params.fields).toContain("historyVersion");
+    if (config.method === "get") expect(config.url).toContain("historyVersion");
     else sent.push(JSON.parse(config.data));
     return { data, status: 200, statusText: "", headers: {}, config };
   };

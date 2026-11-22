@@ -1,7 +1,6 @@
 // Request-scoped note reads, search and writes over the shared transport.
 // Writes carry the revision read, retry additive edits, and three-way merge whole-file edits.
 // Listings are invalidated after writes; taint is persisted in the same write and never cleared.
-import { listTags } from "@/core/client/tags";
 import { fold, newNotePath, noteKindOf, parseNote, snippetOf, type NoteKind } from "@/core/notes";
 import { mergedWrite } from "@/core/note-read";
 import * as pb from "@/core/client/pocketbase";
@@ -56,7 +55,7 @@ export class NoteService {
   /** Every tag a note may carry: the Settings definitions, then any other tag already on a note (typed in the editor,
    *  never defined), spelled as first seen. */
   async tags(): Promise<TagDef[]> {
-    const [defs, notes] = await Promise.all([listTags(this.server), this.list()]);
+    const [defs, notes] = await Promise.all([pb.tags.list(this.server), this.list()]);
     const out = [...defs];
     for (const t of notes.flatMap((n) => n.tags))
       if (!out.some((d) => fold(d.name) === fold(t))) out.push({ rec: "", name: t, description: "" });
@@ -104,9 +103,7 @@ export class NoteService {
     for (let i = 0; i < TRIES; i++) {
       const path = newNotePath(title, Date.now(), new Set((await this.all()).keys())), body = text(path);
       try {
-        const r = await pb.createdUnder(
-          () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: rec, ...noteColumns(path, body), ...(taint ? { tainted: true } : {}) })),
-          () => pb.get(this.server, rec));
+        const r = await pb.create(this.server, rec, path, body, taint ? { tainted: true } : {});
         this.rows = undefined;
         return { saved: r.path, rev: r.rev, text: body };
       } catch (e) {
@@ -150,9 +147,7 @@ export class NoteService {
         if (!o.create) return { error: `No note ${path}: it was deleted meanwhile.` };
         const first = edit("");
         try {
-          const r = await pb.createdUnder(
-            () => pb.call(this.server, "collections/notes/records", pb.json("POST", { id: made, ...noteColumns(path, first), ...(o.taint ? { tainted: true } : {}) })),
-            () => pb.get(this.server, made));
+          const r = await pb.create(this.server, made, path, first, o.taint ? { tainted: true } : {});
           this.rows = undefined;
           return { saved: path, rev: r.rev, text: first };
         } catch (e) {

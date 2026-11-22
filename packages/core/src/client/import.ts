@@ -39,10 +39,10 @@ export async function importNotes(s: Server, src: Source, o: { dry: boolean; upd
       if (!(await pb.update(s, cur, e.text, o.mark))) throw new Error(`${e.path} was deleted meanwhile`);
       t.updated++;
     }
-    const have = new Set(cur ? (await pb.photos(s, id)).map((p) => p.name) : []);
+    const have = new Set(cur ? (await pb.attachments.list(s, id)).map((p) => p.name) : []);
     for (const f of e.files) {
       if (have.has(f.name)) continue;
-      try { await pb.upload(s, id, f.name, await src.blob(f.from)); t.files++; } catch (err) {
+      try { await pb.attachments.upload(s, id, f.name, await src.blob(f.from)); t.files++; } catch (err) {
         if (!(err instanceof Conflict)) throw err;                     // added meanwhile: it is there
       }
     }

@@ -32,7 +32,7 @@ export function withoutPictures<M extends UIMessage>(ms: M[]): M[] {
 
 /** The note's drawings (`note`: its own id, parseNote's). */
 export async function drawingsOf(server: Server, note: string): Promise<Drawing[]> {
-  return (await pb.photos(server, note)).filter((p) => isDrawing(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
+  return (await pb.attachments.list(server, note)).filter((p) => isDrawing(p.name)).map(({ rec, name, file }) => ({ rec, name, file }));
 }
 
 /** A drawing's shapes, read from its file. */

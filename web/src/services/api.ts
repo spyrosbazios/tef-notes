@@ -1,9 +1,8 @@
-// The one HTTP client of the web app: axios on the page's own origin, with failures as the core client names them
-// (packages/core/src/client/pocketbase.ts), so the UI handles a stale rev the same way the phone and the CLI do. No sign-in:
+// The one HTTP client of the web app: axios on the page's own origin, with failures as the core names them
+// (packages/core/src/record-contracts.ts), so the UI handles a stale rev the same way the agent and the CLI do. No sign-in:
 // the private network is the gate (server/pb_migrations/1792400000_open.js).
 import axios, { AxiosError } from "axios";
-import { conflictOf, serverError } from "@/core/record-contracts";
-export { lit } from "@/core/record-contracts";
+import { conflictOf, Gone, serverError, Unavailable } from "@/core/record-contracts";
 import { getNet, note } from "@/lib/net";
 
 export const api = axios.create({ baseURL: "/api", timeout: 45_000 });
@@ -20,9 +19,9 @@ declare module "axios" {
   interface AxiosRequestConfig { /** Sent by the sync engine: not refused up front while offline (see `synced`). */ synced?: boolean }
 }
 
-/** A write with no local copy to wait in, refused because the browser is offline. */
-export class Offline extends Error {
-  constructor() { super("You're offline: this can't be saved until the server is reachable."); }
+/** A write with no local copy to wait in, refused because the browser is offline: no answer to act on (core's Unavailable). */
+export class Offline extends Unavailable {
+  constructor() { super("You're offline: this can't be saved until the server is reachable.", true); }
 }
 
 api.interceptors.request.use((c) => {
@@ -48,5 +47,6 @@ export async function orNull<T>(p: Promise<T>): Promise<T | null> {
 /** What went wrong, in words for a toast. */
 export function message(e: unknown): string {
   if (e instanceof AxiosError) return serverError(e.response?.data) ?? (e.response ? `HTTP ${e.response.status}` : "The server can't be reached.");
+  if (e instanceof Gone) return "It was deleted meanwhile.";
   return e instanceof Error ? e.message : String(e);
 }

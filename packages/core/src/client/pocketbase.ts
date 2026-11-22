@@ -9,14 +9,13 @@
 // (`tasks` below; their shape: core/todo.ts); links between records are records too, outside it (`links`
 // below; their shape: core/record-links.ts).
 import { SEARCH_PATH, searchHitsOf, type SearchHit } from "../find";
-import { CHAT_FIELDS, chatOf, type StoredChat } from "../chat-history";
-import { lensColumns, lensOf, type Lens, type LensFields } from "../lens";
+import type { LensFields } from "../lens";
 import type { LinkPreview } from "../links";
 import { noteKindOf, type NoteKind } from "../notes";
-import type { Photo } from "../photos";
 import type { Link, LinkEnd } from "../record-links";
-import { Conflict, Gone, Refused, Unavailable, conflictOf, likeLit, lit, type Entry, type Remote, type Listed, type Mark } from "../record-contracts";
-import { noteCollection, revCollection, links as linkProtocol, type RecordTransport } from "../record-protocol";
+import { Conflict, Gone, Refused, Unavailable, conflictOf, likeLit, type Entry, type Remote, type Listed, type Mark } from "../record-contracts";
+import { attachments as attachmentProtocol, chats as chatProtocol, createdUnder, lenses as lensProtocol, links as linkProtocol, noteCollection, revCollection, tags as tagProtocol, type RecordTransport } from "../record-protocol";
+import type { TagFields, TagMark } from "../tags";
 import { taskOf, type Task } from "../todo";
 import { agentUrl, type Server } from "../urls";
 import { getJson, HttpError } from "./http";
@@ -32,10 +31,10 @@ export const json = (method: string, body: unknown): RequestInit => ({
  *  already — someone else made one by that name first, or this one landed before. Anything else stays an HttpError. */
 function meaning(e: HttpError, what: string): Error { return conflictOf(e.status, e.body, what) ?? e; }
 
-/** One request, its failures as meaning() reads them. */
-export async function call(s: Server, path: string, init: RequestInit = {}): Promise<any> {
+/** One request, its failures as meaning() reads them. `timeoutMs`: getJson's by default. */
+export async function call(s: Server, path: string, init: RequestInit = {}, timeoutMs?: number): Promise<any> {
   try {
-    return await getJson(api(s, path), init, 2);
+    return await getJson(api(s, path), init, 2, timeoutMs);
   } catch (e) {
     throw e instanceof HttpError ? meaning(e, path) : e;
   }
@@ -45,33 +44,14 @@ export async function call(s: Server, path: string, init: RequestInit = {}): Pro
  *  (5xx, a 408 or 429 too: the reply is no word on what was done). The server's own refusals (Conflict, Gone, Refused, a 4xx)
  *  are answers: the write did not happen. */
 export const unanswered = (e: unknown): boolean =>
-  e instanceof Unavailable || (!(e instanceof Conflict || e instanceof Gone || e instanceof Refused)
+  (e instanceof Unavailable && !e.unsent) || (!(e instanceof Unavailable || e instanceof Conflict || e instanceof Gone || e instanceof Refused)
     && (!(e instanceof HttpError) || e.status >= 500 || e.status === 408 || e.status === 429));
-
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** A create under an id the caller made (`recordId`), sent again when no answer came back. getJson sends a write once, since
- *  a second send after a landed one acts twice; under its own id a create can be repeated: the server holds that id once. `make`
- *  sends it; `there` reads the record by that id (null: none). A Conflict means the id is taken, which after our own earlier
- *  try is that try having landed: the record `there` finds is the answer, and no new id is ever made. A Conflict with nothing
- *  under the id is another record's (a path, a name): it goes back to the caller as it was. */
-export async function createdUnder<T>(make: () => Promise<T>, there: () => Promise<T | null>, { tries = 3, wait = 500 } = {}): Promise<T> {
-  for (let i = 0; ; i++) {
-    try { return await make(); } catch (e) {
-      if (e instanceof Conflict) {
-        const had = await there();
-        if (had) return had;
-        throw e;
-      }
-      if (!unanswered(e) || i >= tries - 1) throw e;
-      await pause(wait * 2 ** i);
-    }
-  }
-}
 
 /** The record protocols (core/record-protocol.ts) over `s`: the agent's and the CLI's fetch. */
 export const transport = (s: Server): RecordTransport => ({
-  request: (path, request = {}) => call(s, path, request.body === undefined ? { method: request.method } : json(request.method ?? "POST", request.body)),
+  request: (path, { method, body, timeout, signal } = {}) => call(s, path,
+    body === undefined ? { method, signal } : body instanceof FormData ? { method: method ?? "POST", body, signal } : { ...json(method ?? "POST", body), signal },
+    timeout),
   answer: (e) => e instanceof HttpError ? { status: e.status, body: e.body } : undefined,
 });
 const remote = (r: any): Remote => ({ rec: r.id, path: r.path, rev: r.rev, text: r.text, kind: noteKindOf(r.kind) });
@@ -101,7 +81,8 @@ export async function search(s: Server, query: string, limit = 20): Promise<Remo
   return j.items.map(remote);
 }
 
-/** A new note under the caller's own record id (`recordId`), sent again when no answer came back (createdUnder): a repeat that
+/** A new note under the caller's own record id (`recordId`), sent again when no answer came back (record-protocol.ts
+ *  createdUnder): a repeat that
  *  finds the id taken by a note of this path is the first send having landed, and that note is the answer. Conflict when a record
  *  has that path already, or that id with another path. */
 export const create = (s: Server, rec: string, path: string, text: string, mark: Mark = {}): Promise<Remote> => createdUnder(
@@ -132,75 +113,26 @@ export const links = {
   remove: (s: Server, id: string) => linkProtocol.remove(transport(s), id),
 };
 
-// ---- lenses
-
-/** The `lenses` collection (core/lens.ts): the owner's saved filters, open rules and no `rev` (a lens is edited whole, like a
- *  tag definition: the last save wins). */
 export const lenses = {
-  /** Every lens, oldest first (the order the switcher shows). */
-  async list(s: Server): Promise<Lens[]> {
-    const j = await call(s, `collections/lenses/records?perPage=${PAGE}&skipTotal=1&sort=created,id`);
-    return j.items.map(lensOf);
-  },
-  /** A new lens, under an id of its own (`id`, made here when not given): sent again when no answer came, never twice. Conflict: a
-   *  lens by that name (ignoring case) exists. */
-  create: (s: Server, l: LensFields, id = recordId()): Promise<Lens> => createdUnder(
-    async () => lensOf(await call(s, "collections/lenses/records", json("POST", { id, ...lensColumns(l) }))),
-    async () => { try { return lensOf(await call(s, `collections/lenses/records/${id}`)); } catch (e) { if (e instanceof HttpError && e.status === 404) return null; throw e; } }),
-  /** `rec` rewritten. HttpError 404 when it has gone. */
-  update: async (s: Server, rec: string, l: LensFields): Promise<Lens> =>
-    lensOf(await call(s, `collections/lenses/records/${rec}`, json("PATCH", lensColumns(l)))),
-  /** A lens gone. Already gone is done. */
-  async remove(s: Server, rec: string): Promise<void> {
-    try { await call(s, `collections/lenses/records/${rec}`, { method: "DELETE" }); } catch (e) {
-      if (e instanceof HttpError && e.status === 404) return;
-      throw e;
-    }
-  },
+  list: (s: Server) => lensProtocol.list(transport(s)),
+  create: (s: Server, l: LensFields) => lensProtocol.create(transport(s), l, recordId()),
 };
-
-// ---- photos
-
-const photo = (r: any): Photo => ({ rec: r.id, note: r.note, name: r.name, file: r.file });
-
-/** Every photo's record: which note, its name in the body, the stored file. */
-export async function photos(s: Server, note?: string): Promise<Photo[]> {
-  const out: Photo[] = [], filter = note ? `&filter=${encodeURIComponent(`note = ${lit(note)}`)}` : "";
-  for (let page = 1; ; page++) {
-    const j = await call(s, `collections/attachments/records?fields=id,note,name,file&perPage=${PAGE}&page=${page}&skipTotal=1${filter}`);
-    out.push(...j.items.map(photo));
-    if (j.items.length < PAGE) return out;
-  }
-}
-
-/** Where a photo goes up, as a multipart POST: the file under `file`, these fields beside it (`upload` sends it). */
-export const uploadTo = (s: Server, note: string, name: string) =>
-  ({ url: api(s, "collections/attachments/records"), fields: { note, name } });
-
-/** The reply to an upload: the new photo, or Conflict when the note has one by that name already. */
-export function uploaded(status: number, body: string, name: string): Photo {
-  let j: any;
-  try { j = JSON.parse(body); } catch { j = undefined; }
-  if (status >= 200 && status < 300) return photo(j);
-  throw meaning(new HttpError(status, `HTTP ${status}`, undefined, j), name);
-}
-
-/** A photo up from bytes in memory: the CLI and the import. */
-export async function upload(s: Server, note: string, name: string, file: Blob): Promise<Photo> {
-  const to = uploadTo(s, note, name), form = new FormData();
-  for (const [k, v] of Object.entries(to.fields)) form.append(k, v);
-  form.append("file", file, name);
-  const r = await fetch(to.url, { method: "POST", body: form });
-  return uploaded(r.status, await r.text(), name);
-}
-
-/** A photo gone. Already gone is done. */
-export async function removePhoto(s: Server, rec: string): Promise<void> {
-  try { await call(s, `collections/attachments/records/${rec}`, { method: "DELETE" }); } catch (e) {
-    if (e instanceof HttpError && e.status === 404) return;
-    throw e;
-  }
-}
+export const tags = {
+  list: (s: Server) => tagProtocol.list(transport(s)),
+  create: (s: Server, t: TagFields, mark?: TagMark) => tagProtocol.create(transport(s), t, recordId(), mark),
+  update: (s: Server, rec: string, t: TagFields, mark?: TagMark) => tagProtocol.update(transport(s), rec, t, mark),
+  rename: (s: Server, from: string, to: string) => tagProtocol.rename(transport(s), from, to),
+  describeAll: (s: Server) => tagProtocol.describeAll(transport(s)),
+};
+export const attachments = {
+  list: (s: Server, note?: string) => attachmentProtocol.list(transport(s), note),
+  upload: (s: Server, note: string, name: string, file: Blob) => attachmentProtocol.upload(transport(s), note, name, file),
+  remove: (s: Server, rec: string) => attachmentProtocol.remove(transport(s), rec),
+};
+export const chats = {
+  get: (s: Server, id: string) => chatProtocol.get(transport(s), id),
+  save: (s: Server, id: string, rev: number, c: { messages: unknown; title: string; model: string }) => chatProtocol.save(transport(s), id, rev, c),
+};
 
 // ---- link previews
 
@@ -248,13 +180,3 @@ export const pdfPages = async (s: Server, note: string, name: string): Promise<n
 /** A record id as PocketBase makes them (15 of [a-z0-9]): a client names a new chat or task before it exists
  *  on the server. */
 export const recordId = () => Array.from({ length: 15 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
-
-/** A chat as its one writer, the agent, reads it (server/agent/src/chats.ts): the history in any version chat-history.ts
- *  reads, and the rev its next save names; null when there is no such record. Throws ChatHistoryError on a history it
- *  can't read. */
-export async function chat(s: Server, id: string): Promise<StoredChat | null> {
-  try { return chatOf(await call(s, `collections/chats/records/${encodeURIComponent(id)}?fields=${CHAT_FIELDS}`)); } catch (e) {
-    if (e instanceof HttpError && e.status === 404) return null;
-    throw e;
-  }
-}

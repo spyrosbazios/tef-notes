@@ -1,6 +1,6 @@
 # TEF Notes web app
 
-<!-- reviewed: 2026-11-21 -->
+<!-- reviewed: 2026-11-22 -->
 
 The laptop client for [TEF Notes](../README.md): browse and edit notes and tasks, view photos, PDFs and
 drawings, and chat with the agent. React 19, Vite 8, Tailwind 4, shadcn/ui, TanStack Query, TanStack Router and axios.
@@ -43,8 +43,9 @@ your real notes. Without it the app loads but has nothing to talk to.
 Everything is a same-origin request: `/api` goes to PocketBase and `/agent` to the chat agent. Production gets that
 from the server itself, which serves the built app from `pb_public`; in development the Vite proxy stands in for
 it. The transport is `src/services/` (axios), with `records.ts` adapting it to the shared
-`packages/core/src/record-protocol.ts` for notes, tasks and links; a stale write is mapped to the core's `Conflict`, and the app merges
-and retries.
+`packages/core/src/record-protocol.ts` for every collection (notes, tasks, links, lenses, tags, attachments, chats; the
+preferences through `prefs-sync.ts`): `recordTransport` for the sync engines, `directTransport`, refused while offline, for
+the rest. A stale write is mapped to the core's `Conflict`, and the app merges and retries.
 
 ## The assistant
 

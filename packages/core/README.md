@@ -13,7 +13,7 @@ TypeScript; how it fits the rest is in [`../../ARCHITECTURE.md`](../../ARCHITECT
 | `record-links.ts` | Links between records (`links`): types, wire columns, a task's notes, a note's backlinks |
 | `todo.ts`, `things.ts`, `bulk.ts`, `dates.ts`, `time.ts` | Tasks: types, patches, ticking and repeats, the field-level merge, the smart views |
 | `record-contracts.ts` | Pure record types, conflict classification, filter literals and the columns derived from note text |
-| `record-protocol.ts` | Note/task/link requests, pagination and idempotency over an injected transport; no I/O of its own |
+| `record-protocol.ts` | Every collection's requests (notes, tasks, links, lenses, tags and their routes, attachments, chats), pagination and idempotency over an injected transport; no I/O of its own |
 | `tags.ts` | Tag definitions' shapes, a note's tags, a search box's `#tag`s and the debounced guess for a draft task |
 | `urls.ts` | The server's address and where a photo, a thumb, a preview's picture and the agent's routes are |
 | `client/` (`pocketbase.ts`, `http.ts`, `tags.ts`, `import.ts`) | The fetch client (the CLI, the agent): the core's one I/O. Nothing outside `client/` loads it (`scripts/check-boundaries.ts`) |

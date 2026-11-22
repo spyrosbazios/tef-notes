@@ -24,7 +24,7 @@ How TEF Notes fits together: the pieces, the note format, the write contract, ta
   `@/core/*`. It holds the note format, the merge, task logic, agent card shapes and the theme
   palettes, all pure; its one I/O is the fetch client under `src/client/` (the CLI's, the agent's), which nothing else in the
   core loads (`scripts/check-boundaries.ts`). `record-contracts.ts` holds transport-free record types, the typed failures (`Conflict`, `Gone`, `Refused`,
-  `Unavailable`) and derived note columns; `record-protocol.ts` holds note/task/link requests over an injected transport and
+  `Unavailable`) and derived note columns; `record-protocol.ts` holds every collection's requests (notes, tasks, links, lenses, tags, attachments, chats) over an injected transport and
   maps PocketBase's answers to those failures (`outcomeOf`: a relation to a deleted record is `Gone`). The fetch client
   (`client/pocketbase.ts`) and the web's axios adapter (`web/src/services/records.ts`) share that protocol. The sync engine imports
   the contracts, not the HTTP client, and switches on those types, never on status codes: a `Refused` change is parked
@@ -124,7 +124,7 @@ Things-style to-dos, records of their own (`tasks`; schema in
   (`server/pb_hooks/notes.pb.js`) and its links (cascade); no task changes.
 - Ticking a repeating task marks it done without `every` and makes its next round a new record (`complete`), linked to
   what the done one was linked to (`linksForNextRound` in `packages/core/src/record-links.ts`).
-- Transport: `packages/core/src/client/pocketbase.ts` (`tasks`: `revs`, `list`, `get`, `getMany`, `create`,
+- Transport: `packages/core/src/record-protocol.ts` `revCollection`, bound by `packages/core/src/client/pocketbase.ts` (`tasks`: `revs`, `list`, `get`, `getMany`, `create`,
   `update`, `remove`).
 
 ## Lenses
@@ -137,7 +137,7 @@ lens says; only lists are narrowed.
 
 - The definitions are the `lenses` collection (`server/pb_migrations/1793600000_lenses.js`: `name`, unique ignoring case, and
   `tags` as JSON), so every device has the same ones. Like the `tags` definitions it has open rules and no `rev`: a lens is
-  edited whole and the last save wins. Calls: `packages/core/src/client/pocketbase.ts` `lenses`.
+  edited whole and the last save wins. Calls: `packages/core/src/record-protocol.ts` `lenses`.
 - Which lens is on is a preference every device shares (`packages/core/src/prefs.ts` `lens`), and none is the unfiltered app. A lens deleted elsewhere is none (`activeLens`).
   The web switcher is at the bottom of the rail; on a phone it is on Home, and the lens filters every tab.
 - The assistant is told: the web app sends the lens as the request context's `filter` (`lens: Work (tags: work, clients)`,
@@ -148,7 +148,7 @@ lens says; only lists are narrowed.
 
 One `links` record per relation between two records, `from` → `to` with a `role` (schema:
 `server/pb_migrations/1793300001_links.js`; shape in code: `packages/core/src/record-links.ts`; calls:
-`packages/core/src/client/pocketbase.ts` `links`). It replaced the single `tasks.note`: a task about several notes, what links to a
+`packages/core/src/record-protocol.ts` `links`). It replaced the single `tasks.note`: a task about several notes, what links to a
 note (its backlinks), a task made from a clipped picture (about the new note holding it).
 
 - Ends are typed relations, one column per kind of record on each side: `fromNote` `fromTask`, `toNote` `toTask` (the

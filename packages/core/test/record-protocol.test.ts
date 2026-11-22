@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Conflict, Gone, Refused, Unavailable, conflictOf } from "../src/record-contracts";
-import { heardOf, links, noteCollection, outcomeOf, revCollection, type RecordTransport, type RecordRequest } from "../src/record-protocol";
+import { attachments, chats, heardOf, lenses, links, noteCollection, outcomeOf, revCollection, tags, type RecordTransport, type RecordRequest } from "../src/record-protocol";
 import { linkRecord, type Link } from "../src/record-links";
 
 function transport(reply: (path: string, request: RecordRequest) => any) {
@@ -132,4 +132,87 @@ test("a realtime event is a record for the sync engine, or null when the record 
   expect(heardOf("links", "create", { id: "l2", role: "about" })).toBeNull();
   expect(heardOf("links", "delete", { id: "l1" })).toEqual({ topic: "links", gone: "l1" });
   expect(heardOf("notes", "update", null)).toBeNull();
+});
+
+test("lenses: oldest first, a create under the caller's id found again after a lost answer, a gone one's delete is done", async () => {
+  const lens = { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null };
+  let posts = 0, gone = false;
+  const { io, calls } = transport((path, r) => {
+    if (r.method === "POST") { if (++posts === 1) throw new Failure(503); throw new Failure(400, { data: { id: { code: "validation_not_unique" } } }); }
+    if (r.method === "DELETE" && gone) throw new Failure(404);
+    if (path.includes("?")) return { items: [{ id: "b", name: "Home", created: "2026-02-01" }, { id: "a", name: "Work", created: "2026-01-01" }] };
+    return { id: "abcdefghij01234", ...lens };
+  });
+  expect((await lenses.list(io)).map((l) => l.rec)).toEqual(["a", "b"]);
+  expect((await lenses.create(io, lens, "abcdefghij01234")).rec).toBe("abcdefghij01234");
+  expect(calls.filter((c) => c.request.method === "POST").map((c) => (c.request.body as { id: string }).id)).toEqual(["abcdefghij01234", "abcdefghij01234"]);
+  expect((await lenses.update(io, "a", lens)).name).toBe("Work");
+  gone = true;
+  await lenses.remove(io, "a");
+});
+
+test("tags: by name, the routes' timeouts and Stop, a failure in the server's own words", async () => {
+  let fail: Failure | null = null;
+  const { io, calls } = transport((path) => {
+    if (fail) throw fail;
+    if (path.startsWith("collections/tags/records?")) return { items: [{ id: "2", name: "work" }, { id: "1", name: "home" }] };
+    if (path === "tefnotes/tags/guess") return { tags: ["work", 3] };
+    if (path === "tefnotes/tags/describe") return { description: "Paid work" };
+    return { id: "1", name: "home", description: "" };
+  });
+  expect((await tags.list(io)).map((t) => t.name)).toEqual(["home", "work"]);
+  await tags.create(io, { name: "Home", description: "hint" }, "abcdefghij01234", "agent");
+  expect(calls[1].request.body).toEqual({ id: "abcdefghij01234", name: "Home", color: "", description: "hint", describedBy: "agent" });
+  const stop = new AbortController();
+  expect(await tags.guess(io, { title: "Email", notes: "" }, stop.signal)).toEqual(["work"]);
+  expect(calls[2].request).toMatchObject({ method: "POST", timeout: 20_000, signal: stop.signal });
+  expect(await tags.describe(io, "work")).toBe("Paid work");
+  expect(calls[3].request).toMatchObject({ body: { tag: "work" }, timeout: 90_000 });
+  fail = new Failure(400, { error: "No note carries that tag." });
+  await expect(tags.describeAll(io)).rejects.toThrow(new Refused("No note carries that tag."));
+  fail = new Failure(502, { error: "The model failed." });
+  await expect(tags.rename(io, "a", "b")).rejects.toThrow(new Unavailable("The model failed."));
+});
+
+test("attachments: a note's in the order added, an upload as a form, a name taken is a Conflict", async () => {
+  let taken = false;
+  const { io, calls } = transport((_path, r) => {
+    if (r.method === "POST") { if (taken) throw new Failure(400, { data: { name: { code: "validation_not_unique" } } }); return { id: "p1", note: "n1", name: "a.jpg", file: "a_x.jpg" }; }
+    return { items: [{ id: "z", note: "n1", name: "b.jpg", file: "b", created: "2026-01-02" }, { id: "y", note: "n1", name: "a.jpg", file: "a", created: "2026-01-01" }] };
+  });
+  expect((await attachments.list(io, "n1")).map((p) => p.name)).toEqual(["a.jpg", "b.jpg"]);
+  expect(decodeURIComponent(calls[0].path)).toContain('filter=(note = "n1")');
+  expect(await attachments.upload(io, "n1", "a.jpg", new Blob(["x"]))).toEqual({ rec: "p1", note: "n1", name: "a.jpg", file: "a_x.jpg" });
+  const form = calls[1].request.body as FormData;
+  expect([form.get("note"), form.get("name"), (form.get("file") as File).name]).toEqual(["n1", "a.jpg", "a.jpg"]);
+  taken = true;
+  await expect(attachments.upload(io, "n1", "a.jpg", new Blob(["x"]))).rejects.toBeInstanceOf(Conflict);
+});
+
+test("chats: newest first, one read with its history and rev, a create in the current format, a save at its rev", async () => {
+  const history = [{ id: "m", role: "user" as const, parts: [{ type: "text", text: "hi" }] }];
+  let missing = false;
+  const { io, calls } = transport((path, r) => {
+    if (missing) throw new Failure(404);
+    if (r.method === "PATCH") return { rev: 5 };
+    if (r.method === "POST") return { id: "c2", title: "New", updated: "now" };
+    if (path.startsWith("collections/chats/records?")) return { items: [{ id: "c1", title: "Old", updated: "2026-01-01" }, { id: "c2", title: "New", updated: "2026-02-01" }] };
+    return { id: "c1", title: "Old", updated: "2026-01-01", rev: 4, messages: history };
+  });
+  expect((await chats.list(io)).map((c) => c.id)).toEqual(["c2", "c1"]);
+  expect(await chats.get(io, "c1")).toEqual({ id: "c1", title: "Old", updated: "2026-01-01", rev: 4, messages: history });
+  await chats.create(io, "c2", "New");
+  expect(calls[2].request.body).toEqual({ id: "c2", title: "New", historyVersion: 1, messages: [] });
+  expect(await chats.save(io, "c1", 4, { messages: history, title: "Old", model: "m" })).toBe(5);
+  expect(calls[3].request.body).toMatchObject({ rev: 4, title: "Old", model: "m", historyVersion: 1 });
+  missing = true;
+  expect(await chats.get(io, "c1")).toBeNull();
+  await chats.remove(io, "c1");
+});
+
+test("a create the transport never sent (a browser offline) goes back at once: it can't have landed", async () => {
+  let tries = 0;
+  const { io } = transport(() => { tries++; throw new Unavailable("offline", true); });
+  await expect(chats.create(io, "c1", "New")).rejects.toThrow("offline");
+  expect(tries).toBe(1);
 });

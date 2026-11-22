@@ -13,7 +13,10 @@ export class Gone extends Error {}
 /** The server answered and will refuse the same request again: it has to change before it is sent once more. */
 export class Refused extends Error {}
 /** No answer to act on: nothing answered (the network, a timeout), or the server is failing for now. Worth trying later. */
-export class Unavailable extends Error {}
+export class Unavailable extends Error {
+  /** `unsent`: the request never left (a browser offline), so a write it carried can't have landed. */
+  constructor(message?: string, readonly unsent = false) { super(message); }
+}
 
 /** Map only conflicts; callers retain their native HTTP error for every other failure. */
 export function conflictOf(status: number | undefined, body: any, what: string): Conflict | undefined {

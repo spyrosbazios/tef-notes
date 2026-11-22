@@ -4,7 +4,6 @@
 import { tool } from "ai";
 import { z } from "zod";
 import * as pb from "@/core/client/pocketbase";
-import { createTag, listTags, updateTag } from "@/core/client/tags";
 import { COLOR } from "./notes";
 import { toolModule, EVERY_RUN } from "./tool-policy";
 import { lensFields, LENS } from "./widgetTools";
@@ -28,7 +27,7 @@ export const tagModule = toolModule(({ notes }) => ({
       description: z.string().trim().max(500).optional(),
     }),
     execute: async ({ name, color, description = "" }) => {
-      try { return { tag: await createTag(notes.server, { name, color, description }, "agent") }; }
+      try { return { tag: await pb.tags.create(notes.server, { name, color, description }, "agent") }; }
       catch (e) { return { error: `Couldn't create tag: ${(e as Error).message}` }; }
     },
   }),
@@ -55,9 +54,9 @@ export const tagModule = toolModule(({ notes }) => ({
     execute: async ({ id, name, color, description }) => {
       if (name === undefined && color === undefined && description === undefined) return { error: "Pass a name, color or description to change." };
       try {
-        const before = (await listTags(notes.server)).find((t) => t.rec === id);
+        const before = (await pb.tags.list(notes.server)).find((t) => t.rec === id);
         if (!before) return { error: "No tag definition with that id. Use list_tags." };
-        return { tag: await updateTag(notes.server, id, {
+        return { tag: await pb.tags.update(notes.server, id, {
           name: name ?? before.name,
           color: color === undefined ? before.color : color ?? undefined,
           description: description ?? before.description,

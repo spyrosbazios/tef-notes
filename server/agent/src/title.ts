@@ -26,7 +26,7 @@ const Body = z.object({ note: z.string().min(1).max(200) });
 
 /** The question for the note's files, or null when there is nothing a model could title it from. */
 async function question(server: Server, note: string): Promise<ModelMessage[] | null> {
-  const files = await pb.photos(server, note);
+  const files = await pb.attachments.list(server, note);
   const pdf = files.find((f) => isPdf(f.name)), image = files.find((f) => imageType(f.name));
   if (pdf) {
     let ps = await pages(server, pdf);

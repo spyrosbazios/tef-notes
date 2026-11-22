@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { activeLens, contextFilter, inheritTags, inLens, lensColumns, lensAccent, lensFilter, lensOf, lensProblem, lensTag, type Lens } from "../src/lens";
-import { lenses } from "../src/client/pocketbase";
 
 const work: Lens = { rec: "w", name: "Work", tags: ["work", "Clients"], exclude: [], accent: null, theme: null };
 
@@ -83,28 +82,5 @@ describe("a lens that is on", () => {
     expect(contextFilter(work, "milk")).toBe("lens: Work (tags: work, Clients) · milk");
     expect(contextFilter(null, "milk")).toBe("milk");
     expect(contextFilter(null, "")).toBeUndefined();
-  });
-});
-
-describe("lenses calls", () => {
-  const s = { url: "http://pb" };
-  const fake = (reply: (url: string, init?: RequestInit) => unknown) => {
-    const calls: { url: string; init?: RequestInit }[] = [];
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (url: any, init?: any) => { calls.push({ url: String(url), init }); return new Response(JSON.stringify(reply(String(url), init)), { status: 200, headers: { "Content-Type": "application/json" } }); }) as typeof fetch;
-    return { calls, restore: () => { globalThis.fetch = real; } };
-  };
-  it("lists, creates, updates and removes", async () => {
-    const f = fake((url, init) => (init?.method === "DELETE" ? {} : url.includes("?") ? { items: [{ id: "a", name: "Work", tags: ["work"] }] } : { id: "a", name: "Work", tags: ["work"] }));
-    try {
-      expect(await lenses.list(s)).toEqual([{ rec: "a", name: "Work", tags: ["work"], exclude: [], accent: null, theme: null }]);
-      expect((await lenses.create(s, { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null }, "abcdefghij01234")).rec).toBe("a");
-      await lenses.update(s, "a", { name: "Work", tags: ["work"], exclude: [], accent: null, theme: null });
-      await lenses.remove(s, "a");
-      expect(f.calls.map((c) => `${c.init?.method ?? "GET"} ${c.url.replace("http://pb/api/", "").split("?")[0]}`)).toEqual([
-        "GET collections/lenses/records", "POST collections/lenses/records", "PATCH collections/lenses/records/a", "DELETE collections/lenses/records/a",
-      ]);
-      expect(JSON.parse(String(f.calls[1].init!.body))).toEqual({ id: "abcdefghij01234", name: "Work", tags: ["work"], exclude: [], accent: "", theme: "" });
-    } finally { f.restore(); }
   });
 });

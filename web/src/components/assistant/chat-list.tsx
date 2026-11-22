@@ -20,11 +20,11 @@ import { useLeaving } from "@/hooks/presence";
 import { ms } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { message } from "@/services/api";
-import type { ChatRec } from "@/services/agent";
+import type { ChatLine } from "@/core/record-protocol";
 
 /** One saved chat: it leaves on a fade when deleted and the rows below close the gap (the list recipe); on its way out it can't be
  *  tabbed to. */
-function ChatRow({ chat, current, idle, now, onOpen, onRemove }: { chat: ChatRec; current: boolean; idle: boolean; now: number; onOpen: () => void; onRemove: () => void }) {
+function ChatRow({ chat, current, idle, now, onOpen, onRemove }: { chat: ChatLine; current: boolean; idle: boolean; now: number; onOpen: () => void; onRemove: () => void }) {
   const li = useLeaving<HTMLLIElement>("[data-chats]");
   const move = useTempoTransition(spring.reflow), fade = useTempoTransition(transition.fade);
   return (
@@ -49,7 +49,7 @@ export function ChatList({ current, idle, onDone }: { current: string; idle: boo
   const { data, isPending, isError } = useChats();
   const remove = useRemoveChat();
   const now = useNow(30_000);
-  const [removing, setRemoving] = useState<ChatRec>();
+  const [removing, setRemoving] = useState<ChatLine>();
 
   const confirm = async () => {
     if (!removing) return;

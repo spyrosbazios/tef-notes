@@ -56,10 +56,10 @@ export const fileModule = toolModule(({ notes, files }) => ({
       const cur = await notes.read(path);
       if (!cur) return { error: `No note ${path}.` };
       const id = parseNote(path, cur.text).id;
-      const taken = new Set((await pb.photos(notes.server, id)).map((p) => p.name));
+      const taken = new Set((await pb.attachments.list(notes.server, id)).map((p) => p.name));
       const pdf = f.mediaType === PDF, name = pdf ? pdfName(f.name, taken) : photoName(Date.now(), taken);
       let rec: string;
-      try { rec = (await pb.upload(notes.server, id, name, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: pdf ? PDF : "image/jpeg" }))).rec; }
+      try { rec = (await pb.attachments.upload(notes.server, id, name, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: pdf ? PDF : "image/jpeg" }))).rec; }
       catch (e) { return { error: `Couldn't save ${f.name}: ${(e as Error).message}` }; }
 
       const line = pdf ? fileMarkdown(id, name, f.name) : photoMarkdown(id, [name]);
@@ -68,7 +68,7 @@ export const fileModule = toolModule(({ notes, files }) => ({
         const n = parseNote(path, file);
         return withBody(file, n, `${n.body.trimEnd()}${n.body.trim() ? "\n\n" : ""}${add}\n`);
       }, { taint: true }));
-      if ("error" in saved) await pb.removePhoto(notes.server, rec).catch(() => {});
+      if ("error" in saved) await pb.attachments.remove(notes.server, rec).catch(() => {});
       return saved;
     },
   }),

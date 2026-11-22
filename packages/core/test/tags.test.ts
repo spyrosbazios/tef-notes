@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import { guessTags } from "../src/client/tags";
+import { tags as tagCalls, type RecordTransport } from "../src/record-protocol";
 import { absorbTags, allTagNames, dropTyping, GUESS_DELAY, liveTags, tagGuesser, matchesTask, parseTagQuery, suggestTags, typingTag, undefinedTags, type TagDef } from "../src/tags";
 import { newTask } from "../src/todo";
 
@@ -79,13 +79,12 @@ describe("tags guessed while a task is typed", () => {
   test("tagGuesser asks once, after the typing stops, and drops a stale answer", async () => {
     const calls: string[] = [];
     let tags: string[] = ["mine"];
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (_url: string, init: RequestInit) => {
-      calls.push(JSON.parse(String(init.body)).title);
-      return new Response(JSON.stringify({ tags: ["work"] }), { status: 200 });
-    }) as typeof fetch;
-    try {
-      const g = tagGuesser((d, signal) => guessTags({ url: "http://pb" } as never, d, signal), (f) => { tags = f(tags); });
+    const io: RecordTransport = {
+      async request(_path, r = {}) { calls.push((r.body as { title: string }).title); return { tags: ["work"] }; },
+      answer: () => undefined,
+    };
+    {
+      const g = tagGuesser((d, signal) => tagCalls.guess(io, d, signal), (f) => { tags = f(tags); });
       g.update("ab", "");                     // too short
       g.update("Email", ""); g.update("Email the client", "");
       await new Promise((r) => setTimeout(r, GUESS_DELAY + 100));
@@ -100,8 +99,6 @@ describe("tags guessed while a task is typed", () => {
       g.update("Call mum", ""); g.stop();
       await new Promise((r) => setTimeout(r, GUESS_DELAY + 100));
       expect(calls).toHaveLength(2);
-    } finally {
-      globalThis.fetch = real;
     }
   });
 });

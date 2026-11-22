@@ -9,7 +9,6 @@ import { dirname, join, relative, sep } from "node:path";
 import { exportPlan, fileNameOf } from "@/core/handoff";
 import { appendToNote, COLORS, isNotePath, MEMORY, newNotePath, parseNote, reconcile, serializeNote, type Color } from "@/core/notes";
 import * as pb from "@/core/client/pocketbase";
-import { describeAllTags, listTags, renameTag } from "@/core/client/tags";
 import { type Remote, Conflict, landed } from "@/core/record-contracts";
 import { backlinks, linksForNextRound, linksFrom, newLink, notesOfTask, type Link, type LinkEnd } from "@/core/record-links";
 import { complete, nextOrder, newTask, patchTask, views, type Task, type TaskPatch } from "@/core/todo";
@@ -129,7 +128,7 @@ async function draw(s: Server, a: string[]) {
   if (problem) die(`${file}: ${problem}`);
   const note = await need(s, id!), noteId = parseNote(note.path, note.text).id;
   const png = await pb.drawingPicture(s, scene), blob = new Blob([scene], { type: "application/json" });
-  const have = await pb.photos(s, noteId), replace = opt.get("replace");
+  const have = await pb.attachments.list(s, noteId), replace = opt.get("replace");
   if (replace !== undefined) {
     if (!isDrawingName(replace) || !have.some((p) => p.name === replace)) die(`${idOf(note.path)} has no drawing ${replace}; it has: ${have.filter((p) => isDrawingName(p.name)).map((p) => p.name).join(", ") || "none"}`);
     if (!note.text.includes(linkPath(noteId, replace))) die(`${idOf(note.path)} doesn't link ${replace}: nothing replaced`);
@@ -137,18 +136,18 @@ async function draw(s: Server, a: string[]) {
     // stem), the note's link is moved to it at the rev read, and only then the old two files go: whatever fails on the way,
     // the old drawing is still there and linked.
     const stem = replace.replace(/\.excalidraw$/i, "").replace(/-\d+$/, ""), name = drawingName(stem, new Set(have.map((p) => p.name)));
-    const up = await pb.upload(s, noteId, name, blob);
+    const up = await pb.attachments.upload(s, noteId, name, blob);
     let pre: Photo | undefined;
     try {
-      pre = await pb.upload(s, noteId, drawingPreview(name), png);
+      pre = await pb.attachments.upload(s, noteId, drawingPreview(name), png);
       await change(s, id!, (t) => t.split(linkPath(noteId, replace)).join(linkPath(noteId, name)));
-    } catch (e) { for (const p of [up, pre]) if (p) await pb.removePhoto(s, p.rec); throw e; }
-    for (const p of have) if (p.name === replace || p.name === drawingPreview(replace)) await pb.removePhoto(s, p.rec);
+    } catch (e) { for (const p of [up, pre]) if (p) await pb.attachments.remove(s, p.rec); throw e; }
+    for (const p of have) if (p.name === replace || p.name === drawingPreview(replace)) await pb.attachments.remove(s, p.rec);
     return console.log(name);
   }
   const label = opt.get("label")?.trim() || "Drawing", name = drawingName(label, new Set(have.map((p) => p.name)));
-  const up = await pb.upload(s, noteId, name, blob);
-  try { await pb.upload(s, noteId, drawingPreview(name), png); } catch (e) { await pb.removePhoto(s, up.rec); throw e; }  // never a scene without its picture
+  const up = await pb.attachments.upload(s, noteId, name, blob);
+  try { await pb.attachments.upload(s, noteId, drawingPreview(name), png); } catch (e) { await pb.attachments.remove(s, up.rec); throw e; }  // never a scene without its picture
   const r = await change(s, id!, (t) => `${t.trimEnd()}\n\n${fileMarkdown(noteId, name, label)}\n`);
   console.error(`linked at the end, rev ${r.rev}`);
   console.log(name);
@@ -165,7 +164,7 @@ async function inBatches<T, R>(items: T[], fn: (x: T) => Promise<R>, size = 8): 
 async function exportAll(s: Server, dir: string) {
   const entries = (await pb.list(s)).filter((e) => isNotePath(e.path));
   const notes = (await inBatches(entries, (e) => pb.get(s, e.rec))).flatMap((n) => (n && isNotePath(n.path) ? [n] : []));   // one deleted meanwhile is skipped
-  const plan = exportPlan(notes, await pb.photos(s));
+  const plan = exportPlan(notes, await pb.attachments.list(s));
   const put = (rel: string, data: string | Uint8Array) => { const file = join(dir, rel); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, data); };
   for (const e of plan) put(`notes/${fileNameOf(e.path)}`, e.text);
   const files = plan.flatMap((e) => e.files);
@@ -329,12 +328,12 @@ async function main(argv: string[]) {
     case "tags": {
       const { opt } = options(a, ["describe", "write"]);
       if (opt.has("write") && !opt.has("describe")) die("--write goes with --describe");
-      const defs = await listTags(s);
+      const defs = await pb.tags.list(s);
       if (!opt.has("describe")) {
         for (const t of defs) console.log([t.name, t.color ?? "", t.description].filter(Boolean).join(" · "));
         return;
       }
-      const described = await describeAllTags(s);   // a failure is the server's words (main's catch)
+      const described = await pb.tags.describeAll(s);   // a failure is the server's words (main's catch)
       for (const { tag, description } of described) {
         const def = defs.find((d) => d.name === tag);
         if (opt.has("write") && def) await write.tags.update(s, def, { name: def.name, color: def.color, description });
@@ -485,7 +484,7 @@ async function main(argv: string[]) {
     case "tag": {
       const { words, opt } = options(a, []), name = words.join(" ").trim() || die(`tefnotes tag <name> [--color <${COLORS.join("|")}>] [--about <text>]`);
       const color = opt.has("color") ? colorOf(opt.get("color")!) : undefined;
-      const had = (await listTags(s)).find((d) => d.name.toLowerCase() === name.toLowerCase());
+      const had = (await pb.tags.list(s)).find((d) => d.name.toLowerCase() === name.toLowerCase());
       if (had) {
         await write.tags.update(s, had, { name: had.name, color: opt.has("color") ? color : had.color, description: opt.get("about") ?? had.description });
         return console.error(`changed ${had.name}`);
@@ -496,7 +495,7 @@ async function main(argv: string[]) {
     case "rename-tag": {
       const [from, to, ...rest] = a;
       if (!from || !to || rest.length) die("tefnotes rename-tag <old> <new>");
-      const r = await renameTag(s, from, to);
+      const r = await pb.tags.rename(s, from, to);
       return console.error(`${r.merged ? "merged" : "renamed"} ${from} into ${r.tag}: ${r.notes} notes, ${r.tasks} tasks, ${r.lenses} lenses`);
     }
     case "link": case "unlink": {
