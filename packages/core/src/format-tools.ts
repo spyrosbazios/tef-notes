@@ -71,3 +71,41 @@ export function narrowBar(slots: readonly ToolSlot[]): { bar: FormatTool[]; menu
   const bar = toolsAt(slots, "bar"), stay = bar.filter((id, i) => i < NARROW_BAR || id === "link");
   return { bar: stay, menu: [...bar.filter((id) => !stay.includes(id)), ...toolsAt(slots, "menu")] };
 }
+
+// ---- the bar over selected words
+
+// The desktop's floating bar over a selection (prefs `desktop.selectionBar`): which tools it shows, in the owner's order.
+// Its tools are the text style menu (text and the headings), the inline and block tools that apply to words, and the
+// assistant's ask. A phone's is the assistant's button alone (the bar over the keyboard has the format tools), so it has none.
+
+export const SELECTION_TOOLS = [
+  "style", "bold", "italic", "strike", "code", "link", "ask", "bulletList", "orderedList", "taskList", "blockquote", "codeBlock",
+] as const;
+export type SelectionTool = (typeof SELECTION_TOOLS)[number];
+export const SELECTION_TOOL_LABEL: Record<SelectionTool, string> = {
+  ...FORMAT_TOOL_LABEL, style: "Text style", ask: "Ask the assistant",
+};
+/** Each tool's kind: the bar draws a divider where two neighbours are of different kinds. */
+export const SELECTION_GROUP = (id: SelectionTool): string => (id === "style" || id === "ask" ? id : TOOL_GROUP[id]);
+
+/** A selection tool shown in the bar, or not. */
+export type SelectionSlot = { id: SelectionTool; on: boolean };
+
+/** What the bar always showed: the style, the four inline marks, link and the ask. */
+const SELECTION_DEFAULT: readonly SelectionTool[] = ["style", "bold", "italic", "strike", "code", "link", "ask"];
+const isSelectionTool = (v: unknown): v is SelectionTool => (SELECTION_TOOLS as readonly unknown[]).includes(v);
+
+/** Whatever was stored as the bar's tools, whole: nothing stored is the bar it always was; a stored list keeps its order,
+ *  drops what is unknown, and adds a tool it doesn't know yet at the end, hidden. */
+export function selectionSlotsOf(raw: unknown): SelectionSlot[] {
+  if (!Array.isArray(raw)) return SELECTION_TOOLS.map((id) => ({ id, on: SELECTION_DEFAULT.includes(id) }));
+  const out: SelectionSlot[] = [];
+  for (const r of raw) {
+    const s = obj(r);
+    if (isSelectionTool(s.id) && !out.some((o) => o.id === s.id)) out.push({ id: s.id, on: s.on === true });
+  }
+  return [...out, ...SELECTION_TOOLS.filter((id) => !out.some((o) => o.id === id)).map((id) => ({ id, on: false }))];
+}
+
+/** The tools the bar shows, in order. */
+export const shownTools = (slots: readonly SelectionSlot[]): SelectionTool[] => slots.filter((s) => s.on).map((s) => s.id);

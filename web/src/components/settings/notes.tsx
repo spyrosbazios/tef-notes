@@ -1,8 +1,8 @@
 // Settings → Notes: per layout, the editor's format tools (core/format-tools.ts: dragged into order; in the bar, under its ⋯,
-// or off) and where each of a note's actions sits in its header (core/note-actions.ts: dragged into order; a button in the
+// or off), the desktop's bar over selected words (the same file: dragged into order, each shown or not) and where each of a note's actions sits in its header (core/note-actions.ts: dragged into order; a button in the
 // header, a row in the menu, or off), and the assistant actions themselves: the owner's saved prompts, added, changed and
 // deleted here. All of it is preferences (hooks/prefs.ts), so every device follows.
-import { GripVertical, Monitor, Pencil, Plus, Smartphone } from "lucide-react";
+import { GripVertical, Monitor, Pencil, Plus, Pilcrow, Smartphone, Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { TOOL_ICON } from "@/components/format-tool-icons";
 import { BUILTIN_ICON, PROMPT_ICON } from "@/components/note-action-icons";
@@ -12,9 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { FORMAT_TOOL_LABEL, NARROW_BAR, placesFor, TOOL_PLACE_LABEL, type ToolSlot } from "@/core/format-tools";
+import {
+  FORMAT_TOOL_LABEL, NARROW_BAR, placesFor, SELECTION_TOOL_LABEL, TOOL_PLACE_LABEL, type SelectionSlot, type SelectionTool, type ToolSlot,
+} from "@/core/format-tools";
 import {
   ACTION_ICONS, BUILTIN_LABEL, isBuiltin, ACTION_LIMITS, movedSlot, newActionId, SLOT_PLACE_LABEL, SLOT_PLACES, placedAt, promptProblem,
   RESULT_ABOUT, RESULT_LABEL, RESULTS, type ActionIcon, type PromptAction, type Result, type Slot,
@@ -56,6 +59,42 @@ function ToolList({ layout }: { layout: Layout }) {
                 <span className={cn("min-w-0 flex-1 basis-32 truncate text-sm", place === "off" && "text-faint")}>{name}</span>
                 <Choice label={`Where ${name} sits`} value={place} options={placesFor(layout, id)} names={TOOL_PLACE_LABEL}
                   onPick={(v) => setTools(layout, placedAt(prefsNow()[layout].formatTools, id, v))} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+const setSelection = (selectionBar: SelectionSlot[]) => setPrefs({ desktop: { selectionBar } });
+const SELECTION_ICON = (id: SelectionTool) => (id === "style" ? Pilcrow : id === "ask" ? Sparkles : TOOL_ICON[id]);
+
+/** The desktop's bar over selected words: every tool it can have, dragged into order, each shown or not. */
+function SelectionList() {
+  const slots = usePrefs().desktop.selectionBar;
+  const drag = useRowDrag((_g, id, over, after) => setSelection(movedSlot(prefsNow().desktop.selectionBar, id, over, after)));
+  return (
+    <div className="divide-y divide-line rounded-xl border border-line">
+      <div className="px-3 py-2.5">
+        <p className="text-sm font-semibold">Selection bar</p>
+        <p className="text-[13px] leading-snug text-dim">
+          The bar that floats over words you select. Drag to reorder, switch on what it shows. On a phone it is the assistant's button alone.
+        </p>
+      </div>
+      <ul aria-label="Selection bar tools" className="divide-y divide-line">
+        {slots.map(({ id, on }) => {
+          const Icon = SELECTION_ICON(id), name = SELECTION_TOOL_LABEL[id], d = drag("selection", id);
+          return (
+            <li key={id} {...d.props} className={cn("relative select-none", d.dragging && "opacity-40")}>
+              {d.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", d.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
+              <div className="flex items-center gap-2.5 px-3 py-2">
+                <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />
+                <Icon className={cn("size-4 shrink-0", !on ? "text-faint" : id === "ask" ? "text-brand" : "text-dim")} />
+                <span className={cn("min-w-0 flex-1 truncate text-sm", !on && "text-faint")}>{name}</span>
+                <Switch aria-label={`Show ${name}`} checked={on}
+                  onCheckedChange={(v) => setSelection(prefsNow().desktop.selectionBar.map((s) => (s.id === id ? { ...s, on: v } : s)))} />
               </div>
             </li>
           );
@@ -222,7 +261,7 @@ export function NotesSettings() {
             <TabsTrigger value="desktop"><Monitor /> Web</TabsTrigger>
           </TabsList>
           <TabsContent value="phone" className="space-y-3"><ToolList layout="phone" /><HeaderList layout="phone" /></TabsContent>
-          <TabsContent value="desktop" className="space-y-3"><ToolList layout="desktop" /><HeaderList layout="desktop" /></TabsContent>
+          <TabsContent value="desktop" className="space-y-3"><ToolList layout="desktop" /><SelectionList /><HeaderList layout="desktop" /></TabsContent>
         </Tabs>
       </section>
       <Actions />

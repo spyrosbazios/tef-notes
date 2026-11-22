@@ -24,7 +24,7 @@ describe("prefsOf", () => {
   test("each layout keeps its own", () => {
     const p = prefsOf({ phone: { start: "inbox", homeList: "upcoming" }, desktop: { start: "notes", homeList: "nope", hidden: ["today", "bogus", "today"] } });
     expect(p.phone).toMatchObject({ start: "inbox", homeList: "upcoming" });
-    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"], fab: "chat", noteHeader: DEFAULT_PREFS.desktop.noteHeader, formatTools: DEFAULT_PREFS.desktop.formatTools });
+    expect(p.desktop).toEqual({ start: "notes", homeList: "today", hidden: ["today"], fab: "chat", noteHeader: DEFAULT_PREFS.desktop.noteHeader, formatTools: DEFAULT_PREFS.desktop.formatTools, selectionBar: DEFAULT_PREFS.desktop.selectionBar });
   });
   test("the shape before layouts reads as defaults: the migration moved it (1794600000_prefs_layouts.js)", () => {
     expect(prefsOf({ start: "inbox", tabs: ["ask", "home"] }).phone).toEqual(DEFAULT_PREFS.phone);

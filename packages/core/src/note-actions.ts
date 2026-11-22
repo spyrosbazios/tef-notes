@@ -36,6 +36,8 @@ export const RESULT_ABOUT: Record<Result, string> = {
 /** The icons a prompt can have, by name: a client draws each from its own icon set. */
 export const ACTION_ICONS = [
   "wand", "tasks", "summary", "sparkles", "pencil", "list", "check", "languages", "scissors", "lightbulb", "calendar", "book", "mail", "hash",
+  "bot", "brain", "message", "quote", "search", "tag", "clock", "star", "heart", "flag", "target", "zap", "globe", "code", "table",
+  "chart", "file", "bookmark", "megaphone", "palette", "graduation", "cart", "briefcase", "pin", "users", "shield", "rocket",
 ] as const;
 export type ActionIcon = (typeof ACTION_ICONS)[number];
 

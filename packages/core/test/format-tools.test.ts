@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FORMAT_TOOLS, NARROW_BAR, narrowBar, placesFor, toolSlotsOf, toolsAt } from "../src/format-tools";
+import { FORMAT_TOOLS, NARROW_BAR, narrowBar, placesFor, SELECTION_TOOLS, selectionSlotsOf, shownTools, toolSlotsOf, toolsAt } from "../src/format-tools";
 import { movedSlot, placedAt } from "../src/note-actions";
 import { DEFAULT_PREFS, patchPaths, prefsOf, withPatch } from "../src/prefs";
 
@@ -38,4 +38,23 @@ test("in the preferences: a layout's own field, read back whole", () => {
   expect(toolsAt(p.phone.formatTools, "off")).toEqual(["code"]);
   expect(toolsAt(p.desktop.formatTools, "off")).toEqual([]);
   expect(prefsOf(JSON.parse(JSON.stringify(p)))).toEqual(p);
+});
+
+describe("selectionSlotsOf", () => {
+  test("nothing stored: the bar it always was, the rest hidden", () => {
+    expect(shownTools(selectionSlotsOf(undefined))).toEqual(["style", "bold", "italic", "strike", "code", "link", "ask"]);
+    expect(selectionSlotsOf(undefined)).toHaveLength(SELECTION_TOOLS.length);
+  });
+  test("keeps order and what is shown, drops the unknown, adds the new hidden", () => {
+    const s = selectionSlotsOf([{ id: "ask", on: true }, { id: "heading1", on: true }, { id: "taskList", on: true }, { id: "bold", on: false }, { id: "ask", on: false }]);
+    expect(shownTools(s)).toEqual(["ask", "taskList"]);
+    expect(s[2]).toEqual({ id: "bold", on: false });
+    expect(s.find((x) => x.id === "style")).toEqual({ id: "style", on: false });
+    expect(s).toHaveLength(SELECTION_TOOLS.length);
+  });
+  test("in the preferences: the desktop's own, read back whole", () => {
+    const p = withPatch(DEFAULT_PREFS, { desktop: { selectionBar: movedSlot(DEFAULT_PREFS.desktop.selectionBar, "ask", "style", false) } });
+    expect(shownTools(p.desktop.selectionBar)[0]).toBe("ask");
+    expect(prefsOf(JSON.parse(JSON.stringify(p)))).toEqual(p);
+  });
 });

@@ -1,5 +1,5 @@
-// The bar over selected words in a note: the text's style (text, headings), bold, italic, strikethrough, code, link, and
-// the assistant. It shows once a selection settles (a mouse released, a finger's handles let go, Shift and the arrows) and
+// The bar over selected words in a note: the tools the owner put in it (core/format-tools.ts, prefs `desktop.selectionBar`,
+// Settings → Notes; by default the text's style, bold, italic, strikethrough, code, link and the assistant). It shows once a selection settles (a mouse released, a finger's handles let go, Shift and the arrows) and
 // goes when it collapses, the editor loses the focus, or the words are in code. Over a mouse it floats above the words,
 // and its labels are Animate UI's own Tooltip: one popup that glides from button to button. Under a finger it is the assistant's button alone (the bar over the keyboard has the format tools), below,
 // clear of the selection's handles and of Android's own Copy and Paste menu above them, with no labels. A mousedown on a
@@ -9,9 +9,10 @@
 import { autoUpdate, flip, FloatingPortal, offset, shift, useFloating } from "@floating-ui/react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@animate-ui/react/primitives/tooltip";
 import { scale, spring, useShouldReduceMotion, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { Bold, Check, ChevronDown, Code, Heading1, Heading2, Heading3, Italic, Pilcrow, Sparkles, Strikethrough, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Heading1, Heading2, Heading3, Pilcrow, Sparkles, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { TOOL_ICON } from "@/components/format-tool-icons";
 import { LinkTool } from "@/components/format-tools";
 import { AskPanel, PhoneAsk } from "@/components/selection-ask";
 import { useAskSession, useCloseOutside } from "@/hooks/ask-session";
@@ -19,21 +20,22 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import { Toggle } from "@/components/ui/toggle";
+import { SELECTION_GROUP, SELECTION_TOOL_LABEL, shownTools, type SelectionTool } from "@/core/format-tools";
 import type { CommandName, Editor } from "@/editor";
 import { useModel } from "@/hooks/agent";
 import { useHovers } from "@/hooks/hover";
 import { useNarrow } from "@/hooks/media";
+import { usePrefs } from "@/hooks/prefs";
 import { keepFocus } from "@/lib/keys";
 
 const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘" : "Ctrl+";
 const ALT = MOD === "⌘" ? "⌥" : "Alt+";
 
-const TOOLS: { name: CommandName; label: string; keys: string; icon: LucideIcon }[] = [
-  { name: "bold", label: "Bold", keys: `${MOD}B`, icon: Bold },
-  { name: "italic", label: "Italic", keys: `${MOD}I`, icon: Italic },
-  { name: "strike", label: "Strikethrough", keys: `${MOD}Shift+X`, icon: Strikethrough },
-  { name: "code", label: "Code", keys: `${MOD}E`, icon: Code },
-];
+/** The keyboard shortcut a tool's label shows (editor/commands.ts' keymap), where it has one. */
+const KEYS: Partial<Record<SelectionTool, string>> = {
+  bold: `${MOD}B`, italic: `${MOD}I`, strike: `${MOD}Shift+X`, code: `${MOD}E`,
+  orderedList: `${MOD}Shift+7`, bulletList: `${MOD}Shift+8`, taskList: `${MOD}Shift+9`,
+};
 
 const STYLES: { name: CommandName; label: string; keys: string; icon: LucideIcon }[] = [
   { name: "paragraph", label: "Text", keys: `${MOD}${ALT}0`, icon: Pilcrow },
@@ -88,11 +90,13 @@ export function SelectionBar({ editor }: { editor: Editor }) {
   const [linking, setLinking] = useState(false), [styling, setStyling] = useState(false);
   useEffect(() => editor.subscribe(redraw), [editor]);
   const ask = useAskSession(editor);
+  // A phone's bar is the assistant's button alone (the bar over the keyboard has the format tools)
+  const shown = shownTools(usePrefs().desktop.selectionBar), tools: SelectionTool[] = narrow ? ["ask"] : shown;
 
   // The ask in the bar's place on a laptop (a phone's is a sheet). Otherwise the bar, for a settled selection, or while its
   // link field or style menu, opened from it, has the focus
   const asking = !!ask.session && !narrow;
-  const open = asking || (!ask.session && (!!editor.selectionBox() || linking || styling));
+  const open = asking || (!ask.session && tools.length > 0 && (!!editor.selectionBox() || linking || styling));
 
   // Read on every scroll and resize, so the bar follows the words (the held ones while asking: an answer may have changed
   // them); the last box stands in while the focus is elsewhere
@@ -126,6 +130,27 @@ export function SelectionBar({ editor }: { editor: Editor }) {
   const pop = { initial: hidden, animate: { opacity: 1, scale: 1, transition: enter }, exit: { ...hidden, transition: enter }, style: { transformOrigin: below ? "50% 0%" : "50% 100%" } };
   const surface = "rounded-lg bg-popover text-dim shadow-md ring-1 ring-foreground/10";
 
+  const tool = (id: SelectionTool) => {
+    if (id === "style") return <StyleTool editor={editor} hovers={hovers} below={below} onOpenChange={setStyling} />;
+    if (id === "link") return <LinkTool editor={editor} side={below ? "bottom" : "top"} onOpenChange={setLinking} label={(text, toggle) => <Label hovers={hovers} text={text}>{toggle}</Label>} />;
+    if (id === "ask") return (
+      <Label hovers={hovers} text={model ? SELECTION_TOOL_LABEL.ask : "The assistant is off: no model key"}>
+        <Button variant="ghost" size={hovers ? "icon-sm" : "icon-lg"} aria-label="Ask the assistant about this" className="text-brand"
+          disabled={!model} onMouseDown={keepFocus} onClick={() => ask.start()}>
+          <Sparkles />
+        </Button>
+      </Label>
+    );
+    const Icon = TOOL_ICON[id], label = SELECTION_TOOL_LABEL[id];
+    return (
+      <Label hovers={hovers} text={label} keys={KEYS[id]}>
+        <Toggle size={hovers ? "sm" : "lg"} aria-label={label} pressed={editor.isActive(id)} onMouseDown={keepFocus} onPressedChange={() => editor.run(id)}>
+          <Icon />
+        </Toggle>
+      </Label>
+    );
+  };
+
   return (
     <>
       <FloatingPortal>
@@ -141,26 +166,12 @@ export function SelectionBar({ editor }: { editor: Editor }) {
                   ) : (
                     <motion.div key="bar" role="toolbar" aria-label="Format selection" {...pop} className={`${surface} flex items-center gap-0.5 p-1`}>
                       <TooltipProvider openDelay={400}>
-                        {/* On a phone the bar over the keyboard has every format tool: here, only the assistant */}
-                        {narrow ? null : (<>
-                        <StyleTool editor={editor} hovers={hovers} below={below} onOpenChange={setStyling} />
-                        <div className="mx-0.5 h-5 w-px bg-line" />
-                        {TOOLS.map(({ name, label, keys, icon: Icon }) => (
-                          <Label key={name} hovers={hovers} text={label} keys={keys}>
-                            <Toggle size={hovers ? "sm" : "lg"} aria-label={label} pressed={editor.isActive(name)} onMouseDown={keepFocus} onPressedChange={() => editor.run(name)}>
-                              <Icon />
-                            </Toggle>
-                          </Label>
+                        {tools.map((id, i) => (
+                          <Fragment key={id}>
+                            {i > 0 && SELECTION_GROUP(tools[i - 1]) !== SELECTION_GROUP(id) ? <div className="mx-0.5 h-5 w-px bg-line" /> : null}
+                            {tool(id)}
+                          </Fragment>
                         ))}
-                        <LinkTool editor={editor} side={below ? "bottom" : "top"} onOpenChange={setLinking} label={(text, toggle) => <Label hovers={hovers} text={text}>{toggle}</Label>} />
-                        <div className="mx-0.5 h-5 w-px bg-line" />
-                        </>)}
-                        <Label hovers={hovers} text={model ? "Ask the assistant" : "The assistant is off: no model key"}>
-                          <Button variant="ghost" size={hovers ? "icon-sm" : "icon-lg"} aria-label="Ask the assistant about this" className="text-brand"
-                            disabled={!model} onMouseDown={keepFocus} onClick={() => ask.start()}>
-                            <Sparkles />
-                          </Button>
-                        </Label>
                       </TooltipProvider>
                     </motion.div>
                   )}
