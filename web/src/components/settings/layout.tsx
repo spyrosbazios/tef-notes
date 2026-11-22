@@ -88,7 +88,7 @@ function DesktopLayout() {
           </Row>
         </Group>
       ) : null}
-      <Group title="Sidebar" hint="Home, Search and Settings always stay.">
+      <Group title="Sidebar" hint="Search and Settings always stay; the logo always leads Home.">
         <ul aria-label="Sidebar" className="divide-y divide-line">
           {RAIL.filter(offered).map((r) => {
             const shown = !hidden.includes(r);
