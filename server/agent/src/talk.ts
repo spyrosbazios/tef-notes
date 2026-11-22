@@ -50,6 +50,8 @@ const PLAY_LEAD = 60;
  *  sentence, rather than at the end of the reply. A clause counts from a dozen characters, so it is not the first word. */
 const BREAKS = /[.!?…;·\n]/;
 const MIN_CLAUSE = 12;
+/** How long a reply may stop being written before what Fish is keeping of it is spoken anyway. */
+const LULL = 600;
 
 export function wordsOf(text: string): { say: string; rest: string } | null {
   let at = -1;
@@ -142,7 +144,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   let timer: ReturnType<typeof setInterval> | undefined, beat: ReturnType<typeof setInterval> | undefined;
   /** Whether the ear has confirmed it is the owner's turn: a turn begun on
    *  `eager_end_of_turn` may still be resumed, so its words are held back from the voice until `committed` says so. */
-  let confirmed = true, held: string[] = [];
+  let confirmed = true, held: { text: string; now: boolean }[] = [];
 
   // ---- the messages
 
@@ -198,19 +200,23 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     return opening;
   }
 
-  /** What the app hears: markdown read aloud as the words it is, and Fish told to say it. A reply to a turn the ear has
-   *  not confirmed yet waits: the owner may still be speaking, and then it was never an answer. */
-  async function say(text: string) {
+  /** What the app hears: markdown read aloud as the words it is, and Fish given it. `now` has Fish speak it at once (a
+   *  reply's first sentence, and its last words); without it Fish keeps the sentence with the ones that follow and speaks
+   *  them as one passage, in one tone: a sentence spoken alone gets a delivery of its own, and a reply said that way
+   *  changed mood from one sentence to the next. A reply to a turn the ear has not confirmed yet waits: the owner may
+   *  still be speaking, and then it was never an answer. */
+  async function say(text: string, now: boolean) {
     const clean = text.replace(/[*_`#>|]/g, "").replace(/\s+/g, " ").trim();
     if (!clean || ended) return;
-    if (!confirmed) { held.push(clean); return; }
+    if (!confirmed) { held.push({ text: clean, now }); return; }
     const gen = generation;
     try {
       const v = voice ?? await voiceNow();
       if (gen !== generation || ended) return;                 // spoken over while the voice was opening
-      v.say(clean);
-      v.flush();
-      saidBytes += bytesOf(clean);
+      const line = `${clean} `;                                // Fish joins what it is given: the space keeps two sentences apart
+      v.say(line);
+      if (now) v.flush();
+      saidBytes += bytesOf(line);
       // What it has cost is what went to the voice, so it is counted there: a reply held until the ear confirms it lands here
       // in a later tick than the turn's end, and a total sent before it would be a cent short every time
       out.json({ type: "usage", said: saidBytes, cost: costOf(saidBytes, d.sea.model) });
@@ -221,18 +227,40 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     }
   }
 
-  /** The reply's words on their way to the voice: a sentence is said as soon as it is written, not at the end. */
+  /** Fish speaks what it was given and is still keeping, if a voice is open or opening. */
+  async function breathe() {
+    const gen = generation;
+    try {
+      const v = voice ?? await opening;
+      if (gen === generation && !ended) v?.flush();
+    } catch { /* the voice never opened: `say` reported it */ }
+  }
+
+  /** The reply's words on their way to the voice. Its first sentence is spoken as soon as it is written, so the answer
+   *  starts at once; the ones after go to Fish as they are written and are spoken together (`say`), when the writing
+   *  stops for `LULL` (a tool is running) or the reply ends. */
   const speak = (() => {
-    let rest = "";
+    let rest = "", begun = false, lull: ReturnType<typeof setTimeout> | undefined;
+    const settle = () => { clearTimeout(lull); lull = undefined; };
     return {
       feed(delta: string) {
         rest += delta;
-        for (let w = wordsOf(rest); w; w = wordsOf(rest)) { rest = w.rest; void say(w.say); }
+        for (let w = wordsOf(rest); w; w = wordsOf(rest)) {
+          rest = w.rest;
+          void say(w.say, !begun);
+          settle();
+          if (begun) lull = setTimeout(() => { lull = undefined; void breathe(); }, LULL);
+          begun = true;
+        }
       },
       /** What is left of the reply is said now: the turn ended, or waits on the owner. */
-      flush() { const left = rest.trim(); rest = ""; if (left) void say(left); },
+      flush() {
+        const left = rest.trim();
+        rest = ""; begun = false; settle();
+        if (left) void say(left, true); else void breathe();
+      },
       /** What is left is dropped: the owner spoke over it. */
-      drop() { rest = ""; },
+      drop() { rest = ""; begun = false; settle(); },
     };
   })();
 
@@ -273,7 +301,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
   function confirm() {
     if (confirmed) return;
     confirmed = true;
-    for (const text of held.splice(0)) void say(text);
+    for (const h of held.splice(0)) void say(h.text, h.now);
   }
 
   function startTurn(text: string) {

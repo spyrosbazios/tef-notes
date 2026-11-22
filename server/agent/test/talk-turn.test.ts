@@ -51,7 +51,14 @@ async function talking(saved: UIMessage[] = []) {
   const events: TalkServerEvent[] = [], spoken: string[] = [];
   let hear: ((e: EarEvent) => void) | undefined, closed = false;
   const ear: EarSession = { audio() {}, speaking() {}, said() {}, done() {}, close() {}, listen: (l) => { hear = l; return () => {}; } };
-  const voice: Voice = { say: (t) => { spoken.push(t); }, flush() {}, stop() {} };
+  /** What Fish was given, and `flushed`: the passages it was told to speak, each the sentences given since the last. */
+  const flushed: string[][] = [];
+  let kept: string[] = [];
+  const voice: Voice = {
+    say: (t) => { spoken.push(t.trim()); kept.push(t.trim()); },
+    flush() { if (kept.length) flushed.push(kept); kept = []; },
+    stop() {},
+  };
   const deps: Deps = {
     server: { url: pb.url }, sea: { model: "s2.1-pro", voice: "v", speed: 1 }, model: "m", effort: "normal", pick,
     connectVoice: async () => voice, connectEar: async () => ear,
@@ -65,7 +72,7 @@ async function talking(saved: UIMessage[] = []) {
   };
   const tool = (name: string) => parts().filter((p) => p.type === `tool-${name}`).at(-1);
   return {
-    talk, events, spoken, parts, tool,
+    talk, events, spoken, flushed, parts, tool,
     said: (t: string) => hear!({ type: "turn", text: t, yours: true, degraded: false }),
     hear: (e: EarEvent) => hear!(e),
     closed: () => closed,
@@ -196,6 +203,31 @@ describe("cards over the socket", () => {
     await ending;
     expect(res.status).toBe(200);
     await res.text();
+  });
+});
+
+
+describe("the reply's passages", () => {
+  it("speaks the first sentence at once and the rest as one passage, so its tone holds", async () => {
+    const c = await talking();
+    replies = [{ stream: new ReadableStream({
+      start(ctl) {
+        ctl.enqueue({ type: "stream-start", warnings: [] });
+        ctl.enqueue({ type: "text-start", id: "t" });
+        for (const delta of ["First things first, here it is. ", "Then the second thing follows. ", "And a third one comes after. ", "The end"]) ctl.enqueue({ type: "text-delta", id: "t", delta });
+        ctl.enqueue({ type: "text-end", id: "t" });
+        ctl.enqueue({ type: "finish", finishReason: { unified: "stop", raw: undefined }, usage });
+        ctl.close();
+      },
+    }) }];
+    c.said("tell me");
+    await until(() => c.spoken.length === 4, "the whole reply");
+    await Bun.sleep(50);
+    expect(c.flushed).toEqual([
+      ["First things first, here it is."],
+      ["Then the second thing follows.", "And a third one comes after.", "The end"],
+    ]);
+    await c.talk.end();
   });
 });
 
