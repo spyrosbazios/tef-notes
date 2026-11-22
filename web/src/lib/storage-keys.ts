@@ -9,7 +9,7 @@ export const STORAGE = {
   dock: "tefnotes.dock",
   /** The desktop rail: folded to its icons or not (hooks/rail.ts). */
   rail: "tefnotes.rail",
-  /** Talk's small panel: how wide and tall the owner dragged it (lib/talk-panel.ts). */
+  /** Talk's small panel: how wide and tall the owner dragged it and where they moved it (lib/talk-panel.ts). */
   talkPanel: "tefnotes.talk-panel",
   /** When the dock was last on screen, for the new-chat rule (assistant/provider.tsx). */
   chatSeen: "tefnotes.chat-seen",
