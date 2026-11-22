@@ -2,7 +2,8 @@
 // when it ends and each piece of dictation Fish read, in a sqlite file in TEF_NOTES_DATA. Fish keeps no history we can read, so
 // this is the only one: losing the volume loses it. `GET /agent/fish/usage` sums it and adds Fish's balance.
 import { Database } from "bun:sqlite";
-import { join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { FishSpend, FishUsage, FishUse } from "@/core/fish-usage";
 import { credit } from "./fish";
 import { key } from "./keys";
@@ -10,6 +11,7 @@ import { key } from "./keys";
 export class FishLedger {
   private db: Database;
   constructor(file = ":memory:", private now: () => number = Date.now) {
+    if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new Database(file, { create: true });
     this.db.run("CREATE TABLE IF NOT EXISTS uses (at INTEGER, kind TEXT, seconds REAL, bytes INTEGER, cost REAL)");
     this.db.run("CREATE INDEX IF NOT EXISTS uses_at ON uses (at)");

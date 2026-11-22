@@ -43,8 +43,8 @@ test("task lists", () => {
 });
 
 test("shownRail: the sidebar's order, less what is hidden", () => {
-  expect(shownRail({ hidden: ["today", "notes"] })).toEqual(["inbox", "upcoming", "logbook", "talk"]);
-  expect(shownRail(DEFAULT_PREFS.desktop)).toEqual(["inbox", "today", "upcoming", "logbook", "talk"]);
+  expect(shownRail({ hidden: ["today", "notes"] })).toEqual(["home", "inbox", "upcoming", "logbook", "talk"]);
+  expect(shownRail(DEFAULT_PREFS.desktop)).toEqual(["home", "inbox", "today", "upcoming", "logbook", "talk"]);
 });
 
 test("shownTabs and movedTab", () => {
