@@ -114,8 +114,10 @@ const waitKey = (a: Asked) => (a.kind === "approval" ? `approval:${a.id}` : `out
  *  ear is the last thing opened, and the timers start once it is. */
 export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> {
   // The conversation holds its chat from start to end (chats.ts `hold`): the text assistant can't run a turn on it meanwhile,
-  // and its saves are the only ones
-  const chatHold = await hold(start.chat);
+  // and its saves are the only ones. Once it has ended, a turn that wants the chat waits for its last save (`stopping`)
+  // instead of being refused
+  let over = false;
+  const chatHold = await hold(start.chat, { stopping: () => over });
   if (!chatHold) throw new Error("A reply is still being written in this chat: wait for it, or stop it.");
   const letGo = chatHold.release;
   let prior;
@@ -376,6 +378,7 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     if (ended) return;
     stopReply();
     ended = true;
+    over = true;
     clearInterval(timer); clearInterval(beat);
     ear?.done();
     ear?.close();

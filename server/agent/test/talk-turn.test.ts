@@ -185,6 +185,18 @@ describe("cards over the socket", () => {
     expect(after.status).toBe(200);
     await after.text();
   });
+
+  it("once it has ended, a turn that comes during its last save waits for it instead of being refused", async () => {
+    const c = await talking();
+    const ending = c.talk.end();          // the last save is under way, the chat still held
+    replies = [text("Typed.")];
+    const res = await chat(new Request("http://x/agent/chat", { method: "POST", body: JSON.stringify({
+      id: "chat1", model: "m", effort: "normal", message: { id: "u9", role: "user", parts: [{ type: "text", text: "typed" }] },
+    }) }), { url: pb.url }, pick);
+    await ending;
+    expect(res.status).toBe(200);
+    await res.text();
+  });
 });
 
 describe("speaking over the reply", () => {
