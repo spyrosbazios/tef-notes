@@ -9,7 +9,7 @@ import { boxDraft, shown, type Draft, type DraftState, type Status } from "@/lib
 import { holdDrafts, noteDrafts, pushNow } from "@/lib/records";
 import type { NoteRec } from "@/services/notes";
 
-export type { Clash, Status } from "@/lib/drafts";
+export type { Status } from "@/lib/drafts";
 
 const useDraftState = (d: Draft): DraftState => useSyncExternalStore(d.watch, d.get);
 

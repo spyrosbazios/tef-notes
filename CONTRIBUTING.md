@@ -58,6 +58,7 @@ Each module's README has its setup and commands:
 - `cli`: [cli/README.md](cli/README.md)
 - `extension`: [extension/README.md](extension/README.md)
 - `android`: [android/README.md](android/README.md)
+- Dead code, every module: `bun install && bun run knip` from the root, each module installed first. Unused files and dependencies fail; unused exports only warn. Fix the code, or teach `knip.json` an entry point it missed; never an `ignore` to quiet a real finding.
 - `site` and `video` (the public page and the promo film drawn from its screens): [site/README.md](site/README.md),
   [video/README.md](video/README.md); a change to a screen in `site/src/components/mock/` is checked in both
 

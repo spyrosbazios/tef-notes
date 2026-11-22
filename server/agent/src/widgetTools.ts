@@ -33,8 +33,6 @@ export const LENS = z.object({
   theme: z.enum(THEME_NAMES).optional().describe(`The theme the app takes while it is on: ${THEME_NAMES.join(" ")}`),
 });
 
-export type LensInput = z.infer<typeof LENS>;
-
 /** `i` as a lens's fields, its tags the defined names they match, or why it can't be one. */
 export async function lensFields(notes: Pick<NoteService, "tags">, i: z.infer<typeof LENS>): Promise<Omit<Lens, "rec"> | { error: string }> {
   const problem = lensProblem({ name: i.name, tags: i.tags, exclude: i.exclude ?? [] });

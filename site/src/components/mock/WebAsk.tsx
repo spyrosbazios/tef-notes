@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { ConfirmCard, Dock, ToolLine, UserBubble } from "./parts";
-import { LisbonPage } from "./WebNote";
 
 /** The dock drawn on its own, at its own width and tall enough for the page's turn whole: the chat, the card to approve,
  *  the composer. */
@@ -24,16 +23,6 @@ const TURN: ReactNode[] = [
 type ChatProps = { turn?: ReactNode; sees?: string; draft?: string };
 
 const Chat = ({ turn = TURN, sees = "Autumn trip: Lisbon in five days", draft }: ChatProps) => <Dock sees={sees} draft={draft}>{turn}</Dock>;
-
-/** The assistant docked beside the open note: it sees the note, reads it, and proposes the tasks as a card to approve. */
-export function WebAsk() {
-  return (
-    <div className="flex h-full w-full bg-bg">
-      <LisbonPage narrow />
-      <Chat />
-    </div>
-  );
-}
 
 /** The dock alone, filling a DOCK-sized screen. */
 export function AskDock(chat: ChatProps) {

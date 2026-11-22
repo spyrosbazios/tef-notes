@@ -32,6 +32,28 @@ jobs:
       - run: bun scripts/check-migrations.ts
       - run: bun test scripts/check-migrations.test.ts
 
+  # Dead code across every module: unused files, dependencies and unlisted ones fail; unused exports only warn (knip.json).
+  knip:
+    name: Knip - unused files, dependencies, exports
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-knip-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            bun-knip-${{ runner.os }}-${{ env.BUN_VERSION }}-
+      # Knip reads each module's installed packages to tell a used dependency from a dead one.
+      - run: |
+          bun install --frozen-lockfile
+          for d in packages/core web cli extension site video server/agent android; do (cd "$d" && bun install --frozen-lockfile); done
+      - run: bun run knip
+
   core:
     name: Core - lint, tests, typecheck
     runs-on: ubuntu-latest

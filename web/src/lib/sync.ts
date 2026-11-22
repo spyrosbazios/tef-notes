@@ -11,7 +11,6 @@
 import type { Transport } from "@/core/sync";
 import { createSync } from "./sync-controller";
 export type { SyncStatus, Settle } from "./sync-controller";
-export type { Relayed } from "./tab-sync";
 import * as links from "@/services/links";
 import * as notes from "@/services/notes";
 import { watch } from "@/services/realtime";

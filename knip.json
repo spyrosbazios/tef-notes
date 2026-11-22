@@ -1,0 +1,76 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "rules": {
+    "exports": "warn",
+    "types": "warn",
+    "nsExports": "warn",
+    "nsTypes": "warn",
+    "enumMembers": "warn",
+    "duplicates": "warn"
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.ts",
+        "assets/icons.ts",
+        "docs/assets/*.ts",
+        "server/pb_hooks/*.pb.js",
+        "server/pb_hooks/bundle/build.ts",
+        "server/pb_migrations/*.js",
+        "server/test/**/*.{js,ts}",
+        "server/integration/*.ts",
+        "server/pb_hooks/bundle/core.ts",
+        "server/pb_hooks/lib/notes.js"
+      ],
+      "project": [
+        "scripts/**/*.ts",
+        "assets/**/*.ts",
+        "docs/**/*.ts",
+        "server/{integration,pb_hooks,test}/**/*.{js,ts}"
+      ],
+      "ignoreDependencies": [
+        "@napi-rs/canvas"
+      ]
+    },
+    "packages/core": {
+      "entry": [
+        "vite.ts"
+      ]
+    },
+    "web": {
+      "entry": [
+        "vite-*.ts"
+      ],
+      "ignore": [
+        "src/components/ui/**"
+      ]
+    },
+    "extension": {
+      "entry": [
+        "src/{background,options,popup}.ts",
+        "scripts/*.ts"
+      ]
+    },
+    "video": {
+      "entry": [
+        "src/index.ts",
+        "scripts/*.ts",
+        "remotion.config.ts"
+      ]
+    },
+    "server/agent": {
+      "entry": [
+        "src/render-child.ts",
+        "test/render-fixture.ts"
+      ]
+    },
+    "android": {
+      "entry": [
+        "scripts/*.ts"
+      ]
+    },
+    "site": {},
+    "cli": {}
+  }
+}

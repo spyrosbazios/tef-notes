@@ -88,6 +88,7 @@ cd extension && bun install && bun run build           # -> extension/dist; `bun
 cd android && bun install && ./gradle.sh testDebugUnitTest lintRelease assembleRelease   # JAVA_HOME, ANDROID_HOME; android/README.md
 cd server/agent && bun install && bun run lint && bun test && bun run typecheck
 cd video && bun install && bun test && bun run typecheck && bun run stills   # the film's frames -> video/out/stills; video/README.md
+bun install && bun run knip                            # dead files, deps, exports across every module (each module installed first); knip.json
 ```
 
 ## Ownership

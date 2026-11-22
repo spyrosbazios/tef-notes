@@ -24,7 +24,6 @@ const PAGE = 500, TRIES = 3, RRF = 60;
 const FIELDS = "id,path,kind,rev,text,title,tags,pinned,archived,color,updated,tainted";
 
 import { time } from "./metadata";
-export { time } from "./metadata";
 
 const metaOf = (r: any): Meta => ({
   rec: r.id, path: r.path, kind: noteKindOf(r.kind), rev: r.rev, text: r.text ?? "", title: r.title || parseNote(r.path, r.text ?? "").title, tags: r.tags ?? [],

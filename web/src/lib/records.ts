@@ -270,5 +270,5 @@ export function startRecords(): () => void {
 // What hooks read beside the writes: the copy's lists, the sync's status and triggers. Hooks import them from here, never
 // lib/local or lib/sync.
 export { flushLocal };
-export { LOCAL_QUERY, getStatus, live, onRedraw, opened, pushNow, syncNow, watchStatus, type Relayed, type Settle, type SyncStatus } from "./sync";
+export { LOCAL_QUERY, getStatus, live, onRedraw, opened, pushNow, syncNow, watchStatus, type Settle, type SyncStatus } from "./sync";
 export { LINKS, NOTES, TASKS, projectLocal, readLinks, readNotes, readTasks } from "./local-records";

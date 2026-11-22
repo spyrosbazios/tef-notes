@@ -54,7 +54,7 @@ export const Markdown = memo(function Markdown({ body, className, onNote }: Prop
         components={{
           input: (p) => (p.type === "checkbox" ? <input type="checkbox" checked={!!p.checked} readOnly onClick={(e) => e.stopPropagation()} /> : null),
           a: ({ href = "", title, children }) => {
-            // A PDF of this note's: a chip, opening in a new tab once the page has its URL (see useShown), plain until then
+            // A PDF of this note's: a chip, opening in a new tab once its href is a server URL, plain until then
             const file = attachmentLink(href);
             if (file && (isPdf(file.name) || isDrawing(file.name))) {
               const drawing = isDrawing(file.name), shown = /^https?:/.test(href);

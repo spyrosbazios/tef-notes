@@ -8,7 +8,6 @@ export const DELETE_WIDTH = 80, DELETE_AT = 56;
 /** px a finger travels sideways before the press is a swipe. */
 export const CLAIM = 10;
 
-export type Rest = "closed" | "delete";
 export type Outcome = "when" | "delete" | "closed";
 
 /** Where the row sits for a finger `dx` px from where it went down, the row starting `from` (0 closed, `-DELETE_WIDTH` with Delete out).

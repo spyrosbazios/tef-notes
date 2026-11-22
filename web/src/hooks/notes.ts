@@ -13,7 +13,7 @@ import type { NoteRec } from "@/services/notes";
 import { useActiveLens, activeLensOf } from "./lens";
 
 export { NOTES, type Settle } from "@/lib/records";
-export { Gone, write, setFlags, landed, deleteNote } from "@/lib/records";
+export { write, setFlags, landed, deleteNote } from "@/lib/records";
 
 /** Every note, from the local copy once it has opened: what the routes' loaders wait for (router.ts) and the lists read. */
 export const notesQuery = queryOptions({ queryKey: NOTES, queryFn: async () => { await opened(); return readNotes(); }, ...LOCAL_QUERY });
@@ -32,11 +32,6 @@ export function useLensSorted(): NoteRec[] {
   const sorted = useSorted(), lens = useActiveLens();
   return useMemo(() => (lens ? sorted.filter((n) => inLens(lens, n.note)) : sorted), [sorted, lens]);
 }
-
-export const useNote = (id: string | undefined) => {
-  const { data } = useNotes();
-  return useMemo(() => (id ? data?.find((n) => n.note.id === id) : undefined), [data, id]);
-};
 
 /** The note opened as `id`, wherever it is now: a note made here that moved aside to `-2` on its first push (another device had
  *  the name) is found under its new id, which the caller puts in the address. */

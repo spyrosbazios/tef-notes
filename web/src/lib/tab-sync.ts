@@ -463,5 +463,3 @@ export function createTabs(d: Deps) {
     leading,
   };
 }
-
-export type Tabs = ReturnType<typeof createTabs>;

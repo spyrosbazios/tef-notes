@@ -97,5 +97,3 @@ export function drawingStore() {
     },
   };
 }
-
-export type DrawingStore = ReturnType<typeof drawingStore>;

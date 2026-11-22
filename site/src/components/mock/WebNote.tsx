@@ -1,6 +1,6 @@
 import { Bold, BookOpen, Check, ChevronLeft, ChevronRight, Circle, Copy, Ellipsis, EllipsisVertical, FileText, Italic, Link2, ListChecks, ListTodo, Mic, Paperclip, Pin, Plus, Sparkles, WandSparkles } from "lucide-react";
 import { cn } from "@/lib";
-import { Fab, Mosaic, Picture, Tag } from "./parts";
+import { Mosaic, Picture, Tag } from "./parts";
 
 const Tool = ({ icon: I, label }: { icon: typeof BookOpen; label: string }) => (
   <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2 text-xs font-medium leading-5 text-dim"><I className="size-3.5" />{label}</span>
@@ -69,9 +69,4 @@ export function LisbonPage({ narrow }: { narrow?: boolean }) {
       </div>
     </article>
   );
-}
-
-/** A note open on its own page, the whole window; the assistant's button in the corner. */
-export function WebNote() {
-  return <div className="relative flex h-full w-full bg-bg"><LisbonPage /><Fab /></div>;
 }

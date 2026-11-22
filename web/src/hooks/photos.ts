@@ -24,12 +24,6 @@ function usePhotoUrls(noteId: string, body: string): Map<string, string> | null 
   return useMemo(() => (refs ? new Map((data ?? []).map((p) => [p.name, photos.url(p)])) : null), [refs, data]);
 }
 
-/** The body with its `../attachments/<id>/<name>` images pointed at the server's files. */
-export function useShown(noteId: string, body: string): string {
-  const byName = usePhotoUrls(noteId, body);
-  return useMemo(() => (byName ? rewriteImagePaths(body, noteId, (n) => byName.get(n)) : body), [byName, body, noteId]);
-}
-
 /** The editor's image resolver: an image's `src` to the file's URL on the server. An attachment the server doesn't
  *  list (yet) gives null, an address elsewhere is its own. A new function whenever the list changes. */
 export function useResolveImage(noteId: string, body: string): (src: string) => string | null {

@@ -14,7 +14,7 @@ import type { TaskRec } from "@/services/todo";
 import { activeLensOf, useActiveLens } from "./lens";
 import { useNow } from "./now";
 
-export { TASKS, readTasks } from "@/lib/records";
+export { TASKS } from "@/lib/records";
 export { changeTask, editTask, tickTask } from "@/lib/records";
 
 export const tasksQuery = queryOptions({ queryKey: TASKS, queryFn: async () => { await opened(); return readTasks(); }, ...LOCAL_QUERY });

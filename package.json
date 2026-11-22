@@ -1,0 +1,1 @@
+{ "name": "tefnotes", "private": true, "scripts": { "knip": "knip" }, "devDependencies": { "knip": "6.47.0" } }

@@ -155,24 +155,6 @@ export function NoteTile({ note, maxTags }: { note: DemoNote; maxTags?: number }
 
 // ---- checkboxes ----
 
-/** The square box of a markdown `- [ ]` line. */
-export function Box({ on, size = 18 }: { on?: boolean; size?: number }) {
-  return (
-    <span style={{ width: size, height: size }} className={cn("flex shrink-0 items-center justify-center rounded-[4px] border-2", on ? "border-brand bg-brand text-bg" : "border-faint bg-muted")}>
-      {on ? <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth={4}><path d="M20 6 9 17l-5-5" /></svg> : null}
-    </span>
-  );
-}
-
-/** One checkbox line of a note. */
-export function BoxLine({ on, children, phone }: { on?: boolean; children: ReactNode; phone?: boolean }) {
-  return (
-    <div className={cn("flex items-center gap-3 text-[16px]", on && "text-faint line-through decoration-faint")}>
-      <Box on={on} size={phone ? 20 : 18} />{children}
-    </div>
-  );
-}
-
 /** The round box of a task. */
 export function Radio({ on, size = 18 }: { on?: boolean; size?: number }) {
   return (
