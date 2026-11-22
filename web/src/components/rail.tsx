@@ -61,8 +61,6 @@ export function Rail({ onSearch, onPick, fold }: { onSearch: () => void; onPick?
   const is = (v: View) => view.kind === v.kind;
   const offered = useOffered();
   const shown = shownRail(usePrefs().desktop).filter(offered);
-  const lists = shown.filter((k) => k !== "notes" && k !== "talk");
-  const screens = shown.filter((k) => k === "notes" || k === "talk");
   const go = (v: View) => { goView(v); onPick?.(); };
 
   return (
@@ -76,16 +74,11 @@ export function Rail({ onSearch, onPick, fold }: { onSearch: () => void; onPick?
             </Button>
           </Named>
         </div>
-        {lists.length ? (
+        {shown.length ? (
           <div className="space-y-0.5">
-            {lists.map((k) => (
+            {shown.map((k) => (
               <Item key={k} icon={RAIL_ICON[k]} label={titleOf({ kind: k })} value={k} count={counts[k as keyof typeof counts] || undefined} active={is({ kind: k })} onClick={() => go({ kind: k })} folded={folded} />
             ))}
-          </div>
-        ) : null}
-        {screens.length ? (
-          <div className="space-y-0.5">
-            {screens.map((k) => <Item key={k} icon={RAIL_ICON[k]} value={k} label={titleOf({ kind: k })} active={is({ kind: k })} onClick={() => go({ kind: k })} folded={folded} />)}
           </div>
         ) : null}
         <div className="flex-1" />
