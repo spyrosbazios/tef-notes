@@ -12,6 +12,7 @@ import { Group, Page, Row, Segmented, type Option } from "@/components/settings/
 import { TalkSpeed, TalkVoicePicker } from "@/components/talk/voice-settings";
 import { useTalkModel } from "@/hooks/agent";
 import { setPrefs, usePrefs } from "@/hooks/prefs";
+import { useNow } from "@/hooks/now";
 import { useTalkOn } from "@/hooks/talk";
 
 /** Voice input: the mic, and where it goes — Fish Audio, not this server's own CPU. */
@@ -51,7 +52,8 @@ function TalkVoice() {
 
 /** What Fish Audio has cost this week and this month (core/fish-usage.ts), from the agent's own record, and the credit left. */
 function Spending() {
-  const starts = periodStarts(new Date());
+  const now = useNow();
+  const starts = periodStarts(new Date(now));
   const usage = useQuery({ queryKey: ["fish-usage", starts.week, starts.month], queryFn: () => fishUsage(starts), staleTime: 60_000 });
   const u = usage.data;
   if (!u) return null;
