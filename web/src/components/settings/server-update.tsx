@@ -1,12 +1,12 @@
 // Settings → Maintenance's server box: the release the server runs, the newest published one with its notes, and updating to
 // it with the updater (hooks/release.ts). When the updater can't run here (it is opt-in, or the server is built from source) the
 // box says why instead of offering the button.
-import { CircleArrowUp, ExternalLink, Loader2 } from "lucide-react";
+import { CircleArrowUp, ExternalLink, Loader2, Server } from "lucide-react";
 import { useState } from "react";
 import { updateOffered } from "@/core/release";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Line } from "@/components/settings/line";
+import { Row, Status } from "@/components/settings/kit";
 import { useOnline } from "@/hooks/online";
 import { useRelease, useServerUpdate } from "@/hooks/release";
 
@@ -19,26 +19,25 @@ export function ServerUpdate() {
   const latest = info.latest;
   const offered = updateOffered(info);
   const why = info.updater.why;
+  const tone = target ? "warn" : offered ? "brand" : latest ? "up" : "muted";
   const status = target ? doing : offered ? `${latest!.version} is out` : latest ? "Up to date" : "Couldn't check";
   return (
     <>
-      <Line title="Server version" detail={info.running ? `Release ${info.running}` : "A build without a release version"}
-        trailing={<span className="text-[13px] text-dim">{status}</span>} />
+      <Row icon={Server} title={<>Server {info.running ? <span className="ml-1 font-normal tabular-nums text-dim">{info.running}</span> : null}</>}
+        detail={info.running ? undefined : "A build without a release version"}>
+        <Status tone={tone}>{status}</Status>
+      </Row>
       {offered && latest && (
-        <Line title={`Update to ${latest.version}`}
-          detail={error || why || "Downloads the release, backs up pb_data, and restarts the server. The app reloads once it is back."}
-          trailing={
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                <a href={latest.url} target="_blank" rel="noreferrer"><ExternalLink /> Notes</a>
-              </Button>
-              {!why && (
-                <Button variant="outline" size="sm" className="rounded-full" disabled={!online || !!target} onClick={() => setAsking(true)}>
-                  {target ? <Loader2 className="animate-spin" /> : <CircleArrowUp />} {target ? "Updating" : "Update"}
-                </Button>
-              )}
-            </div>
-          } />
+        <Row icon={CircleArrowUp} tone="brand" title={`Update to ${latest.version}`} detail={error || why || "Backs up pb_data, then restarts the server."}>
+          <Button variant="ghost" size="sm" className="rounded-full" asChild>
+            <a href={latest.url} target="_blank" rel="noreferrer"><ExternalLink /> Notes</a>
+          </Button>
+          {!why && (
+            <Button variant="outline" size="sm" className="rounded-full" disabled={!online || !!target} onClick={() => setAsking(true)}>
+              {target ? <Loader2 className="animate-spin" /> : <CircleArrowUp />} {target ? "Updating" : "Update"}
+            </Button>
+          )}
+        </Row>
       )}
       <AlertDialog open={asking} onOpenChange={setAsking}>
         <AlertDialogContent>

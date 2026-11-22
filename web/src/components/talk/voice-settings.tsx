@@ -1,14 +1,13 @@
-// Talk's voice in Settings (core/prefs.ts `talk`): whose voice it speaks in, picked from the Fish voices the server lists
+// Talk's voice in Settings → Voice, as rows of its Talk group (core/prefs.ts `talk`): whose voice it speaks in, picked from the Fish voices the server lists
 // (the owner's own first, then public ones, searchable), each with its sample to hear; and how fast it talks. Both are the
 // owner's, read by the server at the start of every conversation.
 import { useQuery } from "@tanstack/react-query";
-import { Check, Loader2, Pause, Play } from "lucide-react";
+import { Check, Gauge, Loader2, Pause, Play, Speech } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TalkVoice } from "@/core/talk";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Row, Segmented } from "@/components/settings/kit";
 import { setPrefs, usePrefs } from "@/hooks/prefs";
 import { useTalkStatus } from "@/hooks/talk";
 import * as talk from "@/services/talk";
@@ -20,14 +19,10 @@ const speedLabel = (s: number) => `${s}×`;
 export function TalkSpeed() {
   const { talk: t } = usePrefs();
   return (
-    <div className="space-y-2 px-3 py-2.5">
-      <p className="text-sm font-semibold">Speed</p>
-      <p className="text-[13px] leading-snug text-dim">How fast the voice talks back. 1× is its natural pace; the next conversation uses it.</p>
-      <ToggleGroup type="single" variant="outline" size="sm" aria-label="Speed" value={String(t.speed)}
-        onValueChange={(v) => { if (v) setPrefs({ talk: { speed: Number(v) } }); }}>
-        {SPEEDS.map((s) => <ToggleGroupItem key={s} value={String(s)} className="tabular-nums">{speedLabel(s)}</ToggleGroupItem>)}
-      </ToggleGroup>
-    </div>
+    <Row icon={Gauge} title="Speed">
+      <Segmented label="Speed" value={String(t.speed)} options={SPEEDS.map(String)} of={(s) => ({ label: speedLabel(Number(s)) })}
+        onPick={(v) => setPrefs({ talk: { speed: Number(v) } })} />
+    </Row>
   );
 }
 
@@ -41,19 +36,17 @@ export function TalkVoicePicker() {
   const sample = useSample();
   const pick = (v: TalkVoice) => setPrefs({ talk: { voice: v.id } });
   return (
-    <div className="space-y-2 px-3 py-2.5">
-      <Label htmlFor="talk-voice-q" className="text-sm font-semibold">Voice</Label>
-      <p className="text-[13px] leading-snug text-dim">
-        Every reply is spoken in this one voice. Your own voices on fish.audio come first, then public ones; search by name, or paste a voice's id.
-        {!t.voice && current ? " None picked yet: the server is using the first one it found." : ""}
-      </p>
-      <Input id="talk-voice-q" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Search voices" />
-      <div className="max-h-72 overflow-y-auto rounded-lg border border-line" role="radiogroup" aria-label="Voice">
-        {list.isPending ? <p className="flex items-center gap-2 px-3 py-2.5 text-[13px] text-dim"><Loader2 className="size-4 animate-spin" />Asking Fish…</p>
-          : list.isError ? <p className="px-3 py-2.5 text-[13px] text-dim">Fish's voice list didn't answer: {list.error.message}</p>
-          : <VoiceRows voices={withPasted(list.data, typed)} current={current} sample={sample} pick={pick} />}
-      </div>
-    </div>
+    <Row icon={Speech} title="Voice" detail={!t.voice && current ? "None picked: the server uses the first it found." : "Yours on fish.audio first, then public ones."}
+      below={
+        <div className="space-y-2">
+          <Input id="talk-voice-q" aria-label="Search voices" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Search voices, or paste an id" />
+          <div className="max-h-72 overflow-y-auto rounded-lg border border-line" role="radiogroup" aria-label="Voice">
+            {list.isPending ? <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-dim"><Loader2 className="size-4 animate-spin" />Asking Fish…</p>
+              : list.isError ? <p className="px-3 py-2.5 text-xs text-dim">Fish's voice list didn't answer: {list.error.message}</p>
+              : <VoiceRows voices={withPasted(list.data, typed)} current={current} sample={sample} pick={pick} />}
+          </div>
+        </div>
+      } />
   );
 }
 
@@ -65,7 +58,7 @@ function withPasted(voices: TalkVoice[], typed: string): TalkVoice[] {
 }
 
 function VoiceRows({ voices, current, sample, pick }: { voices: TalkVoice[]; current: string; sample: Sample; pick: (v: TalkVoice) => void }) {
-  if (!voices.length) return <p className="px-3 py-2.5 text-[13px] text-dim">No voice by that name.</p>;
+  if (!voices.length) return <p className="px-3 py-2.5 text-xs text-dim">No voice by that name.</p>;
   return (
     <ul className="divide-y divide-line">
       {voices.map((v) => {
