@@ -4,7 +4,8 @@
 //     run the prompt on the open note, with no chat to open. Tidy and Make a task are two that come with the app, the owner's
 //     to change or delete like any they wrote.
 // Where an action sits is a layout's own (prefs `phone.noteHeader`, `desktop.noteHeader`): a `Slot` each, in order, a button in
-// the header, a row in its menu, or off. A header holds `HEADER_MAX` buttons; Delete and the colour are the menu's, always.
+// the header, a row in its menu, or off. A header holds as many buttons as the owner pins (it scrolls when they overflow);
+// Delete and the colour are the menu's, always.
 // A run (`runMessage`, `ActionRun`): the client sends the message naming the note and the prompt as a chat of its own, with the
 // action's id beside it; the agent's server reads the action from the preferences and offers only the tools its `result`
 // needs (server/agent/src/note-action.ts), so a summary can't delete and a tidy can't touch another note. Its writes are the
@@ -107,11 +108,8 @@ export type Slot = { id: string; place: SlotPlace };
 
 type LayoutName = "phone" | "desktop";
 
-/** The most buttons a header holds beside the mic and the menu: a phone's is narrower, and a desktop's shares its row with
- *  the format tools. */
-export const HEADER_MAX: Record<LayoutName, number> = { phone: 3, desktop: 4 };
-
-/** A layout's header before the owner changed it: the buttons it always had, then the app's two actions while there is room. */
+/** A layout's header before the owner changed it: the buttons it always had, then the app's two actions (fewer on a phone's
+ *  narrower header). */
 const DEFAULT_HEADER: Record<LayoutName, readonly string[]> = { phone: ["attach", "pin", "tidy"], desktop: ["attach", "pin", "tidy", "task"] };
 
 /** The slots of a layout nobody set: the default header, then everything else in the menu. */
@@ -121,16 +119,13 @@ function defaultSlots(layout: LayoutName, prompts: readonly PromptAction[]): Slo
 }
 
 /** Whatever was stored as a layout's slots, whole: stored order kept, an action that is gone dropped, one the list doesn't know
- *  yet (a new prompt, a new built-in) added to the menu, and buttons past the header's room moved to the menu. */
+ *  yet (a new prompt, a new built-in) added to the menu. */
 export function slotsOf(raw: unknown, layout: LayoutName, prompts: readonly PromptAction[]): Slot[] {
   if (!Array.isArray(raw)) return defaultSlots(layout, prompts);
   const known = [...BUILTINS, ...prompts.map((p) => p.id)] as string[], out: Slot[] = [];
-  let room = HEADER_MAX[layout];
   for (const r of raw) {
     const s = obj(r), id = typeof s.id === "string" ? s.id : "";
-    if (!known.includes(id) || out.some((o) => o.id === id)) continue;
-    const want = one(SLOT_PLACES, s.place, "menu"), place = want === "header" && room-- <= 0 ? "menu" : want;
-    out.push({ id, place });
+    if (known.includes(id) && !out.some((o) => o.id === id)) out.push({ id, place: one(SLOT_PLACES, s.place, "menu") });
   }
   return [...out, ...known.filter((id) => !out.some((o) => o.id === id)).map((id) => ({ id, place: "menu" as const }))];
 }
@@ -138,18 +133,13 @@ export function slotsOf(raw: unknown, layout: LayoutName, prompts: readonly Prom
 /** The ids at `place`, in order. */
 export const idsAt = (slots: readonly Slot[], place: SlotPlace): string[] => slots.filter((s) => s.place === place).map((s) => s.id);
 
-/** Whether the header has room for one more button. */
-export const headerRoom = (slots: readonly Slot[], layout: LayoutName): boolean => idsAt(slots, "header").length < HEADER_MAX[layout];
+/** `slots` with `id` put at `place`. */
+export const placedAt = <S extends { id: string; place: string }>(slots: readonly S[], id: string, place: S["place"]): S[] =>
+  slots.map((s) => (s.id === id ? { ...s, place } : s));
 
-/** `slots` with `id` put at `place`; a header that is full keeps it where it was. */
-export function placedAt(slots: readonly Slot[], layout: LayoutName, id: string, place: SlotPlace): Slot[] {
-  const now = slots.find((s) => s.id === id);
-  if (!now || now.place === place || (place === "header" && !headerRoom(slots, layout))) return [...slots];
-  return slots.map((s) => (s.id === id ? { id, place } : s));
-}
-
-/** The order with `id` dropped before (or `after`) `over`; unchanged when either is unknown or they are the same. */
-export function movedSlot(slots: readonly Slot[], id: string, over: string, after: boolean): Slot[] {
+/** The order with `id` dropped before (or `after`) `over`; unchanged when either is unknown or they are the same. Any list of
+ *  slots: a note header's, the format tools' (format-tools.ts). */
+export function movedSlot<S extends { id: string }>(slots: readonly S[], id: string, over: string, after: boolean): S[] {
   const moving = slots.find((s) => s.id === id);
   if (!moving || id === over || !slots.some((s) => s.id === over)) return [...slots];
   const rest = slots.filter((s) => s.id !== id), to = rest.findIndex((s) => s.id === over) + (after ? 1 : 0);

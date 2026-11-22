@@ -1,8 +1,10 @@
-// Settings → Notes (core/note-actions.ts): where each of a note's actions sits in its header, one list per layout (dragged
-// into order; a button in the header, a row in the menu, or off), and the assistant actions themselves: the owner's saved
-// prompts, added, changed and deleted here. All of it is preferences (hooks/prefs.ts), so every device follows.
+// Settings → Notes: per layout, the editor's format tools (core/format-tools.ts: dragged into order; in the bar, under its ⋯,
+// or off) and where each of a note's actions sits in its header (core/note-actions.ts: dragged into order; a button in the
+// header, a row in the menu, or off), and the assistant actions themselves: the owner's saved prompts, added, changed and
+// deleted here. All of it is preferences (hooks/prefs.ts), so every device follows.
 import { GripVertical, Monitor, Pencil, Plus, Smartphone } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { TOOL_ICON } from "@/components/format-tool-icons";
 import { BUILTIN_ICON, PROMPT_ICON } from "@/components/note-action-icons";
 import { Choice } from "@/components/settings/choice";
 import { SUB, TITLE } from "@/components/settings/style";
@@ -12,9 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { FORMAT_TOOL_LABEL, NARROW_BAR, placesFor, TOOL_PLACE_LABEL, type ToolSlot } from "@/core/format-tools";
 import {
-  ACTION_ICONS, BUILTIN_LABEL, HEADER_MAX, headerRoom, idsAt, isBuiltin, ACTION_LIMITS, movedSlot, newActionId, SLOT_PLACE_LABEL, SLOT_PLACES, placedAt, promptProblem,
-  RESULT_ABOUT, RESULT_LABEL, RESULTS, type ActionIcon, type PromptAction, type Result,
+  ACTION_ICONS, BUILTIN_LABEL, isBuiltin, ACTION_LIMITS, movedSlot, newActionId, SLOT_PLACE_LABEL, SLOT_PLACES, placedAt, promptProblem,
+  RESULT_ABOUT, RESULT_LABEL, RESULTS, type ActionIcon, type PromptAction, type Result, type Slot,
 } from "@/core/note-actions";
 import type { Layout } from "@/core/prefs";
 import { useRowDrag } from "@/hooks/drag";
@@ -22,20 +25,56 @@ import { useLayout } from "@/hooks/media";
 import { prefsNow, setPrefs, usePrefs } from "@/hooks/prefs";
 import { cn } from "@/lib/utils";
 
-const setHeader = (layout: Layout, noteHeader: ReturnType<typeof placedAt>) =>
+const setHeader = (layout: Layout, noteHeader: Slot[]) =>
   setPrefs(layout === "phone" ? { phone: { noteHeader } } : { desktop: { noteHeader } });
+const setTools = (layout: Layout, formatTools: ToolSlot[]) =>
+  setPrefs(layout === "phone" ? { phone: { formatTools } } : { desktop: { formatTools } });
+
+/** One layout's format tools: every one, dragged into order, each in the bar, under its ⋯ (the desktop's), or off. */
+function ToolList({ layout }: { layout: Layout }) {
+  const slots = usePrefs()[layout].formatTools, group = `${layout}-tools`;
+  const drag = useRowDrag((_g, id, over, after) => setTools(layout, movedSlot(prefsNow()[layout].formatTools, id, over, after)));
+  return (
+    <div className="divide-y divide-line rounded-xl border border-line">
+      <div className="px-3 py-2.5">
+        <p className="text-sm font-semibold">Format tools</p>
+        <p className="text-[13px] leading-snug text-dim">
+          {layout === "phone"
+            ? "Drag to reorder. They ride on top of the keyboard while you write; the tools for moving a list item or editing a table join where they apply."
+            : `Drag to reorder. They sit at the left of the note's top bar. When it is narrow, the first ${NARROW_BAR} stay and the rest move under ⋯; Link always stays.`}
+        </p>
+      </div>
+      <ul aria-label={`Format tools, ${layout === "phone" ? "Phone" : "Web"}`} className="divide-y divide-line">
+        {slots.map(({ id, place }) => {
+          const Icon = TOOL_ICON[id], name = FORMAT_TOOL_LABEL[id], d = drag(group, id);
+          return (
+            <li key={id} {...d.props} className={cn("relative select-none", d.dragging && "opacity-40")}>
+              {d.mark ? <span aria-hidden className={cn("pointer-events-none absolute inset-x-3 h-0.5 rounded-full bg-brand", d.mark === "before" ? "-top-px" : "-bottom-px")} /> : null}
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-3 py-2">
+                <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />
+                <Icon className={cn("size-4 shrink-0", place === "off" ? "text-faint" : "text-dim")} />
+                <span className={cn("min-w-0 flex-1 basis-32 truncate text-sm", place === "off" && "text-faint")}>{name}</span>
+                <Choice label={`Where ${name} sits`} value={place} options={placesFor(layout, id)} names={TOOL_PLACE_LABEL}
+                  onPick={(v) => setTools(layout, placedAt(prefsNow()[layout].formatTools, id, v))} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 /** One layout's note header: every action, dragged into order, each a header button, a menu row, or off. */
 function HeaderList({ layout }: { layout: Layout }) {
   const prefs = usePrefs(), slots = prefs[layout].noteHeader, prompts = prefs.noteActions;
   const drag = useRowDrag((_g, id, over, after) => setHeader(layout, movedSlot(prefsNow()[layout].noteHeader, id, over, after)));
-  const room = headerRoom(slots, layout), used = idsAt(slots, "header").length;
   return (
     <div className="divide-y divide-line rounded-xl border border-line">
       <div className="px-3 py-2.5">
         <p className="text-sm font-semibold">Buttons and menu</p>
         <p className="text-[13px] leading-snug text-dim">
-          Drag to reorder. The header holds {HEADER_MAX[layout]} buttons ({used} used); the mic and the menu always stay, and the colour and Delete are always in the menu.
+          Drag to reorder. Pin as many buttons as you like; the mic and the menu always stay, and the colour and Delete are always in the menu.
         </p>
       </div>
       <ul aria-label={`Note actions, ${layout === "phone" ? "Phone" : "Web"}`} className="divide-y divide-line">
@@ -51,8 +90,8 @@ function HeaderList({ layout }: { layout: Layout }) {
                 <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />
                 <Icon className={cn("size-4 shrink-0", place === "off" ? "text-faint" : prompt ? "text-brand" : "text-dim")} />
                 <span className={cn("min-w-0 flex-1 basis-32 truncate text-sm", place === "off" && "text-faint")}>{name}</span>
-                <Choice label={`Where ${name} sits`} value={place} options={SLOT_PLACES} names={SLOT_PLACE_LABEL} off={(o) => o === "header" && !room}
-                  onPick={(v) => setHeader(layout, placedAt(prefsNow()[layout].noteHeader, layout, id, v))} />
+                <Choice label={`Where ${name} sits`} value={place} options={SLOT_PLACES} names={SLOT_PLACE_LABEL}
+                  onPick={(v) => setHeader(layout, placedAt(prefsNow()[layout].noteHeader, id, v))} />
               </div>
             </li>
           );
@@ -176,14 +215,14 @@ export function NotesSettings() {
     <div className="space-y-8">
       <section className="space-y-3" aria-labelledby="notes-h">
         <h2 id="notes-h" className={TITLE}>Notes</h2>
-        <h3 className={SUB}>Note header</h3>
+        <h3 className={SUB}>Note bar</h3>
         <Tabs defaultValue={here} className="space-y-3">
           <TabsList>
             <TabsTrigger value="phone"><Smartphone /> Phone</TabsTrigger>
             <TabsTrigger value="desktop"><Monitor /> Web</TabsTrigger>
           </TabsList>
-          <TabsContent value="phone"><HeaderList layout="phone" /></TabsContent>
-          <TabsContent value="desktop"><HeaderList layout="desktop" /></TabsContent>
+          <TabsContent value="phone" className="space-y-3"><ToolList layout="phone" /><HeaderList layout="phone" /></TabsContent>
+          <TabsContent value="desktop" className="space-y-3"><ToolList layout="desktop" /><HeaderList layout="desktop" /></TabsContent>
         </Tabs>
       </section>
       <Actions />

@@ -2,7 +2,7 @@
 // (`phone.noteHeader`, `desktop.noteHeader`): a button here, a row in the menu, or off. The app's own (attach, pin, ask,
 // markdown source, copy link, download, archive) and the owner's assistant actions share the list; an assistant action is drawn
 // in the brand colour and turns while it runs. The colour and Delete are the menu's, always. A menu row carries "Pin to
-// header" while the header has room; the rest is set in Settings → Notes.
+// header"; the rest is set in Settings → Notes.
 import { Link } from "@tanstack/react-router";
 import { ArchiveRestore, ArrowUpToLine, EllipsisVertical, FileUp, Loader2, PenTool, SlidersHorizontal, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { BUILTIN_LABEL, headerRoom, idsAt, isBuiltin, placedAt, type Builtin, type PromptAction } from "@/core/note-actions";
+import { BUILTIN_LABEL, idsAt, isBuiltin, placedAt, type Builtin, type PromptAction } from "@/core/note-actions";
 import type { Color } from "@/core/notes";
 import { useModel } from "@/hooks/agent";
 import { useLayout } from "@/hooks/media";
@@ -56,9 +56,9 @@ function PinUp({ label, onPin }: { label: string; onPin: () => void }) {
 export function NoteHeaderActions(p: Props) {
   const layout = useLayout(), prefs = usePrefs();
   const slots = prefs[layout].noteHeader, prompts = prefs.noteActions;
-  const room = headerRoom(slots, layout), off = !useModel().model;       // no model key: the agent is off, and so are its buttons
+  const off = !useModel().model;       // no model key: the agent is off, and so are its buttons
   const pinUp = (id: string) => {
-    const noteHeader = placedAt(prefsNow()[layout].noteHeader, layout, id, "header");
+    const noteHeader = placedAt(prefsNow()[layout].noteHeader, id, "header");
     setPrefs(layout === "phone" ? { phone: { noteHeader } } : { desktop: { noteHeader } });
   };
 
@@ -106,7 +106,7 @@ export function NoteHeaderActions(p: Props) {
   };
 
   const row = (id: string) => {
-    const up = (label: string) => (room ? <PinUp label={label} onPin={() => pinUp(id)} /> : null);
+    const up = (label: string) => <PinUp label={label} onPin={() => pinUp(id)} />;
     if (id === "attach") return [
       <DropdownMenuItem key="file" onSelect={p.onFile}><FileUp /> Photo or PDF…{up(BUILTIN_LABEL.attach)}</DropdownMenuItem>,
       <DropdownMenuItem key="draw" onSelect={p.onDraw}><PenTool /> New drawing</DropdownMenuItem>,

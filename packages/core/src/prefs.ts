@@ -5,7 +5,7 @@
 //      the server (the `prefs` collection: one record keyed `owner`, its `data` this shape) so every device has it.
 //      - The same on every screen (the look, the notes list, the assistant, what it may do and the note actions it runs, the voice, sharing, the lens on): a key,
 //        or a group's field.
-//      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar, a note's header): `phone` or `desktop`. A layout
+//      - About one layout (where the app opens, Home's list, the phone's tabs, the desktop's sidebar, a note's header, the editor's format tools): `phone` or `desktop`. A layout
 //        is what the window draws, not what the device is: the phone's below `md` (768px: tabs at the bottom), the desktop's from
 //        it (the rail). A laptop window made narrow is drawn as a phone's, and follows the phone's preferences.
 //   2. The state of a window rather than a choice (the dock open and how wide, the chat it is on, when it was last seen): kept by
@@ -17,6 +17,7 @@
 // Pure and platform-neutral.
 import { actionsOf, DEFAULT_ACTIONS, type Actions } from "./actions";
 import { EFFORTS, effortOf, type Effort } from "./agent";
+import { toolSlotsOf, type ToolSlot } from "./format-tools";
 import { DEFAULT_PROMPTS, promptsOf, slotsOf, type PromptAction, type Slot } from "./note-actions";
 import { isNoteSort, type NoteSort } from "./note-sort";
 import { DEFAULT_TALK_MODEL, TALK_MODELS, TALK_SPEED, speedOf, type TalkModel } from "./talk";
@@ -87,6 +88,8 @@ export type LayoutPrefs = {
   homeList: OpeningList;
   /** A note's header: every action in order, each a button there, a row in its menu, or off (note-actions.ts). */
   noteHeader: Slot[];
+  /** The note editor's format tools: every one in order, each in the bar, under its menu, or off (format-tools.ts). */
+  formatTools: ToolSlot[];
 };
 
 /** The phone's, with its bottom bar. */
@@ -154,7 +157,8 @@ export const talkThinking = (p: Prefs): { model?: string; effort: Effort } => {
   return { ...(model ? { model } : {}), effort: p.talk.agent.effort ?? p.agent.effort };
 };
 
-const layoutDefaults = (layout: Layout): LayoutPrefs => ({ start: "home", homeList: "today", noteHeader: slotsOf(undefined, layout, DEFAULT_PROMPTS) });
+const layoutDefaults = (layout: Layout): LayoutPrefs => ({ start: "home", homeList: "today", noteHeader: slotsOf(undefined, layout, DEFAULT_PROMPTS),
+  formatTools: toolSlotsOf(undefined, layout) });
 
 export const DEFAULT_PREFS: Prefs = {
   theme: DEFAULT_THEME, accent: DEFAULT_ACCENT,
@@ -181,6 +185,7 @@ const layoutOf = (l: Record<string, unknown>, layout: Layout, prompts: readonly 
   start: one(STARTS, l.start, "home"),
   homeList: one(OPENING_LISTS, l.homeList, "today"),
   noteHeader: slotsOf(l.noteHeader, layout, prompts),
+  formatTools: toolSlotsOf(l.formatTools, layout),
 });
 
 /** Whatever was stored as Prefs: the one defensive reader. Tabs keep their stored order, any missing ones appended. */

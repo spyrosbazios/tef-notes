@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  BUILTINS, DEFAULT_PROMPTS, HEADER_MAX, headerRoom, idsAt, ACTION_LIMITS, movedSlot, newActionId, placedAt, promptOf, promptProblem, promptsOf, ranOn,
+  BUILTINS, DEFAULT_PROMPTS, idsAt, ACTION_LIMITS, movedSlot, newActionId, placedAt, promptOf, promptProblem, promptsOf, ranOn,
   runMessage, runOf, runTitle, slotsOf,
 } from "../src/note-actions";
 import { DEFAULT_PREFS, patchPaths, prefsOf, withPatch } from "../src/prefs";
@@ -53,19 +53,16 @@ describe("slotsOf", () => {
     expect(s.slice(0, 2)).toEqual([{ id: "sum", place: "header" }, { id: "pin", place: "off" }]);
     expect(idsAt(s, "menu")).toEqual(BUILTINS.filter((b) => b !== "pin"));
   });
-  test("buttons past the header's room go to the menu", () => {
+  test("the header holds as many buttons as are pinned", () => {
     const s = slotsOf(BUILTINS.map((id) => ({ id, place: "header" })), "phone", []);
-    expect(idsAt(s, "header")).toEqual(BUILTINS.slice(0, HEADER_MAX.phone));
-    expect(idsAt(s, "menu")).toEqual(BUILTINS.slice(HEADER_MAX.phone));
+    expect(idsAt(s, "header")).toEqual([...BUILTINS]);
   });
 });
 
-test("placedAt: a full header refuses one more; movedSlot reorders", () => {
+test("placedAt moves one without a cap; movedSlot reorders", () => {
   const s = slotsOf(undefined, "phone", DEFAULT_PROMPTS);
-  expect(headerRoom(s, "phone")).toBe(false);
-  expect(placedAt(s, "phone", "ask", "header")).toEqual(s);
-  const freed = placedAt(s, "phone", "pin", "off");
-  expect(idsAt(placedAt(freed, "phone", "ask", "header"), "header")).toEqual(["attach", "tidy", "ask"]);
+  expect(idsAt(placedAt(s, "ask", "header"), "header")).toEqual(["attach", "pin", "tidy", "ask"]);
+  expect(idsAt(placedAt(s, "pin", "off"), "off")).toEqual(["pin"]);
   expect(movedSlot(s, "tidy", "attach", false).map((x) => x.id).slice(0, 3)).toEqual(["tidy", "attach", "pin"]);
   expect(movedSlot(s, "tidy", "nope", false)).toEqual(s);
 });

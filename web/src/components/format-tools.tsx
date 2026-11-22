@@ -1,38 +1,22 @@
-// The note pane's format tools, the one set of editing tools: all in a row when the top bar is wide, else bold, italic,
-// checklist, link and the rest under ⋯;
-// they sit in the pane's top bar (on a phone, in a bar on top of the keyboard), driven by the editor instance the body hands up. A mousedown on a tool is
-// prevented, so the editor keeps its selection and focus.
-import {
-  Bold, Code, CodeXml, Italic, Link2, List, ListOrdered, ListTodo, Minus, Quote, Redo2, Strikethrough, Table2, Undo2, type LucideIcon,
-  Heading1, Heading2, Heading3, Ellipsis, Plus, Trash2, ArrowUp, ArrowDown,
-} from "lucide-react";
-import { useEffect, useReducer, useState } from "react";
+// The note pane's format tools, the one set of editing tools, each where this layout's preferences put it (core/format-tools.ts,
+// `phone.formatTools`, `desktop.formatTools`; set in Settings → Notes): in the bar, under ⋯, or off. On the desktop they sit in
+// the pane's top bar, where a narrow bar keeps its first few and moves the rest under ⋯; on a phone, in a bar on top of the
+// keyboard with no menu. The contextual tools (moving a list item, a table's rows and columns) join where they apply. Driven by
+// the editor instance the body hands up; a mousedown on a tool is prevented, so the editor keeps its selection and focus.
+import { ArrowDown, ArrowUp, Ellipsis, Link2, Plus, Trash2, type LucideIcon } from "lucide-react";
+import { Fragment, useEffect, useReducer, useState } from "react";
+import { TOOL_ICON } from "@/components/format-tool-icons";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { FORMAT_TOOL_LABEL, narrowBar, TOOL_GROUP, toolsAt, type FormatTool } from "@/core/format-tools";
 import type { CommandName, Editor } from "@/editor";
+import { useLayout } from "@/hooks/media";
+import { usePrefs } from "@/hooks/prefs";
 import { cn } from "@/lib/utils";
-
-const GROUPS: { name: CommandName; label: string; icon: LucideIcon }[][] = [
-  [
-    { name: "bold", label: "Bold", icon: Bold }, { name: "italic", label: "Italic", icon: Italic },
-    { name: "strike", label: "Strikethrough", icon: Strikethrough }, { name: "code", label: "Code", icon: Code },
-  ],
-  [
-    { name: "heading1", label: "Heading 1", icon: Heading1 }, { name: "heading2", label: "Heading 2", icon: Heading2 },
-    { name: "heading3", label: "Heading 3", icon: Heading3 },
-  ],
-  [
-    { name: "bulletList", label: "Bulleted list", icon: List }, { name: "orderedList", label: "Numbered list", icon: ListOrdered },
-    { name: "taskList", label: "Checklist", icon: ListTodo }, { name: "blockquote", label: "Quote", icon: Quote },
-    { name: "codeBlock", label: "Code block", icon: CodeXml }, { name: "table", label: "Table", icon: Table2 },
-    { name: "rule", label: "Divider", icon: Minus },
-  ],
-  [{ name: "undo", label: "Undo", icon: Undo2 }, { name: "redo", label: "Redo", icon: Redo2 }],
-];
 
 const MOVE: { name: CommandName; label: string; icon: LucideIcon }[] = [
   { name: "moveUp", label: "Move item up (Alt+↑)", icon: ArrowUp }, { name: "moveDown", label: "Move item down (Alt+↓)", icon: ArrowDown },
@@ -43,6 +27,8 @@ const TABLE: { name: CommandName; label: string; icon: LucideIcon }[] = [
   { name: "deleteRow", label: "Delete row", icon: Trash2 }, { name: "deleteColumn", label: "Delete column", icon: Trash2 },
   { name: "deleteTable", label: "Delete table", icon: Trash2 },
 ];
+
+const Divider = () => <div className="mx-1 h-5 w-px shrink-0 bg-line" />;
 
 function Tool({ label, pressed, onRun, children }: { label: string; pressed?: boolean; onRun: () => void; children: React.ReactNode }) {
   return (
@@ -96,76 +82,80 @@ export function LinkTool({ editor, side, onOpenChange, label = defaultLabel }: {
   );
 }
 
-/** The format tools in the note bar: the few used most, the rest under ⋯. Redraws with the editor's state. */
-export function FormatTools({ editor, side = "bottom", flat = false }: { editor: Editor; side?: "top" | "bottom"; flat?: boolean }) {
+/** The format tools in the note bar, as this layout's preferences place them. Redraws with the editor's state. */
+export function FormatTools({ editor, side = "bottom" }: { editor: Editor; side?: "top" | "bottom" }) {
   const [, redraw] = useReducer((n: number) => n + 1, 0);
   useEffect(() => editor.subscribe(redraw), [editor]);
-  // The bar on top of a phone's keyboard: every tool in one scrolling row. A menu there would take the focus from the
-  // editor, which drops the keyboard and the bar with it
-  const row = (className?: string) => {
-    const extra = [...(editor.canMove() ? MOVE : []), ...(editor.inTable() ? TABLE : [])];
-    return (
-      <div role="toolbar" aria-label="Format" className={cn("flex items-center gap-0.5 text-dim", className)}>
-        {GROUPS.map((group, i) => (
-          <div key={i} className="flex shrink-0 items-center gap-0.5">
-            {i > 0 ? <div className="mx-1 h-5 w-px bg-line" /> : null}
-            {group.map(({ name, label, icon: Icon }) => (
-              <Tool key={name} label={label} pressed={editor.isActive(name)} onRun={() => editor.run(name)}><Icon /></Tool>
-            ))}
-            {i === 0 ? <LinkTool editor={editor} side={side} /> : null}
-          </div>
-        ))}
-        {extra.length ? <div className="mx-1 h-5 w-px shrink-0 bg-line" /> : null}
-        {extra.map(({ name, label, icon: Icon }) => (
-          <Tool key={name} label={label} onRun={() => editor.run(name)}><Icon /></Tool>
-        ))}
-      </div>
-    );
+  const layout = useLayout(), slots = usePrefs()[layout].formatTools;
+  const extra = [...(editor.canMove() ? MOVE : []), ...(editor.inTable() ? TABLE : [])];
+
+  const tool = (id: FormatTool) => {
+    if (id === "link") return <LinkTool key={id} editor={editor} side={side} />;
+    const Icon = TOOL_ICON[id];
+    return <Tool key={id} label={FORMAT_TOOL_LABEL[id]} pressed={editor.isActive(id)} onRun={() => editor.run(id)}><Icon /></Tool>;
   };
-  if (flat) return row();
-  const primary: CommandName[] = ["bold", "italic", "taskList"];
-  const commands = GROUPS.flat();
-  // In the top bar: every tool in a row when the bar is wide enough (a container query on the bar), else the few and ⋯
-  return (
-    <>
-    {row("hidden @5xl:flex")}
-    <div role="toolbar" aria-label="Format" className="flex items-center gap-0.5 text-dim @5xl:hidden">
-      {commands.filter(({ name }) => primary.includes(name)).map(({ name, label, icon: Icon }) => (
-        <Tool key={name} label={label} pressed={editor.isActive(name)} onRun={() => editor.run(name)}><Icon /></Tool>
+  // The bar's tools in order, a divider where the kind changes, then the contextual ones
+  const row = (ids: FormatTool[], className?: string, more?: React.ReactNode) => (
+    <div role="toolbar" aria-label="Format" className={cn("flex shrink-0 items-center gap-0.5 text-dim", className)}>
+      {ids.map((id, i) => (
+        <Fragment key={id}>
+          {i > 0 && TOOL_GROUP[ids[i - 1]] !== TOOL_GROUP[id] ? <Divider /> : null}
+          {tool(id)}
+        </Fragment>
       ))}
-      <LinkTool editor={editor} side={side} />
+      {more}
+    </div>
+  );
+  const extras = extra.length ? (
+    <>
+      <Divider />
+      {extra.map(({ name, label, icon: Icon }) => <Tool key={name} label={label} onRun={() => editor.run(name)}><Icon /></Tool>)}
+    </>
+  ) : null;
+
+  // The bar on top of a phone's keyboard: one scrolling row, no menu (it would take the focus and drop the keyboard)
+  if (layout === "phone") return row(toolsAt(slots, "bar"), undefined, extras);
+
+  const menu = (ids: FormatTool[], withExtra: boolean) => {
+    const groups = ids.reduce<FormatTool[][]>((gs, id, i) => {
+      if (i > 0 && TOOL_GROUP[ids[i - 1]] === TOOL_GROUP[id]) gs[gs.length - 1].push(id); else gs.push([id]);
+      return gs;
+    }, []);
+    const contextual = withExtra ? [editor.canMove() ? MOVE : [], editor.inTable() ? TABLE : []].filter((g) => g.length) : [];
+    if (!groups.length && !contextual.length) return null;
+    return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon-sm" aria-label="More formatting" onMouseDown={(e) => e.preventDefault()}><Ellipsis /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side={side} align="start" className="w-52 max-h-[60dvh] overflow-y-auto" onCloseAutoFocus={(e) => { e.preventDefault(); editor.focus(); }}>
-          {GROUPS.map((group, i) => (
-            <div key={i}>
+          {groups.map((g, i) => (
+            <div key={g[0]}>
               {i > 0 ? <DropdownMenuSeparator /> : null}
-              {group.filter(({ name }) => !primary.includes(name)).map(({ name, label, icon: Icon }) => (
-                <DropdownMenuItem key={name} onSelect={() => editor.run(name)}><Icon />{label}</DropdownMenuItem>
-              ))}
+              {g.map((id) => {
+                if (id === "link") return null;
+                const Icon = TOOL_ICON[id];
+                return <DropdownMenuItem key={id} onSelect={() => editor.run(id)}><Icon />{FORMAT_TOOL_LABEL[id]}</DropdownMenuItem>;
+              })}
             </div>
           ))}
-          {editor.canMove() ? (
-            <>
-              <DropdownMenuSeparator />
-              {MOVE.map(({ name, label, icon: Icon }) => (
-                <DropdownMenuItem key={name} onSelect={() => editor.run(name)}><Icon />{label}</DropdownMenuItem>
-              ))}
-            </>
-          ) : null}
-          {editor.inTable() ? (
-            <>
-              <DropdownMenuSeparator />
-              {TABLE.map(({ name, label, icon: Icon }) => (
-                <DropdownMenuItem key={name} onSelect={() => editor.run(name)}><Icon />{label}</DropdownMenuItem>
-              ))}
-            </>
-          ) : null}
+          {contextual.map((g, i) => (
+            <div key={i}>
+              {groups.length || i > 0 ? <DropdownMenuSeparator /> : null}
+              {g.map(({ name, label, icon: Icon }) => <DropdownMenuItem key={name} onSelect={() => editor.run(name)}><Icon />{label}</DropdownMenuItem>)}
+            </div>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    );
+  };
+  // In the top bar: the bar's tools in a row when the bar is wide enough (a container query on the bar), else its first few,
+  // the rest under ⋯ with the menu's own and the contextual ones
+  const narrow = narrowBar(slots);
+  return (
+    <>
+      {row(toolsAt(slots, "bar"), "hidden @5xl:flex", <>{extras}{menu(toolsAt(slots, "menu"), false)}</>)}
+      {row(narrow.bar, "@5xl:hidden", menu(narrow.menu, true))}
     </>
   );
 }
