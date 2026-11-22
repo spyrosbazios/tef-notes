@@ -98,7 +98,11 @@ export const connectFishVoice = (sea: Sea): ConnectVoice => async (out) => {
         prosody: { speed: sea.speed, volume: 0 },
         format: "pcm",
         sample_rate: TALK_RATE.voice,                                // the app's player is opened at this rate
-        latency: "balanced",                                         // Fish's quality-versus-time compromise
+        latency: "normal",                                           // Fish's most stable output, some 200 ms later than "balanced"
+        temperature: 0.4,                                            // under Fish's 0.7: the delivery varies less from one passage to the next
+        top_p: 0.6,
+        chunk_length: 200,                                           // a reply's sentences are spoken as one passage up to this long
+        condition_on_previous_chunks: true,                          // each passage takes its voice from the one before
         normalize: true,                                             // numbers, dates and units read out in words
       },
     }));
