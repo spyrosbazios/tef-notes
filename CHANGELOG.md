@@ -5,6 +5,8 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.14.0 - 2026-11-22
+
 ### Security
 
 - Talk follows the same rules as the chat, read every turn: a chat that read the web is still treated as having read it
@@ -22,6 +24,13 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Added
 
+- Settings → Voice shows what Fish Audio cost this week and this month, and the credit left; Talk's panel shows the
+  conversation's time and running cost.
+- On the desktop the assistant button can open a menu to type or talk, and Talk can run in a small panel in the corner.
+- The sidebar has a Home button above Inbox (hideable in Settings → Layout).
+- Settings → Notes places the editor's format tools per layout (bar, menu or off) and picks the desktop's selection bar tools.
+- The clipper can add any tag in use and search for any note to add to.
+- A note's header has Copy markdown in place of the Markdown source toggle.
 - Updates from the app: Settings → Maintenance shows the server's release and, when a newer one is out, its notes and an
   Update button (a toast says so once per release). The button needs the opt-in updater service (`COMPOSE_PROFILES=updater`),
   which pulls the release, backs `pb_data` up into `server/backups/` and restarts the server; the app reloads into it.
@@ -30,6 +39,10 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Changed
 
+- Settings is redrawn as one kit: fewer words, more icons and colour.
+- A note's save state is one small mark at the editor's corner, and it shows the connection too (offline, sending, not sent).
+- On the phone, selecting notes moves the actions into a labelled dock where the tab bar is.
+- The command palette's arrow keys move the highlight, and a resting mouse no longer takes it back.
 - Smaller fixes to the installed app's plumbing: an unreadable reminder push still shows a notification, renaming a tag
   syncs the notes instead of refetching every query, link previews are kept for the full week offline, and the offline
   cache is no longer rewritten on every note edit.
@@ -49,6 +62,9 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ### Fixed
 
+- The editor's cursor no longer jumps back, nor are words lost, when a save lands while you type.
+- A note ending on a card, picture or PDF gets an empty line after it to type in.
+- On a note tile, tapping a tag while selecting selects the tile.
 - The chat list shows every saved chat, not only the newest 200; a lens, a tag or a chat made again after its answer was lost
   is not made twice; a tag route's failure shows the server's reason.
 - A note file with no day of its own (none in its frontmatter or its name) is no longer given the day a flag was set as the
