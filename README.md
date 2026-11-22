@@ -54,7 +54,8 @@ Auto-tagging and web search are optional too.
 ### Keep control of your data
 
 Run the server yourself. The web app, installed on your phone from Chrome, keeps an offline copy and merges edits when it
-reconnects. Export notes and their attachments as files with the CLI. Notes and tasks remain usable without configuring an AI provider.
+reconnects. Export notes and their attachments as files with the CLI. When a release is out, Settings offers it, and with the opt-in updater one tap pulls it, snapshots `pb_data` and restarts
+the server. Notes and tasks remain usable without configuring an AI provider.
 
 ### Focus with lenses
 
