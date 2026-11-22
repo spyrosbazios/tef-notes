@@ -5,7 +5,7 @@ import type { UIMessage } from "ai";
 import { choiceOutput } from "@/core/assistant";
 import { approach, follow, LOOKS } from "@/lib/orb";
 import { floats, pcm16, rms } from "@/lib/pcm";
-import { answeredPart, clock, money, rowsOf, talkStateOf, withPart, type PartEvent } from "@/lib/talk";
+import { answeredPart, clock, money, rowsOf, runningCall, talkStateOf, withPart, type PartEvent } from "@/lib/talk";
 
 const part = (message: string, index: number, p: PartEvent["part"], role: PartEvent["role"] = "assistant"): PartEvent => ({ type: "part", message, role, index, part: p });
 const text = (t: string): PartEvent["part"] => ({ type: "text", text: t });
@@ -63,7 +63,25 @@ describe("talkStateOf", () => {
   });
   test("only the newest message counts, and only the assistant's", () => {
     const older = withPart(asks, part("m2", 0, text("ok"), "user"));
-    expect(talkStateOf("live", false, older)).toBe("listening");
+    expect(talkStateOf("live", false, older)).toBe("thinking");
+  });
+  test("the owner's turn settled and nothing shown yet is thinking, until the reply's first part", () => {
+    const asked = withPart([], part("u1", 0, text("what's on today"), "user"));
+    expect(talkStateOf("live", false, asked)).toBe("thinking");
+    expect(talkStateOf("live", false, withPart(asked, part("m1", 0, text("Two things"))))).toBe("listening");
+    expect(talkStateOf("live", true, asked)).toBe("speaking");
+  });
+});
+
+describe("runningCall", () => {
+  test("the newest message's latest call on its way, never one waiting for a tap or done", () => {
+    let m = withPart([], part("m1", 0, tool("search_notes", "output-available")));
+    expect(runningCall(m)).toBeUndefined();
+    m = withPart(m, part("m1", 1, tool("read_note", "input-available")));
+    expect(runningCall(m)).toMatchObject({ type: "tool-read_note" });
+    m = withPart(m, part("m1", 2, tool("add_task", "approval-requested", { approval: { id: "a1" } })));
+    expect(runningCall(m)).toMatchObject({ type: "tool-read_note" });
+    expect(runningCall(withPart(m, part("u2", 0, text("stop"), "user")))).toBeUndefined();
   });
 });
 

@@ -30,7 +30,7 @@ import { clock, money, rowsOf, type TalkState } from "@/lib/talk";
 import { cn } from "@/lib/utils";
 
 const LABEL: Record<TalkState, string> = {
-  idle: "Ready", connecting: "Connecting", listening: "Listening", speaking: "Speaking", working: "Working", waiting: "Waiting for you", failed: "Stopped",
+  idle: "Ready", connecting: "Connecting", listening: "Listening", thinking: "Thinking", speaking: "Speaking", working: "Working", waiting: "Waiting for you", failed: "Stopped",
 };
 
 /** The time and Fish's cost so far, small: the ear's open seconds plus the voice's bytes (the model's tokens are a chat's

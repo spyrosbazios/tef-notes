@@ -1,6 +1,6 @@
 // Talk's orb: how it looks in each state (`LOOKS`), how a look eases into the next (`approach`) and how a level is followed
 // (`follow`), and the canvas drawing of one frame (`drawOrb`). The numbers are the whole personality: listening breathes with the owner's
-// voice, speaking is bigger, faster and moves with the assistant's, working is small and quiet with an arc circling it, waiting
+// voice, thinking draws in and stirs under a faint arc, speaking is bigger, faster and moves with the assistant's, working is small and quiet with an arc circling it, waiting
 // holds still and sends a ring out, again and again, until it is answered. Colours are never in here: the caller reads them from the
 // theme's tokens and hands them in. Pure apart from the context it draws on: test/talk.test.ts.
 import type { TalkState } from "@/lib/talk";
@@ -29,6 +29,7 @@ export const LOOKS: Record<TalkState, Look> = {
   idle: { radius: 0.5, wobble: 0.02, speed: 0.35, glow: 0.2, spin: 0, pulse: 0, fail: 0, body: 0.6 },
   connecting: { radius: 0.46, wobble: 0.02, speed: 0.6, glow: 0.25, spin: 1, pulse: 0, fail: 0, body: 0.6 },
   listening: { radius: 0.52, wobble: 0.035, speed: 0.7, glow: 0.45, spin: 0, pulse: 0, fail: 0, body: 0.9 },
+  thinking: { radius: 0.46, wobble: 0.05, speed: 1.2, glow: 0.4, spin: 0.55, pulse: 0, fail: 0, body: 0.8 },
   speaking: { radius: 0.58, wobble: 0.07, speed: 1.9, glow: 0.85, spin: 0, pulse: 0, fail: 0, body: 1 },
   working: { radius: 0.44, wobble: 0.012, speed: 0.4, glow: 0.3, spin: 1, pulse: 0, fail: 0, body: 0.75 },
   waiting: { radius: 0.5, wobble: 0.008, speed: 0.3, glow: 0.55, spin: 0, pulse: 1, fail: 0, body: 0.95 },

@@ -64,7 +64,8 @@ feed, as any client's writes do. A note's "Ask about this" opens the dock with a
 ## Talk
 
 The spoken conversation with the assistant, at `/talk` (a tab on the phone, an item in the rail on the desktop, and a pill
-over every other screen while one goes on). It is not a second assistant: one WebSocket at `/agent/talk` runs the same
+over every other screen while one goes on: the orb, small, and what the assistant is doing down to the call it is on; a tap
+opens it into a menu with Mute, Talk's page and End, `components/talk/pill.tsx`). It is not a second assistant: one WebSocket at `/agent/talk` runs the same
 tools, cards and write rules as the dock (contract: `packages/core/src/talk.ts`).
 
 - **The microphone** (`lib/mic.ts`) is an AudioWorklet tap with echo cancellation on: the voice plays while it records, and
