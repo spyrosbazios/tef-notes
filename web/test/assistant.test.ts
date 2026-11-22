@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
 import { choiceOutput, CONTEXT_LIMITS, UI_OK, uiToolsFor } from "@/core/assistant";
-import { assistantView, closeUnfinished, isAppTool, notOffered, pageContext, resumes, runUiTool, uiTrouble, uiWords, webView, type UiHost } from "@/lib/assistant";
+import { assistantView, closeUnfinished, createdNote, isAppTool, notOffered, pageContext, resumes, runUiTool, uiTrouble, uiWords, webView, type UiHost } from "@/lib/assistant";
 import type { View } from "@/lib/nav";
 import { withNote, type NoteRec } from "@/services/notes";
 import type { TaskRec } from "@/services/todo";
@@ -128,6 +128,32 @@ const reply = (...parts: object[]): UIMessage[] => [
   { id: "u", role: "user", parts: [{ type: "text", text: "hi" }] },
   { id: "a", role: "assistant", parts: [{ type: "step-start" }, ...parts] as UIMessage["parts"] },
 ];
+
+describe("a note the assistant made", () => {
+  const made = (id: string, path: string, state = "output-available") => ({ type: "tool-create_note", toolCallId: id, state, input: {}, output: { saved: path, rev: 1 } });
+  const parts = (...p: object[]) => p as UIMessage["parts"];
+
+  test("is opened once, however often the reply is read", () => {
+    const seen = new Set<string>(), p = parts(made("c1", "notes/garage.md"));
+    expect(createdNote(p, seen)).toBe("notes/garage.md");
+    expect(createdNote(p, seen)).toBeNull();
+  });
+
+  test("the newest of several; one not saved yet, refused or not a note is none", () => {
+    expect(createdNote(parts(made("c1", "notes/a.md"), made("c2", "notes/b.md")), new Set())).toBe("notes/b.md");
+    expect(createdNote(parts(made("c1", "notes/a.md", "approval-requested")), new Set())).toBeNull();
+    expect(createdNote(parts({ type: "tool-create_note", toolCallId: "c1", state: "output-available", input: {}, output: { error: "no" } }), new Set())).toBeNull();
+    expect(createdNote(parts(made("c1", "../etc")), new Set())).toBeNull();
+  });
+
+  test("not when the assistant moved the screen itself afterwards, nor a saved chat's", () => {
+    expect(createdNote(parts(made("c1", "notes/a.md"), tool("tool-go_view", "output-available")), new Set())).toBeNull();
+    expect(createdNote(parts(tool("tool-go_view", "output-available"), made("c1", "notes/a.md")), new Set())).toBe("notes/a.md");
+    const seen = new Set<string>();
+    createdNote(parts(made("c1", "notes/a.md")), seen);       // what a chat held when it was loaded
+    expect(createdNote(parts(made("c1", "notes/a.md"), made("c2", "notes/b.md")), seen)).toBe("notes/b.md");
+  });
+});
 
 describe("resuming by itself", () => {
   test("after a UI tool's answer", () => {

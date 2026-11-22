@@ -198,6 +198,10 @@
   .pm-editor .ProseMirror-selectednode { @apply outline-2 outline-brand/60; }
   /* Words held for an ask about them (editor/held.ts): marked like a selection while the focus is in the ask's field */
   .pm-editor .pm-held { @apply rounded-[2px] bg-brand/20; box-decoration-break: clone; }
+  /* Words a body from elsewhere just brought (the assistant's write, another device's: editor/fresh.ts): tinted, then fading
+     for as long as the editor keeps the mark (`FRESH_MS`). With reduced motion the tint holds still until the mark goes. */
+  .pm-editor .pm-fresh { @apply rounded-[2px] bg-brand/25; box-decoration-break: clone; animation: pm-fresh 2.6s ease-in forwards; }
+  @keyframes pm-fresh { 40% { background-color: color-mix(in oklab, var(--tf-brand) 25%, transparent); } to { background-color: transparent; } }
   .pm-editor img.ProseMirror-separator { display: inline !important; border: none !important; margin: 0 !important; width: 0 !important; height: 0 !important; }
   .pm-editor li.task-list-item { @apply list-none -ml-5; }
   .pm-editor li.task-list-item > .task-content { @apply min-w-0 flex-1; }
@@ -316,6 +320,7 @@
   .animate-pulse { animation: none; }
   .pm-editor .pm-link-tool[data-busy]::before { animation: none; opacity: 0.5; }
   .ProseMirror-gapcursor::after { animation: none; }
+  .pm-editor .pm-fresh { animation: none; }
 }
 
 /* The theme and accent wipe (hooks/appearance.ts `set`, which starts its transition with the type `look`): the new page is revealed left

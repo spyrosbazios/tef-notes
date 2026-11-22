@@ -5,6 +5,12 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+### Added
+
+- What the assistant writes in the note you have open is tinted for a moment and scrolled into view, so you see where
+  the note changed without reading it again; an edit from another device shows the same way.
+- A note the assistant creates opens by itself, in the chat and in Talk, instead of waiting as a card to click.
+
 ## 0.14.0 - 2026-11-22
 
 ### Security

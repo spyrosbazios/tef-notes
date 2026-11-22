@@ -13,6 +13,7 @@ import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { base, commands, isActive, keys, linkAt, setLink, typed } from "./commands";
 import type { CommandName } from "./commands";
 import { chipHref, drawingPreviewSrc, fileChips, isDrawingLink, isPdfLink, redrawChips, type PdfPage, type PdfPages } from "./files";
+import { changedRanges, fresh, FRESH_MS, tinted } from "./fresh";
 import { heldMark, heldRange, hold, type Held } from "./held";
 import { markdownSlice, normalizeBody, parse, schema, serialize, sliceMarkdown } from "./markdown";
 import { cardUrl, linkCards } from "./link-cards";
@@ -71,7 +72,8 @@ export type Editor = {
   markdown(): string;
   /** Report an edit still waiting for its `onChange` now; nothing when none waits. */
   flush(): void;
-  /** Replace the body with one that came from elsewhere (another device, a settled conflict). Not an edit: no `onChange`.
+  /** Replace the body with one that came from elsewhere (the assistant's write, another device, a settled conflict). Not an
+   *  edit: no `onChange`. What it changed is tinted for a moment (./fresh) and, unless the owner is typing, brought into view.
    *  False when typing not yet reported was there: the body predates it and is not taken. */
   setMarkdown(markdown: string): boolean;
   /** Insert markdown at the cursor (the end, if the editor was never touched). */
@@ -112,6 +114,10 @@ export type Editor = {
 const EXTERNAL = "tefnotes-external";
 /** The longest an edit waits before `onChange` is told of it, ms. */
 const REPORT = 150;
+/** How long after a key the owner still counts as typing, ms: a change from elsewhere doesn't move the page under them. */
+const TYPING = 3000;
+/** How near the screen's edge a change still counts as out of view, px: the app's bars lie over that much of the page. */
+const EDGE = 96;
 
 /** Grey hint in an empty note. */
 function placeholder(text: string) {
@@ -155,7 +161,8 @@ const trailingParagraph = new Plugin({
 
 export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   let resolve: ResolveImage = options.resolveImage ?? ((src) => src);
-  let last = "", touched = false, dragging = false;
+  let last = "", touched = false, dragging = false, typedAt = 0;
+  let fading: ReturnType<typeof setTimeout> | undefined;
   const images = new Set<ImageView>(), listeners = new Set<() => void>();
   // `now` is the outline as the document stands; `shown` the array handed out, kept while it would draw the same
   let outlined: { doc: Node; now: OutlineItem[]; shown: OutlineItem[] } | null = null;
@@ -209,7 +216,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   const stateFor = (doc: Node) => EditorState.create({
     doc,
     plugins: [
-      history(), slashMenu, typed, keys, base, heldMark, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
+      history(), slashMenu, typed, keys, base, heldMark, fresh, dropCursor({ color: false, width: 2 }), gapCursor(), tableEditing(),
       placeholder(options.placeholder ?? ""), trailingParagraph, fileChips(() => resolve, options.pdfPage, options.pdfPages),
       ...(options.onRead ? [readLinks(options.onRead, options.summarize)] : []),
       ...(options.resolveLink ? [linkCards(options.resolveLink, open, options.onRead, options.summarize)] : []),
@@ -227,7 +234,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     },
     dispatchTransaction(tr) {
       view.updateState(view.state.apply(tr));
-      if (tr.docChanged && !tr.getMeta(EXTERNAL)) report.poke();
+      if (tr.docChanged && !tr.getMeta(EXTERNAL)) { typedAt = Date.now(); report.poke(); }
       listeners.forEach((l) => l());
     },
     handleDOMEvents: {
@@ -281,6 +288,15 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
   });
   last = serialize(view.state.doc);
 
+  /** The first of the words just tinted, brought to the middle of the screen when it lies outside it or under the app's bars. */
+  const reveal = () => {
+    const first = view.dom.querySelector(".pm-fresh"), win = el.ownerDocument.defaultView;
+    if (!first || !win || Date.now() - typedAt < TYPING) return;
+    const box = first.getBoundingClientRect();
+    if (box.top >= EDGE && box.bottom <= win.innerHeight - EDGE) return;
+    first.scrollIntoView({ block: "center", behavior: win.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  };
+
   return {
     markdown: () => serialize(view.state.doc),
     flush: report.flush,
@@ -299,8 +315,14 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
       const at = view.state.selection.from;
       const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content).setMeta(EXTERNAL, true).setMeta("addToHistory", false);
       tr.setSelection(Selection.near(tr.doc.resolve(Math.min(at, tr.doc.content.size))));
+      const changed = changedRanges(view.state.doc, tr.doc);
       last = next;
-      view.dispatch(tr);
+      view.dispatch(tinted(tr, changed));
+      clearTimeout(fading);
+      if (changed.length) {
+        fading = setTimeout(() => view.dispatch(tinted(view.state.tr, []).setMeta(EXTERNAL, true)), FRESH_MS);
+        reveal();
+      }
       return true;
     },
 
@@ -363,6 +385,7 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     dom: view.dom,
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     destroy() {
+      clearTimeout(fading);
       report.flush();
       window.removeEventListener("pagehide", leaving, true);
       window.removeEventListener("beforeunload", leaving, true);

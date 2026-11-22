@@ -1,7 +1,8 @@
 // The Talk engine: one spoken conversation with the assistant, from the Start tap to End, as a store the page and the live pill read
 // (`subscribe`/`snapshot`). It speaks the contract in core/talk.ts over one WebSocket to the agent and nothing else: the
 // microphone goes up as PCM from `ready` on, the voice comes down and is played, what was said and done comes down as the chat's own
-// message parts (lib/talk.ts), and the UI tools (open_note, go_view, ...) are done in the app and answered. The one thing it never
+// message parts (lib/talk.ts), the UI tools (open_note, go_view, ...) are done in the app and answered, and a note the assistant
+// just made is opened as its own `open_note` would (lib/assistant.ts `createdNote`). The one thing it never
 // does by itself is approve: `approve` is called by a tap on a card, and by nothing the model said or heard.
 // It owns no browser API: the socket, microphone, voice, wake lock and the app's own tools come in as `Deps` (hooks/talk.tsx makes the
 // real ones), so test/talk-session.test.ts runs a whole conversation over fakes. Everything it opens is closed again on every way out:
@@ -9,7 +10,7 @@
 import type { UIMessage } from "ai";
 import { choiceFrom, isAskTool, isUiTool, uiError, type AssistantContext, type ChoiceOutput } from "@/core/assistant";
 import { MIC_FRAME, talkServerEventOf, type TalkClientEvent } from "@/core/talk";
-import { isAppTool, type AppTool } from "@/lib/assistant";
+import { createdNote, isAppTool, type AppTool } from "@/lib/assistant";
 import { isTool, toolName } from "@/lib/ask";
 import { loudness, micTrouble, type Mic } from "@/lib/mic";
 import { pcm16 } from "@/lib/pcm";
@@ -89,7 +90,7 @@ export function createSession(deps: Deps): TalkSession {
   let run = 0, link: ReturnType<Deps["open"]> | null = null, mic: Mic | null = null, voice: Voice | null = null;
   let release: (() => void) | null = null, giveUp: ReturnType<typeof setTimeout> | undefined, hush: ReturnType<typeof setTimeout> | undefined;
   let ready = false, playing = false, micLevel = 0;
-  const done = new Set<string>(), answered = new Set<string>();
+  const done = new Set<string>(), answered = new Set<string>(), created = new Set<string>();
 
   const set = (patch: Partial<TalkSnapshot>) => {
     const next = { ...snap, ...patch };
@@ -159,7 +160,10 @@ export function createSession(deps: Deps): TalkSession {
       const messages = withPart(snap.messages, e);
       set({ messages });
       const m = messages.find((x) => x.id === e.message);
-      if (m) tool(m);
+      if (!m) return;
+      tool(m);
+      const path = createdNote(m.parts, created);
+      if (path) void deps.tool("open_note", { path }).catch(() => undefined);
     } else if (e.type === "interrupted") {
       voice?.flush();
       clearTimeout(hush);
@@ -183,6 +187,8 @@ export function createSession(deps: Deps): TalkSession {
     const mine = ++run;
     done.clear();
     answered.clear();
+    created.clear();
+    for (const m of resumed?.messages ?? []) createdNote(m.parts, created);
     snap = { ...IDLE, phase: "connecting", ...(resumed && { messages: resumed.messages }) };
     set({});
     // Both audio paths open before anything is awaited, so they are still inside the tap that started this
