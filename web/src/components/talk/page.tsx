@@ -11,7 +11,7 @@ import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
 import { AudioLines, History, Maximize2, Mic, MicOff, PhoneOff, Plus, RotateCw, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type HTMLAttributes, type ReactNode } from "react";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Empty } from "@/components/empty";
 import { PageHeader } from "@/components/page-header";
@@ -163,8 +163,9 @@ function Notice({ id, children }: { id: string; children: ReactNode }) {
 }
 
 /** The conversation: the route's whole page, or (`panel`) the assistant button's small panel at a window's corner, which
- *  draws it as a phone does: one column, the orb stepping back, its own header with Expand (to the page) and Close. */
-export function Conversation({ panel }: { panel?: { onExpand: () => void; onClose: () => void } }) {
+ *  draws it as a phone does: one column, the orb stepping back, its own header with Expand (to the page) and Close. The header is what the panel is moved by: `bar` is its
+ *  pointer handlers, `grip` the handle drawn at its start (panel.tsx). */
+export function Conversation({ panel }: { panel?: { onExpand: () => void; onClose: () => void; bar: HTMLAttributes<HTMLDivElement>; grip: ReactNode } }) {
   const t = useTalk();
   const phone = useNarrow() || !!panel;
   const { rows, pending } = useMemo(() => rowsOf(t.messages), [t.messages]);
@@ -181,7 +182,8 @@ export function Conversation({ panel }: { panel?: { onExpand: () => void; onClos
       </>}
       <div className="flex h-full flex-col @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] @3xl:grid-rows-[minmax(0,1fr)_auto] @5xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]">
         {panel ? (
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
+          <div {...panel.bar} className="flex h-14 shrink-0 cursor-grab touch-none items-center gap-2 border-b border-line pr-1.5 pl-1.5 select-none active:cursor-grabbing">
+            {panel.grip}
             <AudioLines className="size-4 shrink-0 text-brand" />
             <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
               <span className="font-semibold">Talk</span>
