@@ -71,8 +71,9 @@ export type Editor = {
   markdown(): string;
   /** Report an edit still waiting for its `onChange` now; nothing when none waits. */
   flush(): void;
-  /** Replace the body with one that came from elsewhere (another device, a settled conflict). Not an edit: no `onChange`. */
-  setMarkdown(markdown: string): void;
+  /** Replace the body with one that came from elsewhere (another device, a settled conflict). Not an edit: no `onChange`.
+   *  False when typing not yet reported was there: the body predates it and is not taken. */
+  setMarkdown(markdown: string): boolean;
   /** Insert markdown at the cursor (the end, if the editor was never touched). */
   insertMarkdown(markdown: string): void;
   /** Insert plain text at the cursor (the end, if never touched), spaced from a word before it: what dictation types. */
@@ -285,16 +286,22 @@ export function createEditor(el: HTMLElement, options: EditorOptions): Editor {
     flush: report.flush,
 
     setMarkdown(markdown) {
-      report.flush();      // what was typed is the caller's before a body from elsewhere is weighed against it
+      // What was typed is the caller's before a body from elsewhere is weighed against it. When there was some, that body was
+      // worked out without it: replacing the text with it would throw away the words typed and move the cursor back. It is left
+      // alone; the draft merges it with the typing on its next save, and the merged body comes back here.
+      const before = last;
+      report.flush();
+      if (last !== before) return false;
       // Parsing loses what typing leaves mid-word, a trailing space above all: a body that differs from the editor's only by
       // that (the save of "hello " read back, or the copy from before it) is the same text, and replacing it would eat the space.
       const doc = parse(markdown), next = serialize(doc), now = serialize(view.state.doc);
-      if (next === now || next === normalizeBody(now)) { last = now; return; }
+      if (next === now || next === normalizeBody(now)) { last = now; return true; }
       const at = view.state.selection.from;
       const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content).setMeta(EXTERNAL, true).setMeta("addToHistory", false);
       tr.setSelection(Selection.near(tr.doc.resolve(Math.min(at, tr.doc.content.size))));
       last = next;
       view.dispatch(tr);
+      return true;
     },
 
     insertMarkdown(markdown) {

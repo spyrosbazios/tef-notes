@@ -92,7 +92,8 @@ export function NoteEditor({ noteId, markdown, onChange, onFiles, onNote, onDraw
   // A body that arrives from elsewhere; what the editor itself sent comes back equal, and is left alone
   useEffect(() => {
     if (markdown === sent.current) return;
-    editorRef.current?.setMarkdown(markdown);     // reports what was typed first, which sets `sent`
+    // Reports what was typed first, which sets `sent`; a body that predates that typing is not taken (false)
+    if (editorRef.current?.setMarkdown(markdown) === false) return;
     sent.current = markdown;
   }, [markdown]);
 
