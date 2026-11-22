@@ -57,14 +57,34 @@ export type ConnectVoice = (out: VoiceOut) => Promise<Voice>;
 /** A socket's failure in words, for the log and the app. */
 const why = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** Why Fish refused a socket. A WebSocket's error carries no HTTP answer, so the same upgrade is asked once more over HTTP
+ *  to read it: out of credit (402) and a refused key (401, 403) were all "could not be reached" before. */
+async function refusal(url: string, headers: Record<string, string>, who: string): Promise<string> {
+  const unreached = `${who} could not be reached`;
+  try {
+    const r = await fetch(url.replace(/^wss:/, "https:"), {
+      headers: { ...headers, Upgrade: "websocket", Connection: "Upgrade", "Sec-WebSocket-Version": "13", "Sec-WebSocket-Key": "dGVmbm90ZXMtZmlzaC0xMg==" },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (r.status === 402) return `${who} is out of Fish Audio API credit`;
+    if (r.status === 401 || r.status === 403) return `Fish Audio refused the key (${r.status})`;
+    if (r.ok || r.status === 101) return unreached;
+    const body = await r.json().catch(() => undefined) as { message?: unknown } | undefined;
+    return typeof body?.message === "string" ? `${who} was refused (${r.status}): ${body.message.slice(0, 200)}` : `${who} was refused (${r.status})`;
+  } catch {
+    return unreached;
+  }
+}
+
 export const connectFishVoice = (sea: Sea): ConnectVoice => async (out) => {
   const apiKey = await key("fish");
   if (!apiKey) throw new Error("Talk has no Fish Audio key");
-  const ws = new WebSocket(TTS_URL, { headers: { Authorization: `Bearer ${apiKey}`, model: sea.model } } as never);
+  const headers = { Authorization: `Bearer ${apiKey}`, model: sea.model };
+  const ws = new WebSocket(TTS_URL, { headers } as never);
   ws.binaryType = "arraybuffer";
   const opened = Promise.withResolvers<void>();
   const setup = setTimeout(() => opened.reject(new Error("Fish's voice did not answer")), SETUP_TIMEOUT);
-  let stopped = false;
+  let stopped = false, refused = false;
   const fail = (message: string) => { if (!stopped) { stopped = true; out.ended(message); } };
   ws.onopen = () => {
     clearTimeout(setup);
@@ -82,8 +102,12 @@ export const connectFishVoice = (sea: Sea): ConnectVoice => async (out) => {
     }));
     opened.resolve();
   };
-  ws.onerror = () => { clearTimeout(setup); opened.reject(new Error("Fish's voice could not be reached")); fail("Fish's voice could not be reached"); };
-  ws.onclose = (e) => { clearTimeout(setup); opened.reject(new Error(`Fish's voice hung up (${e.code})`)); fail(e.code === 1000 ? "The voice closed" : `Fish's voice hung up (${e.code})`); };
+  ws.onerror = () => {
+    clearTimeout(setup);
+    refused = true;
+    void refusal(TTS_URL, headers, "Fish's voice").then((message) => { opened.reject(new Error(message)); fail(message); });
+  };
+  ws.onclose = (e) => { clearTimeout(setup); if (refused) return; opened.reject(new Error(`Fish's voice hung up (${e.code})`)); fail(e.code === 1000 ? "The voice closed" : `Fish's voice hung up (${e.code})`); };
   ws.onmessage = (m) => {
     const f = decode(new Uint8Array(m.data as ArrayBuffer)) as { event?: string; audio?: Uint8Array; reason?: string };
     if (f.event === "audio" && f.audio) out.audio(new Uint8Array(f.audio));
@@ -187,11 +211,12 @@ const TURN_KIND = new Set(["user", "backchannel", "other"]);
 export const connectFishEar = (): ConnectEar => async (terms) => {
   const apiKey = await key("fish");
   if (!apiKey) throw new Error("Talk has no Fish Audio key");
-  const ws = new WebSocket(ASR_URL, { headers: { Authorization: `Bearer ${apiKey}` } } as never);
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const ws = new WebSocket(ASR_URL, { headers } as never);
   ws.binaryType = "arraybuffer";
   const opened = Promise.withResolvers<void>(), listeners = new Set<(e: EarEvent) => void>();
   const setup = setTimeout(() => opened.reject(new Error("Fish's ear did not answer")), SETUP_TIMEOUT);
-  let closed = false, turns = 0;
+  let closed = false, refused = false, turns = 0;
   /** The session's listeners: `talk.ts` subscribes after the socket is open, so what came first is replayed by it. */
   const tell = (e: EarEvent) => { for (const l of listeners) l(e); };
   const fail = (message: string) => { if (closed) return; closed = true; tell({ type: "failed", message }); };
@@ -204,10 +229,15 @@ export const connectFishEar = (): ConnectEar => async (terms) => {
       ...(terms.length ? { context: { terms: terms.slice(0, 100).map((t) => t.slice(0, 32)) } } : {}),
     }));
   };
-  ws.onerror = () => { clearTimeout(setup); opened.reject(new Error("Fish's ear could not be reached")); fail("Fish's ear could not be reached"); };
+  ws.onerror = () => {
+    clearTimeout(setup);
+    refused = true;
+    void refusal(ASR_URL, headers, "Fish's ear").then((message) => { opened.reject(new Error(message)); fail(message); });
+  };
   ws.onclose = (e) => {
     clearTimeout(setup);
     clearInterval(beat);
+    if (refused) return;
     opened.reject(new Error(`Fish's ear hung up (${e.code})`));
     if (e.code !== 1000) fail(`Fish's ear hung up (${e.code})`);
   };
