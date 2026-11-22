@@ -1,7 +1,7 @@
 // Tags. A tag *definition* (name, badge colour, a hint for the AI) is a record in `tags` on the server; a note's own
 // tags are its frontmatter `tags:` line, copied into the `tags` column by noteColumns like every flag. Deleting a
-// definition leaves notes alone; renaming a tag is the server's (renameTag), so every item carrying it follows. The server tags notes itself (its `autotagged` column);
-// a client's own tag edits go through applyTags. The calls to the server: client/tags.ts.
+// definition leaves notes alone; renaming a tag is the server's (record-protocol.ts `tags.rename`), so every item carrying it follows. The server tags notes itself (its `autotagged` column);
+// a client's own tag edits go through applyTags. The calls to the server: record-protocol.ts `tags`.
 import { fold, parseNote, withFlags, type Color } from "./notes";
 import type { Task } from "./todo";
 
@@ -50,7 +50,7 @@ export function liveTags(tags: string[], before: string[], guessed: string[], di
 
 type Guess = (draft: { title: string; notes: string }, signal: AbortSignal) => Promise<string[]>;
 
-/** A debounced guesser for one form, over `guess` (the phone's is guessTags, the web app's its own transport):
+/** A debounced guesser for one form, over `guess` (record-protocol.ts `tags.guess` over a client's transport):
  *  `update(title, notes)` on every keystroke asks GUESS_DELAY after the last one, skips a draft already asked about or
  *  too short (under 3 characters of title), and cancels a request still running, so an older answer never lands after a
  *  newer one. Each answer reaches the form as `apply(tags => next)` (liveTags: hand-added tags kept, the previous guess

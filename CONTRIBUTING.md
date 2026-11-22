@@ -62,8 +62,12 @@ Each module's README has its setup and commands:
   [video/README.md](video/README.md); a change to a screen in `site/src/components/mock/` is checked in both
 
 `bun scripts/check-boundaries.ts` checks runtime import boundaries without installing dependencies: the core loads no
-package, and nothing in it outside `src/client/` (the fetch client) loads that client; application services stay independent of assistant cards/tools and the AI SDK,
-and web record features share projections rather than coordinating each other. CI runs this check separately.
+package, and nothing in it outside `src/client/` (the fetch client) loads that client; the agent's application services load no
+assistant tool, card (core `agent.ts`) or AI SDK, its companion routes and word/semantic search no assistant tool or AI SDK,
+and its guard and loop no tool registry;
+the web's sync controller and tabs load no UI, service or package, its copy's projections (`local-records.ts`) no UI or
+service, hooks reach records only through `lib/records.ts` and components only through hooks, and the record features' hooks
+don't load each other. CI runs this check separately.
 
 Run the checks of every module you touched, and of `packages/core` if you changed it (all clients depend on it).
 Format, then lint, type-check, test and build, in that order.

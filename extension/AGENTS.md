@@ -6,7 +6,7 @@ The web app's Share page (`web/src/components/share-page.tsx`) calls the same ro
 Root `AGENTS.md` has the server and the note format; this file only what is the extension's. How to build, install and
 release it is in `README.md`, not repeated here.
 
-<!-- reviewed: 2026-11-21 -->
+<!-- reviewed: 2026-11-22 -->
 
 ## Contract
 
@@ -28,7 +28,7 @@ same way; never suggested, always offered last).
    `pick` is new. A picture TypeSafe refuses (its image input is opt-in and early) is asked about again by its words.
    Typing a note asks again (after a 0.9 s pause, or on leaving the box).
 2. `POST {server}/api/tefnotes/clip`, multipart: `@jsonPayload` = `{id, url?, title, selection?, line?, note?, images?: [{src,
-   alt?, caption?}], pdfs?: [{name}], target, summary?: true, text?}` (`target` as above, `id` 15 of a-z0-9 the client makes for this save and keeps for every send of it (core `clipId`, `saveBodies`: a save pressed again after a failure keeps it): the server records the save under it and answers a repeat as the first, so a clip lands once; `line` passed back from step 1; `summary` only
+   alt?, caption?}], pdfs?: [{name}], target, summary?: true, text?}` (`target` as above, `id` 15 of a-z0-9 the client makes for this save and keeps for every send of it (core `client/ids.ts` `recordId`, `saveBodies`: a save pressed again after a failure keeps it): the server records the save under it and answers a repeat as the first, so a clip lands once; `line` passed back from step 1; `summary` only
    when the user ticked "Add a summary", and `text` the page's text then, the same 50000 chars as in step 1) and, with `images` or `pdfs` and a note, a new
    note or a new task as target, one `file` part per file in order: each picture's JPEG to store (long edge 1600, quality 0.82, `packages/core/src/photos.ts`),
    then each PDF as it is (at most `MAX_PDF`); an existing task takes none: `sendsFiles` in core. Answers `200 {kind: "note", path, title, action: "created" | "appended", summary?}` or `{kind: "task", id, title,

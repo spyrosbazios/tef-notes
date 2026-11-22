@@ -1,5 +1,5 @@
 // `URL` inside the hooks' core bundle (lib/core.js, bundle/build.ts): PocketBase's JS VM (goja) has none, and the
-// bundled code reads one thing of a URL, its host (core links.ts hostOf, which titles a clip of a bare link by its site;
+// bundled code reads one thing of a URL, its host (core hyperlinks.ts hostOf, which titles a clip of a bare link by its site;
 // a clip's url is http(s) only, lib/clip.js input). This is that much of WHATWG URL, for the schemes with a host it
 // always parses (http, https, ws, wss, ftp): `hostname`, or a TypeError where URL throws. An ASCII address comes out as
 // URL reads it (server/test/url.test.js checks generated ones); a non-ASCII host stays Unicode, lowercased, where URL

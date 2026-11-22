@@ -2,7 +2,7 @@
 // role, in place of a task's single note. A task about several notes, what links to a note (its backlinks), a note or a
 // task made from another note. The server's `links` also has `fromShot` and `toShot` columns, from the screenshot captures
 // that are gone: no client reads or writes them (a link with one is not a link here, linkOf). Pure: the shapes, the wire columns and the questions every client asks of
-// a list of links. The calls are core/record-protocol.ts `links`. (core/links.ts is something else: a pasted URL's title.)
+// a list of links. The calls are core/record-protocol.ts `links`. (core/hyperlinks.ts is something else: the URLs in a note's text.)
 //
 // A link is never edited, only made or deleted, and carries no `rev`: it holds nothing to merge, and making or removing
 // one changes neither end (neither end's `rev` moves). Both are idempotent: a create whose id, or whose (from, to, role),

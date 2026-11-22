@@ -2,7 +2,7 @@
 // DELETE (a repeat that finds the record gone is a 404, which every caller reads as done). A POST, PATCH or PUT is sent once:
 // a reply lost after the server acted would have it act twice (a second create, an append added twice, a claim read as taken).
 // A caller that must survive a lost reply sends a write under an id of its own and sends it again itself, where it can read what
-// a clash on that id means (pocketbase.ts `createdUnder`, record-contracts.ts `landed`).
+// a clash on that id means (record-protocol.ts `createdUnder`, record-contracts.ts `landed`).
 import { serverError } from "../record-contracts";
 
 export class HttpError extends Error {

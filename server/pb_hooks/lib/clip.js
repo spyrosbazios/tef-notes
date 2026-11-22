@@ -155,7 +155,7 @@ function target(v) {
   throw new Bad("target must be a note's path, a task's id, new or newtask.");
 }
 
-/** A save's `id`, made by the client for that one save (core clip.ts `clipId`): 15 of a-z0-9, as a record id is. The save is
+/** A save's `id`, made by the client for that one save (core client/ids.ts `recordId`, kept by clip.ts `saveBodies`): 15 of a-z0-9, as a record id is. The save is
  *  kept under it (`clip_saves`), so the same save sent again, after an answer that was lost, is answered and not done twice. */
 function clipId(v) {
   if (typeof v !== "string" || !/^[a-z0-9]{15}$/.test(v)) throw new Bad("id must be 15 lowercase letters and digits, made once for this save.");

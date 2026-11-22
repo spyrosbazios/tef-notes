@@ -119,8 +119,8 @@ describe("tefnotes.ts", () => {
   const source = readFileSync(CLI, "utf8");
 
   test("writes notes, tasks and tags only through writes.ts", () => {
-    // pb.update, pb.create, pb.tasks.create/update, createTag, updateTag and importNotes each take the mark as an argument:
+    // pb.update, pb.create, pb.tasks.create/update, pb.tags.create/update and importNotes each take the mark as an argument:
     // a call outside `writer` is a write somebody can forget to mark.
-    expect(source.match(/\bpb\.(create|update)\(|\bpb\.tasks\.(create|update)\(|import \{[^}]*\b(createTag|updateTag|importNotes)\b/g)).toBeNull();
+    expect(source.match(/\bpb\.(create|update)\(|\bpb\.(tasks|tags)\.(create|update)\(|import \{[^}]*\bimportNotes\b/g)).toBeNull();
   });
 });

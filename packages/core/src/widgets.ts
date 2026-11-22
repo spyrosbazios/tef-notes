@@ -62,7 +62,7 @@ export type ReviewWidget = {
  *  "…" where cut. Draw the quote with the note's title, tapping opens `path`. */
 export type QuoteWidget = { type: "quote"; path: string; title: string; quote: string; before: string; after: string };
 
-/** A page's preview as a link card (`previewPictureUrl`, `hasPreview` and the card the notes' link tiles draw are core/urls.ts' and core/links.ts'). */
+/** A page's preview as a link card (`previewPictureUrl`, `hasPreview` and the card the notes' link tiles draw are core/server-urls.ts' and core/hyperlinks.ts'). */
 export type LinkWidget = { type: "link"; preview: LinkPreview };
 
 /** What a lens would show, from the tags alone, before anything is saved: how many notes and (open) tasks pass `inLens`, and up

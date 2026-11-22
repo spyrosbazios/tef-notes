@@ -280,7 +280,7 @@ fun suggestBody(page: ClipPage, note: String, look: String?): JSONObject =
     page.json(look).apply { if (note.isNotBlank()) put("note", note.trim()) }
 
 /** A new id for something sent to the server that must land once however often it is sent: 15 of a-z0-9, as a record id is
- *  (clip.ts `clipId`; the server takes exactly these). Made once, before the first send, and kept with what waits. */
+ *  (core client/ids.ts `recordId`, which clip.ts `saveBodies` is handed; the server takes exactly these). Made once, before the first send, and kept with what waits. */
 fun newId(random: java.util.Random = java.security.SecureRandom()): String =
     String(CharArray(15) { "abcdefghijklmnopqrstuvwxyz0123456789"[random.nextInt(36)] })
 
