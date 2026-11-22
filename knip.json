@@ -62,6 +62,7 @@
     "server/agent": {
       "entry": [
         "src/render-child.ts",
+        "src/updater/main.ts",
         "test/render-fixture.ts"
       ]
     },
