@@ -19,6 +19,6 @@ services:
       secrets: [crx_key]
   agent:
     image: tefnotes-agent:local
-    build: { context: .., dockerfile: server/agent/Dockerfile }
+    build: { context: .., dockerfile: server/agent/Dockerfile, args: { TEF_NOTES_VERSION: "${TEF_NOTES_VERSION:-}" } }
 secrets:
   crx_key: { file: *crxkey }

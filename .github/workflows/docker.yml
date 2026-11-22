@@ -1,5 +1,5 @@
 # Publishes the server images to GHCR on every version tag: ghcr.io/spyrosbazios/tef-notes (PocketBase, hooks, migrations and
-# the web app) and ghcr.io/spyrosbazios/tef-notes-agent (the chat agent), each for amd64 and arm64, tagged <version> and
+# the web app), ghcr.io/spyrosbazios/tef-notes-agent (the chat agent) and ghcr.io/spyrosbazios/tef-notes-updater (updating from the app), each for amd64 and arm64, tagged <version> and
 # latest. The signed Chrome extension is not in them (it needs the owner's origin and key): server/docker-compose.build.yml.
 name: Docker images
 
@@ -24,6 +24,9 @@ jobs:
           - image: ghcr.io/spyrosbazios/tef-notes-agent
             dockerfile: server/agent/Dockerfile
             target: ""
+          - image: ghcr.io/spyrosbazios/tef-notes-updater
+            dockerfile: server/agent/updater.Dockerfile
+            target: ""
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v4
@@ -47,6 +50,7 @@ jobs:
           target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: TEF_NOTES_VERSION=${{ steps.meta.outputs.version }}   # Settings shows it; the updater compares it with GitHub's newest
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}

@@ -16,6 +16,8 @@ import { keyRoute, subscribeRoute, unsubscribeRoute } from "./push";
 import { own } from "./request-guard";
 import { startReminders } from "./reminders";
 import { reader } from "./reader";
+import { releases } from "./release";
+import { versionOf } from "@/core/release";
 import { search } from "./search";
 import { steerRoute } from "./steer";
 import { talkRoute, talkSocket, talkVoicesRoute, type Fish } from "./talk";
@@ -26,6 +28,7 @@ import { transcribe } from "./transcribe";
 const server = { url: process.env.TEF_NOTES_PB ?? "http://127.0.0.1:8097" };
 const fish: Fish = { speak: connectFishVoice, hear: connectFishEar(), voices: fishVoices, fallback: fallbackVoice };
 const port = Number(process.env.PORT ?? 8098);
+const release = releases({ running: versionOf(process.env.TEF_NOTES_IMAGE_VERSION), updater: process.env.TEF_NOTES_UPDATER ?? "http://updater:8099", fetch, now: Date.now });
 
 Bun.serve({
   port,
@@ -50,6 +53,8 @@ Bun.serve({
     "/agent/talk/voices": { GET: (req) => talkVoicesRoute(req, fish) },
     "/agent/title": { POST: own("json", (req) => titleRoute(req, server)) },
     "/agent/transcribe": { POST: own("bytes", (req) => transcribe(req)) },
+    "/agent/version": { GET: () => release.version() },
+    "/agent/update": { POST: own("json", (req) => release.update(req)) },
     "/agent/models": { GET: async () => Response.json(await catalog()) },
     "/agent/companion/hello": { GET: () => helloRoute(server) },
     "/agent/companion/tasks": { GET: (req) => tasksRoute(req, server), POST: own("json", (req) => addTaskRoute(req, server)) },

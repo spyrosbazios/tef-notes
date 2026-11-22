@@ -1,4 +1,4 @@
-# Pulls the published images (ghcr.io/spyrosbazios/tef-notes and tef-notes-agent, multi-arch), never builds: TEF_NOTES_VERSION
+# Pulls the published images (ghcr.io/spyrosbazios/tef-notes, tef-notes-agent and the opt-in tef-notes-updater, multi-arch), never builds: TEF_NOTES_VERSION
 # pins a release, unset it is the latest. Building from source, or with the extension's signing key: docker-compose.build.yml.
 # Loopback only: there is no sign-in, so the phone and the laptop reach it through a reverse proxy on a private network
 # (e.g. Tailscale serve, HTTPS). Every setting is an environment variable with a default: .env.example lists them.
@@ -44,6 +44,21 @@ services:
       - ${TEF_NOTES_KEY_FISH:-./keys/fish}:/run/fish:ro   # Fish Audio's key (api-key): dictation and Talk; without it both are off
       - agent_data:/data   # derived: search by meaning's model and vectors, what OCR read of scanned PDFs and its language data (deleting it costs one re-embed and one re-read)
     depends_on: [pocketbase]
+    restart: unless-stopped
+  # Updating from the app (Settings → Maintenance), opt-in: COMPOSE_PROFILES=updater in .env. The one container holding the
+  # Docker socket, which is root on the host: no port on the host, reached by the agent alone, and it takes nothing but a
+  # release version (agent/src/updater/). It pulls that release's images, backs pb_data up into ./backups and recreates the
+  # services. It mounts this folder at its own path, so its compose resolves ./pb_data and the keys as yours does: ${PWD} is
+  # the folder you run docker compose from, which must be this one.
+  updater:
+    image: ghcr.io/spyrosbazios/tef-notes-updater:${TEF_NOTES_VERSION:-latest}
+    profiles: [updater]
+    environment:
+      TEF_NOTES_DIR: ${PWD}
+      TEF_NOTES_UPDATE_BACKUP: ${TEF_NOTES_UPDATE_BACKUP:-on}   # off: no pb_data snapshot before an update (needed when pb_data is a named volume)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}:${PWD}
     restart: unless-stopped
 volumes:
   agent_data:

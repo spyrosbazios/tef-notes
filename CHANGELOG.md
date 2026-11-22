@@ -20,6 +20,14 @@ version is one semver number for the whole repository, set by the git tag (see [
 - A link pasted into a note from a web page keeps only an `http(s):`, `mailto:` or the app's own address; a
   `javascript:` or `data:` link becomes plain text, and Ctrl-click never opens one.
 
+### Added
+
+- Updates from the app: Settings → Maintenance shows the server's release and, when a newer one is out, its notes and an
+  Update button (a toast says so once per release). The button needs the opt-in updater service (`COMPOSE_PROFILES=updater`),
+  which pulls the release, backs `pb_data` up into `server/backups/` and restarts the server; the app reloads into it.
+  `server/README.md`, "Updating from the app".
+- The published images carry their release version: Settings showed 0.0.0 for them.
+
 ### Changed
 
 - Smaller fixes to the installed app's plumbing: an unreadable reminder push still shows a notification, renaming a tag

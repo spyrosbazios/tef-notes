@@ -18,6 +18,9 @@ COPY packages/core/src /app/packages/core/src
 COPY server/agent/tsconfig.json ./
 COPY server/agent/src ./src
 USER bun
+# The release this image is, shown in Settings and compared with GitHub's newest (src/release.ts); docker.yml passes the tag.
+ARG TEF_NOTES_VERSION
+ENV TEF_NOTES_IMAGE_VERSION=${TEF_NOTES_VERSION}
 ENV HOST=0.0.0.0 PORT=8098 TEF_NOTES_DATA=/data
 EXPOSE 8098
 CMD ["bun", "src/index.ts"]

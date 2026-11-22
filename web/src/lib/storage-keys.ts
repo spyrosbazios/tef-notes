@@ -11,6 +11,8 @@ export const STORAGE = {
   rail: "tefnotes.rail",
   /** When the dock was last on screen, for the new-chat rule (assistant/provider.tsx). */
   chatSeen: "tefnotes.chat-seen",
+  /** The newest server release this browser already announced (components/release-toast.tsx). */
+  releaseSeen: "tefnotes.release-seen",
 } as const;
 
 export type StorageKey = (typeof STORAGE)[keyof typeof STORAGE];

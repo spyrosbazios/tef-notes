@@ -8,6 +8,7 @@ import { AssistantProvider } from "@/components/assistant/provider";
 import { TalkProvider } from "@/components/talk/provider";
 import { Toaster } from "@/components/ui/sonner";
 import { UpdateToast } from "@/components/update-toast";
+import { ReleaseToast } from "@/components/release-toast";
 import { useShownLook } from "@/hooks/appearance";
 import { useNarrow } from "@/hooks/media";
 import { useLive } from "@/hooks/live";
@@ -30,6 +31,7 @@ export function Frame() {
       </AssistantProvider>
       <Toaster theme={scheme} position={narrow ? "top-center" : "bottom-right"} offset={clear} mobileOffset={clear} />
       <UpdateToast />
+      <ReleaseToast />
       <Suspense><Devtools /></Suspense>
     </>
   );

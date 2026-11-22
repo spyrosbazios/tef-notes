@@ -283,6 +283,31 @@ Auto-tagging check: a note's `tagged` field fills in within a minute or two of a
 `POST /api/tefnotes/clip/suggest` with `{"url":"https://example.com","title":"Test"}` lists suggestions and writes
 nothing. A new tag definition or an edited description re-evaluates every note, at up to 50 a minute.
 
+## Updating from the app
+
+Settings → Maintenance shows the release the server runs and, when GitHub has a newer one, its notes and an **Update**
+button. Every install gets the notice; the button needs the updater, an opt-in service, because it holds the Docker socket
+(root on the host). Turn it on in `server/.env`:
+
+```sh
+COMPOSE_PROFILES=updater
+```
+
+then `docker compose up -d` from `server/` (the updater mounts that folder at its own path, `${PWD}`, so run compose from
+there). It has no port on the host; only the agent reaches it, and it takes nothing but a release version. An update:
+
+1. checks the version is a published release, newer than the one running;
+2. pulls the release's three images (a failure here changes nothing);
+3. stops PocketBase and tars `pb_data/` into `server/backups/` (the newest 3 kept, owned by root);
+4. moves a pinned `TEF_NOTES_VERSION` in `.env` to the new version (unpinned stays on `latest`), recreates `pocketbase`
+   and `agent` (migrations apply on start), then recreates itself from the new image.
+
+The app reloads into the new web app once the server answers on the new version. It does not change your compose file:
+when a release's notes say `docker-compose.yml` changed, update the file and run `docker compose up -d` yourself.
+`TEF_NOTES_UPDATE_BACKUP=off` skips the snapshot (needed when `pb_data` is a named volume, not a folder). A server built
+from source (`docker-compose.build.yml`) is never updated by the app: pull with git and rebuild. If an update fails, the
+reason shows in Settings and in `docker compose logs updater`.
+
 ## Backups
 
 `pb_data/` (SQLite database and uploaded files) is the only copy of your data, and the server does not back it up. Copy

@@ -1,0 +1,5 @@
+# The build context is the repo root, which holds the live database (server/pb_data): send only what the updater runs.
+*
+!server/agent/tsconfig.json
+!server/agent/src/updater
+!packages/core/src

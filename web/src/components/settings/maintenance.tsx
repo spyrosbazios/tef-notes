@@ -1,4 +1,4 @@
-// Settings → Maintenance: the server, the offline copy this browser keeps, the version.
+// Settings → Maintenance: the server, the offline copy this browser keeps, the version and updating the server.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { builtAt } from "@/lib/persist";
 import { appVersion, forceUpdate } from "@/lib/update";
 import { Line } from "@/components/settings/line";
+import { ServerUpdate } from "@/components/settings/server-update";
 
 /** The server this app talks to, what this browser keeps of it for offline, and clearing that: Maintenance's first box. */
 function ServerSync() {
@@ -71,6 +72,7 @@ export function Maintenance() {
         <Line title="Version" detail={`Built ${builtAt().toLocaleString()}`} trailing={<span className="text-[13px] text-dim tabular-nums">{appVersion()}</span>} />
         <Line title="Get the latest version" detail="Check for a newer build and reload into it."
           trailing={<Button variant="outline" size="sm" className="rounded-full" disabled={!online || busy} onClick={reload}>{busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} Reload</Button>} />
+        <ServerUpdate />
       </div>
     </section>
   );

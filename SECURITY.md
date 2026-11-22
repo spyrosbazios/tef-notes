@@ -57,7 +57,13 @@ on every device would add friction without keeping out anyone the network does n
   extension (the one your server serves, by its id) and clients that aren't browsers (CLI, agent, Android companion)
   get through. CORS names only the extension, so no other site can read an answer either. A browser too old to send
   `Sec-Fetch-Site` is judged by its `Origin`, so a proxy in front must pass `Host` or `X-Forwarded-Host` through.
-- TEF Notes has no backups of its own. See the README's "Backups".
+- The updater (opt-in, `COMPOSE_PROFILES=updater`) mounts the Docker socket, which is root on the host. It publishes no
+  port, only the agent reaches it over the compose network, and it takes one input: a version, which it checks is a
+  published GitHub release newer than the running one before it pulls this repository's images
+  (`server/agent/src/updater/update.ts`). Anyone who can reach the app can therefore move the server to a newer official
+  release, and nothing else. Leave it off if that is too much.
+- TEF Notes has no backups of its own. See the README's "Backups". The updater's snapshot before an update is the only
+  copy it makes.
 
 ## Reporting a vulnerability
 

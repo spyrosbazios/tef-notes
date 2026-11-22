@@ -17,3 +17,5 @@ server/pb_hooks/lib/core.js
 video/out/
 site/public/film*
 *.apk
+# the updater's pb_data snapshots before an update (server/README.md, Updating from the app)
+server/backups/
