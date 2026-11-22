@@ -131,7 +131,8 @@ export function Legend<T extends string>({ options, of }: { options: readonly T[
   );
 }
 
-/** More options, or longer names, than a `Segmented` holds: a menu showing the picked one. */
+/** More options, or longer names, than a `Segmented` holds: a menu showing the picked one. An option is its own flex row: the
+ *  item's highlight wraps its children, and an svg on its own is a block, so a bare icon would sit on a line above its name. */
 export function Choose<T extends string>({ label, value, options, of, onPick }: {
   label: string; value: T; options: readonly T[]; of: (v: T) => Option; onPick: (v: T) => void;
 }) {
@@ -141,7 +142,7 @@ export function Choose<T extends string>({ label, value, options, of, onPick }: 
       <SelectContent align="end">
         {options.map((o) => {
           const { label: name, icon: Icon } = of(o);
-          return <SelectItem key={o} value={o}>{Icon ? <Icon className="text-dim" /> : null}{name}</SelectItem>;
+          return <SelectItem key={o} value={o}><span className="flex items-center gap-2">{Icon ? <Icon className="text-dim" /> : null}{name}</span></SelectItem>;
         })}
       </SelectContent>
     </Select>
