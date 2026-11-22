@@ -5,11 +5,27 @@ version is one semver number for the whole repository, set by the git tag (see [
 
 ## Unreleased
 
+## 0.15.0 - 2026-11-22
+
 ### Added
 
 - What the assistant writes in the note you have open is tinted for a moment and scrolled into view, so you see where
   the note changed without reading it again; an edit from another device shows the same way.
 - A note the assistant creates opens by itself, in the chat and in Talk, instead of waiting as a card to click.
+- Talk's corner panel can be moved by its header and resized from its edges; the browser keeps where and how big.
+- On the phone, Talk's pill is the orb itself and the call's state, opening a menu with Mute, Talk and End; it shows
+  when the assistant is thinking.
+- The voice assistant can draw.
+
+### Changed
+
+- Talk: speaking over a reply always cuts it, and the voice is lowered the moment something is heard over it.
+- Talk: a reply keeps the same tone from one sentence to the next.
+- Talk's captions use the chat's reading size and fold older ones to two lines, leaving room for widgets and cards.
+
+### Fixed
+
+- Talk's header readout no longer runs under the model pill.
 
 ## 0.14.0 - 2026-11-22
 
