@@ -1,13 +1,13 @@
 // Each note action (core/note-actions.ts) and its icon: the note's header and menu (note-header.tsx) and Settings → Notes draw them.
 import {
-  Archive, BookOpen, Bookmark, Bot, Brain, Briefcase, CalendarPlus, ChartBar, CheckCheck, Clock, Code, Download, FileCode, FileText, Flag, Globe,
+  Archive, BookOpen, Bookmark, Bot, Brain, Briefcase, CalendarPlus, ChartBar, CheckCheck, Clock, Code, Copy, Download, FileText, Flag, Globe,
   GraduationCap, Hash, Heart, Languages, Lightbulb, Link2, ListChecks, ListOrdered, Mail, MapPin, Megaphone, MessageSquare, Palette, Paperclip, PenLine,
   Pin, Quote, Rocket, Scissors, Search, Shield, ShoppingCart, Sparkles, Star, Table2, Tag, Target, TextQuote, Users, WandSparkles, Zap, type LucideIcon,
 } from "lucide-react";
 import type { ActionIcon, Builtin } from "@/core/note-actions";
 
 export const BUILTIN_ICON: Record<Builtin, LucideIcon> = {
-  attach: Paperclip, pin: Pin, ask: Sparkles, source: FileCode, copyLink: Link2, download: Download, archive: Archive,
+  attach: Paperclip, pin: Pin, ask: Sparkles, copyMarkdown: Copy, copyLink: Link2, download: Download, archive: Archive,
 };
 
 export const PROMPT_ICON: Record<ActionIcon, LucideIcon> = {

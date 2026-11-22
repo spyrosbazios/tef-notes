@@ -1,6 +1,6 @@
 // The right of a note's header: its actions (core/note-actions.ts), each where this layout's preferences put it
 // (`phone.noteHeader`, `desktop.noteHeader`): a button here, a row in the menu, or off. The app's own (attach, pin, ask,
-// markdown source, copy link, download, archive) and the owner's assistant actions share the list; an assistant action is drawn
+// copy markdown, copy link, download, archive) and the owner's assistant actions share the list; an assistant action is drawn
 // in the brand colour and turns while it runs. The colour and Delete are the menu's, always. A menu row carries "Pin to
 // header"; the rest is set in Settings → Notes.
 import { Link } from "@tanstack/react-router";
@@ -24,12 +24,12 @@ type Own = Exclude<Builtin, "attach">;
 const isOwn = (id: string): id is Own => isBuiltin(id) && id !== "attach";
 
 type Props = {
-  pinned: boolean; archived: boolean; color?: Color; raw: boolean;
+  pinned: boolean; archived: boolean; color?: Color;
   /** "Download" or "Share": what taking the note out is called on this device. */
   saveVerb: string;
   /** The action whose run is on its way, by id. */
   running: string | null;
-  onFile: () => void; onDraw: () => void; onPin: () => void; onAsk: () => void; onRaw: (on: boolean) => void; onCopyLink: () => void;
+  onFile: () => void; onDraw: () => void; onPin: () => void; onAsk: () => void; onCopyMarkdown: () => void; onCopyLink: () => void;
   onSave: () => void; onArchive: () => void; onColor: (c: Color | null) => void; onDelete: () => void; onRun: (a: PromptAction) => void;
 };
 
@@ -64,11 +64,11 @@ export function NoteHeaderActions(p: Props) {
 
   // What each of the app's own shows and does (attach is two things, drawn by itself below)
   const own: Record<Own, { label: string; icon: ReactNode; act: () => void; pressed?: boolean }> = (() => {
-    const { pin: Pin, ask: Ask, source: Source, copyLink: Copy, download: Save, archive: Archive } = BUILTIN_ICON;
+    const { pin: Pin, ask: Ask, copyMarkdown: CopyMd, copyLink: Copy, download: Save, archive: Archive } = BUILTIN_ICON;
     return {
       pin: { label: p.pinned ? "Unpin" : BUILTIN_LABEL.pin, icon: <Pin className={p.pinned ? "fill-fg text-fg" : "text-dim"} />, act: p.onPin, pressed: p.pinned },
       ask: { label: BUILTIN_LABEL.ask, icon: <Ask className="text-dim" />, act: p.onAsk },
-      source: { label: BUILTIN_LABEL.source, icon: <Source className={p.raw ? "text-fg" : "text-dim"} />, act: () => p.onRaw(!p.raw), pressed: p.raw },
+      copyMarkdown: { label: BUILTIN_LABEL.copyMarkdown, icon: <CopyMd className="text-dim" />, act: p.onCopyMarkdown },
       copyLink: { label: BUILTIN_LABEL.copyLink, icon: <Copy className="text-dim" />, act: p.onCopyLink },
       download: { label: `${p.saveVerb} .md`, icon: <Save className="text-dim" />, act: p.onSave },
       archive: { label: p.archived ? "Unarchive" : BUILTIN_LABEL.archive, icon: p.archived ? <ArchiveRestore className="text-dim" /> : <Archive className="text-dim" />, act: p.onArchive },

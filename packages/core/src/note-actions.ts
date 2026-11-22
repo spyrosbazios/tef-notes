@@ -1,5 +1,5 @@
 // A note's actions: what the note screen's header offers, and where each sits. Two kinds share one list:
-//   - built-ins, done by the app itself (`BUILTINS`: attach, pin, ask, the markdown source, copy the link, download, archive);
+//   - built-ins, done by the app itself (`BUILTINS`: attach, pin, ask, copy the markdown, copy the link, download, archive);
 //   - assistant actions, the owner's saved prompts (`PromptAction`, kept in prefs `noteActions`): a button that has the agent
 //     run the prompt on the open note, with no chat to open. Tidy and Make a task are two that come with the app, the owner's
 //     to change or delete like any they wrote.
@@ -17,10 +17,10 @@ import { noteIdOf } from "./notes";
 // ---- the actions
 
 /** The actions the app does itself. */
-export const BUILTINS = ["attach", "pin", "ask", "source", "copyLink", "download", "archive"] as const;
+export const BUILTINS = ["attach", "pin", "ask", "copyMarkdown", "copyLink", "download", "archive"] as const;
 export type Builtin = (typeof BUILTINS)[number];
 export const BUILTIN_LABEL: Record<Builtin, string> = {
-  attach: "Attach or draw", pin: "Pin to top", ask: "Ask about this note", source: "Markdown source", copyLink: "Copy link",
+  attach: "Attach or draw", pin: "Pin to top", ask: "Ask about this note", copyMarkdown: "Copy markdown", copyLink: "Copy link",
   download: "Download .md", archive: "Archive",
 };
 export const isBuiltin = (v: unknown): v is Builtin => (BUILTINS as readonly unknown[]).includes(v);

@@ -17,7 +17,7 @@ const SETTLE = 1200;
 const NONE: OutlineItem[] = [];
 
 export type Contents = {
-  /** The headings the rail draws: none when the note has fewer than `MIN`, or is shown as markdown source. */
+  /** The headings the rail draws: none when the note has fewer than `MIN`, or the editor isn't up yet. */
   items: OutlineItem[];
   /** The index of the section being read. */
   current: number;

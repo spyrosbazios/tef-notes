@@ -1,5 +1,5 @@
-// The open note, edited as it reads (src/editor: boxes tick in place, photos show), on the page note-page.tsx gives it. The raw
-// markdown, which is what the phone edits, is one toggle away (in ⋮). The title is editable in place, and a note just made
+// The open note, edited as it reads (src/editor: boxes tick in place, photos show), on the page note-page.tsx gives it. Its markdown
+// is one tap from the clipboard (Copy markdown). The title is editable in place, and a note just made
 // ("Untitled", empty) opens with it selected, ready to be typed over; pin, colour and tags are
 // one click each, written as the frontmatter edit the phone makes (withFlags). One top bar holds every tool and option of the
 // note: the format tools, attach, pin and ⋮. A note is pure markdown: tasks are records of their own (task-detail.tsx), and those linked to it show under its title.
@@ -26,7 +26,6 @@ import { SelectionBar } from "@/components/selection-bar";
 import { TagEditor } from "@/components/tag-editor";
 import type { Editor } from "@/editor";
 import { useContents } from "@/hooks/contents";
-import { dictateInto } from "@/hooks/dictation";
 import { openDrawing, useOpened } from "@/hooks/drawing";
 import { useDraft } from "@/hooks/draft";
 import { deleteNote, NOTES, setFlags, write } from "@/hooks/notes";
@@ -46,14 +45,13 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   const d = useDraft(n);
   const { filterTag } = useNav();
   const now = useNow(30_000);
-  const [raw, setRaw] = useState(false);
   const [ed, setEd] = useState<Editor | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const drawing = useOpened(n.note.id);     // the drawing open over the note, the owner's or the agent's (hooks/drawing.ts)
   const scroller = useRef<HTMLDivElement>(null);
-  const contents = useContents(raw ? null : ed, scroller);     // the headings, for the rail beside the text
-  const title = useRef<HTMLTextAreaElement>(null), area = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
+  const contents = useContents(ed, scroller);     // the headings, for the rail beside the text
+  const title = useRef<HTMLTextAreaElement>(null), file = useRef<HTMLInputElement>(null), editor = useRef<NoteEditorHandle>(null);
   const addFiles = useAddFiles(n.path);
   const note = n.note;
 
@@ -68,14 +66,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
   };
 
   /** Lines of markdown (files already uploaded) into the body at the cursor: one to a paragraph in the editor. */
-  const place = (md: string) => {
-    const el = area.current;
-    if (!raw || !el) { editor.current?.insertMarkdown(md.split("\n").join("\n\n")); return; }
-    const at = el.selectionStart, before = d.body.slice(0, at), after = d.body.slice(at);
-    const pad = (s: string) => (s && !s.endsWith("\n\n") ? (s.endsWith("\n") ? "\n" : "\n\n") : "");
-    d.setBody(`${before}${pad(before)}${md}\n${after.startsWith("\n") || !after ? "" : "\n"}${after}`);
-    void d.flush();
-  };
+  const place = (md: string) => { editor.current?.insertMarkdown(md.split("\n").join("\n\n")); };
 
   /** Photos and PDFs into the body at the cursor, uploaded first: a body never points at nothing. */
   const attach = async (files: File[]) => {
@@ -117,14 +108,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
 
   // On a phone the format tools ride on top of the keyboard (the viewport resizes with it, index.html), not in the top bar
   const narrow = useNarrow(), keyboard = useKeyboard();
-  const tools = raw || !ed ? null : <FormatTools editor={ed} side={narrow ? "top" : "bottom"} />;
-
-  const source = (
-    <textarea ref={area} value={d.body} onChange={(e) => d.setBody(e.target.value)} spellCheck
-      onPaste={(e) => { const f = [...e.clipboardData.files]; if (f.length) { e.preventDefault(); void attach(f); } }}
-      placeholder="Write in markdown…" aria-label="Note body (markdown)"
-      className="h-full min-h-[50vh] w-full resize-none bg-transparent font-mono text-[13px] leading-[1.6] outline-none placeholder:text-faint" />
-  );
+  const tools = !ed ? null : <FormatTools editor={ed} side={narrow ? "top" : "bottom"} />;
 
   return (
     <article className="flex h-full min-h-0 flex-col" aria-label={note.title}
@@ -135,11 +119,12 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
         {narrow ? null : tools}
         <div className="flex-1" />
         {uploading ? <Loader2 className="mr-1 size-4 animate-spin text-dim" /> : null}
-        <MicButton variant="bar" onText={(t) => { if (raw || !ed) dictateInto(area.current, d.body, t, d.setBody); else ed.insertText(t); }} />
+        <MicButton variant="bar" onText={(t) => ed?.insertText(t)} />
         <input ref={file} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
-        <NoteHeaderActions pinned={!!note.pinned} archived={!!note.archived} color={note.color} raw={raw} saveVerb={out.verb} running={running ? runs.run?.meta.action.id ?? null : null}
+        <NoteHeaderActions pinned={!!note.pinned} archived={!!note.archived} color={note.color} saveVerb={out.verb} running={running ? runs.run?.meta.action.id ?? null : null}
           onFile={() => file.current?.click()} onDraw={() => { void openDrawing(note.id, null); }} onPin={() => { void flag({ pinned: !note.pinned }); }}
-          onAsk={() => { void sendOut("ask"); }} onRaw={setRaw} onSave={() => { void sendOut("save"); }} onColor={(color) => { void flag({ color }); }}
+          onAsk={() => { void sendOut("ask"); }} onSave={() => { void sendOut("save"); }} onColor={(color) => { void flag({ color }); }}
+          onCopyMarkdown={() => { void navigator.clipboard.writeText(d.body).then(() => toast("Markdown copied")); }}
           onCopyLink={() => { void navigator.clipboard.writeText(location.origin + noteHref(note.id)); toast("Link copied"); }}
           onArchive={() => { void flag(archivePatch([note])).then(() => toast(note.archived ? "Brought back from the archive" : "Archived")); }}
           onDelete={() => setConfirm(true)} onRun={(a) => { void runAction(a); }} />
@@ -161,7 +146,7 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
               void d.flush();
             }}
             aria-label="Title" placeholder="Title"
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (raw) area.current?.focus(); else editor.current?.focus("start"); } }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); editor.current?.focus("start"); } }}
             className="field-sizing-content block w-full resize-none break-words bg-transparent font-extrabold text-3xl leading-tight tracking-tight outline-none placeholder:text-faint" />
           <div className="mt-2 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-faint">
             {note.archived ? <span className="flex items-center gap-1"><Archive className="size-3" /> Archived</span> : null}
@@ -170,12 +155,8 @@ export function NotePane({ n, leading, onNote, onGone }: { n: NoteRec; leading?:
             <TagEditor tags={note.tags} onAdd={(t) => void retag([t])} onRemove={(t) => void retag([], [t])} onTag={filterTag} />
           </div>
           <LinkedTasks n={n} className="mb-6" />
-          {raw ? source : (
-            <>
-            <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onTainted={d.taint} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => { void openDrawing(note.id, name); }} onEditor={setEd} />
-            {ed ? <SelectionBar editor={ed} /> : null}
-            </>
-          )}
+          <NoteEditor ref={editor} key={note.id} noteId={note.id} markdown={d.body} onChange={d.setBody} onTainted={d.taint} onFiles={(f) => void attach(f)} onNote={onNote} onDrawing={(name) => { void openDrawing(note.id, name); }} onEditor={setEd} />
+          {ed ? <SelectionBar editor={ed} /> : null}
         </div>
       </div>
       <ContentsRail contents={contents} />
