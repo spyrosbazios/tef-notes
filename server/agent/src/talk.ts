@@ -12,7 +12,7 @@
 // says, shows and runs nothing more (talkAgent.ts `live`).
 //
 // Billing is why this is Fish and not a speech-to-speech model: nothing is re-billed per turn. The ear is a session's
-// seconds, the voice the bytes of what is said (core/talk.ts `costOf`), and the model the text's tokens, cached as any
+// seconds (core/talk.ts `earCostOf`, counted by the app from the clock), the voice the bytes of what is said (`costOf`), and the model the text's tokens, cached as any
 // chat's. The ear is billed while it is open, so a conversation ends after a while with nothing from the owner, and after an
 // hour in all (core/talk.ts TALK_LIMITS). What the owner says goes to Fish to be transcribed; what the assistant says, to be
 // voiced.

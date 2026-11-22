@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { bytesOf, costOf, DEFAULT_TALK_MODEL, MIC_FRAME, TALK_RATE, talkClientEventOf, talkServerEventOf, talkStatusOf, talkVoicesOf, speedOf, TALK_SPEED } from "../src/talk";
+import { bytesOf, costOf, earCostOf, DEFAULT_TALK_MODEL, MIC_FRAME, TALK_RATE, talkClientEventOf, talkServerEventOf, talkStatusOf, talkVoicesOf, speedOf, TALK_SPEED } from "../src/talk";
 
 describe("talkClientEventOf", () => {
   it("reads a start, with the context only when it has a view", () => {
@@ -55,6 +55,8 @@ describe("the voice's rate", () => {
     expect(costOf(1_000_000, "s2.1-pro")).toBe(15);
     expect(costOf(1_000_000, DEFAULT_TALK_MODEL)).toBe(0);
     expect(costOf(0, "s2.1-pro")).toBe(0);
+    expect(earCostOf(3600)).toBeCloseTo(0.36);
+    expect(earCostOf(-5)).toBe(0);
   });
 
   it("keeps the app's microphone frames inside the ear's own pace", () => {

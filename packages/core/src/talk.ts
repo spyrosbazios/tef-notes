@@ -53,6 +53,13 @@ export const bytesOf = (text: string) => new TextEncoder().encode(text).length;
 /** What saying `said` bytes cost through `model`. */
 export const costOf = (said: number, model: TalkModel) => (said / 1e6) * TTS_USD_PER_MB[model];
 
+/** US dollars per hour the ear's socket is open, Fish Audio's list price for realtime speech to text (docs.fish.audio,
+ *  "Pricing & Rate Limits"). It has no free model: the voice's free one leaves this paid. */
+const EAR_USD_PER_HOUR = 0.36;
+
+/** What `seconds` of an open ear cost. */
+export const earCostOf = (seconds: number) => (Math.max(0, seconds) / 3600) * EAR_USD_PER_HOUR;
+
 /** How fast the voice talks: Fish's prosody speed, a multiplier of its natural pace (docs.fish.audio, "Text to Speech"). */
 export const TALK_SPEED = { min: 0.5, max: 2, step: 0.05, normal: 1 } as const;
 

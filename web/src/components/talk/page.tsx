@@ -23,6 +23,7 @@ import { useNow } from "@/hooks/now";
 import { useTalkModel } from "@/hooks/agent";
 import { useAssistant } from "@/hooks/assistant";
 import { useTalk, useTalkStatus } from "@/hooks/talk";
+import { earCostOf } from "@/core/talk";
 import { haptic } from "@/lib/haptics";
 import { clock, money, rowsOf, type TalkState } from "@/lib/talk";
 import { cn } from "@/lib/utils";
@@ -31,14 +32,18 @@ const LABEL: Record<TalkState, string> = {
   idle: "Ready", connecting: "Connecting", listening: "Listening", speaking: "Speaking", working: "Working", waiting: "Waiting for you", failed: "Stopped",
 };
 
-/** The time and cost so far, small: how much was said on hover, for whoever wants the detail. */
+/** The time and Fish's cost so far, small: the ear's open seconds plus the voice's bytes (the model's tokens are a chat's
+ *  and not counted); the split on hover, for whoever wants the detail. */
 function Readout() {
   const { startedAt, endedAt, usage } = useTalk();
   const now = useNow(endedAt ? 3_600_000 : 1000);
   if (startedAt == null) return null;
+  const seconds = ((endedAt ?? now) - startedAt) / 1000;
+  const ear = earCostOf(seconds), voice = usage?.cost ?? 0;
+  const detail = `Fish: listening ${money(ear)}, voice ${money(voice)}${usage ? ` (${usage.said.toLocaleString()} characters said)` : ""}. The model's tokens are not included.`;
   return (
-    <p className="min-w-0 shrink-0 whitespace-nowrap text-xs tabular-nums text-faint" title={usage ? `${usage.said.toLocaleString()} characters said` : undefined}>
-      {clock(((endedAt ?? now) - startedAt) / 1000)}{usage ? ` · ${money(usage.cost)}` : ""}
+    <p className="min-w-0 shrink-0 whitespace-nowrap text-xs tabular-nums text-faint" title={detail}>
+      {clock(seconds)} · {money(ear + voice)}
     </p>
   );
 }
