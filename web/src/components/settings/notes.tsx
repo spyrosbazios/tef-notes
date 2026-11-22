@@ -149,9 +149,9 @@ function ActionDialog({ action, onClose }: { action: PromptAction | null; onClos
             <DialogTitle>{action ? "Edit action" : "New action"}</DialogTitle>
             <DialogDescription>A prompt the assistant runs on the open note.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             <Label>Icon and name</Label>
-            <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-1.5">
+            <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-1.5 py-1">
               {ACTION_ICONS.map((i) => {
                 const Icon = PROMPT_ICON[i];
                 return (
