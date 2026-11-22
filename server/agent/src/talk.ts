@@ -78,10 +78,10 @@ export function turnsOf(act: { start(text: string, confirmed: boolean): void; co
   };
 }
 
-/** Whether an ear event is the owner taking the turn over the voice. Only `taken` is: `speech` (Fish's voice activity) opens
- *  on any noise, a cough or the room, so cutting the reply on it made it stop while the owner sat silent; Fish judges whether
- *  it is the owner (and not a noise or a "mm-hm", a backchannel) and says so with `user_turn_taken`. */
-export const cutsIn = (e: EarEvent, speaking: boolean): boolean => speaking && e.type === "taken";
+/** How long a reply still being written may be silent and count as speaking, for the ear: Fish's rule for `agent_speaking`
+ *  (docs.fish.audio, "Tell the server when your agent speaks": the gaps between sentences are speaking, a pause of more than
+ *  about two seconds is not). Told it had stopped in every gap, the ear took a "mm-hm" there for a turn. */
+const PAUSE = 2000;
 
 /** Where a conversation's two sides go: JSON events and voice frames to the app, and hanging up on it. */
 export type Out = { json(e: TalkServerEvent): void; voice(pcm: Uint8Array): void; close(): void };
@@ -323,8 +323,11 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
     start(text, sure) { interrupt(); confirmed = sure; if (sure) held = []; startTurn(text); },
     confirm,
     cancel() {
+      // It was not the owner's turn after all. A reply that had already spoken (it paused for the app before `committed`)
+      // is cut like any other the owner speaks over
+      if (speaking) return interrupt();
       stopReply();
-      speak.drop(); confirmed = true; held = [];                      // it was not the owner's turn after all
+      speak.drop(); confirmed = true; held = [];
     },
   });
 
@@ -336,7 +339,12 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
         if (e.on) turns.speech();                                       // something is being said: whatever was heard is over
         break;
       }
-      case "taken": strikes = 0; lastActive = Date.now(); if (cutsIn(e, speaking)) interrupt(); break;   // the owner, not a noise, spoke over the voice
+      // The owner took the turn (`user_turn_taken`): the one event that cuts the reply. `speech` never does: Fish's voice
+      // activity opens on any noise, a cough or the room, and cutting on it stopped the reply while the owner sat silent.
+      // It cuts whatever of the reply is under way, sounding or not: one taken in the quiet between two sentences, or while
+      // the reply was still being thought, was once let pass, and the voice then went on over the owner until their turn
+      // was committed
+      case "taken": strikes = 0; lastActive = Date.now(); interrupt(); break;
       case "eager": turns.eager(e.text); break;
       case "resumed": turns.resumed(); break;
       case "turn": if (e.yours) { strikes = 0; turns.turn(e.text); } break;
@@ -399,10 +407,12 @@ export async function startTalk(start: Start, out: Out, d: Deps): Promise<Talk> 
 
   try { ear = await openEar(); } catch (e) { letGo(); throw e; }   // nothing else is open yet: the timers start below
   timer = setInterval(() => { if (dirty) { dirty = false; void keep(withoutPictures(settle(messages))); } }, SAVE_EVERY);
-  /** The speaking clock (the voice stops counting when the last frame it sent has played), and the ear's caps. */
+  /** The speaking clock (the voice stops counting when the last frame it sent has played, or, while the reply is still being
+   *  written and waits on nothing, a `PAUSE` after it: the next sentence is on its way), and the ear's caps. */
   beat = setInterval(() => {
     const now = Date.now();
-    if (speaking && now > endsAt) markSpeaking(false);
+    const writing = !!current && current.waits.size === 0;
+    if (speaking && now > endsAt + (writing ? PAUSE : 0)) markSpeaking(false);
     if (now - began > TALK_LIMITS.maxMs) void hangUp(`Talk ends after ${TALK_LIMITS.maxMs / 60_000} minutes. Start again to go on.`);
     // A reply waiting on a tap is not busy: a card left unanswered doesn't keep the ear open
     else if (!speaking && (!current || current.waits.size > 0) && now - lastActive > TALK_LIMITS.idleMs)

@@ -111,6 +111,7 @@ export const connectFishVoice = (sea: Sea): ConnectVoice => async (out) => {
   };
   ws.onclose = (e) => { clearTimeout(setup); if (refused) return; opened.reject(new Error(`Fish's voice hung up (${e.code})`)); fail(e.code === 1000 ? "The voice closed" : `Fish's voice hung up (${e.code})`); };
   ws.onmessage = (m) => {
+    if (stopped) return;                                             // frames still arriving while a stopped socket closes are not played
     const f = decode(new Uint8Array(m.data as ArrayBuffer)) as { event?: string; audio?: Uint8Array; reason?: string };
     if (f.event === "audio" && f.audio) out.audio(new Uint8Array(f.audio));
     else if (f.event === "finish") { stopped = true; out.ended(f.reason === "error" ? "Fish's voice failed mid-sentence" : undefined); }

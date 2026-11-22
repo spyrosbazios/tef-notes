@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cutsIn, turnsOf, wordsOf } from "../src/talk";
+import { turnsOf, wordsOf } from "../src/talk";
 
 describe("wordsOf", () => {
   test("says a whole sentence at once, and keeps what follows", () => {
@@ -74,16 +74,5 @@ describe("turnsOf", () => {
     const { log, turns } = harness();
     turns.eager("  ");
     expect(log).toEqual([]);
-  });
-});
-
-describe("cutsIn", () => {
-  test("noise opening a turn (speech_start) never cuts the voice; the ear's verdict that it is the owner does", () => {
-    expect(cutsIn({ type: "speech", on: true }, true)).toBe(false);
-    expect(cutsIn({ type: "taken" }, true)).toBe(true);
-  });
-
-  test("nothing to cut while the voice is silent", () => {
-    expect(cutsIn({ type: "taken" }, false)).toBe(false);
   });
 });

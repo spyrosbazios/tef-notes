@@ -48,9 +48,9 @@ async function until(ok: () => boolean, what: string, ms = 3000) {
 /** A conversation on chat1 (holding `saved`), with the ear, the voice and the app's socket faked. */
 async function talking(saved: UIMessage[] = []) {
   pb.chats.set("chat1", { id: "chat1", title: "", messages: saved, model: "" });
-  const events: TalkServerEvent[] = [], spoken: string[] = [];
+  const events: TalkServerEvent[] = [], spoken: string[] = [], told: boolean[] = [];
   let hear: ((e: EarEvent) => void) | undefined, closed = false;
-  const ear: EarSession = { audio() {}, speaking() {}, said() {}, done() {}, close() {}, listen: (l) => { hear = l; return () => {}; } };
+  const ear: EarSession = { audio() {}, speaking: (on) => { told.push(on); }, said() {}, done() {}, close() {}, listen: (l) => { hear = l; return () => {}; } };
   const voice: Voice = { say: (t) => { spoken.push(t); }, flush() {}, stop() {} };
   const deps: Deps = {
     server: { url: pb.url }, sea: { model: "s2.1-pro", voice: "v", speed: 1 }, model: "m", effort: "normal", pick,
@@ -65,7 +65,7 @@ async function talking(saved: UIMessage[] = []) {
   };
   const tool = (name: string) => parts().filter((p) => p.type === `tool-${name}`).at(-1);
   return {
-    talk, events, spoken, parts, tool,
+    talk, events, spoken, told, parts, tool,
     said: (t: string) => hear!({ type: "turn", text: t, yours: true, degraded: false }),
     hear: (e: EarEvent) => hear!(e),
     closed: () => closed,
@@ -234,6 +234,57 @@ describe("speaking over the reply", () => {
     expect(c.events.filter((e) => e.type === "usage").length).toBe(billed + 1);   // only the new reply's words were billed
     expect(rev()).toBe(1);                                                 // the old reply's late call never ran
     expect(offered).toHaveLength(2);                                       // and it never stepped again
+    await c.talk.end();
+  });
+});
+
+/** A reply that says `first`, then waits for `release` before it says `rest`. */
+function gated(first: string, rest: string) {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const reply: Reply = { stream: new ReadableStream({
+    async start(ctl) {
+      ctl.enqueue({ type: "stream-start", warnings: [] });
+      ctl.enqueue({ type: "text-start", id: "t" });
+      if (first) ctl.enqueue({ type: "text-delta", id: "t", delta: first });
+      await gate;
+      ctl.enqueue({ type: "text-delta", id: "t", delta: rest });
+      ctl.enqueue({ type: "text-end", id: "t" });
+      ctl.enqueue({ type: "finish", finishReason: { unified: "stop", raw: undefined }, usage });
+      ctl.close();
+    },
+  }) };
+  return { reply, release };
+}
+
+describe("taking the turn before the reply has said a word", () => {
+  it("stops it too: the reply still being thought never starts over the owner", async () => {
+    const c = await talking();
+    const g = gated("", "This should never be heard by anyone. ");
+    replies = [g.reply];
+    c.said("what is on today");
+    await until(() => offered.length === 1, "the model's call");
+    c.hear({ type: "taken" });                                             // the owner goes on before any of it sounds
+    expect(c.events.some((e) => e.type === "interrupted")).toBe(true);
+    g.release();
+    await Bun.sleep(100);
+    expect(c.spoken).toEqual([]);
+    await c.talk.end();
+  });
+});
+
+describe("what the ear is told of the voice", () => {
+  it("is speaking through the quiet between a reply's sentences, and not once the reply has ended", async () => {
+    const c = await talking();
+    const g = gated("Here is the first of it. ", "And here is the rest. ");
+    replies = [g.reply];
+    c.said("tell me");
+    await until(() => c.spoken.length === 1, "the first sentence");
+    await Bun.sleep(500);                                                  // long played out; the next sentence is still being written
+    expect(c.told).toEqual([true]);
+    g.release();
+    await until(() => c.told.at(-1) === false, "the voice's end");
+    expect(c.told).toEqual([true, false]);
     await c.talk.end();
   });
 });
