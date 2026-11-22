@@ -114,7 +114,7 @@ function DesktopLayout() {
       ) : null}
       <div className="px-3 py-2.5">
         <p className="text-sm font-semibold">Sidebar</p>
-        <p className="text-[13px] leading-snug text-dim">Home, Search and Settings always stay.</p>
+        <p className="text-[13px] leading-snug text-dim">Search and Settings always stay; the logo always leads Home.</p>
       </div>
       <ul aria-label="Sidebar" className="divide-y divide-line">
         {RAIL.filter(offered).map((r) => {

@@ -41,11 +41,11 @@ export const HIDEABLE: readonly Tab[] = ["tasks", "notes", "ask", "talk"];
 /** Tabs off until turned on: Notes, a page of only the notes, which Home already lists under its tasks. */
 const OFF: readonly Tab[] = ["notes"];
 
-/** The desktop's sidebar (the rail): the screens it lists, in its order, each of which can be hidden. Home (the logo), Search, the
- *  lens and Settings are always there (Settings is where the sidebar is set). */
-export const RAIL = ["inbox", "today", "upcoming", "logbook", "notes", "talk"] as const;
+/** The desktop's sidebar (the rail): the screens it lists, in its order, each of which can be hidden. Home is also the logo, so
+ *  hiding its button never strands it; Search, the lens and Settings are always there (Settings is where the sidebar is set). */
+export const RAIL = ["home", "inbox", "today", "upcoming", "logbook", "notes", "talk"] as const;
 export type RailItem = (typeof RAIL)[number];
-export const RAIL_LABEL: Record<RailItem, string> = { ...TASK_LIST_LABEL, notes: "Notes", talk: "Talk" };
+export const RAIL_LABEL: Record<RailItem, string> = { home: "Home", ...TASK_LIST_LABEL, notes: "Notes", talk: "Talk" };
 /** Off until turned on: Notes, as on the phone. */
 const RAIL_OFF: readonly RailItem[] = ["notes"];
 

@@ -1,8 +1,8 @@
 // The left rail: search, the task lists (Inbox to Logbook), Notes and Talk (Talk only where the server has it), those of them the owner shows (core/prefs.ts
-// `desktop.hidden`, set in Settings → Layout), and at the bottom the lens switcher and settings. The logo
-// is the way back to Home (where the notes are). Its counts are those of the lens that is on. The assistant is its own button
+// `desktop.hidden`, set in Settings → Layout), and at the bottom the lens switcher and settings. Home has its
+// own button (hideable) and the logo leads there too. Its counts are those of the lens that is on. The assistant is its own button
 // at the corner (assistant/fab.tsx), and tags are Home's filter. It replaces the phone's tabs: every view is one click away. One
-// Highlight glides the view's background between the lists and Settings (Home, the logo, has none).
+// Highlight glides the view's background between the screens and Settings.
 // Folded (`[` or its last button, hooks/rail.ts) it is down to its icons: every icon keeps its place, centred in the narrow
 // rail, so the shell only animates the rail's width (shell.tsx) and the words fade out under the clip; a folded item names
 // itself in a tooltip.
@@ -65,7 +65,7 @@ export function Rail({ onSearch, onPick, fold }: { onSearch: () => void; onPick?
 
   return (
     <nav className="flex h-full flex-col gap-4 overflow-x-hidden overflow-y-auto p-3" aria-label="Views">
-      <Highlight controlledItems value={view.kind === "home" ? null : view.kind} className="inset-0 rounded-lg bg-accent">
+      <Highlight controlledItems value={view.kind} className="inset-0 rounded-lg bg-accent">
         <button type="button" aria-label="Home" onClick={() => go({ kind: "home" })} className="overflow-hidden rounded-lg px-1.5 pt-1 text-left"><Brand folded={folded} /></button>
         <div>
           <Named label="Search" folded={folded}>
