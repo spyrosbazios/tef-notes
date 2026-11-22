@@ -108,7 +108,7 @@ function DesktopLayout() {
       {talkOn ? (
         <div className="space-y-2.5 px-3 py-2.5">
           <p className="text-sm font-semibold">The assistant's button</p>
-          <p className="text-[13px] leading-snug text-dim">The round button at the corner: straight to the chat, or a menu to type or talk.</p>
+          <p className="text-[13px] leading-snug text-dim">The round button at the corner: the chat, Talk in a small panel there, or a menu of the two.</p>
           <Choice label="The assistant's button" value={fab} options={FAB_ACTIONS} names={FAB_ACTION_LABEL} onPick={(v) => setPrefs({ desktop: { fab: v } })} />
         </div>
       ) : null}

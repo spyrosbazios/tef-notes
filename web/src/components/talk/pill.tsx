@@ -1,4 +1,4 @@
-// The conversation, while the owner is somewhere else (the assistant just opened a note, say): a small pill showing what it is doing,
+// The conversation, while the owner is somewhere else (the assistant just opened a note, say) and Talk's panel is closed: a small pill showing what it is doing,
 // that takes them back to Talk on a tap and ends it from its own button. Not on the Talk page, which is all of this and more. The
 // level bars are moved from the frame loop, not by React. It comes and goes on a spring from the edge it sits at: the top of a phone,
 // the bottom of a window.
@@ -13,6 +13,7 @@ import { useFrames, useTalk } from "@/hooks/talk";
 import { haptic } from "@/lib/haptics";
 import { follow } from "@/lib/orb";
 import { useNav, usePlace } from "@/lib/nav";
+import { useTalkPanel } from "@/lib/talk-panel";
 import { clock, type TalkState } from "@/lib/talk";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +56,8 @@ function Pill() {
 export function TalkPill() {
   const { phase } = useTalk();
   const { view } = usePlace();
-  const shown = (phase === "connecting" || phase === "live") && view.kind !== "talk";
+  const panel = useTalkPanel();
+  const shown = (phase === "connecting" || phase === "live") && view.kind !== "talk" && !panel;
   return (
     <div className="pointer-events-none absolute inset-x-0 z-[60] flex justify-center max-md:top-[calc(env(safe-area-inset-top)+0.5rem)] md:bottom-5">
       <AnimatePresence>{shown ? <Pill key="pill" /> : null}</AnimatePresence>

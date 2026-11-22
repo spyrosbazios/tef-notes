@@ -9,7 +9,7 @@
 import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { spring, transition, useTempoTransition } from "@animate-ui/react/utils/motion";
-import { AudioLines, History, Mic, MicOff, PhoneOff, Plus, RotateCw, TriangleAlert } from "lucide-react";
+import { AudioLines, History, Maximize2, Mic, MicOff, PhoneOff, Plus, RotateCw, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, type ReactNode } from "react";
 import { ModelMenu } from "@/components/assistant/model-menu";
@@ -162,28 +162,41 @@ function Notice({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
-function Conversation() {
+/** The conversation: the route's whole page, or (`panel`) the assistant button's small panel at a window's corner, which
+ *  draws it as a phone does: one column, the orb stepping back, its own header with Expand (to the page) and Close. */
+export function Conversation({ panel }: { panel?: { onExpand: () => void; onClose: () => void } }) {
   const t = useTalk();
-  const phone = useNarrow();
+  const phone = useNarrow() || !!panel;
   const { rows, pending } = useMemo(() => rowsOf(t.messages), [t.messages]);
   const live = t.phase === "live";
   const waiting = pending.length > 0;
   const tail = t.messages.at(-1);
   return (
     <main className="@container relative h-full min-w-0 flex-1 overflow-hidden">
-      <div className="pointer-events-none absolute top-7 left-8 z-10 hidden items-baseline gap-3 md:flex">
-        <h1 className="text-3xl font-bold tracking-tight">Talk</h1><Readout />
-      </div>
-      <div className="absolute top-6 right-6 z-10 hidden md:block"><Thinking /></div>
+      {panel ? null : <>
+        <div className="pointer-events-none absolute top-7 left-8 z-10 hidden items-baseline gap-3 md:flex">
+          <h1 className="text-3xl font-bold tracking-tight">Talk</h1><Readout />
+        </div>
+        <div className="absolute top-6 right-6 z-10 hidden md:block"><Thinking /></div>
+      </>}
       <div className="flex h-full flex-col @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] @3xl:grid-rows-[minmax(0,1fr)_auto] @5xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]">
-        <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking compact /></>} className="md:hidden" />
+        {panel ? (
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
+            <AudioLines className="size-4 shrink-0 text-brand" />
+            <span className="font-semibold">Talk</span>
+            <span className="min-w-0 flex-1"><Readout /></span>
+            <Thinking compact />
+            <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Open Talk's page" title="Expand" onClick={panel.onExpand}><Maximize2 className="size-4" /></Button>
+            <Button variant="ghost" size="icon" className="size-8 rounded-full text-dim" aria-label="Close the panel" title="Close" onClick={panel.onClose}><X className="size-4" /></Button>
+          </div>
+        ) : <PageHeader title="Talk" icon={<AudioLines className="size-5 shrink-0 text-brand" />} actions={<><Readout /><Thinking compact /></>} className="md:hidden" />}
         <Stage state={t.state} muted={t.muted} compact={phone && (waiting || rows.length > 0)} />
         <div className="flex min-h-0 flex-1 flex-col @3xl:col-start-2 @3xl:row-start-1 @3xl:border-l @3xl:border-line">
           <Transcript rows={rows} live={live} state={t.state} newest={tail?.id} empty={<About />} />
           <Notice id={t.failure ? "failure" : ""}>{t.failure ? <Failure message={t.failure.message} mic={t.failure.mic} /> : null}</Notice>
         </div>
         <div className="@3xl:col-start-2 @3xl:row-start-2 @3xl:border-l @3xl:border-line"><Tray pending={pending} last={tail} /></div>
-        <div className="flex shrink-0 justify-center px-5 pt-2 pb-3 max-md:pb-[calc(var(--under-tabs)+0.5rem)] md:pb-8 @3xl:col-start-1 @3xl:row-start-2 @3xl:pb-10">
+        <div className={cn("flex shrink-0 justify-center px-5 pt-2 @3xl:col-start-1 @3xl:row-start-2 @3xl:pb-10", panel ? "pb-4" : "pb-3 max-md:pb-[calc(var(--under-tabs)+0.5rem)] md:pb-8")}>
           <Controls />
         </div>
       </div>

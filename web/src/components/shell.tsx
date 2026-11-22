@@ -25,7 +25,9 @@ import { Rail } from "@/components/rail";
 import { TabBar } from "@/components/tab-bar";
 import { SyncNotice } from "@/components/sync-notice";
 import { TaskDrawer } from "@/components/task-drawer";
+import { TalkPanel } from "@/components/talk/panel";
 import { TalkPill } from "@/components/talk/pill";
+import { useTalkPanel } from "@/lib/talk-panel";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { dockNow, setDock, useDock } from "@/hooks/dock";
@@ -76,6 +78,7 @@ export function Shell() {
   const onNote = !!note;
   const newNote = useNewNote();
   const [dock] = useDock();
+  const talkPanel = useTalkPanel();
   const [rail] = useRail(), reduce = useShouldReduceMotion(), railMove = useTempoTransition(spring.reflow);
   const keyboard = useKeyboard();
   const [palette, setPalette] = useState(false), [menu, setMenu] = useState(false), [adding, setAdding] = useState<Start | null>(null);
@@ -155,7 +158,8 @@ export function Shell() {
           </div>
 
           <Dock />
-          {!dock.open && <AssistantFab />}
+          {!dock.open && !talkPanel && <AssistantFab />}
+          <TalkPanel />
 
           <Palette open={palette} onOpenChange={setPalette} onNew={newNote} />
           <QuickAdd initial={adding} onClose={() => setAdding(null)} />

@@ -100,10 +100,10 @@ type PhonePrefs = LayoutPrefs & {
   tasksList: OpeningList;
 };
 
-/** What the assistant's round button at the corner does: opens the chat, or a small menu of the chat and Talk. */
-export const FAB_ACTIONS = ["chat", "menu"] as const;
+/** What the assistant's round button at the corner does: opens the chat, Talk in a small panel at the corner, or a menu of the two. */
+export const FAB_ACTIONS = ["chat", "talk", "menu"] as const;
 export type FabAction = (typeof FAB_ACTIONS)[number];
-export const FAB_ACTION_LABEL: Record<FabAction, string> = { chat: "Open the chat", menu: "Ask: chat or Talk" };
+export const FAB_ACTION_LABEL: Record<FabAction, string> = { chat: "Chat", talk: "Talk", menu: "Chat or Talk" };
 
 /** The desktop's, with its sidebar. */
 type DesktopPrefs = LayoutPrefs & {

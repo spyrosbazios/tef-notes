@@ -116,5 +116,6 @@ describe("talkThinking", () => {
 test("the desktop's assistant button opens the chat unless the owner picked the menu", () => {
   expect(prefsOf({}).desktop.fab).toBe("chat");
   expect(prefsOf({ desktop: { fab: "menu" } }).desktop.fab).toBe("menu");
+  expect(prefsOf({ desktop: { fab: "talk" } }).desktop.fab).toBe("talk");
   expect(prefsOf({ desktop: { fab: "bogus" } }).desktop.fab).toBe("chat");
 });
