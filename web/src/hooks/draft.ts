@@ -35,7 +35,7 @@ export function useDraft(r: NoteRec) {
     : body.status === "saving" || title.status === "saving" ? "saving"
     : body.status === "unsaved" || title.status === "unsaved" ? "unsaved" : "saved";
   return {
-    body: shown(body, r.note.body), title: shown(title, r.note.title), editing: body.text != null, status, clash: body.clash,
+    body: shown(body, d.body.kept() ?? r.note.body), title: shown(title, d.title.kept() ?? r.note.title), editing: body.text != null, status, clash: body.clash,
     setBody: d.body.type, setTitle: d.title.type,
     /** Whatever is pending, sent now. */
     flush: () => Promise.all([d.body.flush(), d.title.flush()]).then(() => undefined),

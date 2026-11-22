@@ -88,6 +88,9 @@ export function createDraft({ field, merge, delay, schedule = later }: { field: 
 
   return {
     get: (): DraftState => state,
+    /** What the field keeps now, read from it: a client's own copy of the record can lag a save just made, and showing that
+     *  copy for a moment would put back the text from before the save (the editor's cursor jumped back, words lost). */
+    kept: (): string | undefined => field.read(),
     watch(l: () => void): () => void { watchers.add(l); return () => { watchers.delete(l); }; },
     /** Whether something typed waits to be saved. */
     pending: () => pending,
