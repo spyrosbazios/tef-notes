@@ -40,7 +40,7 @@ function TalkVoice() {
         <div className="space-y-2.5 px-3 py-2.5">
           <div>
             <p className="text-sm font-semibold">Voice model</p>
-            <p className="text-[13px] leading-snug text-dim">Same engine either way. Free has fair-use limits and no latency promise; paid costs about a cent a minute.</p>
+            <p className="text-[13px] leading-snug text-dim">Same engine either way. Free has fair-use limits and no latency promise; paid costs about a cent a minute. This is only the speaking side: listening to you is always paid, so Talk and the mic need Fish API credit even on Free.</p>
           </div>
           <div role="radiogroup" aria-label="Voice model" className="flex flex-wrap gap-2">
             {TALK_MODELS.map((m) => (
