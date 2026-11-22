@@ -1,5 +1,6 @@
-// Settings → Tags: the tag definitions (colour, description), their dialog, rename and delete.
-import { Check, Pencil, Plus, Sparkles, Tag as TagIcon, Trash2 } from "lucide-react";
+// Settings → Tags: the tag definitions (colour, description) and the tags in use without one; a row opens its dialog, where it is
+// renamed, described or deleted.
+import { Check, ChevronRight, Plus, Search, Sparkles, Tag as TagIcon } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { COLORS, fold, type Color } from "@/core/notes";
@@ -7,12 +8,13 @@ import { Conflict } from "@/core/record-contracts";
 import { undefinedTags, type TagDef } from "@/core/tags";
 import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
-import { HEAD } from "@/components/settings/style";
+import { Group, Page, Pill } from "@/components/settings/kit";
 import { TagBadge } from "@/components/tag-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,7 +30,7 @@ const BAD = /[\s,[\]{}"\\]/;
 
 /** `name`: a new tag's name to start from (one notes already carry). A changed name renames the tag on every item that
  *  carries it (the server's rename); one another tag already has merges the two, and the dialog says so before Save. */
-function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: string; onClose: () => void }) {
+function TagDialog({ tag, name: start, onClose, onDelete }: { tag: TagDef | null; name?: string; onClose: () => void; onDelete: (t: TagDef) => void }) {
   const [name, setName] = useState(tag?.name ?? start ?? ""), [color, setColor] = useState<Color | undefined>(tag?.color), [description, setDescription] = useState(tag?.description ?? "");
   const create = useCreateTag(), update = useUpdateTag(), rename = useRenameTag(), describe = useDescribeTag();
   const { data: defs = [] } = useTags();
@@ -91,9 +93,10 @@ function TagDialog({ tag, name: start, onClose }: { tag: TagDef | null; name?: s
               </Button>
             </div>
             <Textarea id="tag-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
-              placeholder="Optional. Read by the AI when it decides whether a note belongs here." />
+              placeholder="What the AI reads to decide whether a note belongs." />
           </div>
           <DialogFooter>
+            {tag ? <Button type="button" variant="ghost" className="mr-auto rounded-full text-down" onClick={() => onDelete(tag)}>Delete</Button> : null}
             <Button type="button" variant="outline" className="rounded-full" onClick={onClose}>Cancel</Button>
             <Button type="submit" className="rounded-full" disabled={!n || bad || busy}>{into ? "Merge" : tag ? "Save" : "Add tag"}</Button>
           </DialogFooter>
@@ -130,41 +133,57 @@ export function Tags() {
     setDeleting(undefined);
   };
 
+  const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`;
   return (
-    <section className="space-y-3" aria-labelledby="tags-h">
-      <div className={cn(HEAD, "flex items-center gap-2")}>
-        <h2 id="tags-h" className="flex-1 font-bold text-lg tracking-tight max-md:sr-only">Tags</h2>
-        <span className="flex-1 md:hidden" />
-        <Button size="sm" className="rounded-full" onClick={() => setEditing(null)}><Plus /> Add tag</Button>
-      </div>
-      <p className="text-sm text-dim">The description is what the AI reads to decide whether a note belongs.</p>
+    <Page title="Tags" action={<Button size="sm" className="rounded-full" onClick={() => setEditing(null)}><Plus /> Add tag</Button>}>
       {data?.length || loose.length ? (
-        <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tags" aria-label="Search tags" />
+        <InputGroup>
+          <InputGroupAddon><Search /></InputGroupAddon>
+          <InputGroupInput type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tags" aria-label="Search tags" />
+        </InputGroup>
       ) : null}
       <Loaded loading={isPending} blurred={false} skeleton={<Skeleton className="h-16 rounded-xl" />}>
       {isError ? <p className="text-sm text-down">The tags can't be loaded.</p>
         : defs.length || looseShown.length ? (
-          <ul className="divide-y divide-line rounded-xl border border-line">
-            {defs.map((t) => (
-              <li key={t.rec} className="flex items-start gap-3 px-3 py-2.5">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-center gap-2"><TagBadge name={t.name} /><span className="text-xs tabular-nums text-faint">{count(t.name)} {count(t.name) === 1 ? "item" : "items"}</span></div>
-                  {t.description ? <p className="text-[13px] leading-snug text-dim">{t.description}</p> : null}
-                </div>
-                <Button variant="ghost" size="icon" aria-label={`Edit ${t.name}`} onClick={() => setEditing(t)}><Pencil className="text-dim" /></Button>
-                <Button variant="ghost" size="icon" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}><Trash2 className="text-dim" /></Button>
-              </li>
-            ))}
-            {looseShown.map((t) => (
-              <li key={`loose:${t.name}`} className="flex items-start gap-3 px-3 py-2.5">
-                <div className="flex min-w-0 flex-1 items-center gap-2"><TagBadge name={t.name} /><span className="text-xs tabular-nums text-faint">{t.count} {t.count === 1 ? "item" : "items"}</span></div>
-                <Button variant="ghost" size="icon" aria-label={`Edit ${t.name}`} onClick={() => { setDefining(t.name); setEditing(null); }}><Pencil className="text-dim" /></Button>
-              </li>
-            ))}
-          </ul>
+          <>
+            {defs.length ? (
+              <Group title="Defined">
+                <ul className="divide-y divide-line">
+                  {defs.map((t) => (
+                    <li key={t.rec}>
+                      <button type="button" aria-label={`Edit ${t.name}`} onClick={() => setEditing(t)}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none hover:bg-muted focus-visible:bg-muted">
+                        <span className="min-w-0 flex-1 space-y-1">
+                          <span className="flex items-center gap-2"><TagBadge name={t.name} /><Pill>{items(count(t.name))}</Pill></span>
+                          {t.description ? <span className="line-clamp-2 text-xs leading-snug text-dim">{t.description}</span> : null}
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-faint" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </Group>
+            ) : null}
+            {looseShown.length ? (
+              <Group title="Used, not defined" hint="Define one to give it a colour and a description.">
+                <ul className="divide-y divide-line">
+                  {looseShown.map((t) => (
+                    <li key={`loose:${t.name}`}>
+                      <button type="button" aria-label={`Define ${t.name}`} onClick={() => { setDefining(t.name); setEditing(null); }}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none hover:bg-muted focus-visible:bg-muted">
+                        <span className="flex min-w-0 flex-1 items-center gap-2"><TagBadge name={t.name} /><Pill>{items(t.count)}</Pill></span>
+                        <Plus className="size-4 shrink-0 text-brand" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </Group>
+            ) : null}
+          </>
         ) : <Empty icon={TagIcon} className="rounded-xl border border-dashed border-line px-3 py-8"><p className="text-sm text-faint">{find ? `No tag matches “${find}”.` : "No tags defined yet."}</p></Empty>}
       </Loaded>
-      {editing !== undefined ? <TagDialog key={editing?.rec ?? `new:${defining ?? ""}`} tag={editing} name={defining} onClose={() => { setEditing(undefined); setDefining(undefined); }} /> : null}
+      {editing !== undefined ? <TagDialog key={editing?.rec ?? `new:${defining ?? ""}`} tag={editing} name={defining}
+        onClose={() => { setEditing(undefined); setDefining(undefined); }} onDelete={(t) => { setEditing(undefined); setDeleting(t); }} /> : null}
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(undefined); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -177,6 +196,6 @@ export function Tags() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </Page>
   );
 }

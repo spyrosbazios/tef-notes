@@ -1,15 +1,13 @@
-// Settings → Agent: the model and effort, which of its writes ask first, and what it remembers of the owner.
+// Settings → Agent: the model and effort, when a chat starts afresh, which of its writes ask first, and what it remembers of the owner.
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Brain, FilePen, FilePlus, FileX, ListPlus, ListTodo, ListX, MousePointerClick, Paperclip, ShieldAlert, Tag as TagIcon, type LucideIcon } from "lucide-react";
+import { Ban, Bot, Brain, Cpu, FilePen, FilePlus, FileX, Globe, Hand, ListPlus, ListTodo, ListX, MessageSquarePlus, MousePointerClick, Paperclip, ShieldAlert, Tag as TagIcon, Zap, type LucideIcon } from "lucide-react";
 import { ACTION_LABEL, ACTIONS, RULE_LABEL, RULES, type Action } from "@/core/actions";
 import { NEW_CHAT_LABEL, NEW_CHATS } from "@/core/prefs";
 import { ModelMenu } from "@/components/assistant/model-menu";
 import { Empty } from "@/components/empty";
 import { Loaded } from "@/components/loaded";
 import { Markdown } from "@/components/markdown";
-import { Choice } from "@/components/settings/choice";
-import { SUB, TITLE } from "@/components/settings/style";
-import { Label } from "@/components/ui/label";
+import { Choose, Group, Legend, Page, Row, Segmented, Status, type Option } from "@/components/settings/kit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useModel } from "@/hooks/agent";
@@ -19,72 +17,63 @@ import { memory } from "@/services/notes";
 export function Agent() {
   const choice = useModel(), { models, newChat, set } = choice;
   return (
-    <div className="space-y-8">
-      <section className="space-y-3" aria-labelledby="agent-h">
-      <h2 id="agent-h" className={TITLE}>Agent</h2>
-      <div className="divide-y divide-line rounded-xl border border-line">
-        <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="min-w-0 flex-1"><p className="text-sm font-semibold">Model and effort</p></div>
-          <ModelMenu choice={choice} align="end" />
-        </div>
-        <div className="space-y-2.5 px-3 py-2.5">
-          <div>
-            <p className="text-sm font-semibold">Start a new chat</p>
-            <p className="text-[13px] leading-snug text-dim">When opening the assistant clears the last chat.</p>
-          </div>
-          <Choice label="Start a new chat" value={newChat} options={NEW_CHATS} names={NEW_CHAT_LABEL} onPick={(v) => set({ newChat: v })} />
-        </div>
+    <Page title="Agent">
+      <Group title="Chat">
+        <Row icon={Cpu} title="Model and effort"><ModelMenu choice={choice} align="end" /></Row>
+        <Row icon={MessageSquarePlus} title="New chat">
+          <Choose label="Start a new chat" value={newChat} options={NEW_CHATS} of={(v) => ({ label: NEW_CHAT_LABEL[v] })} onPick={(v) => set({ newChat: v })} />
+        </Row>
         {models ? (
-          <div className="px-3 py-2.5">
-            <p className="text-sm font-semibold">Web</p>
-            <p className="text-[13px] leading-snug text-dim">{models.web ? "The agent can search the web and read pages." : "Web search is off: the server has no search key."}</p>
-          </div>
+          <Row icon={Globe} title="Web search" detail={models.web ? undefined : "The server has no search key."}>
+            <Status tone={models.web ? "up" : "muted"}>{models.web ? "On" : "Off"}</Status>
+          </Row>
         ) : null}
-      </div>
-    </section>
-    <AgentActions />
-    <Memory />
-    </div>
+      </Group>
+      <AgentActions />
+      <Memory />
+    </Page>
   );
 }
+
+type Rule = (typeof RULES)[number];
 
 const ACTION_ICON: Record<Action, LucideIcon> = {
   createTask: ListPlus, editTask: ListTodo, deleteTask: ListX, createNote: FilePlus, editNote: FilePen, deleteNote: FileX,
   files: Paperclip, tags: TagIcon, noteActions: MousePointerClick, memory: Brain,
 };
+const RULE: Record<Rule, Option> = {
+  ask: { label: RULE_LABEL.ask, icon: Hand, tone: "warn" },
+  auto: { label: RULE_LABEL.auto, icon: Zap, tone: "up" },
+  never: { label: RULE_LABEL.never, icon: Ban, tone: "down" },
+};
+const ruleOf = (r: Rule) => RULE[r];
 
 /** Which of the agent's writes wait on a card, go ahead, or are never allowed: one rule per action (@/core/actions), kept in the
  *  preferences and enforced by the agent's server, so no reply can skip a card. */
 function AgentActions() {
   const { actions, agent: { webGuard } } = usePrefs();
   return (
-    <section className="space-y-3" aria-labelledby="actions-h">
-      <h3 id="actions-h" className={SUB}>What the agent may do</h3>
-      <p className="text-sm text-dim">Ask first waits on a card. Just do it doesn't{webGuard ? ", unless the check below asks" : ""}. Never blocks it.</p>
-      <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
-        <ShieldAlert className="size-4 shrink-0 text-dim" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <Label htmlFor="web-guard" className="text-sm font-semibold">Ask after reading outside text</Label>
-          <p className="text-[13px] leading-snug text-dim">After the web, a PDF or an attached file, Just do it asks first: such text can carry instructions.</p>
-        </div>
-        <Switch id="web-guard" checked={webGuard} onCheckedChange={(v) => setPrefs({ agent: { webGuard: v } })} />
-      </div>
-      <ul className="divide-y divide-line rounded-xl border border-line">
-        {ACTIONS.map((a) => {
-          const Icon = ACTION_ICON[a], { name, covers } = ACTION_LABEL[a];
-          return (
-            <li key={a} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
-              <Icon className="size-4 shrink-0 text-dim" aria-hidden />
-              <div className="min-w-0 flex-1 basis-40">
-                <p className="text-sm font-semibold">{name}</p>
-                <p className="text-[13px] leading-snug text-dim">{covers}</p>
-              </div>
-              <Choice label={name} value={actions[a]} options={RULES} names={RULE_LABEL} onPick={(v) => setPrefs({ actions: { [a]: v } })} />
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <>
+      <Group title="Permissions" action={<Legend options={RULES} of={ruleOf} />}>
+        <ul className="divide-y divide-line">
+          {ACTIONS.map((a) => {
+            const { name, covers } = ACTION_LABEL[a], rule = actions[a];
+            return (
+              <li key={a}>
+                <Row icon={ACTION_ICON[a]} tone={RULE[rule].tone} title={name} detail={covers}>
+                  <Segmented compact label={name} value={rule} options={RULES} of={ruleOf} onPick={(v) => setPrefs({ actions: { [a]: v } })} />
+                </Row>
+              </li>
+            );
+          })}
+        </ul>
+      </Group>
+      <Group hint="Web pages, PDFs and attached files can carry instructions.">
+        <Row icon={ShieldAlert} tone={webGuard ? "warn" : "dim"} title="Ask after reading outside text" detail={`Then ${RULE_LABEL.auto} asks first.`} htmlFor="web-guard">
+          <Switch id="web-guard" checked={webGuard} onCheckedChange={(v) => setPrefs({ agent: { webGuard: v } })} />
+        </Row>
+      </Group>
+    </>
   );
 }
 
@@ -92,13 +81,12 @@ function AgentActions() {
 function Memory() {
   const { data, isPending } = useQuery({ queryKey: ["memory"], queryFn: memory });
   return (
-    <section className="space-y-3" aria-labelledby="memory-h">
-      <h3 id="memory-h" className={SUB}>Agent memory</h3>
-      <div className="rounded-xl border border-line px-3 py-2.5">
+    <Group title="Memory" hint="Written by the agent itself; ask it to change something.">
+      <div className="max-h-96 overflow-y-auto px-3 py-2.5">
         <Loaded loading={isPending} blurred={false} skeleton={<Skeleton className="h-24" />}>
-          {data?.text.trim() ? <Markdown body={data.text} /> : <Empty icon={Bot} className="py-2"><p className="text-sm text-faint">Empty: the agent hasn't written anything yet.</p></Empty>}
+          {data?.text.trim() ? <Markdown body={data.text} /> : <Empty icon={Bot} className="py-2"><p className="text-sm text-faint">Nothing yet.</p></Empty>}
         </Loaded>
       </div>
-    </section>
+    </Group>
   );
 }

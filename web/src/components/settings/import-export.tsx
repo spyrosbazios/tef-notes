@@ -1,8 +1,8 @@
 // Settings → Import & export: notes in and out as markdown folders and zips.
-import { Check, Download, Loader2, Upload } from "lucide-react";
+import { Check, Download, FileArchive, FolderOpen, Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { TITLE } from "@/components/settings/style";
+import { Group, Page, Pill, Row } from "@/components/settings/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -48,55 +48,41 @@ export function ImportExport() {
   const files = (e: { target: HTMLInputElement }) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; return f; };
   const count = src ? (update ? src.seen.found : src.seen.found - src.seen.taken) : 0;
   return (
-    <section className="space-y-3" aria-labelledby="transfer-h">
-      <h2 id="transfer-h" className={TITLE}>Import & export</h2>
-      <div className="divide-y divide-line rounded-xl border border-line">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
-          <Download className="mt-0.5 size-4 shrink-0 self-start text-brand" />
-          <div className="min-w-0 flex-1 basis-48">
-            <p className="text-sm font-semibold">Export</p>
-            <p className="text-[13px] leading-snug text-dim">
-              {isPending ? "Counting notes…" : `All ${data?.length ?? 0} notes in one zip.`}
-            </p>
-          </div>
+    <Page title="Import & export">
+      <Group hint="Export is every note and its files as one zip; import takes a folder or zip of Markdown, shown before it is written.">
+        <Row icon={Download} tone="brand" title="Export" detail={isPending ? "Counting notes…" : `${data?.length ?? 0} notes`}>
           <Button variant="outline" size="sm" className="rounded-full" disabled={isPending || exporting || !data?.length} onClick={() => { void download(); }}>
-            {exporting ? <Loader2 className="animate-spin" /> : <Download />} Download zip
+            {exporting ? <Loader2 className="animate-spin" /> : <FileArchive />} Zip
           </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
-          <Upload className="mt-0.5 size-4 shrink-0 self-start text-brand" />
-          <div className="min-w-0 flex-1 basis-48">
-            <p className="text-sm font-semibold">Import</p>
-            <p className="text-[13px] leading-snug text-dim">A folder or zip of markdown files. You see what it finds first.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {busy && !src && <Loader2 className="size-4 animate-spin text-dim" />}
-            <Button asChild variant="outline" size="sm" className="rounded-full" disabled={busy}>
-              <label>
-                Folder
-                <input type="file" className="sr-only" disabled={busy} {...{ webkitdirectory: "" }}
-                  onChange={(e) => { const f = files(e); if (f.length) void pick(f[0].webkitRelativePath.split("/")[0] || "the folder", () => folderSource(f)); }} />
-              </label>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-full" disabled={busy}>
-              <label>
-                Zip
-                <input type="file" accept=".zip,application/zip" className="sr-only" disabled={busy}
-                  onChange={(e) => { const [f] = files(e); if (f) void pick(f.name, () => zipSource(f)); }} />
-              </label>
-            </Button>
-          </div>
-        </div>
+        </Row>
+        <Row icon={Upload} tone="brand" title="Import" detail="Markdown files">
+          {busy && !src && <Loader2 className="size-4 animate-spin text-dim" />}
+          <Button asChild variant="outline" size="sm" className="rounded-full" disabled={busy}>
+            <label>
+              <FolderOpen /> Folder
+              <input type="file" className="sr-only" disabled={busy} {...{ webkitdirectory: "" }}
+                onChange={(e) => { const f = files(e); if (f.length) void pick(f[0].webkitRelativePath.split("/")[0] || "the folder", () => folderSource(f)); }} />
+            </label>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="rounded-full" disabled={busy}>
+            <label>
+              <FileArchive /> Zip
+              <input type="file" accept=".zip,application/zip" className="sr-only" disabled={busy}
+                onChange={(e) => { const [f] = files(e); if (f) void pick(f.name, () => zipSource(f)); }} />
+            </label>
+          </Button>
+        </Row>
         {src && (
-          <div className="space-y-3 rounded-b-xl bg-muted/40 px-3 py-3" aria-live="polite">
-            <p className="text-sm">
+          <div className="space-y-3 bg-muted/40 px-3 py-3" aria-live="polite">
+            <p className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-semibold">{src.name}</span>
-              <span className="text-dim"> · {src.seen.found} notes found{src.seen.taken > 0 ? `, ${src.seen.taken} already here` : ""}</span>
+              <Pill>{src.seen.found} found</Pill>
+              {src.seen.taken > 0 ? <Pill className="bg-warn/15 text-warn">{src.seen.taken} already here</Pill> : null}
             </p>
             {src.seen.taken > 0 && (
               <div className="flex items-center gap-2">
                 <Switch id="import-update" checked={update} onCheckedChange={setUpdate} />
-                <Label htmlFor="import-update" className="text-[13px] text-dim">Overwrite the {src.seen.taken} already here (otherwise they are skipped)</Label>
+                <Label htmlFor="import-update" className="text-xs text-dim">Overwrite the {src.seen.taken} already here</Label>
               </div>
             )}
             <div className="flex gap-2">
@@ -107,7 +93,7 @@ export function ImportExport() {
             </div>
           </div>
         )}
-      </div>
-    </section>
+      </Group>
+    </Page>
   );
 }
